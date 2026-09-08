@@ -24,3 +24,13 @@ pnpm-debug.log*
 
 # IDE
 .idea/
+
+# Local mock responses
+/.mock-data/
+.neon
+.netlify/
+
+# Local coding-agent configuration and downloaded skills
+/.agents/
+/.codex/
+/skills-lock.json

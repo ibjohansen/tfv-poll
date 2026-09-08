@@ -1,17 +1,12 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { answerOptions, surveyQuestions } from "@/data/survey";
+import { answerOptions } from "@/data/survey";
 
-const initialAnswers = {
-  q1: "",
-  q2: "",
-  q3: "",
-  q4: "",
-};
-
-export default function SurveyForm() {
-  const [answers, setAnswers] = useState(initialAnswers);
+export default function SurveyForm({ memberToken, surveyId, questions }) {
+  const router = useRouter();
+  const [answers, setAnswers] = useState(() => Object.fromEntries(questions.map(({ id }) => [id, ""])));
   const [website, setWebsite] = useState("");
   const [status, setStatus] = useState("idle");
   const [errorMessage, setErrorMessage] = useState("");
@@ -21,8 +16,8 @@ export default function SurveyForm() {
     [answers],
   );
 
-  const isComplete = answeredCount === surveyQuestions.length;
-  const progress = Math.round((answeredCount / surveyQuestions.length) * 100);
+  const isComplete = answeredCount === questions.length;
+  const progress = Math.round((answeredCount / questions.length) * 100);
 
   function updateAnswer(questionId, value) {
     setAnswers((current) => ({ ...current, [questionId]: value }));
@@ -33,7 +28,7 @@ export default function SurveyForm() {
     event.preventDefault();
 
     if (!isComplete) {
-      setErrorMessage("Svar på alle fire spørsmål før du sender inn.");
+      setErrorMessage(`Svar på alle ${questions.length} spørsmål før du sender inn.`);
       return;
     }
 
@@ -41,15 +36,19 @@ export default function SurveyForm() {
     setErrorMessage("");
 
     try {
-      const response = await fetch("/api/responses", {
+      const response = await fetch("/survey/api/responses", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ answers, website }),
+        body: JSON.stringify({ answers, website, memberToken, surveyId }),
       });
 
       const data = await response.json();
+
+      if (response.status === 409) {
+        router.refresh();
+      }
 
       if (!response.ok || !data.ok) {
         throw new Error(data.message || "Kunne ikke sende inn svaret.");
@@ -80,10 +79,10 @@ export default function SurveyForm() {
 
   return (
     <form className="survey-form" onSubmit={handleSubmit} noValidate>
-      <div className="form-progress" aria-label={`${answeredCount} av 4 spørsmål besvart`}>
+        <div className="form-progress" aria-label={`${answeredCount} av ${questions.length} spørsmål besvart`}>
         <div className="progress-copy">
           <span>Din besvarelse</span>
-          <span>{answeredCount} av 4 besvart</span>
+          <span>{answeredCount} av {questions.length} besvart</span>
         </div>
         <div className="progress-track" aria-hidden="true">
           <div className="progress-value" style={{ width: `${progress}%` }} />
@@ -104,7 +103,7 @@ export default function SurveyForm() {
       </div>
 
       <div className="question-list">
-        {surveyQuestions.map((question) => (
+        {questions.map((question) => (
           <fieldset className="question-card" key={question.id}>
             <legend>
               <span className="question-number">{question.number}</span>
@@ -150,9 +149,9 @@ export default function SurveyForm() {
 
       <div className="submit-row">
         <div>
-          <p className="privacy-note">Vi ber ikke om navn eller e-post.</p>
+          <p className="privacy-note">Én besvarelse per tomt i denne undersøkelsen.</p>
           <p className="privacy-subnote">
-            Svarene lagres i databasen med tidspunkt for innsending.
+            Svarene kobles til tomten i medlemsregisteret og lagres med tidspunkt for innsending.
           </p>
         </div>
         <button

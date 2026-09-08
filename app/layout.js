@@ -1,8 +1,9 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Turufjell vel - medlemsundersøkelse",
-  description: "Medlemsundersøkelse for Turufjell vel.",
+  title: "Medlemsservice | Turufjell vel",
+  description: "Medlemsservice for Turufjell vel.",
+  referrer: "no-referrer",
   robots: {
     index: false,
     follow: false,
