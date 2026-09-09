@@ -344,76 +344,226 @@ npm run check
 produksjonsbygg. Lokale miljøfiler, Neon-koblingen og Netlifys lokale
 cachemappe er utelatt fra Git gjennom `.gitignore`.
 
-## Deploy på Netlify
+## Produksjonssetting: Netlify + Neon + Microsoft Entra ID
 
 `netlify.toml` inneholder byggkommando, publiseringsmappe, Node-versjon og
-funksjonsmappe. Next.js kjøres som en hybrid SSR-applikasjon, mens den lange
-matrikkelsynkroniseringen kjøres som en separat Netlify Background Function.
+funksjonsmappe. Netlify håndterer Next.js App Router gjennom sin Next.js-adapter,
+mens den lange matrikkelsynkroniseringen kjøres som en Netlify Background
+Function. Se også [Netlifys Next.js-veiledning](https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/)
+og [veiledningen for Background Functions](https://docs.netlify.com/build/functions/background-functions/).
 
-### Før første produksjonsdeploy
+Følg punktene i denne rekkefølgen ved første produksjonssetting. Bruk en konto
+med tilgang til GitHub-repositoriet, Netlify-teamet, Neon-prosjektet og
+appregistreringen i Microsoft Entra ID.
 
-1. Kjør kvalitetskontrollene lokalt:
+### 1. Kontroller kode og GitHub
+
+1. Kontroller at siste commit ligger på `main` i `ibjohansen/tfv-poll`.
+2. Åpne fanen **Actions** i GitHub og kontroller at arbeidsflyten
+   **Code quality** er grønn for committen som skal publiseres.
+3. Kjør den samme kontrollen lokalt dersom det er gjort endringer etter siste
+   push:
 
 ```bash
 npm ci
 npm run check
+git status --short
 ```
 
-2. Kontroller Neons produksjonsgren og opprett Object Storage-tjenesten:
+`git status --short` skal ikke vise ukjente endringer før produksjonssetting.
+
+### 2. Kontroller Neon og databaseskjemaet
+
+1. Kontroller at Neon CLI peker på prosjektets produksjonsgren:
 
 ```bash
+neon status
 neon config plan
+```
+
+2. Dersom planen viser at den private bøtten `cms-assets` mangler, kjør:
+
+```bash
 neon deploy
 ```
 
-3. Kjør databaseskjemaet mot den direkte produksjonsforbindelsen. Kommandoen
-   er idempotent og legger også inn spørsmålssnapshot for historiske svar:
+3. Kontroller at `.env.local` inneholder både pooled `DATABASE_URL` og direkte
+   `DATABASE_URL_UNPOOLED` for den samme produksjonsgrenen. Ikke skriv ut eller
+   lim forbindelsesstrengene inn i logger eller dokumentasjon.
+4. Kjør databaseskjemaet med den direkte forbindelsen når `database/schema.sql`
+   er endret:
 
 ```bash
 npm run db:setup
 ```
 
-4. Koble GitHub-repositoriet `ibjohansen/tfv-poll` til et nytt Netlify-prosjekt.
-   Innstillingene leses automatisk fra `netlify.toml`.
+Kommandoen er idempotent. Den kjørende Netlify-applikasjonen skal bruke pooled
+`DATABASE_URL`; migrering og import skal bruke den direkte forbindelsen. Dette
+følger [Neons anbefaling for pooling og migrering](https://neon.com/docs/connect/connection-pooling).
 
-5. Legg følgende verdier inn som beskyttede miljøvariabler i Netlify. Ingen av
-   dem skal ha `NEXT_PUBLIC_`-prefiks:
+### 3. Opprett og koble Netlify-prosjektet
+
+1. Logg inn på Netlify og velg **Add new project → Import an existing project**.
+2. Velg **GitHub**, godkjenn nødvendig repository-tilgang og velg
+   `ibjohansen/tfv-poll`.
+3. Bruk `main` som produksjonsgren.
+4. Kontroller innstillingene som leses fra `netlify.toml`:
+
+| Innstilling | Verdi |
+| --- | --- |
+| Base directory | tom / repositoryroten |
+| Build command | `npm run build` |
+| Publish directory | `.next` |
+| Functions directory | `netlify/functions` |
+| Node.js | `22` |
+
+5. Opprett prosjektet. Netlify tildeler nå en adresse som
+   `https://<prosjektnavn>.netlify.app`.
+6. Hvis et eget domene skal brukes med en gang, legg det til under
+   **Domain management → Production domains** før autentisering konfigureres.
+7. Bestem én kanonisk produksjonsadresse. Bruk adressen uten avsluttende `/` i
+   både `AUTH_URL` og Entra-oppsettet.
+
+Netlify beskriver den samme Git-flyten i
+[Import an existing project](https://docs.netlify.com/manage/projects/add-new-project/#bring-existing-code-to-netlify).
+
+### 4. Legg inn miljøvariabler i Netlify
+
+Åpne **Project configuration → Environment variables** og legg inn variablene
+enkeltvis. Velg produksjonskonteksten og scopes som gjør dem tilgjengelige for
+både build og Functions.
+
+Ikke bruk `netlify env:import .env.local`. Den lokale filen inneholder verdier
+som ikke skal inn i produksjonsmiljøet, blant annet direkte databaseforbindelse,
+lokal `AUTH_URL` og eventuell mock-konfigurasjon. Netlify leser heller ikke den
+lokale `.env`-filen automatisk under skybygget; se
+[Netlify environment variables](https://docs.netlify.com/build/configure-builds/environment-variables/).
+
+#### Påkrevd for database og CMS
 
 | Variabel | Produksjonsverdi |
 | --- | --- |
 | `DATABASE_URL` | Pooled Neon-forbindelse for produksjonsgrenen |
-| `AUTH_SECRET` | Tilfeldig hemmelighet på minst 32 bytes |
+| `AWS_ACCESS_KEY_ID` | Nøkkelen utstedt for Neon Object Storage |
+| `AWS_SECRET_ACCESS_KEY` | Hemmeligheten utstedt for Neon Object Storage |
+| `AWS_ENDPOINT_URL_S3` | S3-endepunktet fra Neon |
+| `AWS_REGION` | Regionen til Neon-prosjektet, for eksempel `eu-central-1` |
+
+#### Påkrevd for Microsoft-innlogging
+
+| Variabel | Produksjonsverdi |
+| --- | --- |
+| `AUTH_SECRET` | Unik produksjonshemmelighet på minst 32 bytes |
 | `AUTH_MICROSOFT_ENTRA_ID_TENANT_ID` | Directory tenant ID |
 | `AUTH_MICROSOFT_ENTRA_ID_ID` | Application client ID |
-| `AUTH_MICROSOFT_ENTRA_ID_SECRET` | Client secret-verdi |
-| `AUTH_URL` | Applikasjonens endelige HTTPS-adresse |
-| `ADMIN_EMAILS` | Valgfri admin-allowlist; tom tillater domenets kontoer |
-| `AWS_ACCESS_KEY_ID` | Neon Object Storage-nøkkel |
-| `AWS_SECRET_ACCESS_KEY` | Neon Object Storage-hemmelighet |
-| `AWS_ENDPOINT_URL_S3` | Neon Object Storage-endepunkt |
-| `AWS_REGION` | Regionen til Neon-prosjektet |
-| `API_BASE_URL` | Kartverkets godkjente Matrikkel-endepunkt |
-| `API_USR` | Matrikkel-brukernavn |
-| `API_PWD` | Matrikkel-passord, uten lokal dotenv-escaping |
-| `MATRIKKEL_SYNC_EMAILS` | Eksplisitt allowlist for matrikkelsynk |
-| `MATRIKKEL_JOB_SECRET` | Tilfeldig intern hemmelighet på minst 32 bytes |
+| `AUTH_MICROSOFT_ENTRA_ID_SECRET` | Verdien til client secret, ikke secret-ID-en |
+| `AUTH_URL` | Kanonisk HTTPS-adresse uten avsluttende `/` |
 
-`DATABASE_URL_UNPOOLED` trengs for migrering lokalt eller i en særskilt
-migreringsjobb, men brukes ikke av den kjørende webapplikasjonen. `MOCK_DATA`
-skal være utelatt eller `false` i produksjon.
+Lag en ny `AUTH_SECRET` for produksjon, for eksempel lokalt med:
 
-6. Registrer produksjonsadressen som Web redirect URI i Microsoft Entra ID:
-
-```text
-https://<produksjonsdomene>/api/auth/callback/microsoft-entra-id
+```bash
+openssl rand -base64 32
 ```
 
-7. Utløs første deploy fra Netlify. Kontroller forsiden, Microsoft-innlogging,
-   medlemslisten, resultatvisningen, en CMS-fil og en testkjøring av Matrikkel
-   for H-nummer 25 før en full kjøring.
+#### Påkrevd for matrikkelsynkronisering
 
-Hver senere push til `main` utløser en ny produksjonsdeploy. Hemmeligheter skal
-bare administreres i Neon, Netlify og Microsoft Entra ID, aldri i GitHub-filer.
+| Variabel | Produksjonsverdi |
+| --- | --- |
+| `API_BASE_URL` | `https://matrikkel.no/matrikkelapi/wsapi/v1` |
+| `API_USR` | Matrikkel-brukernavn |
+| `API_PWD` | Matrikkel-passord, skrevet normalt uten `\$`-escaping |
+| `MATRIKKEL_SYNC_EMAILS` | Kommaseparert rolle-allowlist, minst `ib@turufjellvel.no` |
+| `MATRIKKEL_JOB_SECRET` | En annen unik hemmelighet på minst 32 bytes |
+
+Generer `MATRIKKEL_JOB_SECRET` separat; ikke bruk samme verdi som `AUTH_SECRET`.
+
+#### Valgfritt eller skal utelates
+
+- Utelat `ADMIN_EMAILS` for å tillate alle godkjente kontoer i den konfigurerte
+  tenant-en med nøyaktig `@turufjellvel.no`. Sett den bare hvis admin skal
+  begrenses ytterligere.
+- Utelat `DATABASE_URL_UNPOOLED`; den trengs ikke av applikasjonen i drift.
+- Utelat `MOCK_DATA`, `MOCK_DATA_DIR` og `MATRIKKEL_ALLOW_PRODTEST`.
+- Ikke opprett `URL`; Netlify setter denne systemvariabelen selv.
+- Ingen hemmelig variabel skal ha `NEXT_PUBLIC_`-prefiks.
+
+### 5. Registrer callback-URL i Microsoft Entra ID
+
+1. Åpne [Microsoft Entra admin center](https://entra.microsoft.com/).
+2. Gå til **Identity → Applications → App registrations → All applications**.
+3. Åpne appregistreringen som har samme **Application (client) ID** som
+   `AUTH_MICROSOFT_ENTRA_ID_ID`.
+4. Kontroller at **Supported account types** er satt til kontoer kun i Turufjell
+   vels egen organisasjon (single tenant).
+5. Gå til **Authentication → Platform configurations**.
+6. Velg **Add a platform → Web**, eller legg URI-en til under eksisterende
+   Web-plattform.
+7. Registrer nøyaktig denne adressen:
+
+```text
+https://<kanonisk-produksjonsdomene>/api/auth/callback/microsoft-entra-id
+```
+
+8. Velg **Configure/Save**. Ikke legg callbacken under plattformtypen SPA, og
+   ikke aktiver implicit grant.
+9. Kontroller under **Certificates & secrets** at client secret ikke er utløpt,
+   og at verdien i Netlify er den faktiske secret-verdien.
+
+Microsoft krever HTTPS for ordinære produksjons-callbacker og at redirect URI
+er registrert for riktig plattform. Se
+[Microsofts redirect URI-veiledning](https://learn.microsoft.com/en-us/entra/identity-platform/reply-url).
+
+Hvis produksjonsdomenet endres senere, må både `AUTH_URL` i Netlify og redirect
+URI i Entra oppdateres. Utløs en ny deploy etter endringen.
+
+### 6. Utløs produksjonsdeploy
+
+1. Gå til **Deploys** i Netlify.
+2. Velg **Trigger deploy → Deploy site**. Bruk **Clear cache and deploy site**
+   hvis forrige bygg ble kjørt før miljøvariablene ble lagt inn.
+3. Kontroller at byggeloggen avsluttes uten feil.
+4. Kontroller at Next.js-funksjonene og
+   `matrikkel-sync-background` finnes i Netlifys funksjonsoversikt.
+5. Kontroller at den publiserte deployen bruker committen som var godkjent i
+   GitHub Actions.
+
+Etter at GitHub-repositoriet er koblet til Netlify, utløser senere pushes til
+`main` normalt en ny produksjonsdeploy.
+
+### 7. Verifiser produksjonen
+
+Utfør kontrollene i denne rekkefølgen:
+
+- Åpne `/` og kontroller toppbilde, publiserte artikler og artikkelpanelet.
+- Åpne `/admin` i et privat vindu og kontroller at du sendes til innlogging.
+- Logg inn som `ib@turufjellvel.no` og kontroller modulene Medlemsregister,
+  Undersøkelser og Web.
+- Åpne en undersøkelse, kontroller kakediagrammene under **Resultater**, og last
+  ned en Excel-eksport.
+- Opprett et CMS-utkast, last opp et lite testvedlegg, forhåndsvis, publiser og
+  kontroller den offentlige visningen. Fjern testinnholdet etterpå.
+- Generer eller bruk testlenken for eget medlem med H-nummer 25. Kontroller
+  opplysningene uten å sende inn et svar dersom undersøkelsen er reell.
+- Kjør bare **Test H-nummer 25** i matrikkelmodulen. Kontroller logg og resultat
+  før en full matrikkelkjøring startes.
+- Kontroller at `/api/admin/surveys` returnerer `401` uten innlogget sesjon.
+- Kontroller Netlify Functions-loggene for feil og verifiser at ingen
+  hemmeligheter skrives til logg.
+
+### 8. Tilbakerulling og etterarbeid
+
+- Ved feil i applikasjonen: åpne **Deploys** i Netlify og publiser siste kjente
+  fungerende deploy på nytt.
+- Ikke reverser databaseskjemaet automatisk. Endringene er additive; undersøk
+  dataene og bruk Neon restore/branch ved behov før en korrigerende migrering.
+- Behold tidligere Entra redirect URI til den nye innloggingen er verifisert.
+- Registrer eier og utløpsdato for Entra client secret, Matrikkel-legitimasjonen
+  og interne hemmeligheter, slik at de kan roteres før utløp.
+- Oppbevar medlems- og resultat-eksporter sikkert og slett lokale kopier når de
+  ikke lenger er nødvendige.
+
+Hemmeligheter skal bare administreres i Neon, Netlify og Microsoft Entra ID,
+aldri i GitHub-filer eller dokumentasjon.
 
 ## Se svar i Neon
 

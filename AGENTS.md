@@ -8,7 +8,7 @@ This is a small production-oriented member administration application for Turufj
 - React.
 - Node runtime for API route handlers.
 - Neon Postgres via @neondatabase/serverless.
-- Plain CSS in app/globals.css. Do not add Tailwind unless explicitly requested.
+- Global styling lives in app/globals.css. Preserve the existing Tailwind and Material Tailwind setup; do not add another styling system.
 
 ## Product principles
 - Keep the visual design restrained, modern and professional.
@@ -18,15 +18,26 @@ This is a small production-oriented member administration application for Turufj
 - Never expose DATABASE_URL to client components or NEXT_PUBLIC variables.
 
 ## Survey data
-- Questions are configured in data/survey.js.
+- data/survey.js contains the initial seed and mock survey. Runtime survey questions are stored in Neon and managed from the admin portal.
 - Responses are written only through app/survey/api/responses/route.js.
+- New responses must retain a snapshot of the question version and question text used when the response was submitted.
 - Valid answers are: ja, nei, usikker.
 - Documents are placed in public/survey/dokumenter and configured in data/survey.js.
 
+## Production and deployment
+- Netlify is the application host. `main` is the production branch and `netlify.toml` is the committed deployment configuration.
+- Neon provides the production database and private Object Storage. Use pooled `DATABASE_URL` at runtime and `DATABASE_URL_UNPOOLED` only for schema migrations and imports.
+- Microsoft Entra ID is the identity provider. Production login requires the exact Web redirect URI documented in README.md.
+- Read and follow `Produksjonssetting: Netlify + Neon + Microsoft Entra ID` in README.md before changing deployment configuration.
+- Never commit `.env.local`, `.neon`, `.netlify`, credentials, tokens, database dumps or member exports.
+- Never bulk-import `.env.local` into Netlify. Add the documented production variables individually and keep them scoped to the production deploy context unless the user explicitly defines an isolated preview environment.
+- Do not run a production deploy, alter Netlify environment variables, change Entra configuration, apply a Neon schema/configuration change, or push to GitHub unless the user explicitly requests that external change.
+- When adding or renaming an environment variable, route, background function or infrastructure service, update the production procedure and verification checklist in README.md in the same change.
+
 ## Before committing changes
-Run:
-- npm run lint
-- npm run build
+- Run `npm run check`.
+- Run `npm audit` when dependencies or the lockfile change.
+- Confirm `git diff --check` passes and verify that no local secrets or generated exports are staged.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
