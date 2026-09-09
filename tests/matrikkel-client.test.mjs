@@ -16,9 +16,9 @@ test('SOAP client sends the quoted SOAPAction required by Matrikkel', async () =
 
   try {
     const client = new MatrikkelClient({
-      API_BASE_URL: 'https://matrikkel.no/matrikkelapi/wsapi/v1',
-      API_USR: 'test-user',
-      API_PWD: 'test-password',
+      API_MATRIKKEL_BASE_URL: 'https://matrikkel.no/matrikkelapi/wsapi/v1',
+      API_MATRIKKEL_USR: 'test-user',
+      API_MATRIKKEL_PWD: 'test-password',
     });
     assert.equal(await client.verifyAccess(), '123');
   } finally {
@@ -35,9 +35,9 @@ test('SOAP errors identify the failing service and operation', async () => {
   globalThis.fetch = async () => new Response('', { status: 401 });
   try {
     const client = new MatrikkelClient({
-      API_BASE_URL: 'https://matrikkel.no/matrikkelapi/wsapi/v1',
-      API_USR: 'test-user',
-      API_PWD: 'test-password',
+      API_MATRIKKEL_BASE_URL: 'https://matrikkel.no/matrikkelapi/wsapi/v1',
+      API_MATRIKKEL_USR: 'test-user',
+      API_MATRIKKEL_PWD: 'test-password',
     });
     await assert.rejects(
       client.verifyAccess(),
@@ -50,9 +50,9 @@ test('SOAP errors identify the failing service and operation', async () => {
 
 test('escaped dollar signs in local env passwords are sent literally', () => {
   const client = new MatrikkelClient({
-    API_BASE_URL: 'https://matrikkel.no/matrikkelapi/wsapi/v1',
-    API_USR: 'user',
-    API_PWD: 'before\\$after',
+    API_MATRIKKEL_BASE_URL: 'https://matrikkel.no/matrikkelapi/wsapi/v1',
+    API_MATRIKKEL_USR: 'user',
+    API_MATRIKKEL_PWD: 'before\\$after',
   });
   assert.equal(client.authorization, `Basic ${Buffer.from('user:before$after').toString('base64')}`);
 });

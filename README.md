@@ -261,9 +261,13 @@ har prioritet dersom Neon skriver til `.env`. Ikke sjekk inn disse filene.
 `neon deploy` anvender Neon-konfigurasjonen. Det publiserer ikke Next.js-appen
 og kjører ikke `database/schema.sql`; databaseoppsettet nedenfor er et eget steg.
 
-`cms-assets` er privat. Følgende servervariabler opprettes/hentes av Neon og må
-også legges inn i Netlify: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
-`AWS_ENDPOINT_URL_S3` og `AWS_REGION`. Ingen av dem skal ha `NEXT_PUBLIC_`-prefiks.
+`cms-assets` er privat. Neon oppretter/henter lokalt `AWS_ACCESS_KEY_ID`,
+`AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL_S3` og `AWS_REGION`. Netlify reserverer
+flere `AWS_*`-navn til sin egen Functions-runtime. Legg derfor de samme verdiene
+inn i Netlify som `NEON_STORAGE_ACCESS_KEY_ID`, `NEON_STORAGE_SECRET_ACCESS_KEY`,
+`NEON_STORAGE_ENDPOINT` og `NEON_STORAGE_REGION`. Ingen av dem skal ha
+`NEXT_PUBLIC_`-prefiks. Se
+[Netlifys begrensninger for Functions-variabler](https://docs.netlify.com/build/functions/environment-variables/#overrides-and-limitations).
 Test helst `neon deploy` på en egen Neon-gren før samme konfigurasjon anvendes på
 produksjonsgrenen.
 
@@ -421,8 +425,8 @@ følger [Neons anbefaling for pooling og migrering](https://neon.com/docs/connec
    `https://<prosjektnavn>.netlify.app`.
 6. Hvis et eget domene skal brukes med en gang, legg det til under
    **Domain management → Production domains** før autentisering konfigureres.
-7. Bestem én kanonisk produksjonsadresse. Bruk adressen uten avsluttende `/` i
-   både `AUTH_URL` og Entra-oppsettet.
+7. Bruk `https://medlemsservice.turufjellvel.no` som kanonisk
+   produksjonsadresse, uten avsluttende `/`, i både `AUTH_URL` og Entra-oppsettet.
 
 Netlify beskriver den samme Git-flyten i
 [Import an existing project](https://docs.netlify.com/manage/projects/add-new-project/#bring-existing-code-to-netlify).
@@ -444,10 +448,16 @@ lokale `.env`-filen automatisk under skybygget; se
 | Variabel | Produksjonsverdi |
 | --- | --- |
 | `DATABASE_URL` | Pooled Neon-forbindelse for produksjonsgrenen |
-| `AWS_ACCESS_KEY_ID` | Nøkkelen utstedt for Neon Object Storage |
-| `AWS_SECRET_ACCESS_KEY` | Hemmeligheten utstedt for Neon Object Storage |
-| `AWS_ENDPOINT_URL_S3` | S3-endepunktet fra Neon |
-| `AWS_REGION` | Regionen til Neon-prosjektet, for eksempel `eu-central-1` |
+| `NEON_STORAGE_ACCESS_KEY_ID` | Verdien fra lokal `AWS_ACCESS_KEY_ID` |
+| `NEON_STORAGE_SECRET_ACCESS_KEY` | Verdien fra lokal `AWS_SECRET_ACCESS_KEY` |
+| `NEON_STORAGE_ENDPOINT` | Verdien fra lokal `AWS_ENDPOINT_URL_S3` |
+| `NEON_STORAGE_REGION` | Verdien fra lokal `AWS_REGION`, for eksempel `eu-central-1` |
+
+Ikke opprett `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` eller `AWS_REGION` i
+Netlify. Navnene er reservert av plattformen. Variabelen
+`AWS_SECRET_ACCESS_KEY_ID` finnes heller ikke; Neons opprinnelige navn er
+`AWS_SECRET_ACCESS_KEY`. Applikasjonen foretrekker `NEON_STORAGE_*` og bruker
+Neons opprinnelige `AWS_*`-variabler som fallback ved lokal utvikling.
 
 #### Påkrevd for Microsoft-innlogging
 
@@ -457,7 +467,7 @@ lokale `.env`-filen automatisk under skybygget; se
 | `AUTH_MICROSOFT_ENTRA_ID_TENANT_ID` | Directory tenant ID |
 | `AUTH_MICROSOFT_ENTRA_ID_ID` | Application client ID |
 | `AUTH_MICROSOFT_ENTRA_ID_SECRET` | Verdien til client secret, ikke secret-ID-en |
-| `AUTH_URL` | Kanonisk HTTPS-adresse uten avsluttende `/` |
+| `AUTH_URL` | `https://medlemsservice.turufjellvel.no` |
 
 Lag en ny `AUTH_SECRET` for produksjon, for eksempel lokalt med:
 
@@ -469,9 +479,9 @@ openssl rand -base64 32
 
 | Variabel | Produksjonsverdi |
 | --- | --- |
-| `API_BASE_URL` | `https://matrikkel.no/matrikkelapi/wsapi/v1` |
-| `API_USR` | Matrikkel-brukernavn |
-| `API_PWD` | Matrikkel-passord, skrevet normalt uten `\$`-escaping |
+| `API_MATRIKKEL_BASE_URL` | `https://matrikkel.no/matrikkelapi/wsapi/v1` |
+| `API_MATRIKKEL_USR` | Matrikkel-brukernavn |
+| `API_MATRIKKEL_PWD` | Matrikkel-passord, skrevet normalt uten `\$`-escaping |
 | `MATRIKKEL_SYNC_EMAILS` | Kommaseparert rolle-allowlist, minst `ib@turufjellvel.no` |
 | `MATRIKKEL_JOB_SECRET` | En annen unik hemmelighet på minst 32 bytes |
 
@@ -490,23 +500,26 @@ Generer `MATRIKKEL_JOB_SECRET` separat; ikke bruk samme verdi som `AUTH_SECRET`.
 ### 5. Registrer callback-URL i Microsoft Entra ID
 
 1. Åpne [Microsoft Entra admin center](https://entra.microsoft.com/).
-2. Gå til **Identity → Applications → App registrations → All applications**.
-3. Åpne appregistreringen som har samme **Application (client) ID** som
+2. Kontroller øverst til høyre at riktig tenant, **TURUFJELL VEL**, er valgt.
+3. Velg **Entra ID → App registrations** i venstremenyen. Bruk søkefeltet
+   øverst og søk etter `App registrations` dersom menyvalget ikke vises.
+4. Velg **All applications**, og åpne appregistreringen som har samme
+   **Application (client) ID** som
    `AUTH_MICROSOFT_ENTRA_ID_ID`.
-4. Kontroller at **Supported account types** er satt til kontoer kun i Turufjell
+5. Kontroller at **Supported account types** er satt til kontoer kun i Turufjell
    vels egen organisasjon (single tenant).
-5. Gå til **Authentication → Platform configurations**.
-6. Velg **Add a platform → Web**, eller legg URI-en til under eksisterende
+6. Gå til **Authentication → Platform configurations**.
+7. Velg **Add a platform → Web**, eller legg URI-en til under eksisterende
    Web-plattform.
-7. Registrer nøyaktig denne adressen:
+8. Registrer nøyaktig denne adressen:
 
 ```text
-https://<kanonisk-produksjonsdomene>/api/auth/callback/microsoft-entra-id
+https://medlemsservice.turufjellvel.no/api/auth/callback/microsoft-entra-id
 ```
 
-8. Velg **Configure/Save**. Ikke legg callbacken under plattformtypen SPA, og
+9. Velg **Configure/Save**. Ikke legg callbacken under plattformtypen SPA, og
    ikke aktiver implicit grant.
-9. Kontroller under **Certificates & secrets** at client secret ikke er utløpt,
+10. Kontroller under **Certificates & secrets** at client secret ikke er utløpt,
    og at verdien i Netlify er den faktiske secret-verdien.
 
 Microsoft krever HTTPS for ordinære produksjons-callbacker og at redirect URI
@@ -697,13 +710,13 @@ Kartverkets produksjonslegitimasjon skal bare ligge i `.env.local` lokalt og i
 Netlifys server-side miljøvariabler i produksjon:
 
 ```env
-API_BASE_URL=https://matrikkel.no/matrikkelapi/wsapi/v1
-API_USR=<brukernavn>
-API_PWD=<passord>
+API_MATRIKKEL_BASE_URL=https://matrikkel.no/matrikkelapi/wsapi/v1
+API_MATRIKKEL_USR=<brukernavn>
+API_MATRIKKEL_PWD=<passord>
 MATRIKKEL_JOB_SECRET=<tilfeldig hemmelighet på minst 32 bytes>
 ```
 
-I lokal `.env.local` må eventuelle `$`-tegn i `API_PWD` escapes som `\$`.
+I lokal `.env.local` må eventuelle `$`-tegn i `API_MATRIKKEL_PWD` escapes som `\$`.
 Next.js ekspanderer ellers teksten etter dollartegnet som en miljøvariabel og
 sender et endret passord. I Netlifys miljøvariabelgrensesnitt legges passordet
 inn normalt, uten denne escapingen.
