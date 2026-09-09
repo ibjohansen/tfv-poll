@@ -437,6 +437,11 @@ Netlify beskriver den samme Git-flyten i
 enkeltvis. Velg produksjonskonteksten og scopes som gjør dem tilgjengelige for
 både build og Functions.
 
+Merk bare faktiske credentials og hemmeligheter som **Contains secret values**.
+`AUTH_URL`, `API_MATRIKKEL_BASE_URL`, `MATRIKKEL_SYNC_EMAILS` og
+`NEON_STORAGE_REGION` er offentlig konfigurasjon og skal ikke merkes som
+hemmelige. Verdiene finnes med hensikt i dokumentasjon og tester.
+
 Ikke bruk `netlify env:import .env.local`. Den lokale filen inneholder verdier
 som ikke skal inn i produksjonsmiljøet, blant annet direkte databaseforbindelse,
 lokal `AUTH_URL` og eventuell mock-konfigurasjon. Netlify leser heller ikke den
@@ -496,6 +501,12 @@ Generer `MATRIKKEL_JOB_SECRET` separat; ikke bruk samme verdi som `AUTH_SECRET`.
 - Utelat `MOCK_DATA`, `MOCK_DATA_DIR` og `MATRIKKEL_ALLOW_PRODTEST`.
 - Ikke opprett `URL`; Netlify setter denne systemvariabelen selv.
 - Ingen hemmelig variabel skal ha `NEXT_PUBLIC_`-prefiks.
+
+Netlifys secretskanning er fortsatt aktiv. `netlify.toml` unntar bare de fire
+offentlige konfigurasjonsnøklene over fra eksakt verdisøk. Dette hindrer falske
+positiver uten å slå av skanning av `DATABASE_URL`, passord, tilgangsnøkler,
+`AUTH_SECRET`, Entra client secret eller `MATRIKKEL_JOB_SECRET`. Se
+[Netlify Secrets Controller](https://docs.netlify.com/build/environment-variables/secrets-controller/#configure-secret-scanning).
 
 ### 5. Registrer callback-URL i Microsoft Entra ID
 
