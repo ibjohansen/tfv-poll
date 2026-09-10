@@ -30,8 +30,8 @@ export default async function HomePage({ searchParams }) {
       <a className="fixed top-3 left-3 z-50 -translate-y-24 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-lg transition-transform focus:translate-y-0 focus:outline-2 focus:outline-offset-2 focus:outline-primary" href="#main-content">Hopp til innhold</a>
       <SiteHeader />
       <main id="main-content">
-        <section className="relative flex min-h-[clamp(30rem,72vh,54rem)] w-full items-end overflow-hidden bg-primary" aria-labelledby="home-title">
-          <Image src={landscape} alt="Utsikt over fjellandskapet på Turufjell" fill sizes="100vw" priority className="object-cover" />
+        <section className="relative flex min-h-[clamp(26rem,60vh,46rem)] w-full items-end overflow-hidden bg-primary" aria-labelledby="home-title">
+          <Image src={landscape} alt="Utsikt over fjellandskapet på Turufjell" fill sizes="100vw" priority className="object-cover object-[35%_center]" />
           <div className="absolute inset-0 bg-linear-to-t from-slate-950/75 via-slate-950/10 to-transparent" />
           <div className="relative mx-auto w-full max-w-7xl px-5 py-12 text-white sm:px-8 sm:py-16 lg:px-12 lg:py-20">
             <p className="text-xs font-semibold tracking-[0.2em] text-white/70 uppercase">Turufjell vel</p>

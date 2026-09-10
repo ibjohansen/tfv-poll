@@ -31,14 +31,16 @@ export default async function AdminLogin({ searchParams }) {
   return (
     <main className="admin-login-page grid min-h-dvh bg-slate-50 lg:grid-cols-[minmax(0,1.05fr)_minmax(32rem,0.95fr)]">
       <section className="relative hidden min-h-dvh overflow-hidden bg-primary lg:block" aria-label="Turufjell">
-        <Image
-          src={landscape}
-          alt="Utsikt over fjellandskapet på Turufjell"
-          fill
-          priority
-          sizes="55vw"
-          className="object-cover object-[15%_center]"
-        />
+        <div className="absolute inset-x-0 top-0 h-[68%] overflow-hidden">
+          <Image
+            src={landscape}
+            alt="Utsikt over fjellandskapet på Turufjell"
+            fill
+            priority
+            sizes="55vw"
+            className="object-cover object-[15%_center]"
+          />
+        </div>
         <div className="absolute inset-0 bg-linear-to-t from-slate-950/80 via-slate-950/25 to-primary/10" />
         <div className="absolute inset-x-0 bottom-0 p-12 xl:p-16">
           <div className="max-w-xl text-white">

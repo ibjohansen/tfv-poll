@@ -1,3 +1,5 @@
+import MemberPropertyMap from '@/components/MemberPropertyMap';
+
 export default function MemberInfo({ access }) {
   const member = access.member;
   const fields = member ? [
@@ -18,9 +20,13 @@ export default function MemberInfo({ access }) {
       {member && (
         <dl className="member-details">
           {fields.map(([label, value]) => (
-            <div key={label}><dt>{label}</dt><dd>{label === "Hjemmelshaver" && value
-              ? value.split(" / ").map((name, index) => <span className="owner-line" key={index}>{name}</span>)
-              : value || "Ikke registrert"}</dd></div>
+            <div className={label === "Gateadresse og nummer" ? "member-address-detail" : undefined} key={label}>
+              <dt>{label}</dt>
+              <dd>{label === "Hjemmelshaver" && value
+                ? value.split(" / ").map((name, index) => <span className="owner-line" key={index}>{name}</span>)
+                : value || "Ikke registrert"}</dd>
+              {label === "Gateadresse og nummer" && value && <MemberPropertyMap streetAddress={value} />}
+            </div>
           ))}
           <div>
             <dt>Andre kontakt-e-postadresser</dt>

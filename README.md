@@ -78,6 +78,7 @@ flowchart TB
   storage[("Privat Neon Object Storage\ncms-assets")]
   files["Statiske dokumenter\npublic/survey/dokumenter"]
   matrikkel["Kartverket\nAdresse-API, A5 og Matrikkel SOAP-API"]
+  norgeskart["Kartverket Norgeskart\ninnbygd eiendomskart"]
   worker["Netlify Background Function\nmatrikkelsynkronisering"]
 
   browser -->|"HTTPS"| next
@@ -88,6 +89,7 @@ flowchart TB
   next -->|"Leverer"| files
   next -->|"Starter rollebeskyttet jobb"| worker
   worker -->|"Server-side API-kall"| matrikkel
+  browser -->|"Adresseoppslag og kartvisning"| norgeskart
   worker -->|"Snapshot, status og oppdateringer"| db
 ```
 
@@ -559,15 +561,21 @@ Etter at GitHub-repositoriet er koblet til Netlify, utløser senere pushes til
 Utfør kontrollene i denne rekkefølgen:
 
 - Åpne `/` og kontroller toppbilde, publiserte artikler og artikkelpanelet.
+- Kontroller at forsidebildet viser et bredere utsnitt med fokus forskjøvet mot
+  venstre, og at loginbildet viser et vesentlig bredere utsnitt uten å miste
+  fokuspunktet.
 - Åpne `/admin` i et privat vindu og kontroller at du sendes til innlogging.
 - Logg inn som `ib@turufjellvel.no` og kontroller modulene Medlemsregister,
-  Undersøkelser og Web.
+  Undersøkelser og Web. Velg et medlem med gateadresse, og kontroller at
+  eiendomskartet vises under adressefeltet i detaljpanelet.
 - Åpne en undersøkelse, kontroller kakediagrammene under **Resultater**, og last
   ned en Excel-eksport.
 - Opprett et CMS-utkast, last opp et lite testvedlegg, forhåndsvis, publiser og
   kontroller den offentlige visningen. Fjern testinnholdet etterpå.
 - Generer eller bruk testlenken for eget medlem med H-nummer 25. Kontroller
-  opplysningene uten å sende inn et svar dersom undersøkelsen er reell.
+  opplysningene uten å sende inn et svar dersom undersøkelsen er reell. Kontroller
+  at eiendomskartet søker på gateadressen i Flå, starter med adresseinformasjonen
+  minimert, og at **Åpne i Norgeskart** åpner kartet på Norgeskarts nettside.
 - Kjør bare **Test H-nummer 25** i matrikkelmodulen. Kontroller logg og resultat
   før en full matrikkelkjøring startes.
 - Kontroller at `/api/admin/surveys` returnerer `401` uten innlogget sesjon.

@@ -612,6 +612,62 @@ h2 {
   padding-left: 20px;
 }
 
+.member-address-detail {
+  grid-column: 1 / -1;
+}
+
+.member-map {
+  margin-top: 16px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-muted);
+}
+
+.member-map-heading {
+  padding: 12px 14px;
+}
+
+.member-map-heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.member-map-heading strong {
+  font-size: 14px;
+}
+
+.member-map-heading span {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.member-map-frame {
+  display: block;
+  width: 100%;
+  height: clamp(280px, 42vw, 420px);
+  border: 0;
+  background: #e7ebea;
+}
+
+.member-map-loading {
+  display: grid;
+  min-height: 280px;
+  place-items: center;
+  color: var(--text-soft);
+  background: #e7ebea;
+  font-size: 14px;
+}
+
+.member-map-source {
+  display: block;
+  padding: 10px 14px;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+}
+
 @media (max-width: 760px) {
   .member-details {
     grid-template-columns: 1fr;
@@ -707,6 +763,7 @@ h2 {
 .admin-detail-header { display: flex; align-items: start; justify-content: space-between; gap: 20px; margin-bottom: 28px; }
 .admin-detail-header h2 { overflow-wrap: anywhere; }
 .admin-detail-form { display: grid; gap: 18px; }
+.admin-detail-field { display: grid; gap: 12px; }
 .admin-detail-form label { display: grid; gap: 7px; color: var(--text-soft); font-size: 13px; font-weight: 700; }
 .admin-detail-form input, .admin-detail-form textarea { width: 100%; padding: 11px 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; font-weight: 400; }
 .admin-detail-form input[readonly], .admin-detail-form textarea[readonly] { background: var(--surface-muted); color: var(--text-soft); cursor: not-allowed; }
