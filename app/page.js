@@ -3,6 +3,8 @@ import Link from 'next/link';
 import landscape from '@/public/turufjell.jpeg';
 import SiteHeader from '@/components/SiteHeader';
 import PublicArticleDirectory from '@/components/PublicArticleDirectory';
+import { auth } from '@/auth';
+import { isAllowedAdmin } from '@/lib/admin-policy';
 import { getPublishedCmsPage, getPublishedCmsPageSummaries } from '@/lib/cms-pages';
 import { isValidCmsSlug } from '@/lib/cms-validation';
 
@@ -10,6 +12,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export default async function HomePage({ searchParams }) {
+  const isAdmin = isAllowedAdmin((await auth())?.user);
   let pages = [];
   let initialPage = null;
   try {
@@ -56,7 +59,7 @@ export default async function HomePage({ searchParams }) {
             <p><span className="font-semibold text-slate-700">E-post:</span> <a className="font-medium text-slate-600 hover:text-primary focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary" href="mailto:post@turufjellvel.no">post@turufjellvel.no</a></p>
             <p><span className="font-semibold text-slate-700">Organisasjonsnummer:</span> 928 968 898</p>
           </div>
-          <Link href="/admin/login" className="inline-flex w-fit items-center gap-2 font-semibold text-slate-700 hover:text-primary focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">Login <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 fill-none stroke-current stroke-2"><path d="m9 18 6-6-6-6" /></svg></Link>
+          <Link href={isAdmin ? '/admin' : '/admin/login'} className="inline-flex w-fit items-center gap-2 font-semibold text-slate-700 hover:text-primary focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">{isAdmin ? 'Åpne adminportal' : 'Login'} <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 fill-none stroke-current stroke-2"><path d="m9 18 6-6-6-6" /></svg></Link>
         </div>
       </footer>
     </div>

@@ -17,5 +17,5 @@ export default async function AdminSurveysPage({ searchParams }) {
   const direction = params.dir === 'desc' ? 'desc' : 'asc';
   let surveys;
   try { surveys = await getAdminSurveys(sort, direction); } catch { surveys = null; }
-  return <main className="admin-shell"><AdminModuleHeader active="surveys" title="Undersøkelser" email={session.user.email} /><section className="admin-content">{surveys ? <AdminSurveyDirectory key={`${sort}-${direction}`} surveys={surveys} sort={sort} direction={direction} /> : <p className="form-error" role="alert">Undersøkelsene er midlertidig utilgjengelige. Prøv igjen senere.</p>}</section></main>;
+  return <main className="admin-shell"><AdminModuleHeader active="surveys" title="Undersøkelser" email={session.user.email} /><section className="admin-content">{surveys ? <AdminSurveyDirectory key={`${sort}-${direction}`} surveys={surveys} sort={sort} direction={direction} adminEmail={session.user.email} /> : <p className="form-error" role="alert">Undersøkelsene er midlertidig utilgjengelige. Prøv igjen senere.</p>}</section></main>;
 }

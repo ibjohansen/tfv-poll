@@ -95,6 +95,8 @@ CREATE TABLE IF NOT EXISTS matrikkel_sync_runs (
   review_count INTEGER NOT NULL DEFAULT 0,
   error_count INTEGER NOT NULL DEFAULT 0,
   error_message TEXT,
+  worker_token TEXT,
+  worker_lease_expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   started_at TIMESTAMPTZ,
   completed_at TIMESTAMPTZ
@@ -245,3 +247,72 @@ CREATE UNIQUE INDEX IF NOT EXISTS cms_attachments_active_image_idx
   ON cms_attachments (page_id) WHERE kind = 'image' AND deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS cms_attachments_page_order_idx
   ON cms_attachments (page_id, kind, sort_order, created_at) WHERE deleted_at IS NULL;
+
+-- E-postkampanjer og leveringsstatus. E-postinnhold og personlige survey-lenker
+-- lagres ikke. Medlemsregisteret er fortsatt autoritativ kilde for adresser.
+CREATE TABLE IF NOT EXISTS email_campaigns (
+  id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
+  survey_id TEXT NOT NULL REFERENCES surveys(id) ON DELETE RESTRICT,
+  kind TEXT NOT NULL DEFAULT 'survey' CHECK (kind IN ('survey')),
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
+  requested_by TEXT NOT NULL,
+  total_count INTEGER NOT NULL DEFAULT 0 CHECK (total_count >= 0),
+  missing_email_count INTEGER NOT NULL DEFAULT 0 CHECK (missing_email_count >= 0),
+  sent_count INTEGER NOT NULL DEFAULT 0 CHECK (sent_count >= 0),
+  delivered_count INTEGER NOT NULL DEFAULT 0 CHECK (delivered_count >= 0),
+  failed_count INTEGER NOT NULL DEFAULT 0 CHECK (failed_count >= 0),
+  suppressed_count INTEGER NOT NULL DEFAULT 0 CHECK (suppressed_count >= 0),
+  error_message TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS email_campaigns_survey_once_idx
+  ON email_campaigns (survey_id) WHERE kind = 'survey' AND status <> 'cancelled';
+CREATE INDEX IF NOT EXISTS email_campaigns_created_at_idx
+  ON email_campaigns (created_at DESC);
+ALTER TABLE email_campaigns ADD COLUMN IF NOT EXISTS worker_token TEXT;
+ALTER TABLE email_campaigns ADD COLUMN IF NOT EXISTS worker_lease_expires_at TIMESTAMPTZ;
+
+CREATE TABLE IF NOT EXISTS email_deliveries (
+  id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
+  campaign_id TEXT REFERENCES email_campaigns(id) ON DELETE RESTRICT,
+  member_id BIGINT REFERENCES members(id) ON DELETE RESTRICT,
+  survey_id TEXT REFERENCES surveys(id) ON DELETE RESTRICT,
+  recipient_email TEXT NOT NULL CHECK (char_length(recipient_email) <= 254),
+  email_type TEXT NOT NULL CHECK (email_type IN ('survey_invitation', 'survey_test')),
+  subject TEXT NOT NULL CHECK (char_length(subject) BETWEEN 1 AND 998),
+  provider TEXT NOT NULL DEFAULT 'mailersend' CHECK (provider = 'mailersend'),
+  provider_message_id TEXT UNIQUE,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'processing', 'sent', 'delivered', 'failed', 'bounced', 'suppressed')),
+  failure_reason TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  processing_at TIMESTAMPTZ,
+  sent_at TIMESTAMPTZ,
+  delivered_at TIMESTAMPTZ,
+  failed_at TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS email_deliveries_campaign_member_idx
+  ON email_deliveries (campaign_id, member_id) WHERE campaign_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS email_deliveries_campaign_status_idx
+  ON email_deliveries (campaign_id, status, created_at);
+
+CREATE TABLE IF NOT EXISTS email_webhook_events (
+  provider_event_id TEXT PRIMARY KEY,
+  provider_message_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS email_suppressions (
+  recipient_email TEXT PRIMARY KEY CHECK (char_length(recipient_email) <= 254),
+  reason TEXT NOT NULL,
+  provider TEXT NOT NULL DEFAULT 'mailersend' CHECK (provider = 'mailersend'),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

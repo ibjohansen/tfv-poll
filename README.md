@@ -29,6 +29,8 @@ Sertifikatkontrollen skal ikke deaktiveres.
 ## Sider og tilgang
 
 - `/` er en offentlig forside med logo, hovedinnhold og bunnfelt.
+- Innloggede administratorer får lenke direkte til adminportalen i bunnfeltet;
+  øvrige brukere får innloggingslenken.
 - Hamburgermenyen åpner Microsoft 365-innlogging via `/admin/login`.
 - `/admin` er startsiden for Medlemsservice og viser tilgjengelige moduler.
 - `/admin/members` er modulen Medlemsregister.
@@ -59,12 +61,14 @@ flowchart LR
   entra["Microsoft Entra ID\nidentitetsleverandør"]
   neon[("Neon Postgres\nmedlemmer, undersøkelser, svar og CMS-metadata")]
   storage[("Neon Object Storage\nbilder og vedlegg")]
+  mailer["MailerSend Email API\ntransaksjonell levering"]
 
   member -->|"Åpner lenke og svarer"| app
   admin -->|"Administrerer medlemmer, undersøkelser og nettsider"| app
   app -->|"Logger inn administrator"| entra
   app -->|"Leser og skriver data"| neon
   app -->|"Lagrer og henter CMS-filer"| storage
+  app -->|"Sender e-post server-side"| mailer
 ```
 
 ### Containere
@@ -80,6 +84,8 @@ flowchart TB
   matrikkel["Kartverket\nAdresse-API, A5 og Matrikkel SOAP-API"]
   norgeskart["Kartverket Norgeskart\ninnbygd eiendomskart"]
   worker["Netlify Background Function\nmatrikkelsynkronisering"]
+  emailworker["Netlify Background Function\nsurvey-utsendelse"]
+  mailer["MailerSend Email API\nlevering og suppression"]
 
   browser -->|"HTTPS"| next
   next -->|"OAuth/OIDC"| auth
@@ -88,6 +94,9 @@ flowchart TB
   next -->|"S3 API, server-side credentials"| storage
   next -->|"Leverer"| files
   next -->|"Starter rollebeskyttet jobb"| worker
+  next -->|"Starter bekreftet utsendelse"| emailworker
+  emailworker -->|"Personlige meldinger over HTTPS"| mailer
+  mailer -->|"Signerte delivery/bounce-webhooks"| next
   worker -->|"Server-side API-kall"| matrikkel
   browser -->|"Adresseoppslag og kartvisning"| norgeskart
   worker -->|"Snapshot, status og oppdateringer"| db
@@ -112,6 +121,9 @@ gang til.
 | `lib/matrikkel-client.js` | Server-side klient for Adresse-API, A5-avvik og Matrikkelens SOAP-tjenester. |
 | `lib/matrikkel-sync.js` | Oppretter sikkerhetskopi, behandler medlemmer og lagrer fremdrift og avvik. |
 | `netlify/functions/matrikkel-sync-background.mjs` | Kjører lange synkroniseringer uten å holde nettleserforespørselen åpen. |
+| `lib/mailer-service.js` og `lib/survey-email.js` | Validerer og sender e-post server-side, bygger personlig survey-invitasjon og holder MailerSend-detaljer utenfor resten av applikasjonen. |
+| `app/api/webhooks/mailersend` | Validerer HMAC-signatur og registrerer nødvendige leverings- og bounce-hendelser idempotent. |
+| `netlify/functions/survey-email-background.mjs` | Behandler en databasebasert utsendelseskø kontrollert uten å holde nettleserforespørselen åpen. |
 | Neon Postgres | Holder medlemsdata, spørsmålsoppsett, besvarelser, sideinnhold og filmetadata. |
 | Neon Object Storage | Holder binære bilder og vedlegg i den private bøtten `cms-assets`. |
 
@@ -347,7 +359,9 @@ npm run check
 ```
 
 `npm run check` kjører ESLint, alle Node-testene og et komplett Next.js-
-produksjonsbygg. Lokale miljøfiler, Neon-koblingen og Netlifys lokale
+produksjonsbygg. Bygget bruker Next.js' støttede `--webpack`-flagg for stabil
+kjøring i CI- og Functions-miljøer; lokal utvikling bruker fortsatt standardbyggeren.
+Lokale miljøfiler, Neon-koblingen og Netlifys lokale
 cachemappe er utelatt fra Git gjennom `.gitignore`.
 
 ## Produksjonssetting: Netlify + Neon + Microsoft Entra ID
@@ -355,7 +369,8 @@ cachemappe er utelatt fra Git gjennom `.gitignore`.
 `netlify.toml` inneholder byggkommando, publiseringsmappe, Node-versjon og
 funksjonsmappe. Netlify håndterer Next.js App Router gjennom sin Next.js-adapter,
 mens den lange matrikkelsynkroniseringen kjøres som en Netlify Background
-Function. Se også [Netlifys Next.js-veiledning](https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/)
+Function. Survey-utsendelser kjøres på samme måte i en egen bakgrunnsfunksjon.
+Se også [Netlifys Next.js-veiledning](https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/)
 og [veiledningen for Background Functions](https://docs.netlify.com/build/functions/background-functions/).
 
 Følg punktene i denne rekkefølgen ved første produksjonssetting. Bruk en konto
@@ -494,6 +509,26 @@ openssl rand -base64 32
 
 Generer `MATRIKKEL_JOB_SECRET` separat; ikke bruk samme verdi som `AUTH_SECRET`.
 
+#### Påkrevd for MailerSend
+
+| Variabel | Produksjonsverdi |
+| --- | --- |
+| `MAILERSEND_ENABLED` | `true` først etter at senderdomenet er verifisert; behold `false` under bootstrap |
+| `MAILERSEND_BULK_ENABLED` | `false` inntil masseutsendelse er eksplisitt godkjent; testmail virker fortsatt |
+| `MAILERSEND_API_TOKEN` | Begrenset API-token fra MailerSend, aldri et browser-token |
+| `MAILERSEND_FROM_EMAIL` | En eksisterende avsender på `turufjellvel.no`, for eksempel `post@turufjellvel.no` |
+| `MAILERSEND_FROM_NAME` | `Turufjell vel` |
+| `MAILERSEND_REPLY_TO_EMAIL` | En overvåket adresse som kan motta svar |
+| `MAILERSEND_DOMAIN_ID` | Domain ID for det verifiserte `turufjellvel.no`-domenet |
+| `MAILERSEND_WEBHOOK_SIGNING_SECRET` | Individuell Signing Secret fra den opprettede webhooken |
+| `MAILERSEND_JOB_SECRET` | Egen tilfeldig intern hemmelighet på minst 32 bytes |
+
+Legg variablene inn enkeltvis og bare i produksjonskonteksten. Generer
+`MAILERSEND_JOB_SECRET` separat fra alle andre hemmeligheter. Ingen av disse
+verdiene skal inn i `netlify.toml`, GitHub eller ha `NEXT_PUBLIC_`-prefiks.
+API-tokenet må minst ha tillatelsene `email_full` og `suppressions_read`, og bør
+begrenses til sending domain der MailerSend-kontoen tilbyr dette.
+
 #### Valgfritt eller skal utelates
 
 - Utelat `ADMIN_EMAILS` for å tillate alle godkjente kontoer i den konfigurerte
@@ -507,7 +542,8 @@ Generer `MATRIKKEL_JOB_SECRET` separat; ikke bruk samme verdi som `AUTH_SECRET`.
 Netlifys secretskanning er fortsatt aktiv. `netlify.toml` unntar bare de fire
 offentlige konfigurasjonsnøklene over fra eksakt verdisøk. Dette hindrer falske
 positiver uten å slå av skanning av `DATABASE_URL`, passord, tilgangsnøkler,
-`AUTH_SECRET`, Entra client secret eller `MATRIKKEL_JOB_SECRET`. Se
+`AUTH_SECRET`, Entra client secret, MailerSend-hemmeligheter eller interne
+jobbhemmeligheter. Se
 [Netlify Secrets Controller](https://docs.netlify.com/build/environment-variables/secrets-controller/#configure-secret-scanning).
 
 ### 5. Registrer callback-URL i Microsoft Entra ID
@@ -549,7 +585,8 @@ URI i Entra oppdateres. Utløs en ny deploy etter endringen.
    hvis forrige bygg ble kjørt før miljøvariablene ble lagt inn.
 3. Kontroller at byggeloggen avsluttes uten feil.
 4. Kontroller at Next.js-funksjonene og
-   `matrikkel-sync-background` finnes i Netlifys funksjonsoversikt.
+   `matrikkel-sync-background` og `survey-email-background` finnes i Netlifys
+   funksjonsoversikt.
 5. Kontroller at den publiserte deployen bruker committen som var godkjent i
    GitHub Actions.
 
@@ -570,6 +607,9 @@ Utfør kontrollene i denne rekkefølgen:
   eiendomskartet vises under adressefeltet i detaljpanelet.
 - Åpne en undersøkelse, kontroller kakediagrammene under **Resultater**, og last
   ned en Excel-eksport.
+- Velg **Utsendelse**, send først en testmail til en eksplisitt testadresse, og
+  kontroller MailerSend-statusen. Start ikke masseutsendelsen før domenekontrollen
+  nedenfor er fullført.
 - Opprett et CMS-utkast, last opp et lite testvedlegg, forhåndsvis, publiser og
   kontroller den offentlige visningen. Fjern testinnholdet etterpå.
 - Generer eller bruk testlenken for eget medlem med H-nummer 25. Kontroller
@@ -771,6 +811,130 @@ oppslag til dette ene medlemmet.
 `registration_date` inneholder Matrikkelens `datoFra` for det aktive tinglyste
 eierforholdet. Det er ikke nødvendigvis kontrakts-, overtakelses- eller faktisk
 tinglysningsdato.
+
+## MailerSend og survey-utsendelser
+
+MailerSend brukes bare som transaksjonell leverandør. `members` i Neon er
+fortsatt autoritativ kilde; applikasjonen oppretter ikke en medlemsdatabase eller
+synkroniserer en kontaktliste hos MailerSend. E-post sendes fra Node-runtime over
+[MailerSend Email API](https://developers.mailersend.com/api/v1/email). SDK er
+ikke nødvendig for den lille API-flaten.
+
+`lib/mailer-service.js` har den generiske `sendEmail`-funksjonen. Den validerer
+konfigurasjon, mottaker, emne og innhold, lager plain-text når det trengs og
+returnerer MailerSend message ID. Klikk-, åpne- og innholdssporing slås eksplisitt
+av. Loggene inneholder bare type, interne medlem-/survey-ID-er, mottakerdomene,
+message ID, tidspunkt og resultat – aldri API-token, komplett e-postinnhold eller
+personlig survey-URL.
+
+### Lokal utvikling og testmail
+
+`MAILERSEND_ENABLED=false` er standard i `.env.example`. Tester bruker falske
+HTTP-responser og sender ingen ekte e-post. For en bevisst lokal integrasjonstest
+legges egne credentials i `.env.local`, og flagget settes til `true`; filen skal
+aldri sjekkes inn.
+
+I `/admin/surveys` åpner administratoren en eksisterende undersøkelse og velger
+**Utsendelse**. **Send testmail** krever én eller maksimalt to eksplisitte,
+komma-separerte mottakere (feltet foreslår innlogget administrators e-post),
+bruker produksjonsmalen og leverandøren, men
+lenker bare til `/survey` uten medlems-token. Dermed kan testen aldri sende til
+medlemsregisteret eller gi tilgang på vegne av et medlem.
+
+### Masseutsendelse og idempotens
+
+Masseutsendelse er sperret både i grensesnittet og på serveren når
+`MAILERSEND_BULK_ENABLED` ikke er nøyaktig `true`. Standard og nåværende
+innstilling er `false`; den skal ikke endres før masseutsendelse er uttrykkelig
+godkjent. Testmail til inntil to eksplisitte adresser er fortsatt tilgjengelig.
+
+Før utsendelse vises antall aktive medlemmer med gyldig primæradresse og antall
+som mangler gyldig adresse. Administrator må bekrefte det eksakte mottakertallet.
+Deretter opprettes én `email_campaigns`-rad og én `email_deliveries`-rad per
+mottaker i samme databasetransaksjon. Den unike kampanjeindeksen gjør at refresh,
+gjentatt request eller Netlify-retry ikke oppretter en ny utsendelse for samme
+survey.
+
+`survey-email-background` hevder én ventende levering atomisk og sender
+kontrollert med minst 6,1 sekunder mellom Email API-kall. Dette holder seg innen
+MailerSends dokumenterte lave rategrense og fungerer for dagens omtrent 425
+medlemmer uten ukontrollerte browser-kall. Personlig URL opprettes i minnet fra
+eksisterende tilfeldig `access_token` og survey-ID, og lagres eller logges ikke.
+Hvis en worker avbrytes etter at den har hevdet en melding, markeres den etter 15
+minutter som `UNCERTAIN_AFTER_INTERRUPTION` i stedet for automatisk å kunne
+dobbeltsendes. Administrator ser sendt, levert, feilet og undertrykt per medlem
+med paginering; full mottakeradresse vises ikke i oversikten.
+
+### Domene og DNS hos Domeneshop
+
+1. Legg til `turufjellvel.no` som sending domain i MailerSend. Ikke bruk
+   MailerSends testdomene i produksjon.
+2. Åpne domenets **Domain verification / DNS records** i MailerSend og kopier de
+   konkrete verdiene som vises der. De skal ikke kopieres fra denne README-en.
+3. Registrer hos Domeneshop den viste SPF TXT-posten, begge DKIM CNAME-postene
+   og Return-Path CNAME-posten med nøyaktige navn og verdier.
+4. Hvis domenet allerede har en SPF TXT-record, slå MailerSend-mekanismen sammen
+   med den eksisterende posten. Det skal bare finnes én SPF-record; opprett ikke
+   en konkurrerende nummer to.
+5. Behold og vurder eksisterende DMARC-policy. Endre ikke DMARC uten å kontrollere
+   at alle legitime avsendere er justert mot SPF og/eller DKIM.
+6. Vent til MailerSend viser domene, SPF, begge DKIM-poster og Return-Path som
+   verifisert. Kontroller også at valgt `MAILERSEND_FROM_EMAIL` faktisk finnes,
+   og at Reply-To overvåkes.
+
+### Webhook og leveringsstatus
+
+Opprett en MailerSend-webhook med URL
+`https://medlemsservice.turufjellvel.no/api/webhooks/mailersend`. Abonner minst
+på `activity.sent`, `activity.delivered`, `activity.soft_bounced`,
+`activity.hard_bounced` og, dersom planen støtter det, `activity.suppressed`;
+`activity.spam_complaint` og
+`activity.unsubscribed` bør også tas med. Åpne- og klikkhendelser er ikke
+nødvendige. Kopier webhookens individuelle Signing Secret til
+`MAILERSEND_WEBHOOK_SIGNING_SECRET`.
+
+Ved første bootstrap kan applikasjonen deployes med `MAILERSEND_ENABLED=false`
+og uten webhook-secret. MailerSends opprettelsesping har eventtypen
+`webhook.test` og kontrolleres mot leverandørens dokumenterte faste test-secret;
+den kan derfor validere URL-en uten å åpne for virkelige aktivitetshendelser.
+Etter at webhooken er lagret, kopieres dens individuelle Signing Secret til
+Netlify og en ny deploy utløses. Sett deretter `MAILERSEND_ENABLED=true`, send
+testmailene og kontroller leveringsstatus før masseutsendelse.
+
+Endepunktet følger [MailerSends webhook-signering](https://developers.mailersend.com/api/v1/account/webhooks):
+HMAC-SHA256 beregnes over rå request-body og sammenlignes konstant-tid med
+`Signature`-headeren. Event-ID lagres i `email_webhook_events`, slik at retry er
+idempotent. Ukjent message ID aksepteres uten å endre en levering. Permanent
+bounce, spam, unsubscribe og suppression registreres lokalt og vises for admin;
+e-postadressen slettes eller endres aldri automatisk i `members`.
+
+### Database og personvern
+
+Kjør `npm run db:setup` med `DATABASE_URL_UNPOOLED` før versjonen deployes.
+Endringen oppretter additivt:
+
+- `email_campaigns` for idempotent jobbidentitet og summer
+- `email_deliveries` for mottaker, type, emne, provider message ID og status
+- `email_webhook_events` for idempotente leveringshendelser
+- `email_suppressions` for adresser som ikke skal forsøkes sendt igjen
+
+Full HTML, plain-text og survey-token lagres ikke. Mottakeradressen lagres fordi
+den kreves for leveringskobling, feilsøking og suppression; fastsett tilgang,
+oppbevaring og slettefrist som del av behandlingsprotokollen. Tracking av åpning
+eller klikk er ikke nødvendig og er derfor slått av. Dersom dette senere endres,
+må personvernformål, informasjon til medlemmer og oppbevaring vurderes først.
+
+Før en produksjonsutsendelse:
+
+- kontroller at domene, SPF, DKIM og Return-Path er verified i MailerSend
+- send testmail til minst Gmail og Microsoft 365
+- kontroller mottakerens headere for bestått SPF, DKIM og DMARC
+- kontroller From, Reply-To, mobilvisning, synlig fallback-URL og at bildet ikke
+  er nødvendig for å forstå e-posten
+- kontroller at webhooken oppdaterer levert og en kontrollert feilhendelse
+- kontroller Netlify-rategrense/WAF for adminruten i tillegg til applikasjonens
+  per-instans rategrense
+- start først deretter den bekreftede masseutsendelsen
 
 ## Medlemsservice og Microsoft 365
 

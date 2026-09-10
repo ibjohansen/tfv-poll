@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import SurveyEmailPanel from '@/components/SurveyEmailPanel';
 
 const blankQuestion = (number) => ({ id: `q${number}`, number, text: '' });
 const answerOptions = [
@@ -98,7 +99,7 @@ function SurveyResults({ data, state, surveyId }) {
   );
 }
 
-export default function AdminSurveyDirectory({ surveys, sort, direction }) {
+export default function AdminSurveyDirectory({ surveys, sort, direction, adminEmail }) {
   const router = useRouter();
   const [selected, setSelected] = useState(null);
   const [activeTab, setActiveTab] = useState('settings');
@@ -264,9 +265,12 @@ export default function AdminSurveyDirectory({ surveys, sort, direction }) {
               <div className="survey-panel-tabs" role="tablist" aria-label="Undersøkelsesdetaljer">
                 <button type="button" role="tab" aria-selected={activeTab === 'settings'} onClick={() => setActiveTab('settings')}>Innstillinger</button>
                 <button type="button" role="tab" aria-selected={activeTab === 'results'} onClick={() => setActiveTab('results')}>Resultater <span>{selected.response_count}</span></button>
+                <button type="button" role="tab" aria-selected={activeTab === 'email'} onClick={() => setActiveTab('email')}>Utsendelse</button>
               </div>
             )}
-            {activeTab === 'results' && !selected.isNew ? (
+            {activeTab === 'email' && !selected.isNew ? (
+              <SurveyEmailPanel surveyId={selected.id} adminEmail={adminEmail} />
+            ) : activeTab === 'results' && !selected.isNew ? (
               <SurveyResults data={results} state={resultsState} surveyId={selected.id} />
             ) : (
               <form className="admin-detail-form" onSubmit={save}>
