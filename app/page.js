@@ -62,7 +62,7 @@ export default async function HomePage({ searchParams }) {
             <p><span className="font-semibold text-slate-700">E-post:</span> <a className="font-medium text-slate-600 hover:text-primary focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary" href="mailto:post@turufjellvel.no">post@turufjellvel.no</a></p>
             <p><span className="font-semibold text-slate-700">Organisasjonsnummer:</span> 928 968 898</p>
           </div>
-          <Link href={isAdmin ? '/admin' : '/admin/login'} className="inline-flex w-fit items-center gap-2 font-semibold text-slate-700 hover:text-primary focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">{isAdmin ? 'Åpne adminportal' : 'Login'} <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 fill-none stroke-current stroke-2"><path d="m9 18 6-6-6-6" /></svg></Link>
+          <Link href={isAdmin ? '/admin' : '/admin/login'} className="inline-flex w-fit items-center gap-2 font-semibold text-slate-700 hover:text-primary focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">{isAdmin ? 'Åpne adminportal' : 'Login for styremedlemmer'} <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 fill-none stroke-current stroke-2"><path d="m9 18 6-6-6-6" /></svg></Link>
         </div>
       </footer>
     </div>
