@@ -5,6 +5,7 @@ import { Button } from '@material-tailwind/react';
 import { auth, signIn } from '@/auth';
 import { isAllowedAdmin, isAuthConfigured } from '@/lib/admin-policy';
 import landscape from '@/public/turufjell.jpeg';
+import BrandLogo from '@/components/BrandLogo';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -29,7 +30,7 @@ export default async function AdminLogin({ searchParams }) {
   if (configured && isAllowedAdmin((await auth())?.user)) redirect('/admin');
   const params = await searchParams;
   return (
-    <main className="admin-login-page grid min-h-dvh bg-slate-50 lg:grid-cols-[minmax(0,1.05fr)_minmax(32rem,0.95fr)]">
+    <main className="admin-login-page grid min-h-dvh bg-background lg:grid-cols-[minmax(0,1.05fr)_minmax(32rem,0.95fr)]">
       <section className="relative hidden min-h-dvh overflow-hidden bg-primary lg:block" aria-label="Turufjell">
         <div className="absolute inset-x-0 top-0 h-[68%] overflow-hidden">
           <Image
@@ -41,9 +42,10 @@ export default async function AdminLogin({ searchParams }) {
             className="object-cover object-[15%_center]"
           />
         </div>
-        <div className="absolute inset-0 bg-linear-to-t from-slate-950/80 via-slate-950/25 to-primary/10" />
+        <div className="absolute inset-0 bg-linear-to-t from-[#493F39]/90 via-[#493F39]/30 to-primary/10" />
         <div className="absolute inset-x-0 bottom-0 p-12 xl:p-16">
           <div className="max-w-xl text-white">
+            <BrandLogo variant="horizontal" tone="dark" decorative priority className="mb-10 h-auto w-80 max-w-full" />
             <p className="mb-5 text-xs font-semibold tracking-[0.2em] text-white/70 uppercase">Turufjell vel</p>
             <h2 className="text-4xl leading-tight font-semibold tracking-tight xl:text-5xl">Enklere medlemsarbeid.<br />Samlet på ett sted.</h2>
             <p className="mt-6 max-w-lg text-base leading-7 text-white/75">Administrer medlemsregister, undersøkelser og innhold i Medlemsservice.</p>
@@ -53,16 +55,16 @@ export default async function AdminLogin({ searchParams }) {
 
       <section className="flex min-h-dvh items-center justify-center px-5 py-10 sm:px-10 lg:px-14" aria-labelledby="login-title">
         <div className="w-full max-w-md">
-          <Link href="/" className="mb-12 inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-primary focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
+          <Link href="/" className="mb-12 inline-flex items-center gap-2 text-sm font-medium text-[#6F645E] transition-colors hover:text-primary-dark focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
             <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 fill-none stroke-current stroke-2"><path d="m15 18-6-6 6-6" /></svg>
             Til forsiden
           </Link>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-xl shadow-slate-900/6 sm:p-10">
-            <div className="mb-8 flex size-12 items-center justify-center rounded-2xl bg-primary text-sm font-bold tracking-tight text-white shadow-lg shadow-primary/20" aria-hidden="true">TV</div>
+          <div className="rounded-3xl border border-foreground/15 bg-white p-7 shadow-xl shadow-[#493F39]/8 sm:p-10">
+            <BrandLogo variant="stacked" decorative priority className="mb-8 h-auto w-32" />
             <p className="text-xs font-semibold tracking-[0.16em] text-primary uppercase">Medlemsservice</p>
-            <h1 id="login-title" className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Velkommen tilbake</h1>
-            <p className="mt-4 text-[0.95rem] leading-6 text-slate-600">Logg inn med din autoriserte Microsoft 365-konto hos Turufjell vel.</p>
+            <h1 id="login-title" className="mt-3 text-3xl font-light tracking-tight text-foreground sm:text-4xl">Velkommen tilbake</h1>
+            <p className="mt-4 text-[0.95rem] leading-6 text-[#6F645E]">Logg inn med din autoriserte Microsoft 365-konto hos Turufjell vel.</p>
 
             {params.error && (
               <div className="mt-6 flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800" role="alert">
@@ -85,15 +87,15 @@ export default async function AdminLogin({ searchParams }) {
               <div className="mt-8 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900" role="status">Microsoft 365-innlogging er ikke konfigurert ennå. Kontakt nettstedsansvarlig.</div>
             )}
 
-            <div className="mt-8 border-t border-slate-200 pt-6">
-              <p className="flex items-start gap-3 text-xs leading-5 text-slate-500">
+            <div className="mt-8 border-t border-foreground/15 pt-6">
+              <p className="flex items-start gap-3 text-xs leading-5 text-[#6F645E]">
                 <svg viewBox="0 0 24 24" aria-hidden="true" className="mt-0.5 size-4 shrink-0 fill-none stroke-current stroke-2"><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
                 Tilgangen er begrenset til godkjente kontoer på turufjellvel.no.
               </p>
             </div>
           </div>
 
-          <p className="mt-8 text-center text-xs text-slate-400">© {new Date().getFullYear()} Turufjell vel</p>
+          <p className="mt-8 text-center text-xs text-[#6F645E]">© {new Date().getFullYear()} Turufjell vel</p>
         </div>
       </section>
     </main>

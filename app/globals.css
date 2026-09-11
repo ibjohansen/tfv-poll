@@ -3,17 +3,31 @@
 @source inline("inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center transition-all duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-base rounded-md py-2.5 px-5 shadow-sm hover:shadow-lg bg-primary border-primary text-primary-foreground hover:bg-primary-light hover:border-primary-light");
 
 :root {
-  --background: #f4f5f2;
+  color-scheme: light;
+  --brand-brown: #493f39;
+  --brand-red: #a13323;
+  --brand-cream: #ebebde;
+  --brand-green: #3b6732;
+  --brand-yellow: #f1b245;
+  --brand-blue: #33626d;
+  --brand-burgundy: #5a2636;
+  --brand-light-red: #f79c80;
+  --brand-light-green: #bfd7a9;
+  --brand-light-yellow: #e8d288;
+  --brand-light-burgundy: #955e6e;
+  --brand-light-blue: #7cabb3;
+  --background: var(--brand-cream);
   --surface: #ffffff;
-  --surface-muted: #f7f8f6;
-  --text: #18211d;
-  --text-soft: #5b6660;
-  --line: #dfe4e0;
-  --line-strong: #cfd6d1;
-  --accent: #244c3c;
-  --accent-soft: #eef4f0;
-  --danger: #8e2f2f;
-  --shadow: 0 18px 55px rgba(24, 33, 29, 0.07);
+  --surface-muted: #f6f5ec;
+  --text: var(--brand-brown);
+  --text-soft: #6f645e;
+  --line: #d9d5c6;
+  --line-strong: #c9c3b2;
+  --accent: var(--brand-light-burgundy);
+  --accent-hover: var(--brand-burgundy);
+  --accent-soft: #f2e7ea;
+  --danger: var(--brand-red);
+  --shadow: 0 18px 55px rgba(73, 63, 57, 0.09);
   --radius-lg: 24px;
   --radius-md: 16px;
   --radius-sm: 12px;
@@ -31,9 +45,9 @@ body {
   margin: 0;
   color: var(--text);
   background:
-    radial-gradient(circle at 12% 0%, rgba(36, 76, 60, 0.06), transparent 28rem),
+    radial-gradient(circle at 12% 0%, rgba(149, 94, 110, 0.08), transparent 30rem),
     var(--background);
-  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-fragment-serif), Georgia, serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -46,6 +60,20 @@ select {
 
 a {
   color: inherit;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-chap), Arial, sans-serif;
+  font-weight: 300;
+  text-wrap: balance;
+}
+
+::selection {
+  background: var(--brand-light-burgundy);
+  color: white;
 }
 
 main {
@@ -73,7 +101,8 @@ main {
   max-width: 100%;
   padding: 8px;
   border-radius: var(--radius-md);
-  background: var(--accent);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .72);
 }
 
 .brand-logo img {
@@ -1016,15 +1045,7 @@ input, textarea, select { caret-color: var(--accent); }
 
 .admin-sidebar-brand > span {
   display: grid;
-  width: 30px;
-  height: 30px;
   place-items: center;
-  border-radius: 9px;
-  background: #18181b;
-  color: white;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: -.03em;
 }
 
 .admin-sidebar .admin-tabs {
@@ -2231,4 +2252,222 @@ input, textarea, select { caret-color: var(--accent); }
   .admin-audit-values section > div { grid-template-columns: 1fr; }
   .admin-audit-actions { flex-direction: column; }
   .admin-audit-actions details { width: 100%; }
+}
+
+/* Turufjell identity */
+.site-header {
+  box-shadow: 0 8px 28px rgba(73, 63, 57, .06);
+}
+
+.brand-public-home {
+  background: var(--brand-cream);
+  color: var(--brand-brown);
+}
+
+.brand-public-home main > section:first-child img,
+.admin-login-page > section:first-child img,
+.cms-article-image img {
+  filter: saturate(.76) contrast(.94) sepia(.05);
+}
+
+.eyebrow,
+.admin-header .eyebrow,
+.admin-detail-header .eyebrow,
+.confirm-dialog .eyebrow {
+  color: var(--brand-light-burgundy);
+}
+
+.primary-button {
+  border-color: var(--brand-light-burgundy);
+  background: var(--brand-light-burgundy);
+  color: white;
+  box-shadow: 0 4px 12px rgba(90, 38, 54, .14);
+}
+
+.primary-button:hover:not(:disabled) {
+  border-color: var(--brand-burgundy);
+  background: var(--brand-burgundy);
+}
+
+.primary-button:focus-visible,
+.admin-shell :focus-visible,
+.admin-login :focus-visible,
+.member-self-service-entry :focus-visible {
+  outline-color: var(--brand-light-burgundy);
+}
+
+.admin-layout,
+.admin-shell,
+.member-profile-page {
+  background: var(--brand-cream);
+  color: var(--brand-brown);
+}
+
+.admin-header,
+.admin-content {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, .9);
+}
+
+.admin-sidebar-brand {
+  min-height: 62px;
+  align-items: center;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--brand-brown);
+}
+
+.admin-sidebar-logo {
+  width: 58px;
+  height: auto;
+  flex: 0 0 auto;
+}
+
+.admin-sidebar-brand strong {
+  font-family: var(--font-chap), Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.admin-sidebar .admin-tabs a,
+.admin-mobile-menu .admin-tabs a,
+.admin-account,
+.admin-count,
+.admin-header .eyebrow {
+  color: var(--text-soft);
+}
+
+.admin-sidebar .admin-tabs a:hover,
+.admin-mobile-menu .admin-tabs a:hover {
+  background: rgba(255, 255, 255, .58);
+  color: var(--brand-burgundy);
+}
+
+.admin-sidebar .admin-tabs a[aria-current="page"],
+.admin-mobile-menu .admin-tabs a[aria-current="page"] {
+  background: white;
+  color: var(--brand-burgundy);
+  box-shadow: 0 1px 2px rgba(73, 63, 57, .04), 0 0 0 1px rgba(149, 94, 110, .08);
+}
+
+.admin-sidebar .admin-tabs a[aria-current="page"]::before {
+  background: var(--brand-light-burgundy);
+}
+
+.admin-avatar {
+  border-color: var(--line-strong);
+  color: var(--brand-burgundy);
+}
+
+.admin-header h1,
+.admin-detail-header h2,
+.admin-module-card h2,
+.admin-module-placeholder h2,
+.member-self-service-intro h2,
+.member-profile-hero h1,
+.member-profile-section h2,
+.cms-article-header h1,
+.cms-documents h2 {
+  color: var(--brand-brown);
+  font-weight: 300;
+}
+
+.admin-button {
+  border-color: var(--line-strong);
+  color: var(--brand-brown);
+}
+
+.admin-button:hover:not(:disabled) {
+  border-color: var(--brand-light-burgundy);
+  background: var(--accent-soft);
+}
+
+.admin-button.is-active {
+  border-color: var(--brand-light-burgundy);
+  background: var(--accent-soft);
+  color: var(--brand-burgundy);
+}
+
+.admin-search input:focus,
+.admin-detail-form input:focus,
+.admin-detail-form textarea:focus,
+.export-form select:focus,
+.member-self-service-form input:focus,
+.member-self-service-form textarea:focus {
+  border-color: var(--brand-light-burgundy);
+  outline-color: rgba(149, 94, 110, .22);
+}
+
+.admin-select-column input,
+.admin-checkbox input {
+  accent-color: var(--brand-light-burgundy);
+}
+
+.admin-table tbody tr:hover,
+.admin-module-card:hover,
+.cms-documents a:hover {
+  background: var(--surface-muted);
+}
+
+.admin-row-button,
+.admin-sort:hover,
+.admin-module-card span,
+.admin-audit-actions > a,
+.admin-audit-actions summary,
+.cms-article-back a,
+.cms-not-found a,
+.cms-preview-bar a,
+.member-privacy-rights a {
+  color: var(--brand-burgundy);
+}
+
+.admin-detail-panel,
+.public-article-panel,
+.member-profile-section,
+.member-self-service-box {
+  border-color: var(--line);
+}
+
+.member-self-service-entry {
+  border-color: var(--line);
+  background: var(--surface-muted);
+}
+
+.member-self-service-tabs {
+  background: #e2ded0;
+}
+
+.member-self-service-tabs button[aria-selected="true"] {
+  color: var(--brand-burgundy);
+}
+
+.cms-public-page,
+.cms-preview-page {
+  background: var(--brand-cream);
+  color: var(--brand-brown);
+}
+
+.cms-article-intro,
+.cms-article-body,
+.member-self-service-intro > p:last-child,
+.member-profile-hero > p:last-child {
+  color: var(--text-soft);
+}
+
+.cms-public-footer,
+.cms-documents,
+.cms-article-back,
+.public-article-panel-header {
+  border-color: var(--line);
+}
+
+@media (max-width: 900px) {
+  .admin-shell {
+    background: var(--brand-cream);
+  }
+
+  .admin-mobile-menu > div {
+    border-color: var(--line);
+    background: var(--surface-muted);
+  }
 }

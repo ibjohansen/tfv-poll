@@ -3,21 +3,21 @@ import { mtConfig } from "@material-tailwind/react";
 const materialTailwind = mtConfig({
   radius: "1rem",
   fonts: {
-    sans: "Inter, ui-sans-serif, system-ui, sans-serif",
+    sans: "var(--font-fragment-serif), Georgia, serif",
   },
   colors: {
-    background: "#f8fafc",
-    foreground: "#334155",
+    background: "#EBEBDE",
+    foreground: "#493F39",
     surface: {
-      default: "#e2e8f0",
-      dark: "#cbd5e1",
-      light: "#f1f5f9",
-      foreground: "#0f172a",
+      default: "#FFFFFF",
+      dark: "#DDD9CA",
+      light: "#F6F5EC",
+      foreground: "#493F39",
     },
     primary: {
-      default: "#24513f",
-      dark: "#193c2e",
-      light: "#326b54",
+      default: "#955E6E",
+      dark: "#5A2636",
+      light: "#B98493",
       foreground: "#ffffff",
     },
   },
@@ -40,6 +40,14 @@ const config = {
     "./components/**/*.{js,jsx,mdx}",
   ],
   plugins: [materialTailwindPlugin],
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['var(--font-fragment-serif)', 'Georgia', 'serif'],
+        display: ['var(--font-chap)', 'Arial', 'sans-serif'],
+      },
+    },
+  },
 };
 
 export default config;

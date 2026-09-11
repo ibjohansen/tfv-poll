@@ -1,8 +1,7 @@
 import Link from "next/link";
 import MemberInfo from "@/components/MemberInfo";
 import { getMemberAccess } from "@/lib/membership";
-import Image from "next/image";
-import logo from "@/public/turufjell-vel-logo.png";
+import BrandLogo from '@/components/BrandLogo';
 import SurveyForm from "@/components/SurveyForm";
 import { surveyDocuments, surveyLinkParameters } from "@/data/survey";
 
@@ -34,7 +33,7 @@ export default async function HomePage({ searchParams }) {
       <div className="page-shell">
         <header className="hero">
           <div className="brand-logo">
-            <Image src={logo} alt="Turufjell vel" sizes="(max-width: 760px) 180px, 220px" priority />
+            <BrandLogo variant="stacked" priority className="h-auto w-full" />
           </div>
           <div className="hero-copy">
             <p className="eyebrow">Turufjell vel</p>

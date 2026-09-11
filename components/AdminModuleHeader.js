@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { signOut } from '@/auth';
+import BrandLogo from '@/components/BrandLogo';
 
 const modules = [
   { href: '/admin', label: 'Oversikt', key: 'overview', icon: 'home' },
@@ -31,7 +32,7 @@ export default function AdminModuleHeader({ active, title, email }) {
   const initial = email?.trim().charAt(0).toUpperCase() || 'T';
   return <>
     <aside className="admin-sidebar">
-      <Link className="admin-sidebar-brand" href="/admin"><span aria-hidden="true">TV</span><strong>Medlemsservice</strong></Link>
+      <Link className="admin-sidebar-brand" href="/admin"><BrandLogo variant="stacked" decorative className="admin-sidebar-logo" /><strong>Medlemsservice</strong></Link>
       <Navigation active={active} />
       <div className="admin-account"><span className="admin-avatar" aria-hidden="true">{initial}</span><span className="admin-account-email">{email}</span><LogoutButton /></div>
     </aside>

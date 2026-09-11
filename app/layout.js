@@ -1,4 +1,5 @@
 import "./globals.css";
+import { chap, fragmentSerif } from './fonts';
 
 export const metadata = {
   title: "Medlemsservice | Turufjell vel",
@@ -12,7 +13,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="nb">
+    <html lang="nb" className={`${chap.variable} ${fragmentSerif.variable}`}>
       <body>{children}</body>
     </html>
   );
