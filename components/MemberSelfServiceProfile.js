@@ -52,6 +52,7 @@ export default function MemberSelfServiceProfile({ initialProfile }) {
       <dl className="member-readonly-grid">
         <div><dt>H-nummer</dt><dd>{member.h_number || 'Ikke registrert'}</dd></div>
         <div><dt>Gårds- og bruksnummer</dt><dd>{member.cadastral_number || 'Ikke registrert'}</dd></div>
+        <div><dt>Seksjonsnummer</dt><dd>{member.section_number || 'Ikke registrert'}</dd></div>
         <div><dt>Gateadresse</dt><dd>{member.street_address || 'Ikke registrert'}</dd></div>
         <div><dt>Hjemmelshaver</dt><dd>{member.title_holder || 'Ikke registrert'}</dd></div>
         <div><dt>Tinglysningsdato</dt><dd>{member.registration_date || 'Ikke registrert'}</dd></div>

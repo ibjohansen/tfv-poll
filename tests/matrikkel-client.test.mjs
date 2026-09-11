@@ -61,6 +61,8 @@ test('address matching accepts one exact property and rejects ambiguity', () => 
   const exact = { adressetekst: 'Turufjellvegen 382', kommunenummer: '3320', gardsnummer: 10, bruksnummer: 371 };
   assert.equal(chooseAddressCandidate([exact], 'Turufjellvegen 382').matchType, 'EXACT');
   assert.throws(() => chooseAddressCandidate([exact, { ...exact, bruksnummer: 372 }], 'Turufjellvegen 382'), /flere forskjellige/);
+  assert.equal(chooseAddressCandidate([exact, { ...exact, bruksnummer: 372 }], 'Turufjellvegen 382', { gnr: '10', bnr: '372' }).matchType, 'EXACT_PROPERTY');
+  assert.throws(() => chooseAddressCandidate([exact], 'Turufjellvegen 382', { gnr: '10', bnr: '999' }), /stemmer ikke/);
   assert.throws(() => chooseAddressCandidate([{ ...exact, kommunenummer: '0301' }], 'Turufjellvegen 382'), /Ingen entydig/);
 });
 

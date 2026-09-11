@@ -7,7 +7,7 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import MemberPropertyMap from '@/components/MemberPropertyMap';
 
 const fields = [
-  ['h_number', 'H-nummer', true], ['cadastral_number', 'Gårds- og bruksnummer', true], ['street_address', 'Gateadresse', true],
+  ['h_number', 'H-nummer', true], ['cadastral_number', 'Gårds- og bruksnummer', true], ['section_number', 'Seksjonsnummer', true], ['street_address', 'Gateadresse', true],
   ['title_holder', 'Hjemmelshaver', true, true], ['registration_date', 'Tinglysningsdato', true, true], ['primary_contact_name', 'Kontaktperson'],
   ['primary_contact_email', 'Hoved-e-post'], ['other_contact_emails', 'Andre e-postadresser'], ['admin_comment', 'Kommentar'],
 ];
@@ -75,7 +75,7 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [exportOpen, exporting]);
   const select = (member) => { setSelected(member); setForm({ ...member, other_contact_emails: (member.other_contact_emails || []).join('\n') }); setMessage(''); setNewToken(''); };
-  const create = () => { setSelected({ isNew: true }); setForm({ h_number: '', cadastral_number: '', street_address: '', title_holder: '', registration_date: '', primary_contact_name: '', primary_contact_email: '', other_contact_emails: '', admin_comment: '' }); setMessage(''); setNewToken(''); };
+  const create = () => { setSelected({ isNew: true }); setForm({ h_number: '', cadastral_number: '', section_number: '', street_address: '', title_holder: '', registration_date: '', primary_contact_name: '', primary_contact_email: '', other_contact_emails: '', admin_comment: '' }); setMessage(''); setNewToken(''); };
   const close = () => { setSelected(null); setForm(null); setNewToken(''); };
   async function save(event) {
     event.preventDefault();

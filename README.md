@@ -38,7 +38,8 @@ Sertifikatkontrollen skal ikke deaktiveres.
   øvrige brukere får innloggingslenken.
 - Hamburgermenyen åpner Microsoft 365-innlogging via `/admin/login`.
 - `/admin` er startsiden for Medlemsservice og viser tilgjengelige moduler.
-- `/admin/inbox` er innboksen for e-postverifiserte innmeldinger og eierskifter.
+- `/admin/inbox` er oppgavelisten for innmeldinger, eierskifter og
+  matrikkelavklaringer, også når innsenderen ennå ikke har bekreftet e-postadressen.
 - `/admin/members` er modulen Medlemsregister.
 - `/admin/surveys` er modulen Undersøkelser.
 - `/admin/web` er CMS-et for nettsider, hovedbilder og nedlastbare vedlegg.
@@ -652,15 +653,19 @@ Utfør kontrollene i denne rekkefølgen:
   fokuspunktet.
 - Åpne `/admin` i et privat vindu og kontroller at du sendes til innlogging.
 - Logg inn som `ib@turufjellvel.no` og kontroller modulene Medlemsregister,
-  Innboks, Undersøkelser og Web. Velg et medlem med gateadresse, og kontroller
+  Oppgaveliste, Undersøkelser og Web. Velg et medlem med gateadresse, og kontroller
   at eiendomskartet er lukket under adressefeltet i detaljpanelet og kan åpnes.
   Kontroller at lukkeknappen forblir synlig når panelet rulles. Kontroller at
   H-nummer, adresse og de øvrige eiendomsfeltene ikke kan redigeres etter
   opprettelse. Aktiver filteret for mangelfull hovedkontakt eller hoved-e-post
   og kontroller at bare relevante medlemmer vises.
-- Send ett kontrollert eierskifte og én ny innmelding med testdata. Bekreft
-  innmeldingsadressen, og kontroller at sakene vises i `/admin/inbox`
-  og krever eksplisitt godkjenning eller avvisning. Fjern testdataene etterpå.
+- Send ett kontrollert eierskifte og én ny innmelding med testdata. Oppgi
+  gårds-/bruksnummer og eventuelt seksjonsnummer. Kontroller at innmeldingen
+  vises som ubekreftet i `/admin/inbox` før e-postlenken åpnes, og som bekreftet
+  etterpå. Kontroller matrikkelopplysningene fra oppgavelisten. Bruk også en
+  seksjonert testeiendom og kontroller at manglende eller ugyldig seksjonsnummer
+  krever kontroll eller eksplisitt manuell bekreftelse før saken kan godkjennes.
+  Fjern testdataene etterpå.
 - Åpne en undersøkelse, kontroller kakediagrammene under **Resultater**, og last
   ned en Excel-eksport.
 - Velg **Utsendelse**, send først en testmail til en eksplisitt testadresse, og
@@ -806,12 +811,19 @@ kontaktperson, hoved-e-post og alternative adresser. Feltverdiene erstattes
 først når en innlogget administrator godkjenner saken; offisielle eiendomsfelt
 endres aldri av godkjenningen. Godkjenningen tilbakekaller samtidig alle aktive
 selvbetjeningslenker for den tidligere eieren. **Meld inn ny tomt** kan brukes når minst
-H-nummer eller gateadresse ikke finnes. Oppgitt e-post må bekreftes med en egen
-24-timers lenke før saken vises for administrator. Godkjenning oppretter medlemmet
-så lenge H-nummer/adresse fremdeles ikke kolliderer med et aktivt medlem.
+H-nummer eller gateadresse ikke finnes. Skjemaet tar også imot gårds-/bruksnummer
+og valgfritt seksjonsnummer. Saken vises umiddelbart i oppgavelisten som
+ubekreftet. Oppgitt e-post kan bekreftes med en egen 24-timers lenke, og saken
+merkes da som bekreftet. Godkjenning oppretter medlemmet så lenge H-nummer/adresse
+fremdeles ikke kolliderer med et aktivt medlem.
 
-Ventende saker vises i den separate innboksen på `/admin/inbox`, med tydelig
-godkjenning eller avvisning. Begge endepunktene kontrollerer Microsoft Entra-
+Ventende saker vises i den separate oppgavelisten på `/admin/inbox`. Saker med
+status `pending_verification` merkes tydelig som ubekreftet, men administrator
+kan velge å behandle dem manuelt. Ved innmelding sammenlignes gateadressen med
+oppgitt gårds-/bruksnummer. Saksbehandler må deretter kontrollere matrikkelenheten
+mot Matrikkel-API-et eller bekrefte den manuelt; seksjonerte eiendommer kan ikke
+godkjennes før seksjonsnummeret er avklart. Godkjenning viser en ekstra
+advarsel om at e-postbekreftelsen overstyres. Begge endepunktene kontrollerer Microsoft Entra-
 administratortilgang server-side. Fordi den offentlige funksjonen nå bekrefter
 om H-nummer, adresse eller e-post finnes, kan den brukes til begrenset kartlegging
 av registeret selv om e-posten er maskert. Offentlige oppslag og endringer har
@@ -822,8 +834,11 @@ rategrense på `/api/member-access/*` og `/api/membership-requests*` i produksjo
 Databaseendringen er additiv og oppretter:
 
 - `member_access_tokens` for hash, utløp, bruk og tilbakekalling
-- `member_requests` for e-postverifisert innmelding og manuell behandling av
-  innmelding/eierskifte
+- `member_requests` for status på e-postbekreftelse og manuell behandling av
+  innmelding/eierskifte, inkludert gårds-/bruksnummer, seksjonsnummer og status
+  for matrikkelkontroll
+- `section_number` på `members` og `matrikkel_sync_backups`, slik at seksjonen
+  følger medlemmet og kan bevares under matrikkelsynkronisering
 - `member_profile_updates` for et minimalt revisjonsspor som bare lagrer navnene
   på kontaktfeltene som ble endret, ikke gamle eller nye verdier
 - e-posttypene `member_access` og `membership_verification` i
@@ -1086,7 +1101,7 @@ Før en produksjonsutsendelse:
 
 ## Medlemsservice og Microsoft 365
 
-Åpne `/admin` for startsiden i Medlemsservice, `/admin/inbox` for henvendelser,
+Åpne `/admin` for startsiden i Medlemsservice, `/admin/inbox` for oppgaver,
 `/admin/members` for medlemmer, `/admin/surveys` for undersøkelser eller
 `/admin/web` for nettsider. Publiserte
 CMS-sider vises automatisk på den offentlige forsiden og på sin egen slug.

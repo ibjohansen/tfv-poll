@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
   createAccessSecret, formatMemberLookupMessage, hashAccessSecret, isAccessSecret,
   maskEmailAddress, MEMBER_ACCESS_TTL_SECONDS, normalizeContactDetails,
-  normalizeHNumberLookup, normalizeMemberLookup, normalizeMembershipRequest,
+  normalizeCadastralNumber, normalizeHNumberLookup, normalizeMemberLookup,
+  normalizeMembershipRequest, normalizeSectionNumber,
 } from '../lib/member-self-service-utils.js';
 
 test('member access secrets are random and only stored as deterministic hashes', () => {
@@ -64,5 +65,18 @@ test('only valid normalized contact fields are accepted', () => {
 test('a membership request requires an address or H-number', () => {
   const contacts = { primary_contact_name: 'Kari Nordmann', primary_contact_email: 'kari@example.com' };
   assert.equal(normalizeMembershipRequest({ ...contacts, h_number: 'H25' }).h_number, 'H25');
+  assert.deepEqual(normalizeMembershipRequest({ ...contacts, street_address: 'Nedre Høgsetervegen 10', cadastral_number: ' 10 / 770 ', section_number: '03' }), {
+    h_number: null,
+    cadastral_number: '10/770',
+    section_number: '3',
+    street_address: 'Nedre Høgsetervegen 10',
+    primary_contact_name: 'Kari Nordmann',
+    primary_contact_email: 'kari@example.com',
+    other_contact_emails: [],
+  });
+  assert.equal(normalizeCadastralNumber('10 / 770'), '10/770');
+  assert.equal(normalizeSectionNumber('004'), '4');
+  assert.throws(() => normalizeCadastralNumber('10-770'), /Invalid cadastral number/);
+  assert.throws(() => normalizeMembershipRequest({ ...contacts, h_number: 'H25', section_number: '2' }), /Cadastral number required/);
   assert.throws(() => normalizeMembershipRequest(contacts), /Property identifier required/);
 });

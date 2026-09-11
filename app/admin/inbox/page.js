@@ -14,5 +14,5 @@ export default async function AdminInboxPage() {
   if (!isAllowedAdmin(session?.user)) redirect('/admin/login');
   let requests;
   try { requests = await getAdminMemberRequests(); } catch { requests = null; }
-  return <main className="admin-shell"><AdminModuleHeader active="inbox" title="Innboks" email={session.user.email} /><section className="admin-content">{requests ? <AdminMemberRequests initialRequests={requests} showEmpty /> : <p className="form-error" role="alert">Innboksen er midlertidig utilgjengelig. Prøv igjen senere.</p>}</section></main>;
+  return <main className="admin-shell"><AdminModuleHeader active="inbox" title="Oppgaveliste" email={session.user.email} /><section className="admin-content">{requests ? <AdminMemberRequests initialRequests={requests} showEmpty /> : <p className="form-error" role="alert">Oppgavelisten er midlertidig utilgjengelig. Prøv igjen senere.</p>}</section></main>;
 }

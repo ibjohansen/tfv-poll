@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 const emptyMembership = {
-  h_number: '', street_address: '', primary_contact_name: '',
+  h_number: '', cadastral_number: '', section_number: '', street_address: '', primary_contact_name: '',
   primary_contact_email: '', other_contact_emails: '',
 };
 
@@ -88,8 +88,10 @@ export default function MemberSelfServiceEntry({ membershipStatus = '' }) {
         <div className="member-form-grid">
           <label>H-nummer<input value={membership.h_number} onChange={(event) => setMembership({ ...membership, h_number: event.target.value })} maxLength={100} /></label>
           <label>Gateadresse<input value={membership.street_address} onChange={(event) => setMembership({ ...membership, street_address: event.target.value })} maxLength={500} /></label>
+          <label>Gårds- og bruksnummer<input value={membership.cadastral_number} onChange={(event) => setMembership({ ...membership, cadastral_number: event.target.value })} maxLength={50} inputMode="numeric" placeholder="10/770" /></label>
+          <label>Seksjonsnummer (valgfritt)<input value={membership.section_number} onChange={(event) => setMembership({ ...membership, section_number: event.target.value })} maxLength={20} inputMode="numeric" placeholder="For eksempel 3" /></label>
         </div>
-        <span className="member-form-note">Minst H-nummer eller gateadresse må fylles ut.</span>
+        <span className="member-form-note">Minst H-nummer eller gateadresse må fylles ut. Bruk formatet 10/770 for gårds- og bruksnummer. Oppgi seksjonsnummer hvis eiendommen er seksjonert.</span>
         <label>Kontaktperson<input value={membership.primary_contact_name} onChange={(event) => setMembership({ ...membership, primary_contact_name: event.target.value })} maxLength={500} autoComplete="name" required /></label>
         <label>Hoved-e-post<input type="email" value={membership.primary_contact_email} onChange={(event) => setMembership({ ...membership, primary_contact_email: event.target.value })} maxLength={254} autoComplete="email" required /></label>
         <label>Andre e-postadresser<textarea value={membership.other_contact_emails} onChange={(event) => setMembership({ ...membership, other_contact_emails: event.target.value })} rows={3} placeholder="Én adresse per linje" /></label>

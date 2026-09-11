@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS members (
     CHECK (access_token ~ '^[a-f0-9]{32}$'),
   h_number TEXT NOT NULL,
   cadastral_number TEXT,
+  section_number TEXT,
   street_address TEXT,
   title_holder TEXT,
   registration_date TEXT,
@@ -70,6 +71,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS survey_responses_member_survey_idx
 
 -- Adminfelt og stabil importidentitet. Flere medlemmer kan vente på H-nummer.
 ALTER TABLE members ADD COLUMN IF NOT EXISTS admin_comment TEXT;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS section_number TEXT;
 ALTER TABLE members ADD COLUMN IF NOT EXISTS import_key TEXT UNIQUE;
 ALTER TABLE members ADD COLUMN IF NOT EXISTS access_expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '180 days');
 ALTER TABLE members ADD COLUMN IF NOT EXISTS access_revoked_at TIMESTAMPTZ;
@@ -106,6 +108,7 @@ CREATE TABLE IF NOT EXISTS matrikkel_sync_backups (
   run_id TEXT NOT NULL REFERENCES matrikkel_sync_runs(id) ON DELETE RESTRICT,
   member_id BIGINT NOT NULL REFERENCES members(id) ON DELETE RESTRICT,
   cadastral_number TEXT,
+  section_number TEXT,
   title_holder TEXT,
   registration_date TEXT,
   PRIMARY KEY (run_id, member_id)
@@ -132,6 +135,7 @@ CREATE INDEX IF NOT EXISTS matrikkel_sync_runs_created_at_idx
 CREATE INDEX IF NOT EXISTS matrikkel_sync_items_status_idx
   ON matrikkel_sync_items (run_id, status);
 ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS h_number_filter TEXT;
+ALTER TABLE matrikkel_sync_backups ADD COLUMN IF NOT EXISTS section_number TEXT;
 ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 ALTER TABLE matrikkel_sync_runs DROP CONSTRAINT IF EXISTS matrikkel_sync_runs_status_check;
 ALTER TABLE matrikkel_sync_runs ADD CONSTRAINT matrikkel_sync_runs_status_check
@@ -342,7 +346,10 @@ CREATE TABLE IF NOT EXISTS member_requests (
   status TEXT NOT NULL CHECK (status IN ('pending_verification', 'pending', 'approved', 'rejected')),
   member_id BIGINT REFERENCES members(id) ON DELETE RESTRICT,
   h_number TEXT,
+  cadastral_number TEXT,
+  section_number TEXT,
   street_address TEXT,
+  matrikkel_review JSONB,
   requested_contact_name TEXT NOT NULL CHECK (char_length(requested_contact_name) BETWEEN 1 AND 500),
   requested_primary_email TEXT NOT NULL CHECK (char_length(requested_primary_email) <= 254),
   requested_other_emails TEXT[] NOT NULL DEFAULT '{}',
@@ -364,6 +371,9 @@ CREATE INDEX IF NOT EXISTS member_requests_member_idx
   ON member_requests (member_id, created_at DESC) WHERE member_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS member_requests_one_pending_transfer_idx
   ON member_requests (member_id) WHERE request_type = 'ownership_transfer' AND status = 'pending';
+ALTER TABLE member_requests ADD COLUMN IF NOT EXISTS cadastral_number TEXT;
+ALTER TABLE member_requests ADD COLUMN IF NOT EXISTS section_number TEXT;
+ALTER TABLE member_requests ADD COLUMN IF NOT EXISTS matrikkel_review JSONB;
 
 -- Minst mulig revisjonsspor for selvbetjente endringer. Tidligere og nye
 -- feltverdier dupliseres ikke; bare hvilke kontaktfelt som ble endret lagres.

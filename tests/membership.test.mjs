@@ -36,7 +36,7 @@ test('valid link returns member data and normalizes uppercase tokens', async () 
   };
   const access = await getMemberAccess(token.toUpperCase(), surveyId, db);
   assert.equal(access.status, 'ready');
-  assert.deepEqual(access.member, { id: '42', h_number: 'H-1', cadastral_number: undefined, street_address: 'Testveien 1', title_holder: undefined, registration_date: undefined, primary_contact_name: undefined, primary_contact_email: 'test@example.com', other_contact_emails: ['test@example.com'], has_responded: false });
+  assert.deepEqual(access.member, { id: '42', h_number: 'H-1', cadastral_number: undefined, section_number: undefined, street_address: 'Testveien 1', title_holder: undefined, registration_date: undefined, primary_contact_name: undefined, primary_contact_email: 'test@example.com', other_contact_emails: ['test@example.com'], has_responded: false });
   assert.equal(validateAccess(token, surveyId), null);
 });
 
@@ -46,7 +46,7 @@ test('existing response blocks submission while retaining member information', a
   const db = async () => ++calls === 1 ? [activeSurvey] : [member];
   const access = await getMemberAccess(token, surveyId, db);
   assert.equal(access.status, 'answered');
-  assert.deepEqual(access.member, { id: '42', h_number: 'H-1', cadastral_number: undefined, street_address: undefined, title_holder: undefined, registration_date: undefined, primary_contact_name: undefined, primary_contact_email: undefined, other_contact_emails: undefined, has_responded: true });
+  assert.deepEqual(access.member, { id: '42', h_number: 'H-1', cadastral_number: undefined, section_number: undefined, street_address: undefined, title_holder: undefined, registration_date: undefined, primary_contact_name: undefined, primary_contact_email: undefined, other_contact_emails: undefined, has_responded: true });
 });
 
 test('database failures do not become unknown-member results', async () => {

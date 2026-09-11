@@ -5,6 +5,7 @@ export default function MemberInfo({ access }) {
   const fields = member ? [
     ["H-nummer", member.h_number],
     ["Gårds- og bruksnummer", member.cadastral_number],
+    ["Seksjonsnummer", member.section_number],
     ["Gateadresse og nummer", member.street_address],
     ["Hjemmelshaver", member.title_holder],
     ["Tinglysningsdato", member.registration_date],
