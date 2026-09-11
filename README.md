@@ -38,6 +38,7 @@ Sertifikatkontrollen skal ikke deaktiveres.
   øvrige brukere får innloggingslenken.
 - Hamburgermenyen åpner Microsoft 365-innlogging via `/admin/login`.
 - `/admin` er startsiden for Medlemsservice og viser tilgjengelige moduler.
+- `/admin/inbox` er innboksen for e-postverifiserte innmeldinger og eierskifter.
 - `/admin/members` er modulen Medlemsregister.
 - `/admin/surveys` er modulen Undersøkelser.
 - `/admin/web` er CMS-et for nettsider, hovedbilder og nedlastbare vedlegg.
@@ -651,12 +652,14 @@ Utfør kontrollene i denne rekkefølgen:
   fokuspunktet.
 - Åpne `/admin` i et privat vindu og kontroller at du sendes til innlogging.
 - Logg inn som `ib@turufjellvel.no` og kontroller modulene Medlemsregister,
-  Undersøkelser og Web. Velg et medlem med gateadresse, og kontroller at
-  eiendomskartet vises under adressefeltet i detaljpanelet. Kontroller at
+  Innboks, Undersøkelser og Web. Velg et medlem med gateadresse, og kontroller
+  at eiendomskartet er lukket under adressefeltet i detaljpanelet og kan åpnes.
+  Kontroller at lukkeknappen forblir synlig når panelet rulles. Kontroller at
   H-nummer, adresse og de øvrige eiendomsfeltene ikke kan redigeres etter
-  opprettelse.
+  opprettelse. Aktiver filteret for mangelfull hovedkontakt eller hoved-e-post
+  og kontroller at bare relevante medlemmer vises.
 - Send ett kontrollert eierskifte og én ny innmelding med testdata. Bekreft
-  innmeldingsadressen, og kontroller at sakene vises øverst i Medlemsregisteret
+  innmeldingsadressen, og kontroller at sakene vises i `/admin/inbox`
   og krever eksplisitt godkjenning eller avvisning. Fjern testdataene etterpå.
 - Åpne en undersøkelse, kontroller kakediagrammene under **Resultater**, og last
   ned en Excel-eksport.
@@ -664,7 +667,8 @@ Utfør kontrollene i denne rekkefølgen:
   kontroller MailerSend-statusen. Start ikke masseutsendelsen før domenekontrollen
   nedenfor er fullført.
 - Opprett et CMS-utkast, last opp et lite testvedlegg, forhåndsvis, publiser og
-  kontroller den offentlige visningen. Fjern testinnholdet etterpå.
+  kontroller den offentlige visningen. Kontroller også at sideoversikten kan
+  brukes uten horisontal rulling på mobil. Fjern testinnholdet etterpå.
 - Generer eller bruk testlenken for eget medlem med H-nummer 25. Kontroller
   opplysningene uten å sende inn et svar dersom undersøkelsen er reell. Kontroller
   at eiendomskartet søker på gateadressen i Flå, starter med adresseinformasjonen
@@ -806,7 +810,7 @@ H-nummer eller gateadresse ikke finnes. Oppgitt e-post må bekreftes med en egen
 24-timers lenke før saken vises for administrator. Godkjenning oppretter medlemmet
 så lenge H-nummer/adresse fremdeles ikke kolliderer med et aktivt medlem.
 
-Ventende saker vises øverst i `/admin/members`, med separat og tydelig
+Ventende saker vises i den separate innboksen på `/admin/inbox`, med tydelig
 godkjenning eller avvisning. Begge endepunktene kontrollerer Microsoft Entra-
 administratortilgang server-side. Fordi den offentlige funksjonen nå bekrefter
 om H-nummer, adresse eller e-post finnes, kan den brukes til begrenset kartlegging
@@ -1082,8 +1086,9 @@ Før en produksjonsutsendelse:
 
 ## Medlemsservice og Microsoft 365
 
-Åpne `/admin` for startsiden i Medlemsservice, `/admin/members` for medlemmer,
-`/admin/surveys` for undersøkelser eller `/admin/web` for nettsider. Publiserte
+Åpne `/admin` for startsiden i Medlemsservice, `/admin/inbox` for henvendelser,
+`/admin/members` for medlemmer, `/admin/surveys` for undersøkelser eller
+`/admin/web` for nettsider. Publiserte
 CMS-sider vises automatisk på den offentlige forsiden og på sin egen slug.
 Oversiktene kan sorteres på kolonneoverskriftene. Medlemslisten har søk og
 uendelig rulling; klikk på en rad for å åpne redigeringspanelet fra høyre.

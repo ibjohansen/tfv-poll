@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderMemberAccessEmail, renderMembershipVerificationEmail, renderSurveyInvitationEmail } from '../lib/email-templates.js';
+import { formatNorwegianDateTime, renderMemberAccessEmail, renderMembershipVerificationEmail, renderSurveyInvitationEmail, SYSTEM_EMAIL_FOOTER } from '../lib/email-templates.js';
 import { buildSurveyUrl, isPastSurveyEnd, parseTestRecipients, selectCampaignRecipients } from '../lib/survey-email-utils.js';
 
 test('survey URL uses the existing token and survey parameter names', () => {
@@ -16,7 +16,8 @@ test('survey invitation has responsive HTML, CTA, visible URL and equivalent pla
   assert.match(rendered.html, /Åpne undersøkelsen/);
   assert.match(rendered.html, /Test &lt;survey&gt;/);
   assert.match(rendered.html, /survey\?klm=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&amp;xyz=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/);
-  assert.match(rendered.text, /31\.12\.2026/);
+  assert.match(rendered.text, /Torsdag 31\. desember 2026 kl\. 00:00/);
+  assert.match(rendered.text, new RegExp(SYSTEM_EMAIL_FOOTER.replace('.', '\\.')));
   assert.match(rendered.text, /klm=/);
   assert.doesNotMatch(rendered.html, /<script|fonts\.googleapis/i);
 });
@@ -30,8 +31,13 @@ test('member access and membership verification emails contain a visible 24-hour
     assert.match(rendered.html, /varer i 24 timer/);
     assert.match(rendered.html, /token=aaaaaaaa/);
     assert.match(rendered.text, /varer i 24 timer/);
+    assert.match(rendered.text, new RegExp(SYSTEM_EMAIL_FOOTER.replace('.', '\\.')));
     assert.doesNotMatch(rendered.html, /<script|fonts\.googleapis/i);
   }
+});
+
+test('correspondence dates use Norwegian weekday, month and time', () => {
+  assert.equal(formatNorwegianDateTime('2027-09-07'), 'Tirsdag 7. september 2027 kl. 00:00');
 });
 
 test('recipient selection excludes missing and invalid email addresses', () => {

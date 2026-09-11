@@ -10,8 +10,9 @@ export async function GET(request) {
   const page = /^\d{1,6}$/.test(searchParams.get('page') || '') ? Math.max(1, Number(searchParams.get('page'))) : 1;
   const sort = searchParams.get('sort') || 'h_number';
   const direction = searchParams.get('dir') === 'desc' ? 'desc' : 'asc';
+  const incompleteContact = searchParams.get('contact') === 'incomplete';
   try {
-    const data = await getAdminMembers(search, page, sort, direction);
+    const data = await getAdminMembers(search, page, sort, direction, incompleteContact);
     return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     const status = error.message === 'Unauthorized' ? 401 : 500;

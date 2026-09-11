@@ -61,15 +61,16 @@ export default function MemberPropertyMap({ streetAddress }) {
   if (!streetAddress) return null;
 
   return (
-    <div className="member-map">
-      <div className="member-map-heading">
+    <details className="member-map">
+      <summary className="member-map-heading">
         <div>
           <strong>Eiendomskart</strong>
           <span>{streetAddress}, {PLACE_NAME}</span>
         </div>
-      </div>
-      <MapFrame coordinates={coordinates} streetAddress={streetAddress} title={`Eiendomskart for ${streetAddress}, ${PLACE_NAME}`} />
-      <a className="member-map-source" href={mapUrl(streetAddress, coordinates)} target="_blank" rel="noreferrer">Åpne i Norgeskart</a>
-    </div>
+        <span className="member-map-toggle" aria-hidden="true">Vis kart</span>
+      </summary>
+      <div className="member-map-content"><MapFrame coordinates={coordinates} streetAddress={streetAddress} title={`Eiendomskart for ${streetAddress}, ${PLACE_NAME}`} />
+        <a className="member-map-source" href={mapUrl(streetAddress, coordinates)} target="_blank" rel="noreferrer">Åpne i Norgeskart</a></div>
+    </details>
   );
 }

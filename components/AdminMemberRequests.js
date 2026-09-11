@@ -8,13 +8,13 @@ function requestTitle(request) {
   return request.request_type === 'ownership_transfer' ? `Eierskifte · ${request.h_number}` : `Ny innmelding · ${request.h_number || request.street_address}`;
 }
 
-export default function AdminMemberRequests({ initialRequests }) {
+export default function AdminMemberRequests({ initialRequests, showEmpty = false }) {
   const router = useRouter();
   const [requests, setRequests] = useState(initialRequests);
   const [decision, setDecision] = useState(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  if (!requests.length && !message) return null;
+  if (!requests.length && !message && !showEmpty) return null;
 
   async function resolve() {
     setBusy(true); setMessage('');
@@ -32,7 +32,8 @@ export default function AdminMemberRequests({ initialRequests }) {
   }
 
   return <section className="admin-member-requests" aria-labelledby="member-requests-title">
-    <div className="admin-section-header"><div><p className="eyebrow">Til behandling</p><h2 id="member-requests-title">Medlemsforespørsler</h2></div><span>{requests.length}</span></div>
+    <div className="admin-section-header"><div><p className="eyebrow">Til behandling</p><h2 id="member-requests-title">Henvendelser</h2></div><span>{requests.length}</span></div>
+    {!requests.length && <p className="admin-inbox-empty">Innboksen er tom. Nye, e-postverifiserte innmeldinger og eierskifter vises her.</p>}
     {requests.length > 0 && <div className="admin-member-request-list">{requests.map((request) => <article key={request.id}>
       <div><h3>{requestTitle(request)}</h3><p>{request.street_address || 'Adresse ikke oppgitt'} · {request.title_holder || 'Ingen registrert hjemmelshaver'}</p></div>
       <dl><div><dt>Ny kontaktperson</dt><dd>{request.requested_contact_name}</dd></div><div><dt>Ny hoved-e-post</dt><dd>{request.requested_primary_email}</dd></div><div><dt>Andre adresser</dt><dd>{request.requested_other_emails?.join(', ') || 'Ingen'}</dd></div></dl>
