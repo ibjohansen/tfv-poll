@@ -3,6 +3,7 @@ import Link from 'next/link';
 import landscape from '@/public/turufjell.jpeg';
 import SiteHeader from '@/components/SiteHeader';
 import PublicArticleDirectory from '@/components/PublicArticleDirectory';
+import MemberSelfServiceEntry from '@/components/MemberSelfServiceEntry';
 import { auth } from '@/auth';
 import { isAllowedAdmin } from '@/lib/admin-policy';
 import { getPublishedCmsPage, getPublishedCmsPageSummaries } from '@/lib/cms-pages';
@@ -13,6 +14,7 @@ export const runtime = 'nodejs';
 
 export default async function HomePage({ searchParams }) {
   const isAdmin = isAllowedAdmin((await auth())?.user);
+  const params = await searchParams;
   let pages = [];
   let initialPage = null;
   try {
@@ -20,7 +22,7 @@ export default async function HomePage({ searchParams }) {
   } catch {
     // Forsiden skal fortsatt fungere før CMS-tabellene er opprettet eller ved et kort databaseavbrudd.
   }
-  const requestedArticle = String((await searchParams)?.article || '');
+  const requestedArticle = String(params?.article || '');
   if (isValidCmsSlug(requestedArticle)) {
     try {
       initialPage = await getPublishedCmsPage(requestedArticle);
@@ -50,6 +52,7 @@ export default async function HomePage({ searchParams }) {
           </div>
         </section>
 
+        <MemberSelfServiceEntry membershipStatus={String(params?.membership || '')} />
         {pages.length > 0 && <PublicArticleDirectory pages={pages} initialPage={initialPage} />}
       </main>
       <footer className="border-t border-slate-200 bg-white">

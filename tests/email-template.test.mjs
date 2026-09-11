@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderSurveyInvitationEmail } from '../lib/email-templates.js';
+import { renderMemberAccessEmail, renderMembershipVerificationEmail, renderSurveyInvitationEmail } from '../lib/email-templates.js';
 import { buildSurveyUrl, isPastSurveyEnd, parseTestRecipients, selectCampaignRecipients } from '../lib/survey-email-utils.js';
 
 test('survey URL uses the existing token and survey parameter names', () => {
@@ -19,6 +19,19 @@ test('survey invitation has responsive HTML, CTA, visible URL and equivalent pla
   assert.match(rendered.text, /31\.12\.2026/);
   assert.match(rendered.text, /klm=/);
   assert.doesNotMatch(rendered.html, /<script|fonts\.googleapis/i);
+});
+
+test('member access and membership verification emails contain a visible 24-hour secret link', () => {
+  const actionUrl = `https://medlemsservice.turufjellvel.no/api/member-access/verify?token=${'a'.repeat(64)}`;
+  for (const rendered of [
+    renderMemberAccessEmail({ actionUrl, baseUrl: 'https://medlemsservice.turufjellvel.no' }),
+    renderMembershipVerificationEmail({ actionUrl, baseUrl: 'https://medlemsservice.turufjellvel.no' }),
+  ]) {
+    assert.match(rendered.html, /varer i 24 timer/);
+    assert.match(rendered.html, /token=aaaaaaaa/);
+    assert.match(rendered.text, /varer i 24 timer/);
+    assert.doesNotMatch(rendered.html, /<script|fonts\.googleapis/i);
+  }
 });
 
 test('recipient selection excludes missing and invalid email addresses', () => {

@@ -5,6 +5,7 @@ import { getAdminMembers } from '@/lib/admin-members';
 import { getAdminSurveys } from '@/lib/admin-surveys';
 import AdminMemberDirectory from '@/components/AdminMemberDirectory';
 import AdminModuleHeader from '@/components/AdminModuleHeader';
+import { getAdminMemberRequests } from '@/lib/member-self-service';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -19,6 +20,7 @@ export default async function AdminMembersPage({ searchParams }) {
   const direction = params.dir === 'desc' ? 'desc' : 'asc';
   let data;
   let surveys;
-  try { [data, surveys] = await Promise.all([getAdminMembers(search, 1, sort, direction), getAdminSurveys()]); } catch { data = null; }
-  return <main className="admin-shell"><AdminModuleHeader active="members" title="Medlemsregister" email={session.user.email} /><section className="admin-content">{!data ? <p className="form-error" role="alert">Medlemsregisteret er midlertidig utilgjengelig. Prøv igjen senere.</p> : <AdminMemberDirectory key={`${search}-${sort}-${direction}`} data={data} surveys={surveys} search={search} sort={sort} direction={direction} />}</section></main>;
+  let memberRequests;
+  try { [data, surveys, memberRequests] = await Promise.all([getAdminMembers(search, 1, sort, direction), getAdminSurveys(), getAdminMemberRequests()]); } catch { data = null; }
+  return <main className="admin-shell"><AdminModuleHeader active="members" title="Medlemsregister" email={session.user.email} /><section className="admin-content">{!data ? <p className="form-error" role="alert">Medlemsregisteret er midlertidig utilgjengelig. Prøv igjen senere.</p> : <AdminMemberDirectory key={`${search}-${sort}-${direction}`} data={data} surveys={surveys} memberRequests={memberRequests} search={search} sort={sort} direction={direction} />}</section></main>;
 }

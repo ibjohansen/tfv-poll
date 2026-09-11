@@ -316,3 +316,67 @@ CREATE TABLE IF NOT EXISTS email_suppressions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Tidsbegrenset e-postinnlogging for medlemmenes selvbetjening. Bare SHA-256-
+-- hash av den tilfeldige lenkehemmeligheten lagres i databasen.
+CREATE TABLE IF NOT EXISTS member_access_tokens (
+  id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
+  member_id BIGINT NOT NULL REFERENCES members(id) ON DELETE RESTRICT,
+  token_hash TEXT NOT NULL UNIQUE CHECK (token_hash ~ '^[a-f0-9]{64}$'),
+  expires_at TIMESTAMPTZ NOT NULL,
+  last_used_at TIMESTAMPTZ,
+  revoked_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS member_access_tokens_member_idx
+  ON member_access_tokens (member_id, expires_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS member_access_tokens_one_active_idx
+  ON member_access_tokens (member_id) WHERE revoked_at IS NULL;
+
+-- Eierskifte og innmelding krever manuell behandling. Offisielle eiendomsdata
+-- endres aldri direkte fra det offentlige skjemaet.
+CREATE TABLE IF NOT EXISTS member_requests (
+  id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
+  request_type TEXT NOT NULL CHECK (request_type IN ('ownership_transfer', 'membership')),
+  status TEXT NOT NULL CHECK (status IN ('pending_verification', 'pending', 'approved', 'rejected')),
+  member_id BIGINT REFERENCES members(id) ON DELETE RESTRICT,
+  h_number TEXT,
+  street_address TEXT,
+  requested_contact_name TEXT NOT NULL CHECK (char_length(requested_contact_name) BETWEEN 1 AND 500),
+  requested_primary_email TEXT NOT NULL CHECK (char_length(requested_primary_email) <= 254),
+  requested_other_emails TEXT[] NOT NULL DEFAULT '{}',
+  verification_token_hash TEXT UNIQUE CHECK (verification_token_hash IS NULL OR verification_token_hash ~ '^[a-f0-9]{64}$'),
+  verification_expires_at TIMESTAMPTZ,
+  verified_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  resolved_at TIMESTAMPTZ,
+  resolved_by TEXT,
+  CHECK (
+    (request_type = 'ownership_transfer' AND member_id IS NOT NULL AND status <> 'pending_verification') OR
+    (request_type = 'membership' AND (h_number IS NOT NULL OR street_address IS NOT NULL))
+  )
+);
+
+CREATE INDEX IF NOT EXISTS member_requests_status_idx
+  ON member_requests (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS member_requests_member_idx
+  ON member_requests (member_id, created_at DESC) WHERE member_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS member_requests_one_pending_transfer_idx
+  ON member_requests (member_id) WHERE request_type = 'ownership_transfer' AND status = 'pending';
+
+-- Minst mulig revisjonsspor for selvbetjente endringer. Tidligere og nye
+-- feltverdier dupliseres ikke; bare hvilke kontaktfelt som ble endret lagres.
+CREATE TABLE IF NOT EXISTS member_profile_updates (
+  id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
+  member_id BIGINT NOT NULL REFERENCES members(id) ON DELETE RESTRICT,
+  changed_fields TEXT[] NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS member_profile_updates_member_idx
+  ON member_profile_updates (member_id, created_at DESC);
+
+ALTER TABLE email_deliveries DROP CONSTRAINT IF EXISTS email_deliveries_email_type_check;
+ALTER TABLE email_deliveries ADD CONSTRAINT email_deliveries_email_type_check
+  CHECK (email_type IN ('survey_invitation', 'survey_test', 'member_access', 'membership_verification'));

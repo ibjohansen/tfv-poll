@@ -29,6 +29,11 @@ Sertifikatkontrollen skal ikke deaktiveres.
 ## Sider og tilgang
 
 - `/` er en offentlig forside med logo, hovedinnhold og bunnfelt.
+- **Mine medlemsopplysninger** ligger alltid på forsiden før publiserte artikler.
+  Et medlem kan be om en 24-timers e-postlenke med H-nummer, gateadresse eller
+  registrert e-postadresse, eller sende inn en ny tomt til behandling.
+- `/mine-opplysninger` viser medlemsdata etter at den personlige e-postlenken er
+  åpnet. Siden er ikke indekserbar og krever en gyldig HttpOnly-økt.
 - Innloggede administratorer får lenke direkte til adminportalen i bunnfeltet;
   øvrige brukere får innloggingslenken.
 - Hamburgermenyen åpner Microsoft 365-innlogging via `/admin/login`.
@@ -55,7 +60,7 @@ renderes direkte i GitHub og de fleste Markdown-visere.
 
 ```mermaid
 flowchart LR
-  member["Medlem\nbruker personlig undersøkelseslenke"]
+  member["Medlem\nbruker personlig undersøkelses- eller selvbetjeningslenke"]
   admin["Administrator\n@turufjellvel.no"]
   app["Medlemsservice\nNext.js-applikasjon for Turufjell vel"]
   entra["Microsoft Entra ID\nidentitetsleverandør"]
@@ -63,7 +68,7 @@ flowchart LR
   storage[("Neon Object Storage\nbilder og vedlegg")]
   mailer["MailerSend Email API\ntransaksjonell levering"]
 
-  member -->|"Åpner lenke og svarer"| app
+  member -->|"Ser data, retter kontaktfelt eller svarer"| app
   admin -->|"Administrerer medlemmer, undersøkelser og nettsider"| app
   app -->|"Logger inn administrator"| entra
   app -->|"Leser og skriver data"| neon
@@ -78,7 +83,7 @@ flowchart TB
   browser["Nettleser\nOffentlig forside, undersøkelse og Medlemsservice"]
   next["Next.js / Node.js\nApp Router, sider, API-ruter og tilgangskontroll"]
   auth["Auth.js\nMicrosoft Entra ID-integrasjon"]
-  db[("Neon Postgres\nmembers · surveys · responses · cms_pages · cms_attachments")]
+  db[("Neon Postgres\nmembers · member_requests · surveys · responses · CMS")]
   storage[("Privat Neon Object Storage\ncms-assets")]
   files["Statiske dokumenter\npublic/survey/dokumenter"]
   matrikkel["Kartverket\nAdresse-API, A5 og Matrikkel SOAP-API"]
@@ -114,6 +119,9 @@ gang til.
 | `app/survey/page.js` og `lib/membership.js` | Validerer den personlige lenken og henter kun medlemmet og undersøkelsen lenken gjelder. |
 | `app/survey/api/responses/route.js` | Validerer svar, lenke, origin og rategrense før svaret lagres. |
 | `app/admin/*` og `app/api/admin/*` | Viser og endrer medlemmer/undersøkelser etter Microsoft-innlogging. |
+| `app/api/member-access/*` og `lib/member-self-service.js` | Matcher medlem server-side, sender tidsbegrenset tilgangslenke, validerer den hash-lagrede hemmeligheten og tillater bare retting av kontaktfeltene. |
+| `app/api/membership-requests/*` | Tar imot ny innmelding, verifiserer oppgitt e-post og legger forespørselen i administrativ behandlingskø. |
+| `app/api/admin/member-requests/*` | Krever Entra-basert administratortilgang og godkjenner eller avviser verifiserte eierskifter og innmeldinger. |
 | `app/admin/web/*` og `app/api/admin/cms/*` | Administrerer strukturert sideinnhold og filmetadata. Alle endringer krever adminøkt. |
 | `app/[slug]/page.js` og `components/CmsPageView.js` | Viser kun publiserte sider med systemstyrt typografi og avsnitt. |
 | `app/api/cms/files/*` og `lib/cms-storage.js` | Leverer filer fra en privat bøtte etter kontroll av publiseringsstatus eller adminøkt. |
@@ -122,6 +130,7 @@ gang til.
 | `lib/matrikkel-sync.js` | Oppretter sikkerhetskopi, behandler medlemmer og lagrer fremdrift og avvik. |
 | `netlify/functions/matrikkel-sync-background.mjs` | Kjører lange synkroniseringer uten å holde nettleserforespørselen åpen. |
 | `lib/mailer-service.js` og `lib/survey-email.js` | Validerer og sender e-post server-side, bygger personlig survey-invitasjon og holder MailerSend-detaljer utenfor resten av applikasjonen. |
+| `lib/email-templates.js` | Rendrer også de profilerte tilgangs- og innmeldingsmailene som HTML og ren tekst. |
 | `app/api/webhooks/mailersend` | Validerer HMAC-signatur og registrerer nødvendige leverings- og bounce-hendelser idempotent. |
 | `netlify/functions/survey-email-background.mjs` | Behandler en databasebasert utsendelseskø kontrollert uten å holde nettleserforespørselen åpen. |
 | Neon Postgres | Holder medlemsdata, spørsmålsoppsett, besvarelser, sideinnhold og filmetadata. |
@@ -150,6 +159,30 @@ sequenceDiagram
   A->>D: Lagrer én besvarelse per medlem og undersøkelse
   D-->>A: Bekreftelse eller duplikatfeil
   A-->>B: Kvittering eller forklaring
+```
+
+### Innsyn og retting av medlemsopplysninger
+
+```mermaid
+sequenceDiagram
+  actor M as Medlem
+  participant B as Nettleser
+  participant A as Next.js
+  participant D as Neon Postgres
+  participant E as MailerSend
+
+  M->>B: Oppgir H-nummer, adresse eller e-post
+  B->>A: POST /api/member-access/request
+  A->>D: Søker etter ett entydig aktivt medlem
+  A->>D: Lagrer SHA-256-hash med 24 timers utløp
+  A->>E: Sender personlig tilgangslenke til registrert hoved-e-post
+  A-->>B: Samme generiske svar for treff og ikke-treff
+  M->>A: Åpner lenken
+  A->>D: Validerer hash og utløp
+  A-->>B: Setter HttpOnly-cookie og fjerner secret fra URL-en
+  M->>B: Retter kontaktfelt eller melder eierskifte
+  B->>A: PATCH /api/member-access/profile
+  A->>D: Oppdaterer kontaktfelt eller oppretter behandlingssak
 ```
 
 ### Administrasjon av medlemmer og undersøkelser
@@ -220,6 +253,9 @@ Start eller start utviklingsserveren på nytt med `npm run dev`.
 Ingen database brukes til medlemsoppslag eller innsendinger i denne modusen.
 Alle medlemsopplysningene er fiktive. Modusen er deaktivert i produksjon
 (`npm run build` / `npm run start` bruker den ordinære databaseløsningen).
+Den e-postbaserte medlemsselvbetjeningen og behandlingskøen kan ikke testes i
+mock-modus og utfører ingen reell utsendelse der; de krever Neon og en bevisst
+aktivert MailerSend-konfigurasjon.
 
 Testlenker:
 
@@ -598,13 +634,25 @@ Etter at GitHub-repositoriet er koblet til Netlify, utløser senere pushes til
 Utfør kontrollene i denne rekkefølgen:
 
 - Åpne `/` og kontroller toppbilde, publiserte artikler og artikkelpanelet.
+- Kontroller at **Mine medlemsopplysninger** alltid vises før artiklene. Be om
+  lenke med en kontrollert testbruker via H-nummer, adresse og e-post, og
+  kontroller at alle tre gir mail til den registrerte hovedadressen uten at
+  skjemaresponsen røper om et oppslag finnes.
+- Åpne tilgangslenken og kontroller at URL-en straks renses, at tilgangen utløper
+  etter 24 timer, at H-nummer/adresse/hjemmelshaver er skrivebeskyttet, og at
+  kontaktperson og e-postadresser kan oppdateres.
 - Kontroller at forsidebildet viser et bredere utsnitt med fokus forskjøvet mot
   venstre, og at loginbildet viser et vesentlig bredere utsnitt uten å miste
   fokuspunktet.
 - Åpne `/admin` i et privat vindu og kontroller at du sendes til innlogging.
 - Logg inn som `ib@turufjellvel.no` og kontroller modulene Medlemsregister,
   Undersøkelser og Web. Velg et medlem med gateadresse, og kontroller at
-  eiendomskartet vises under adressefeltet i detaljpanelet.
+  eiendomskartet vises under adressefeltet i detaljpanelet. Kontroller at
+  H-nummer, adresse og de øvrige eiendomsfeltene ikke kan redigeres etter
+  opprettelse.
+- Send ett kontrollert eierskifte og én ny innmelding med testdata. Bekreft
+  innmeldingsadressen, og kontroller at sakene vises øverst i Medlemsregisteret
+  og krever eksplisitt godkjenning eller avvisning. Fjern testdataene etterpå.
 - Åpne en undersøkelse, kontroller kakediagrammene under **Resultater**, og last
   ned en Excel-eksport.
 - Velg **Utsendelse**, send først en testmail til en eksplisitt testadresse, og
@@ -619,6 +667,8 @@ Utfør kontrollene i denne rekkefølgen:
 - Kjør bare **Test H-nummer 25** i matrikkelmodulen. Kontroller logg og resultat
   før en full matrikkelkjøring startes.
 - Kontroller at `/api/admin/surveys` returnerer `401` uten innlogget sesjon.
+- Kontroller at `/api/admin/member-requests/<id>` returnerer `401` uten
+  innlogget sesjon, og at `/mine-opplysninger` ikke viser data uten gyldig cookie.
 - Kontroller Netlify Functions-loggene for feil og verifiser at ingen
   hemmeligheter skrives til logg.
 
@@ -709,6 +759,72 @@ hindrer at medlemslenken sendes som referanse ved navigasjon til andre nettstede
 Svar og medlemsopplysninger skal behandles som personopplysninger: dokumenter
 formål, tilgang og slettefrist før utsending.
 
+### Mine medlemsopplysninger, eierskifte og innmelding
+
+Forsiden viser alltid **Mine medlemsopplysninger** før artiklene. En registrert
+bruker oppgir H-nummer, nøyaktig gateadresse, hoved-e-post eller en registrert
+alternativ e-post. Oppslaget skjer bare på serveren. Hvis nøyaktig ett aktivt
+medlem samsvarer og har en gyldig hoved-e-post, sendes tilgangslenken dit. Det
+offentlige svaret er det samme ved treff, ikke-treff, flere treff og manglende
+e-post, slik at skjemaet ikke blir et medlemsoppslag for uvedkommende.
+
+Tilgangslenken inneholder en kryptografisk tilfeldig hemmelighet på 32 bytes og
+varer i 24 timer. Bare SHA-256-hashen lagres i `member_access_tokens`. Når lenken
+åpnes, valideres den server-side, den rå hemmeligheten flyttes til en
+`HttpOnly`, `SameSite=Lax`-cookie med samme utløp, og nettleseren videresendes
+til en ren `/mine-opplysninger`-URL. Secret, e-postinnhold og full
+mottakeradresse skrives ikke til applikasjonsloggene. Nye lenker tilbakekaller
+tidligere aktive selvbetjeningslenker for samme medlem. Et mislykket MailerSend-
+forsøk tilbakekaller den nye lenken, slik at medlemmet kan prøve igjen.
+
+Medlemmet kan se registrerte eiendoms-, kontakt- og kommentaropplysninger,
+undersøkelsessvar med spørsmålssnapshot, registrert e-postleveringshistorikk og
+egne medlemsforespørsler. En maskinlesbar kopi kan lastes ned som JSON. Bare
+`primary_contact_name`, `primary_contact_email` og `other_contact_emails` kan
+endres direkte. H-nummer, gårds-/bruksnummer, gateadresse, hjemmelshaver og
+tinglysningsdato er skrivebeskyttet. De samme eiendomsfeltene er også
+skrivebeskyttet etter opprettelse i adminpanelets medlemsdetaljer.
+
+**Meld eierskifte** oppretter en merket, ventende forespørsel med ny
+kontaktperson, hoved-e-post og alternative adresser. Feltverdiene erstattes
+først når en innlogget administrator godkjenner saken; offisielle eiendomsfelt
+endres aldri av godkjenningen. Godkjenningen tilbakekaller samtidig alle aktive
+selvbetjeningslenker for den tidligere eieren. **Meld inn ny tomt** kan brukes når minst
+H-nummer eller gateadresse ikke finnes. Oppgitt e-post må bekreftes med en egen
+24-timers lenke før saken vises for administrator. Godkjenning oppretter medlemmet
+så lenge H-nummer/adresse fremdeles ikke kolliderer med et aktivt medlem.
+
+Ventende saker vises øverst i `/admin/members`, med separat og tydelig
+godkjenning eller avvisning. Begge endepunktene kontrollerer Microsoft Entra-
+administratortilgang server-side. Offentlige oppslag og endringer har origin-
+kontroll og per-instans rategrense; tilgangsmail og innmelding har i tillegg en
+10-minutters duplikatbrems i databasen. Sett også en delt Netlify WAF-
+rategrense på `/api/member-access/*` og `/api/membership-requests*` i produksjon.
+
+Databaseendringen er additiv og oppretter:
+
+- `member_access_tokens` for hash, utløp, bruk og tilbakekalling
+- `member_requests` for e-postverifisert innmelding og manuell behandling av
+  innmelding/eierskifte
+- `member_profile_updates` for et minimalt revisjonsspor som bare lagrer navnene
+  på kontaktfeltene som ble endret, ikke gamle eller nye verdier
+- e-posttypene `member_access` og `membership_verification` i
+  `email_deliveries`
+
+Utløpte selvbetjeningstoken og ubekreftede innmeldinger eldre enn syv dager etter
+utløp ryddes opportunistisk når samme type offentlig forespørsel brukes igjen.
+Godkjente, avviste og verifiserte saker slettes ikke automatisk. Fastsett derfor
+en dokumentert oppbevaringsfrist og eventuell planlagt slettejobb før produksjon.
+
+Selvbetjeningen støtter innsyn, retting og en maskinlesbar kopi, men er ikke i
+seg selv en komplett implementasjon av alle personvernrettigheter. Forespørsler
+om blant annet sletting, begrensning, dataportabilitet eller protest må fortsatt
+sendes til `post@turufjellvel.no` og vurderes konkret. Dokumenter identitetskontroll,
+behandlingsgrunnlag, frister og unntak i personvernrutinen. Se Datatilsynets
+veiledning om [rett til innsyn](https://www.datatilsynet.no/rettigheter-og-plikter/den-registrertes-rettigheter/rett-til-innsyn/),
+[retting og sletting](https://www.datatilsynet.no/rettigheter-og-plikter/virksomhetenes-plikter/retting-og-sletting/)
+og [dataportabilitet](https://www.datatilsynet.no/rettigheter-og-plikter/den-registrertes-rettigheter/rett-til-dataportabilitet/).
+
 ### CSV-import
 
 Importen leser semikolonseparert UTF-8 CSV, inkludert BOM og tom rad før overskriftene.
@@ -728,7 +844,8 @@ Regler:
 - `Matrikkel-eier` og `Matrikkel-tinglyst dato` bevares som tekst, inkludert ` / `.
   Eiernavn vises på separate linjer i både skjema og admin.
 - `Navn` ignoreres helt og er ikke påkrevd i CSV-en. Matrikkel-eier brukes alltid som kontaktnavn.
-- `Kommentar` lagres kun som adminfelt og hentes aldri i det offentlige medlemsoppslaget.
+- `Kommentar` lagres som adminfelt, men vises for det aktuelle medlemmet etter
+  gyldig 24-timers innlogging fordi selvbetjeningen gir innsyn i lagrede data.
 - Gjentatt import oppdaterer medlemmer etter en intern `import_key` basert på
   matrikkelnummer og adresse. Interne ID-er og medlemslenker beholdes også når
   `N/A` erstattes med et H-nummer. Dersom matrikkelnummer/adresse endres, må
@@ -827,12 +944,22 @@ av. Loggene inneholder bare type, interne medlem-/survey-ID-er, mottakerdomene,
 message ID, tidspunkt og resultat – aldri API-token, komplett e-postinnhold eller
 personlig survey-URL.
 
+Den samme tjenesten leverer survey-invitasjoner, 24-timers tilgang til **Mine
+medlemsopplysninger** og e-postbekreftelse av nye innmeldinger. Selvbetjeningen
+krever derfor fungerende MailerSend-konfigurasjon, men bruker ingen nye
+miljøvariabler. `members` er fortsatt eneste autoritative medlemsregister.
+
 ### Lokal utvikling og testmail
 
 `MAILERSEND_ENABLED=false` er standard i `.env.example`. Tester bruker falske
 HTTP-responser og sender ingen ekte e-post. For en bevisst lokal integrasjonstest
 legges egne credentials i `.env.local`, og flagget settes til `true`; filen skal
 aldri sjekkes inn.
+
+Når flagget er `false`, vises fortsatt de offentlige skjemaene, men det sendes
+ingen tilgangs- eller bekreftelsesmail. Endepunktene røper ikke om medlemmet
+finnes. Bruk derfor testadresser og en ikke-produksjonsdatabase ved lokal
+gjennomgang av hele selvbetjeningsflyten.
 
 I `/admin/surveys` åpner administratoren en eksisterende undersøkelse og velger
 **Utsendelse**. **Send testmail** krever én eller maksimalt to eksplisitte,
@@ -917,6 +1044,8 @@ Endringen oppretter additivt:
 - `email_deliveries` for mottaker, type, emne, provider message ID og status
 - `email_webhook_events` for idempotente leveringshendelser
 - `email_suppressions` for adresser som ikke skal forsøkes sendt igjen
+- `member_access_tokens`, `member_requests` og `member_profile_updates` for
+  tidsbegrenset selvbetjening og administrativ behandling
 
 Full HTML, plain-text og survey-token lagres ikke. Mottakeradressen lagres fordi
 den kreves for leveringskobling, feilsøking og suppression; fastsett tilgang,
