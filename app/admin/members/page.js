@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { isAllowedAdmin, isAuthConfigured } from '@/lib/admin-policy';
-import { getAdminMembers } from '@/lib/admin-members';
+import { getAdminMemberById, getAdminMembers } from '@/lib/admin-members';
 import { getAdminSurveys } from '@/lib/admin-surveys';
 import AdminMemberDirectory from '@/components/AdminMemberDirectory';
 import AdminModuleHeader from '@/components/AdminModuleHeader';
@@ -18,8 +18,11 @@ export default async function AdminMembersPage({ searchParams }) {
   const sort = ['h_number', 'street_address', 'title_holder', 'primary_contact_email'].includes(params.sort) ? params.sort : 'h_number';
   const direction = params.dir === 'desc' ? 'desc' : 'asc';
   const incompleteContact = params.contact === 'incomplete';
+  const hasComment = params.comment === 'present';
+  const selectedId = /^\d+$/.test(params.member || '') ? params.member : '';
   let data;
   let surveys;
-  try { [data, surveys] = await Promise.all([getAdminMembers(search, 1, sort, direction, incompleteContact), getAdminSurveys()]); } catch { data = null; }
-  return <main className="admin-shell"><AdminModuleHeader active="members" title="Medlemsregister" email={session.user.email} /><section className="admin-content">{!data ? <p className="form-error" role="alert">Medlemsregisteret er midlertidig utilgjengelig. Prøv igjen senere.</p> : <AdminMemberDirectory key={`${search}-${sort}-${direction}-${incompleteContact}`} data={data} surveys={surveys} search={search} sort={sort} direction={direction} incompleteContact={incompleteContact} />}</section></main>;
+  let initialSelected;
+  try { [data, surveys, initialSelected] = await Promise.all([getAdminMembers(search, 1, sort, direction, incompleteContact, hasComment), getAdminSurveys(), selectedId ? getAdminMemberById(selectedId) : null]); } catch { data = null; }
+  return <main className="admin-shell"><AdminModuleHeader active="members" title="Medlemsregister" email={session.user.email} /><section className="admin-content">{!data ? <p className="form-error" role="alert">Medlemsregisteret er midlertidig utilgjengelig. Prøv igjen senere.</p> : <AdminMemberDirectory key={`${search}-${sort}-${direction}-${incompleteContact}-${hasComment}-${selectedId}`} data={data} surveys={surveys} search={search} sort={sort} direction={direction} incompleteContact={incompleteContact} hasComment={hasComment} initialSelected={initialSelected} />}</section></main>;
 }

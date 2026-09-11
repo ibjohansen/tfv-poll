@@ -2177,6 +2177,38 @@ input, textarea, select { caret-color: var(--accent); }
 .admin-property-fields input:focus { border-color: #71717a; outline: 3px solid rgba(36, 76, 60, .16); }
 .admin-property-actions { display: flex; flex-wrap: wrap; gap: 7px; }
 
+.admin-audit { display: grid; gap: 22px; }
+.admin-audit .admin-section-header { align-items: flex-start; }
+.admin-audit .admin-section-header h2 { margin: 3px 0 7px; font-size: 24px; }
+.admin-audit .admin-section-header p:not(.eyebrow) { max-width: 700px; margin: 0; color: #71717a; font-size: 13px; line-height: 1.6; }
+.admin-audit .admin-section-header > span { display: grid; min-width: 38px; height: 38px; place-items: center; border-radius: 999px; background: #f4f4f5; font-size: 13px; font-weight: 750; }
+.admin-audit-filters { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto auto; gap: 12px; align-items: end; padding: 18px; border: 1px solid #e4e4e7; border-radius: 12px; background: #fafafa; }
+.admin-audit-filters label { display: grid; gap: 6px; color: #52525b; font-size: 11px; font-weight: 700; }
+.admin-audit-filters select { width: 100%; min-height: 44px; padding: 9px 11px; border: 1px solid #d4d4d8; border-radius: 8px; background: #fff; color: #18181b; font: inherit; font-size: 13px; }
+.admin-audit-filters .primary-button { width: auto; }
+.admin-audit-filters > a { min-height: 44px; padding: 12px 4px; font-size: 13px; }
+.admin-audit-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.admin-audit-list > li { padding: 18px; border: 1px solid #e4e4e7; border-radius: 12px; background: #fff; }
+.admin-audit-summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.admin-audit-summary > div { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.admin-audit-summary strong { overflow-wrap: anywhere; font-size: 14px; }
+.admin-audit-summary time { flex: 0 0 auto; color: #71717a; font-size: 11px; }
+.admin-audit-operation { flex: 0 0 auto; padding: 4px 8px; border-radius: 999px; font-size: 9px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.admin-audit-operation.is-insert { background: #dcfce7; color: #166534; }
+.admin-audit-operation.is-update { background: #e0f2fe; color: #075985; }
+.admin-audit-operation.is-delete { background: #fee2e2; color: #991b1b; }
+.admin-audit-list > li > p { margin: 10px 0 0; color: #71717a; font-size: 11px; }
+.admin-audit-actions { display: flex; align-items: flex-start; gap: 18px; margin-top: 13px; font-size: 12px; }
+.admin-audit-actions > a, .admin-audit-actions summary { color: var(--accent); font-weight: 700; cursor: pointer; text-underline-offset: 3px; }
+.admin-audit-actions details { flex: 1; min-width: 0; }
+.admin-audit-values { display: grid; gap: 10px; margin-top: 14px; }
+.admin-audit-values > section { padding-top: 10px; border-top: 1px solid #e4e4e7; }
+.admin-audit-values h3 { margin: 0 0 7px; font-size: 12px; }
+.admin-audit-values section > div { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.admin-audit-values section > div > div { min-width: 0; }
+.admin-audit-values span { display: block; margin-bottom: 4px; color: #71717a; font-size: 9px; font-weight: 750; text-transform: uppercase; }
+.admin-audit-values pre { max-height: 220px; overflow: auto; margin: 0; padding: 10px; border-radius: 7px; background: #f4f4f5; color: #27272a; font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+
 @media (max-width: 760px) {
   .member-self-service-entry { grid-template-columns: 1fr; padding-right: 18px; padding-left: 18px; }
   .member-self-service-intro { max-width: none; }
@@ -2191,4 +2223,12 @@ input, textarea, select { caret-color: var(--accent); }
   .admin-property-fields { grid-template-columns: 1fr; }
   .admin-member-request-actions { justify-content: stretch; }
   .admin-member-request-actions button { flex: 1; }
+  .admin-audit-filters { grid-template-columns: 1fr; }
+  .admin-audit-filters .primary-button { width: 100%; }
+  .admin-audit-summary { align-items: stretch; flex-direction: column; }
+  .admin-audit-summary time { order: -1; }
+  .admin-audit-summary > div { align-items: flex-start; }
+  .admin-audit-values section > div { grid-template-columns: 1fr; }
+  .admin-audit-actions { flex-direction: column; }
+  .admin-audit-actions details { width: 100%; }
 }

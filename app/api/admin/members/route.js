@@ -11,8 +11,9 @@ export async function GET(request) {
   const sort = searchParams.get('sort') || 'h_number';
   const direction = searchParams.get('dir') === 'desc' ? 'desc' : 'asc';
   const incompleteContact = searchParams.get('contact') === 'incomplete';
+  const hasComment = searchParams.get('comment') === 'present';
   try {
-    const data = await getAdminMembers(search, page, sort, direction, incompleteContact);
+    const data = await getAdminMembers(search, page, sort, direction, incompleteContact, hasComment);
     return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     const status = error.message === 'Unauthorized' ? 401 : 500;

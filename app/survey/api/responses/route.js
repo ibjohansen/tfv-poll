@@ -61,8 +61,8 @@ export async function POST(request) {
     } else {
       const sql = getSql();
       const rows = await sql`
-        INSERT INTO survey_responses (member_id, survey_id, question_version, questions, answers)
-        SELECT ${access.member.id}, ${body.surveyId}, ${access.survey.question_version}, questions, ${JSON.stringify(body.answers)}::jsonb
+        INSERT INTO survey_responses (member_id, survey_id, question_version, questions, answers, last_changed_by)
+        SELECT ${access.member.id}, ${body.surveyId}, ${access.survey.question_version}, questions, ${JSON.stringify(body.answers)}::jsonb, ${`member:${access.member.id}`}
         FROM surveys
         WHERE id = ${body.surveyId}
           AND is_open = TRUE

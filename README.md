@@ -43,6 +43,8 @@ Sertifikatkontrollen skal ikke deaktiveres.
 - `/admin/members` er modulen Medlemsregister.
 - `/admin/surveys` er modulen Undersøkelser.
 - `/admin/web` er CMS-et for nettsider, hovedbilder og nedlastbare vedlegg.
+- `/admin/audit` er den administratorbeskyttede oversikten Brukerendringer med
+  før- og etterverdier for endringer i sentrale tabeller.
 - `/<slug>` viser en publisert informasjonsside. Utkast kan bare forhåndsvises
   fra administrasjonen.
 - De seks sist publiserte informasjonssidene vises automatisk på `/`.
@@ -125,6 +127,7 @@ gang til.
 | `app/api/membership-requests/*` | Tar imot ny innmelding, verifiserer oppgitt e-post og legger forespørselen i administrativ behandlingskø. |
 | `app/api/admin/member-requests/*` | Krever Entra-basert administratortilgang og godkjenner eller avviser verifiserte eierskifter og innmeldinger. |
 | `app/admin/web/*` og `app/api/admin/cms/*` | Administrerer strukturert sideinnhold og filmetadata. Alle endringer krever adminøkt. |
+| `app/admin/audit`, `lib/admin-audit.js` og databasetriggere | Viser et skrivebeskyttet revisjonsspor for medlemmer, henvendelser, undersøkelser, svar, nettsider og vedlegg. |
 | `app/[slug]/page.js` og `components/CmsPageView.js` | Viser kun publiserte sider med systemstyrt typografi og avsnitt. |
 | `app/api/cms/files/*` og `lib/cms-storage.js` | Leverer filer fra en privat bøtte etter kontroll av publiseringsstatus eller adminøkt. |
 | `lib/admin-*.js` | Felles serverlogikk for sortering, opprettelse, oppdatering og myk sletting. |
@@ -462,6 +465,11 @@ Kommandoen er idempotent. Den kjørende Netlify-applikasjonen skal bruke pooled
 `DATABASE_URL`; migrering og import skal bruke den direkte forbindelsen. Dette
 følger [Neons anbefaling for pooling og migrering](https://neon.com/docs/connect/connection-pooling).
 
+Skjemaet oppretter også `audit_log` og triggere på `members`, `member_requests`,
+`surveys`, `survey_responses`, `cms_pages` og `cms_attachments`. Loggen starter
+når migreringen kjøres; den rekonstruerer ikke historikk fra tidligere
+endringer. Tilgangstoken, verifiseringshash og interne lagringsnøkler utelates.
+
 ### 3. Opprett og koble Netlify-prosjektet
 
 1. Logg inn på Netlify og velg **Add new project → Import an existing project**.
@@ -653,12 +661,18 @@ Utfør kontrollene i denne rekkefølgen:
   fokuspunktet.
 - Åpne `/admin` i et privat vindu og kontroller at du sendes til innlogging.
 - Logg inn som `ib@turufjellvel.no` og kontroller modulene Medlemsregister,
-  Oppgaveliste, Undersøkelser og Web. Velg et medlem med gateadresse, og kontroller
+  Oppgaveliste, Undersøkelser, Web og Brukerendringer. Velg et medlem med gateadresse, og kontroller
   at eiendomskartet er lukket under adressefeltet i detaljpanelet og kan åpnes.
   Kontroller at lukkeknappen forblir synlig når panelet rulles. Kontroller at
   H-nummer, adresse og de øvrige eiendomsfeltene ikke kan redigeres etter
   opprettelse. Aktiver filteret for mangelfull hovedkontakt eller hoved-e-post
-  og kontroller at bare relevante medlemmer vises.
+  og kontroller at bare relevante medlemmer vises. Aktiver deretter filteret
+  for registrert kommentar og kontroller at alle og bare kommenterte medlemmer
+  vises, også i kombinasjon med søk.
+- Gjør en kontrollert endring på et testmedlem. Åpne `/admin/audit`, kontroller
+  riktig innlogget bruker, tidspunkt og før-/etterverdi, og bruk lenken tilbake
+  til medlemsposten. Kontroller også filtrering på bruker og område. Bekreft at
+  tilgangstoken, verifiseringshash og lagringsnøkler ikke finnes i loggen.
 - Send ett kontrollert eierskifte og én ny innmelding med testdata. Oppgi
   gårds-/bruksnummer og eventuelt seksjonsnummer. Kontroller at innmeldingen
   vises som ubekreftet i `/admin/inbox` før e-postlenken åpnes, og som bekreftet
@@ -1103,10 +1117,13 @@ Før en produksjonsutsendelse:
 
 Åpne `/admin` for startsiden i Medlemsservice, `/admin/inbox` for oppgaver,
 `/admin/members` for medlemmer, `/admin/surveys` for undersøkelser eller
-`/admin/web` for nettsider. Publiserte
+`/admin/web` for nettsider. `/admin/audit` viser hvem som har gjort endringer i
+sentrale tabeller, med før- og etterverdier og lenker tilbake til relevante
+poster. Publiserte
 CMS-sider vises automatisk på den offentlige forsiden og på sin egen slug.
-Oversiktene kan sorteres på kolonneoverskriftene. Medlemslisten har søk og
-uendelig rulling; klikk på en rad for å åpne redigeringspanelet fra høyre.
+Oversiktene kan sorteres på kolonneoverskriftene. Medlemslisten har søk,
+filter for registrert administratorkommentar og uendelig rulling; klikk på en
+rad for å åpne redigeringspanelet fra høyre.
 Medlemmer og undersøkelser kan opprettes, redigeres og mykslettes via en egen
 bekreftelsesdialog. Både siden og datatilgangen krever en autorisert økt.
 Det finnes ingen mock-innlogging eller åpen admin-API. Mock-modus påvirker

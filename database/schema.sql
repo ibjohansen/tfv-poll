@@ -390,3 +390,147 @@ CREATE INDEX IF NOT EXISTS member_profile_updates_member_idx
 ALTER TABLE email_deliveries DROP CONSTRAINT IF EXISTS email_deliveries_email_type_check;
 ALTER TABLE email_deliveries ADD CONSTRAINT email_deliveries_email_type_check
   CHECK (email_type IN ('survey_invitation', 'survey_test', 'member_access', 'membership_verification'));
+
+-- Revisjonsspor for sentrale forretningsdata. Aktørfeltet settes av applikasjonen,
+-- mens triggeren gjør at også direkte databaseendringer logges som "system".
+-- Hemmelige tilgangsverdier og interne lagringsnøkler tas aldri med i loggen.
+ALTER TABLE members ADD COLUMN IF NOT EXISTS last_changed_by TEXT;
+ALTER TABLE member_requests ADD COLUMN IF NOT EXISTS last_changed_by TEXT;
+ALTER TABLE surveys ADD COLUMN IF NOT EXISTS last_changed_by TEXT;
+ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS last_changed_by TEXT;
+ALTER TABLE cms_pages ADD COLUMN IF NOT EXISTS last_changed_by TEXT;
+ALTER TABLE cms_attachments ADD COLUMN IF NOT EXISTS last_changed_by TEXT;
+
+CREATE TABLE IF NOT EXISTS audit_log (
+  id BIGSERIAL PRIMARY KEY,
+  table_name TEXT NOT NULL,
+  row_id TEXT NOT NULL,
+  operation TEXT NOT NULL CHECK (operation IN ('INSERT', 'UPDATE', 'DELETE')),
+  changed_by TEXT NOT NULL,
+  before_value JSONB,
+  after_value JSONB,
+  changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS audit_log_changed_at_idx
+  ON audit_log (changed_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS audit_log_actor_idx
+  ON audit_log (changed_by, changed_at DESC);
+CREATE INDEX IF NOT EXISTS audit_log_entity_idx
+  ON audit_log (table_name, row_id, changed_at DESC);
+
+CREATE OR REPLACE FUNCTION prepare_audit_change()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $audit_context$
+DECLARE
+  actor TEXT;
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    PERFORM set_config('app.audit_actor', 'system', TRUE);
+    RETURN OLD;
+  END IF;
+  actor := COALESCE(NULLIF(NEW.last_changed_by, ''), 'system');
+  PERFORM set_config('app.audit_actor', actor, TRUE);
+  NEW.last_changed_by := NULL;
+  RETURN NEW;
+END;
+$audit_context$;
+
+CREATE OR REPLACE FUNCTION record_audit_change()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $audit$
+DECLARE
+  old_data JSONB;
+  new_data JSONB;
+  actor TEXT;
+  entity_id TEXT;
+BEGIN
+  old_data := CASE WHEN TG_OP = 'INSERT' THEN NULL ELSE to_jsonb(OLD) END;
+  new_data := CASE WHEN TG_OP = 'DELETE' THEN NULL ELSE to_jsonb(NEW) END;
+  actor := COALESCE(NULLIF(current_setting('app.audit_actor', TRUE), ''), 'system');
+
+  old_data := old_data - 'last_changed_by';
+  new_data := new_data - 'last_changed_by';
+
+  IF TG_TABLE_NAME = 'members' THEN
+    old_data := old_data - 'access_token';
+    new_data := new_data - 'access_token';
+  ELSIF TG_TABLE_NAME = 'member_requests' THEN
+    old_data := old_data - 'verification_token_hash';
+    new_data := new_data - 'verification_token_hash';
+  ELSIF TG_TABLE_NAME = 'cms_attachments' THEN
+    old_data := old_data - 'storage_key';
+    new_data := new_data - 'storage_key';
+  END IF;
+
+  IF TG_OP = 'UPDATE' AND old_data = new_data THEN
+    RETURN NULL;
+  END IF;
+
+  entity_id := COALESCE(new_data ->> 'id', old_data ->> 'id', 'unknown');
+
+  INSERT INTO audit_log (table_name, row_id, operation, changed_by, before_value, after_value)
+  VALUES (TG_TABLE_NAME, entity_id, TG_OP, actor, old_data, new_data);
+  RETURN NULL;
+END;
+$audit$;
+
+DROP TRIGGER IF EXISTS members_audit_context_trigger ON members;
+CREATE TRIGGER members_audit_context_trigger
+BEFORE INSERT OR UPDATE OR DELETE ON members
+FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
+DROP TRIGGER IF EXISTS members_audit_trigger ON members;
+CREATE TRIGGER members_audit_trigger
+AFTER INSERT OR UPDATE OR DELETE ON members
+FOR EACH ROW EXECUTE FUNCTION record_audit_change();
+
+DROP TRIGGER IF EXISTS member_requests_audit_context_trigger ON member_requests;
+CREATE TRIGGER member_requests_audit_context_trigger
+BEFORE INSERT OR UPDATE OR DELETE ON member_requests
+FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
+DROP TRIGGER IF EXISTS member_requests_audit_trigger ON member_requests;
+CREATE TRIGGER member_requests_audit_trigger
+AFTER INSERT OR UPDATE OR DELETE ON member_requests
+FOR EACH ROW EXECUTE FUNCTION record_audit_change();
+
+DROP TRIGGER IF EXISTS surveys_audit_context_trigger ON surveys;
+CREATE TRIGGER surveys_audit_context_trigger
+BEFORE INSERT OR UPDATE OR DELETE ON surveys
+FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
+DROP TRIGGER IF EXISTS surveys_audit_trigger ON surveys;
+CREATE TRIGGER surveys_audit_trigger
+AFTER INSERT OR UPDATE OR DELETE ON surveys
+FOR EACH ROW EXECUTE FUNCTION record_audit_change();
+
+DROP TRIGGER IF EXISTS survey_responses_audit_context_trigger ON survey_responses;
+CREATE TRIGGER survey_responses_audit_context_trigger
+BEFORE INSERT OR UPDATE OR DELETE ON survey_responses
+FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
+DROP TRIGGER IF EXISTS survey_responses_audit_trigger ON survey_responses;
+CREATE TRIGGER survey_responses_audit_trigger
+AFTER INSERT OR UPDATE OR DELETE ON survey_responses
+FOR EACH ROW EXECUTE FUNCTION record_audit_change();
+
+DROP TRIGGER IF EXISTS cms_pages_audit_context_trigger ON cms_pages;
+CREATE TRIGGER cms_pages_audit_context_trigger
+BEFORE INSERT OR UPDATE OR DELETE ON cms_pages
+FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
+DROP TRIGGER IF EXISTS cms_pages_audit_trigger ON cms_pages;
+CREATE TRIGGER cms_pages_audit_trigger
+AFTER INSERT OR UPDATE OR DELETE ON cms_pages
+FOR EACH ROW EXECUTE FUNCTION record_audit_change();
+
+DROP TRIGGER IF EXISTS cms_attachments_audit_context_trigger ON cms_attachments;
+CREATE TRIGGER cms_attachments_audit_context_trigger
+BEFORE INSERT OR UPDATE OR DELETE ON cms_attachments
+FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
+DROP TRIGGER IF EXISTS cms_attachments_audit_trigger ON cms_attachments;
+CREATE TRIGGER cms_attachments_audit_trigger
+AFTER INSERT OR UPDATE OR DELETE ON cms_attachments
+FOR EACH ROW EXECUTE FUNCTION record_audit_change();
