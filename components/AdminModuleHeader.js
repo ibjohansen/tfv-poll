@@ -41,7 +41,7 @@ export default function AdminModuleHeader({ active, title, email }) {
         <summary><span className="visually-hidden">Åpne administrasjonsmenyen</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg><strong>Medlemsservice</strong></summary>
         <div><Navigation active={active} /><div className="admin-mobile-account"><span>{email}</span><LogoutButton /></div></div>
       </details>
-      <p className="eyebrow">Turufjell vel</p>
+      <p className="eyebrow">Turufjell Vel</p>
       <h1>{title}</h1>
     </header>
   </>;

@@ -2,8 +2,8 @@ import "./globals.css";
 import { chap, fragmentSerif } from './fonts';
 
 export const metadata = {
-  title: "Medlemsservice | Turufjell vel",
-  description: "Medlemsservice for Turufjell vel.",
+  title: "Medlemsservice | Turufjell Vel",
+  description: "Medlemsservice for Turufjell Vel.",
   referrer: "no-referrer",
   robots: {
     index: false,

@@ -73,7 +73,7 @@ export default function MemberSelfServiceProfile({ initialProfile }) {
 
     <section className="member-profile-section" aria-labelledby="ownership-title">
       <p className="eyebrow">Eierskifte</p><h2 id="ownership-title">Meld eierskifte</h2>
-      <p>Oppgi kontaktopplysningene til ny eier. Forespørselen merkes som eierskifte og må godkjennes av Turufjell vel før kontaktfeltene erstattes. Hjemmelshaver og eiendomsdata endres ikke her.</p>
+      <p>Oppgi kontaktopplysningene til ny eier. Forespørselen merkes som eierskifte og må godkjennes av Turufjell Vel før kontaktfeltene erstattes. Hjemmelshaver og eiendomsdata endres ikke her.</p>
       <form className="member-self-service-form" onSubmit={(event) => { event.preventDefault(); submit('ownership_transfer', transfer); }}>
         <label>Ny kontaktperson<input value={transfer.primary_contact_name} onChange={(event) => setTransfer({ ...transfer, primary_contact_name: event.target.value })} maxLength={500} required /></label>
         <label>Ny hoved-e-post<input type="email" value={transfer.primary_contact_email} onChange={(event) => setTransfer({ ...transfer, primary_contact_email: event.target.value })} maxLength={254} required /></label>

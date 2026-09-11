@@ -77,7 +77,7 @@ export default function PublicArticleDirectory({ pages, initialPage = null }) {
     <>
       <section className="border-t border-foreground/15 bg-white px-5 py-20 sm:px-8 lg:py-24" aria-labelledby="pages-title">
         <div className="mx-auto w-full max-w-7xl">
-          <p className="text-xs font-semibold tracking-[0.16em] text-primary uppercase">Fra Turufjell vel</p>
+          <p className="text-xs font-semibold tracking-[0.16em] text-primary uppercase">Fra Turufjell Vel</p>
           <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <h2 id="pages-title" className="text-3xl font-light tracking-[-0.025em] text-foreground sm:text-4xl">Aktuelt</h2>
             <p className="max-w-lg text-sm leading-6 text-[#6F645E]">Publiserte saker, nyttig informasjon og dokumenter fra velforeningen.</p>

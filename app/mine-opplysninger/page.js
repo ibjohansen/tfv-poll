@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export const metadata = {
-  title: 'Mine medlemsopplysninger | Turufjell vel',
+  title: 'Mine medlemsopplysninger | Turufjell Vel',
   robots: { index: false, follow: false },
 };
 
@@ -19,7 +19,7 @@ export default async function MemberProfilePage({ searchParams }) {
   try { profile = await getMemberSelfServiceProfile(secret); } catch { profile = null; }
   const invalid = (await searchParams)?.status === 'invalid';
   return <div className="member-profile-page"><SiteHeader /><main className="member-profile-main">
-    <header className="member-profile-hero"><p className="eyebrow">Turufjell vel</p><h1>Mine medlemsopplysninger</h1><p>Her kan du se opplysningene vi har knyttet til medlemskapet ditt og rette kontaktfeltene.</p></header>
+    <header className="member-profile-hero"><p className="eyebrow">Turufjell Vel</p><h1>Mine medlemsopplysninger</h1><p>Her kan du se opplysningene vi har knyttet til medlemskapet ditt og rette kontaktfeltene.</p></header>
     {profile ? <MemberSelfServiceProfile initialProfile={JSON.parse(JSON.stringify(profile))} /> : <section className="member-profile-section member-profile-empty"><h2>Tilgang kreves</h2><p>{invalid ? 'Lenken er ugyldig eller har utløpt.' : 'Be om en ny sikker lenke fra forsiden. Lenken varer i 24 timer.'}</p><Link className="primary-button" href="/#medlemsopplysninger">Gå til forsiden</Link></section>}
   </main></div>;
 }

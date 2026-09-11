@@ -84,7 +84,7 @@ export default function MemberSelfServiceEntry({ membershipStatus = '' }) {
         {message && <p className={isError ? 'form-error' : 'admin-success'} role="status">{message}</p>}
         {matchedIdentifier && <button className="primary-button" type="button" onClick={sendAccessLink} disabled={Boolean(busy)}>{busy === 'send' ? 'Sender …' : 'Send meg en sikker lenke'}</button>}
       </form> : <form className="member-self-service-form membership-request-form" onSubmit={submitMembership}>
-        <p>Bruk dette skjemaet bare når verken tomten eller adressen finnes i medlemsregisteret. Innmeldingen behandles av Turufjell vel etter at e-postadressen er bekreftet.</p>
+        <p>Bruk dette skjemaet bare når hverken tomten eller adressen finnes i medlemsregisteret. Innmeldingen behandles av Turufjell Vel etter at e-postadressen er bekreftet.</p>
         <div className="member-form-grid">
           <label>H-nummer<input value={membership.h_number} onChange={(event) => setMembership({ ...membership, h_number: event.target.value })} maxLength={100} /></label>
           <label>Gateadresse<input value={membership.street_address} onChange={(event) => setMembership({ ...membership, street_address: event.target.value })} maxLength={500} /></label>

@@ -36,8 +36,8 @@ export default async function HomePage({ searchParams }) {
             <BrandLogo variant="stacked" priority className="h-auto w-full" />
           </div>
           <div className="hero-copy">
-            <p className="eyebrow">Turufjell vel</p>
-            <h1>Turufjell vel - medlemsundersøkelse.</h1>
+            <p className="eyebrow">Turufjell Vel</p>
+            <h1>Turufjell Vel - medlemsundersøkelse.</h1>
             <p className="hero-intro">
               Vi ønsker medlemmenes vurdering av informasjon og forventninger
               knyttet til et mulig alpinanlegg på Kristnatten, og hvordan
@@ -110,7 +110,7 @@ export default async function HomePage({ searchParams }) {
         </section>}
 
         <footer className="page-footer">
-          <span>Turufjell vel</span>
+          <span>Turufjell Vel</span>
           <Link href="/admin">Administrasjon</Link>
         </footer>
       </div>

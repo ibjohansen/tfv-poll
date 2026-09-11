@@ -46,7 +46,7 @@ export default async function AdminLogin({ searchParams }) {
         <div className="absolute inset-x-0 bottom-0 p-12 xl:p-16">
           <div className="max-w-xl text-white">
             <BrandLogo variant="horizontal" tone="dark" decorative priority className="mb-10 h-auto w-80 max-w-full" />
-            <p className="mb-5 text-xs font-semibold tracking-[0.2em] text-white/70 uppercase">Turufjell vel</p>
+            <p className="mb-5 text-xs font-semibold tracking-[0.2em] text-white/70 uppercase">Turufjell Vel</p>
             <h2 className="text-4xl leading-tight font-semibold tracking-tight xl:text-5xl">Enklere medlemsarbeid.<br />Samlet på ett sted.</h2>
             <p className="mt-6 max-w-lg text-base leading-7 text-white/75">Administrer medlemsregister, undersøkelser og innhold i Medlemsservice.</p>
           </div>
@@ -64,7 +64,7 @@ export default async function AdminLogin({ searchParams }) {
             <BrandLogo variant="stacked" decorative priority className="mb-8 h-auto w-32" />
             <p className="text-xs font-semibold tracking-[0.16em] text-primary uppercase">Medlemsservice</p>
             <h1 id="login-title" className="mt-3 text-3xl font-light tracking-tight text-foreground sm:text-4xl">Velkommen tilbake</h1>
-            <p className="mt-4 text-[0.95rem] leading-6 text-[#6F645E]">Logg inn med din autoriserte Microsoft 365-konto hos Turufjell vel.</p>
+            <p className="mt-4 text-[0.95rem] leading-6 text-[#6F645E]">Logg inn med din autoriserte Microsoft 365-konto hos Turufjell Vel.</p>
 
             {params.error && (
               <div className="mt-6 flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800" role="alert">
@@ -95,7 +95,7 @@ export default async function AdminLogin({ searchParams }) {
             </div>
           </div>
 
-          <p className="mt-8 text-center text-xs text-[#6F645E]">© {new Date().getFullYear()} Turufjell vel</p>
+          <p className="mt-8 text-center text-xs text-[#6F645E]">© {new Date().getFullYear()} Turufjell Vel</p>
         </div>
       </section>
     </main>

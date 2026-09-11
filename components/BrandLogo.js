@@ -30,7 +30,7 @@ export default function BrandLogo({ variant = 'horizontal', tone = 'light', clas
       src={logo.src}
       width={logo.width}
       height={logo.height}
-      alt={decorative ? '' : 'Turufjell vel'}
+      alt={decorative ? '' : 'Turufjell Vel'}
       className={className}
       priority={priority}
     />

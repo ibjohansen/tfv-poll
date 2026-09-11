@@ -70,7 +70,7 @@ export default function SurveyForm({ memberToken, surveyId, questions }) {
         <p className="eyebrow">Svar mottatt</p>
         <h2>Takk for at du svarte.</h2>
         <p>
-          Besvarelsen er lagret. Turufjell vel kan bruke de samlede svarene som
+          Besvarelsen er lagret. Turufjell Vel kan bruke de samlede svarene som
           grunnlag for det videre arbeidet.
         </p>
       </section>

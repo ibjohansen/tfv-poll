@@ -39,7 +39,7 @@ export default async function HomePage({ searchParams }) {
           <Image src={landscape} alt="Utsikt over fjellandskapet på Turufjell" fill sizes="100vw" priority className="object-cover object-[35%_center]" />
           <div className="absolute inset-0 bg-linear-to-t from-[#493F39]/85 via-[#493F39]/15 to-transparent" />
           <div className="relative mx-auto w-full max-w-7xl px-5 py-12 text-white sm:px-8 sm:py-16 lg:px-12 lg:py-20">
-            <p className="text-xs font-semibold tracking-[0.2em] text-white/70 uppercase">Turufjell vel</p>
+            <p className="text-xs font-semibold tracking-[0.2em] text-white/70 uppercase">Turufjell Vel</p>
             <h1 id="home-title" className="mt-4 max-w-3xl text-4xl leading-[1.04] font-light tracking-[-0.035em] sm:text-6xl lg:text-7xl">Fellesskap på fjellet</h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-white/80 sm:text-lg">Vi samordner og ivaretar medlemmenes interesser i og omkring Turufjell hytteområde.</p>
           </div>

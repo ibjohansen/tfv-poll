@@ -1,4 +1,4 @@
-# Medlemsservice · Turufjell vel
+# Medlemsservice · Turufjell Vel
 
 En modulbasert medlemsservice bygget med Next.js, React, Node, Neon Postgres og
 Neon Object Storage. Den har medlemsregister, undersøkelser og et strukturert
@@ -66,7 +66,7 @@ renderes direkte i GitHub og de fleste Markdown-visere.
 flowchart LR
   member["Medlem\nbruker personlig undersøkelses- eller selvbetjeningslenke"]
   admin["Administrator\n@turufjellvel.no"]
-  app["Medlemsservice\nNext.js-applikasjon for Turufjell vel"]
+  app["Medlemsservice\nNext.js-applikasjon for Turufjell Vel"]
   entra["Microsoft Entra ID\nidentitetsleverandør"]
   neon[("Neon Postgres\nmedlemmer, undersøkelser, svar og CMS-metadata")]
   storage[("Neon Object Storage\nbilder og vedlegg")]
@@ -565,7 +565,7 @@ Generer `MATRIKKEL_JOB_SECRET` separat; ikke bruk samme verdi som `AUTH_SECRET`.
 | `MAILERSEND_BULK_ENABLED` | `false` inntil masseutsendelse er eksplisitt godkjent; testmail virker fortsatt |
 | `MAILERSEND_API_TOKEN` | Begrenset API-token fra MailerSend, aldri et browser-token |
 | `MAILERSEND_FROM_EMAIL` | En eksisterende avsender på `turufjellvel.no`, for eksempel `post@turufjellvel.no` |
-| `MAILERSEND_FROM_NAME` | `Turufjell vel` |
+| `MAILERSEND_FROM_NAME` | `Turufjell Vel` |
 | `MAILERSEND_REPLY_TO_EMAIL` | En overvåket adresse som kan motta svar |
 | `MAILERSEND_DOMAIN_ID` | Domain ID for det verifiserte `turufjellvel.no`-domenet |
 | `MAILERSEND_WEBHOOK_SIGNING_SECRET` | Individuell Signing Secret fra den opprettede webhooken |

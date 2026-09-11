@@ -13,9 +13,9 @@ const loadPage = cache(async (slug) => {
 
 export async function generateMetadata({ params }) {
   const page = await loadPage((await params).slug);
-  if (!page) return { title: 'Siden finnes ikke | Turufjell vel' };
+  if (!page) return { title: 'Siden finnes ikke | Turufjell Vel' };
   return {
-    title: `${page.title} | Turufjell vel`,
+    title: `${page.title} | Turufjell Vel`,
     description: page.intro || undefined,
     robots: { index: true, follow: true },
   };

@@ -6,7 +6,7 @@ const env = {
   MAILERSEND_ENABLED: 'true',
   MAILERSEND_API_TOKEN: 'secret-api-token',
   MAILERSEND_FROM_EMAIL: 'post@turufjellvel.no',
-  MAILERSEND_FROM_NAME: 'Turufjell vel',
+  MAILERSEND_FROM_NAME: 'Turufjell Vel',
   MAILERSEND_DOMAIN_ID: 'domain-1',
 };
 
@@ -52,8 +52,8 @@ test('sendEmail sends HTML and plain text with tracking disabled and returns mes
   assert.equal(request.url, 'https://api.mailersend.com/v1/email');
   assert.equal(request.body.to[0].email, 'member@example.com');
   assert.match(request.body.text, /Hei & velkommen/);
-  assert.match(request.body.text, /Denne e-posten er sendt fra Medlemsservice i Turufjell vel\./);
-  assert.match(request.body.html, /Denne e-posten er sendt fra Medlemsservice i Turufjell vel\./);
+  assert.match(request.body.text, /Denne e-posten er sendt fra Medlemsservice i Turufjell Vel\./);
+  assert.match(request.body.html, /Denne e-posten er sendt fra Medlemsservice i Turufjell Vel\./);
   assert.deepEqual(request.body.settings, { track_clicks: false, track_opens: false, track_content: false });
   assert.equal(request.options.headers.Authorization, `Bearer ${env.MAILERSEND_API_TOKEN}`);
 });

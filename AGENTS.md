@@ -1,6 +1,6 @@
 # Project instructions for coding agents
 
-This is a small production-oriented member administration application for Turufjell vel.
+This is a small production-oriented member administration application for Turufjell Vel.
 
 ## Stack
 - JavaScript only. Do not introduce TypeScript.
