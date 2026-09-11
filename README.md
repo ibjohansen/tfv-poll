@@ -171,12 +171,14 @@ sequenceDiagram
   participant D as Neon Postgres
   participant E as MailerSend
 
-  M->>B: Oppgir H-nummer, adresse eller e-post
-  B->>A: POST /api/member-access/request
+  M->>B: Oppgir H-nummer, adresse eller e-post og velger Søk
+  B->>A: POST /api/member-access/request med action=search
   A->>D: Søker etter ett entydig aktivt medlem
+  A-->>B: Viser ikke-treff eller tomt, adresse og maskert e-post
+  M->>B: Velger Send meg en sikker lenke
+  B->>A: POST /api/member-access/request med action=send
   A->>D: Lagrer SHA-256-hash med 24 timers utløp
   A->>E: Sender personlig tilgangslenke til registrert hoved-e-post
-  A-->>B: Samme generiske svar for treff og ikke-treff
   M->>A: Åpner lenken
   A->>D: Validerer hash og utløp
   A-->>B: Setter HttpOnly-cookie og fjerner secret fra URL-en
@@ -636,8 +638,11 @@ Utfør kontrollene i denne rekkefølgen:
 - Åpne `/` og kontroller toppbilde, publiserte artikler og artikkelpanelet.
 - Kontroller at **Mine medlemsopplysninger** alltid vises før artiklene. Be om
   lenke med en kontrollert testbruker via H-nummer, adresse og e-post, og
-  kontroller at alle tre gir mail til den registrerte hovedadressen uten at
-  skjemaresponsen røper om et oppslag finnes.
+  kontroller at alle tre gir mail til den registrerte hovedadressen. Ved treff
+  skal svaret bare vise tomt, adresse og maskert hoved-e-post; ved ikke-treff
+  skal den innskrevne søkeverdien vises uten andre medlemsopplysninger. Sjekk
+  at sendeknappen bare vises etter treff, og at søk på `H25`, `H-25`, `h25`,
+  `h-25`, `H  25` og `25` finner samme H-nummer.
 - Åpne tilgangslenken og kontroller at URL-en straks renses, at tilgangen utløper
   etter 24 timer, at H-nummer/adresse/hjemmelshaver er skrivebeskyttet, og at
   kontaktperson og e-postadresser kan oppdateres.
@@ -763,10 +768,17 @@ formål, tilgang og slettefrist før utsending.
 
 Forsiden viser alltid **Mine medlemsopplysninger** før artiklene. En registrert
 bruker oppgir H-nummer, nøyaktig gateadresse, hoved-e-post eller en registrert
-alternativ e-post. Oppslaget skjer bare på serveren. Hvis nøyaktig ett aktivt
-medlem samsvarer og har en gyldig hoved-e-post, sendes tilgangslenken dit. Det
-offentlige svaret er det samme ved treff, ikke-treff, flere treff og manglende
-e-post, slik at skjemaet ikke blir et medlemsoppslag for uvedkommende.
+alternativ e-post og velger **Søk**. H-nummeroppslaget ignorerer store/små
+bokstaver samt mellomrom eller bindestrek mellom `H` og tallet; eksempelvis
+`H25`, `H-25`, `h25`, `h-25`, `H  25` og `25` behandles likt. Oppslaget skjer
+bare på serveren. Hvis nøyaktig ett aktivt medlem samsvarer og har en gyldig
+hoved-e-post, vises knappen **Send meg en sikker lenke**. Ingen e-post sendes
+før medlemmet trykker på denne knappen. Det
+offentlige svaret oppgir om søket ga treff. Ved treff vises H-nummer,
+gateadresse og en server-maskert hoved-e-post, for eksempel
+`ib.***********@*****.com`; den fullstendige adressen returneres aldri til
+nettleseren. Ved ikke-treff vises den normaliserte søkeverdien. Flere treff
+behandles som ikke-treff fordi medlemmet ikke kan identifiseres entydig.
 
 Tilgangslenken inneholder en kryptografisk tilfeldig hemmelighet på 32 bytes og
 varer i 24 timer. Bare SHA-256-hashen lagres i `member_access_tokens`. Når lenken
@@ -796,9 +808,11 @@ så lenge H-nummer/adresse fremdeles ikke kolliderer med et aktivt medlem.
 
 Ventende saker vises øverst i `/admin/members`, med separat og tydelig
 godkjenning eller avvisning. Begge endepunktene kontrollerer Microsoft Entra-
-administratortilgang server-side. Offentlige oppslag og endringer har origin-
-kontroll og per-instans rategrense; tilgangsmail og innmelding har i tillegg en
-10-minutters duplikatbrems i databasen. Sett også en delt Netlify WAF-
+administratortilgang server-side. Fordi den offentlige funksjonen nå bekrefter
+om H-nummer, adresse eller e-post finnes, kan den brukes til begrenset kartlegging
+av registeret selv om e-posten er maskert. Offentlige oppslag og endringer har
+origin-kontroll og per-instans rategrense; tilgangsmail og innmelding har i
+tillegg en 10-minutters duplikatbrems i databasen. Sett også en delt Netlify WAF-
 rategrense på `/api/member-access/*` og `/api/membership-requests*` i produksjon.
 
 Databaseendringen er additiv og oppretter:
@@ -957,9 +971,10 @@ legges egne credentials i `.env.local`, og flagget settes til `true`; filen skal
 aldri sjekkes inn.
 
 Når flagget er `false`, vises fortsatt de offentlige skjemaene, men det sendes
-ingen tilgangs- eller bekreftelsesmail. Endepunktene røper ikke om medlemmet
-finnes. Bruk derfor testadresser og en ikke-produksjonsdatabase ved lokal
-gjennomgang av hele selvbetjeningsflyten.
+ingen tilgangs- eller bekreftelsesmail. Oppslag uten treff kan fortsatt vises,
+mens et treff som krever utsendelse gir en teknisk feilmelding. Bruk derfor
+testadresser og en ikke-produksjonsdatabase ved lokal gjennomgang av hele
+selvbetjeningsflyten.
 
 I `/admin/surveys` åpner administratoren en eksisterende undersøkelse og velger
 **Utsendelse**. **Send testmail** krever én eller maksimalt to eksplisitte,
