@@ -1,30 +1,36 @@
 import Image from 'next/image';
 
 const variants = {
+  // `light`/`dark` describe the background, preserving the public component API:
+  // brun is the light-background mark and creme is the dark-background mark.
   'horizontal-light': {
-    src: '/turufjell-vel-logo-horizontal-light.png',
-    width: 2256,
-    height: 255,
+    src: '/Turufjell_liggende_VEL_logo_brun.svg',
+    width: 4184,
+    height: 513,
   },
   'horizontal-dark': {
-    src: '/turufjell-vel-logo-horizontal-dark.png',
-    width: 2256,
-    height: 255,
+    src: '/Turufjell_liggende_VEL_logo_creme.svg',
+    width: 4184,
+    height: 513,
   },
   'stacked-light': {
-    src: '/turufjell-vel-logo-stacked-light.png',
-    width: 1040,
-    height: 880,
+    src: '/Turufjell_staende_VEL_logo_brun.svg',
+    width: 1793,
+    height: 1656,
   },
   'stacked-dark': {
-    src: '/turufjell-vel-logo-stacked-dark.png',
-    width: 1040,
-    height: 880,
+    src: '/Turufjell_staende_VEL_logo_creme.svg',
+    width: 1793,
+    height: 1656,
   },
+  'liggende-brun': { src: '/Turufjell_liggende_VEL_logo_brun.svg', width: 4184, height: 513 },
+  'liggende-creme': { src: '/Turufjell_liggende_VEL_logo_creme.svg', width: 4184, height: 513 },
+  'stående-brun': { src: '/Turufjell_staende_VEL_logo_brun.svg', width: 1793, height: 1656 },
+  'stående-creme': { src: '/Turufjell_staende_VEL_logo_creme.svg', width: 1793, height: 1656 },
 };
 
 export default function BrandLogo({ variant = 'horizontal', tone = 'light', className = '', priority = false, decorative = false }) {
-  const logo = variants[`${variant}-${tone}`] || variants['horizontal-light'];
+  const logo = variants[variant] || variants[`${variant}-${tone}`] || variants['horizontal-light'];
   return (
     <Image
       src={logo.src}
