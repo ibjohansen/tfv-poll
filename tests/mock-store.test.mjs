@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { getMemberAccess } from '../lib/membership.js';
+import { getMockSurveyAccess } from '../lib/membership.js';
 import { saveMockResponse, isMockMode } from '../lib/mock-store.js';
 import { surveyId } from '../data/survey.js';
 
@@ -16,15 +16,15 @@ test('mock flow works without a database and prevents concurrent duplicate answe
   delete process.env.DATABASE_URL;
   try {
     const token = '1'.repeat(32);
-    assert.equal((await getMemberAccess(token, surveyId)).status, 'ready');
-    assert.equal((await getMemberAccess('2'.repeat(32), surveyId)).status, 'answered');
-    assert.equal((await getMemberAccess('3'.repeat(32), surveyId)).member.primary_contact_email, null);
-    assert.equal((await getMemberAccess('f'.repeat(32), surveyId)).status, 'not-found');
-    await assert.rejects(getMemberAccess('d'.repeat(32), surveyId), /Simulert/);
+    assert.equal((await getMockSurveyAccess(token, surveyId)).status, 'ready');
+    assert.equal((await getMockSurveyAccess('2'.repeat(32), surveyId)).status, 'answered');
+    assert.equal((await getMockSurveyAccess('3'.repeat(32), surveyId)).member.primary_contact_email, undefined);
+    assert.equal((await getMockSurveyAccess('f'.repeat(32), surveyId)).status, 'not-found');
+    await assert.rejects(getMockSurveyAccess('d'.repeat(32), surveyId), /Simulert/);
     const answers = {q1: 'ja', q2: 'nei', q3: 'usikker', q4: 'ja'};
     const attempts = await Promise.all(Array.from({length: 10}, () => saveMockResponse('1', surveyId, answers)));
     assert.equal(attempts.filter(Boolean).length, 1);
-    assert.equal((await getMemberAccess(token, surveyId)).status, 'answered');
+    assert.equal((await getMockSurveyAccess(token, surveyId)).status, 'answered');
     assert.equal(await saveMockResponse('2', surveyId, answers), false);
     process.env.NODE_ENV = 'production';
     assert.equal(isMockMode(), false);

@@ -30,7 +30,7 @@ Sertifikatkontrollen skal ikke deaktiveres.
 
 - `/` er en offentlig forside med logo, hovedinnhold og bunnfelt.
 - **Mine medlemsopplysninger** ligger alltid på forsiden før publiserte artikler.
-  Et medlem kan be om en 24-timers e-postlenke med H-nummer, gateadresse eller
+  Et medlem kan be om en 15-minutters engangslenke med H-nummer, gateadresse eller
   registrert e-postadresse, eller sende inn en ny tomt til behandling.
 - `/mine-opplysninger` viser medlemsdata etter at den personlige e-postlenken er
   åpnet. Siden er ikke indekserbar og krever en gyldig HttpOnly-økt.
@@ -48,11 +48,13 @@ Sertifikatkontrollen skal ikke deaktiveres.
 - `/<slug>` viser en publisert informasjonsside. Utkast kan bare forhåndsvises
   fra administrasjonen.
 - De seks sist publiserte informasjonssidene vises automatisk på `/`.
-- Undersøkelsen ligger på `/survey?klm=<ID>&xyz=<undersøkelses-ID>`.
+- Undersøkelsen ligger på `/survey`; invitasjonens engangskode utveksles via
+  `/api/survey-access/verify` og fjernes straks fra adresselinjen.
 - Svar sendes til `/survey/api/responses`, og dokumenter ligger under `/survey/dokumenter/`.
 - Andre sider og API-er krever autorisert innlogging som standard, også nye ruter.
   Innloggingsendepunkter og nødvendige statiske ressurser er offentlige.
-- Gamle medlemslenker til `/?member=...` må oppdateres til `/survey?klm=...&xyz=...`.
+- Query-formatet `?klm=...&xyz=...` finnes bare i syntetisk mockmodus og skal
+  aldri brukes til produksjonsinvitasjoner.
 
 ## Arkitektur
 
@@ -152,15 +154,16 @@ sequenceDiagram
   participant A as Next.js
   participant D as Neon Postgres
 
-  M->>B: Åpner /survey?klm=token&xyz=survey-secret
-  B->>A: GET /survey
-  A->>A: Validerer formatet på begge secrets
-  A->>D: Henter aktivt medlem og åpen undersøkelse før sluttdato
-  D-->>A: Medlemsdata, spørsmål og eventuell tidligere besvarelse
+  M->>B: Åpner engangslenke med survey-token
+  B->>A: GET /api/survey-access/verify
+  A->>D: Konsumerer hashet token atomisk og oppretter kort surveyøkt
+  A-->>B: Setter HttpOnly-cookie og videresender til ren /survey-URL
+  B->>A: GET /survey med surveyøkt
+  A->>D: Henter åpen undersøkelse og kun nødvendige tomtefelt
   A-->>B: Skjema eller tydelig tilgangs-/statusmelding
   M->>B: Velger ja, nei eller usikker
   B->>A: POST /survey/api/responses
-  A->>A: Validerer origin, rategrense, lenke og svar
+  A->>A: Validerer origin, rategrense, surveyøkt og svar
   A->>D: Lagrer én besvarelse per medlem og undersøkelse
   D-->>A: Bekreftelse eller duplikatfeil
   A-->>B: Kvittering eller forklaring
@@ -176,18 +179,16 @@ sequenceDiagram
   participant D as Neon Postgres
   participant E as MailerSend
 
-  M->>B: Oppgir H-nummer, adresse eller e-post og velger Søk
-  B->>A: POST /api/member-access/request med action=search
-  A->>D: Søker etter ett entydig aktivt medlem
-  A-->>B: Viser ikke-treff eller tomt, adresse og maskert e-post
-  M->>B: Velger Send meg en sikker lenke
-  B->>A: POST /api/member-access/request med action=send
-  A->>D: Lagrer SHA-256-hash med 24 timers utløp
+  M->>B: Oppgir H-nummer, adresse eller e-post
+  B->>A: POST /api/member-access/request
+  A->>D: Søker og begrenser misbruk uten å avsløre treff
+  A-->>B: Returnerer samme svar ved treff og ikke-treff
+  A->>D: Lagrer SHA-256-hash med 15 minutters utløp ved treff
   A->>E: Sender personlig tilgangslenke til registrert hoved-e-post
   M->>A: Åpner lenken
-  A->>D: Validerer hash og utløp
-  A-->>B: Setter HttpOnly-cookie og fjerner secret fra URL-en
-  M->>B: Retter kontaktfelt eller melder eierskifte
+  A->>D: Konsumerer engangskoden atomisk og oppretter separat 45-minutters økt
+  A-->>B: Setter __Host-/HttpOnly-cookie og fjerner koden fra URL-en
+  M->>B: Retter kontaktfelt, bekrefter e-postbytte eller melder eierskifte
   B->>A: PATCH /api/member-access/profile
   A->>D: Oppdaterer kontaktfelt eller oppretter behandlingssak
 ```
@@ -255,16 +256,16 @@ og frontend bestemmer automatisk avsnitt, typografi, avstander og responsiv layo
 ## Lokal testing uten database
 
 Aktiver mock-modus ved å sette `MOCK_DATA=true` i `.env.local`.
-Den lokale installasjonen bruker nå Neon med `MOCK_DATA=false`.
 Start eller start utviklingsserveren på nytt med `npm run dev`.
 Ingen database brukes til medlemsoppslag eller innsendinger i denne modusen.
-Alle medlemsopplysningene er fiktive. Modusen er deaktivert i produksjon
-(`npm run build` / `npm run start` bruker den ordinære databaseløsningen).
+Alle medlemsopplysningene er fiktive. Når mockmodus er av, skal lokal utvikling
+alltid bruke en isolert schema-only development-gren med syntetiske data.
+Produksjonsforbindelsen skal ikke ligge i lokal standardkonfigurasjon.
 Den e-postbaserte medlemsselvbetjeningen og behandlingskøen kan ikke testes i
 mock-modus og utfører ingen reell utsendelse der; de krever Neon og en bevisst
 aktivert MailerSend-konfigurasjon.
 
-Testlenker:
+Disse gamle query-lenkene er kun test-fixtures for mockmodus:
 
 - [Gyldig medlem, ikke svart](http://localhost:3000/survey?klm=11111111111111111111111111111111&xyz=616fd7e9e244b6f4947eb1822dbd01ad)
 - [Har allerede svart](http://localhost:3000/survey?klm=22222222222222222222222222222222&xyz=616fd7e9e244b6f4947eb1822dbd01ad)
@@ -284,9 +285,9 @@ Neon-databasen er klar. Det skjer ingen automatisk overgang til mock ved databas
 
 ## Neon CLI og prosjektoppsett
 
-Neon CLI, prosjektets Neon-skills og MCP-konfigurasjon for Codex er installert.
-MCP bruker OAuth og er avgrenset til `ancient-wildflower-97748936`.
-CLI-innlogging og MCP-innlogging fullføres separat i nettleseren.
+Neon CLI og prosjektets Neon-verktøy kan brukes lokalt. CLI-innlogging og
+eventuell MCP-innlogging fullføres separat i nettleseren. Konkrete prosjekt-,
+gren- og endpoint-ID-er skal ligge i intern driftsdokumentasjon, ikke her.
 
 Konfigurasjonen ligger i `neon.mjs` (JavaScript), med:
 
@@ -302,11 +303,12 @@ export default defineConfig({
 });
 ```
 
-Prosjektet er koblet til `production`. Ved oppsett på en ny maskin:
+Ved oppsett på en ny maskin skal standardkoblingen peke på en isolert
+schema-only development-gren med syntetiske data, aldri produksjon:
 
 ```bash
 neon login
-neon link --project-id ancient-wildflower-97748936 --branch production -y
+neon link --project-id <project-id> --branch <development-branch> -y
 neon config plan
 neon deploy
 ```
@@ -328,8 +330,6 @@ inn i Netlify som `NEON_STORAGE_ACCESS_KEY_ID`, `NEON_STORAGE_SECRET_ACCESS_KEY`
 Test helst `neon deploy` på en egen Neon-gren før samme konfigurasjon anvendes på
 produksjonsgrenen.
 
-Skjema og CSV-medlemmer er importert til production. Lokal mock-modus er slått av.
-
 ## Database
 
 1. Opprett et prosjekt i Neon.
@@ -343,8 +343,9 @@ DATABASE_URL=postgresql://...-pooler...
 DATABASE_URL_UNPOOLED=postgresql://...
 ```
 
-6. Kjør `npm run db:setup`. Skriptet krever den direkte URL-en, slik at
-   migrering aldri går via PgBouncer.
+6. Sett `APP_ENVIRONMENT=development` og kjør `npm run db:setup`. Skriptet
+   krever den direkte URL-en og avviser miljømismatch, slik at migrering aldri
+   går via PgBouncer eller utilsiktet mot et annet miljø.
 
 ## Strukturert CMS
 
@@ -458,7 +459,7 @@ neon deploy
    er endret:
 
 ```bash
-npm run db:setup
+APP_ENVIRONMENT=production npm run db:setup
 ```
 
 Kommandoen er idempotent. Den kjørende Netlify-applikasjonen skal bruke pooled
@@ -469,6 +470,18 @@ Skjemaet oppretter også `audit_log` og triggere på `members`, `member_requests
 `surveys`, `survey_responses`, `cms_pages` og `cms_attachments`. Loggen starter
 når migreringen kjøres; den rekonstruerer ikke historikk fra tidligere
 endringer. Tilgangstoken, verifiseringshash og interne lagringsnøkler utelates.
+
+Sikkerhetsmigreringen er todelt. `db:setup` er additiv og kan kjøres før ny
+kode deployes. Etter at ny surveyflyt er publisert og gamle lenker er erstattet,
+fjernes klartekstkolonnene med:
+
+```bash
+APP_ENVIRONMENT=production SECURITY_CLEANUP_CONFIRMED=true npm run db:security-cleanup
+```
+
+Oppryddingen må ikke kjøres mens en eldre applikasjonsversjon fortsatt leser
+`members.access_token`. Opprett restore-punkt og test begge steg på en
+schema-only gren først.
 
 ### 3. Opprett og koble Netlify-prosjektet
 
@@ -518,6 +531,9 @@ lokale `.env`-filen automatisk under skybygget; se
 | Variabel | Produksjonsverdi |
 | --- | --- |
 | `DATABASE_URL` | Pooled Neon-forbindelse for produksjonsgrenen |
+| `APP_ENVIRONMENT` | `production` |
+| `TOKEN_AUDIENCE` | Unik, ikke-hemmelig verdi for produksjonsappen, for eksempel `tfv-production` |
+| `SECURITY_EVENT_HMAC_KEY` | Unik tilfeldig produksjonshemmelighet på minst 32 bytes |
 | `NEON_STORAGE_ACCESS_KEY_ID` | Verdien fra lokal `AWS_ACCESS_KEY_ID` |
 | `NEON_STORAGE_SECRET_ACCESS_KEY` | Verdien fra lokal `AWS_SECRET_ACCESS_KEY` |
 | `NEON_STORAGE_ENDPOINT` | Verdien fra lokal `AWS_ENDPOINT_URL_S3` |
@@ -538,6 +554,8 @@ Neons opprinnelige `AWS_*`-variabler som fallback ved lokal utvikling.
 | `AUTH_MICROSOFT_ENTRA_ID_ID` | Application client ID |
 | `AUTH_MICROSOFT_ENTRA_ID_SECRET` | Verdien til client secret, ikke secret-ID-en |
 | `AUTH_URL` | `https://medlemsservice.turufjellvel.no` |
+| `ADMIN_EMAILS` | Obligatorisk, kontrollert liste over godkjente administratorer |
+| `ADMIN_REQUIRED_ROLES` | Anbefalt: kommaseparerte Entra app-roller som skal godtas |
 
 Lag en ny `AUTH_SECRET` for produksjon, for eksempel lokalt med:
 
@@ -552,7 +570,7 @@ openssl rand -base64 32
 | `API_MATRIKKEL_BASE_URL` | `https://matrikkel.no/matrikkelapi/wsapi/v1` |
 | `API_MATRIKKEL_USR` | Matrikkel-brukernavn |
 | `API_MATRIKKEL_PWD` | Matrikkel-passord, skrevet normalt uten `\$`-escaping |
-| `MATRIKKEL_SYNC_EMAILS` | Kommaseparert rolle-allowlist, minst `ib@turufjellvel.no` |
+| `MATRIKKEL_SYNC_EMAILS` | Kommaseparert rolle-allowlist for godkjente driftskontoer |
 | `MATRIKKEL_JOB_SECRET` | En annen unik hemmelighet på minst 32 bytes |
 
 Generer `MATRIKKEL_JOB_SECRET` separat; ikke bruk samme verdi som `AUTH_SECRET`.
@@ -579,9 +597,8 @@ begrenses til sending domain der MailerSend-kontoen tilbyr dette.
 
 #### Valgfritt eller skal utelates
 
-- Utelat `ADMIN_EMAILS` for å tillate alle godkjente kontoer i den konfigurerte
-  tenant-en med nøyaktig `@turufjellvel.no`. Sett den bare hvis admin skal
-  begrenses ytterligere.
+- `ADMIN_EMAILS` skal aldri utelates eller være tom. Manglende eller ugyldig
+  allowlist stenger all administratortilgang.
 - Utelat `DATABASE_URL_UNPOOLED`; den trengs ikke av applikasjonen i drift.
 - Utelat `MOCK_DATA`, `MOCK_DATA_DIR` og `MATRIKKEL_ALLOW_PRODTEST`.
 - Ikke opprett `URL`; Netlify setter denne systemvariabelen selv.
@@ -634,7 +651,8 @@ URI i Entra oppdateres. Utløs en ny deploy etter endringen.
 3. Kontroller at byggeloggen avsluttes uten feil.
 4. Kontroller at Next.js-funksjonene og
    `matrikkel-sync-background` og `survey-email-background` finnes i Netlifys
-   funksjonsoversikt.
+   funksjonsoversikt. Kontroller også at edge-funksjonen
+   `public-member-rate-limit` er oppdaget og aktivert i deployloggen.
 5. Kontroller at den publiserte deployen bruker committen som var godkjent i
    GitHub Actions.
 
@@ -647,20 +665,18 @@ Utfør kontrollene i denne rekkefølgen:
 
 - Åpne `/` og kontroller toppbilde, publiserte artikler og artikkelpanelet.
 - Kontroller at **Mine medlemsopplysninger** alltid vises før artiklene. Be om
-  lenke med en kontrollert testbruker via H-nummer, adresse og e-post, og
-  kontroller at alle tre gir mail til den registrerte hovedadressen. Ved treff
-  skal svaret bare vise tomt, adresse og maskert hoved-e-post; ved ikke-treff
-  skal den innskrevne søkeverdien vises uten andre medlemsopplysninger. Sjekk
-  at sendeknappen bare vises etter treff, og at søk på `H25`, `H-25`, `h25`,
-  `h-25`, `H  25` og `25` finner samme H-nummer.
+  lenke med en kontrollert testbruker via H-nummer, adresse og e-post. Bekreft
+  at treff og ikke-treff gir identisk HTTP-status, responsstruktur og tekst,
+  uten H-nummer, adresse, maskert e-post eller annen medlemsinformasjon.
 - Åpne tilgangslenken og kontroller at URL-en straks renses, at tilgangen utløper
-  etter 24 timer, at H-nummer/adresse/hjemmelshaver er skrivebeskyttet, og at
-  kontaktperson og e-postadresser kan oppdateres.
+  etter 45 minutters inaktivitet, at H-nummer/adresse/hjemmelshaver er
+  skrivebeskyttet, og at hoved-e-post bare kan endres etter bekreftelse via
+  både gammel og ny adresse.
 - Kontroller at forsidebildet viser et bredere utsnitt med fokus forskjøvet mot
   venstre, og at loginbildet viser et vesentlig bredere utsnitt uten å miste
   fokuspunktet.
 - Åpne `/admin` i et privat vindu og kontroller at du sendes til innlogging.
-- Logg inn som `ib@turufjellvel.no` og kontroller modulene Medlemsregister,
+- Logg inn med en godkjent administratorkonto og kontroller modulene Medlemsregister,
   Oppgaveliste, Undersøkelser, Web og Brukerendringer. Velg et medlem med gateadresse, og kontroller
   at eiendomskartet er lukket under adressefeltet i detaljpanelet og kan åpnes.
   Kontroller at lukkeknappen forblir synlig når panelet rulles. Kontroller at
@@ -741,15 +757,17 @@ Kjør hele `database/schema.sql` i Neon SQL Editor før den nye versjonen tas i 
 Skriptet kan kjøres på en eksisterende database: gamle anonyme svar beholdes med
 `NULL` i `member_id` og `survey_id`. Disse teller ikke som medlemsbesvarelser.
 
-Tabellen `members` har et internt løpenummer (`id`) og en tilfeldig offentlig
-lenke-ID (`access_token`, 32 heksadesimale tegn). ID-en genereres av databasen
-og er ikke avledet fra H-nummer eller andre medlemsopplysninger.
+Tabellen `members` har et internt løpenummer (`id`), men ingen global
+surveyhemmelighet. Hver invitasjon oppretter i stedet en tilfeldig 256-bits
+engangskode for nøyaktig ett medlem og én undersøkelse. Bare SHA-256-hashen
+lagres i `survey_access_tokens`; koden er miljø- og audience-bundet og utveksles
+umiddelbart mot en separat, kortlivet surveyøkt.
 
-Lenkeformat:
-
-```text
-https://deres-domene.no/survey?klm=<access_token>&xyz=616fd7e9e244b6f4947eb1822dbd01ad
-```
+Etter overgang fra den gamle tokenmodellen kan en fullført kampanje arkiveres
+fra e-postpanelet med **Send nye sikre lenker**. Handlingen krever eksplisitt
+bekreftelse og oppretter en ny kampanje; tidligere leveringshistorikk beholdes.
+Kjør først deretter `db:security-cleanup` for å gjøre gamle globale lenker
+permanent ugyldige på databasenivå.
 
 Startundersøkelsen i `data/survey.js` seedes til `surveys` ved databaseoppsett.
 Nye undersøkelser opprettes og redigeres i administrasjonen. Hver får en
@@ -769,54 +787,49 @@ Excel-eksporten inneholder både en aggregert oppsummering og et detaljark med
 én rad per spørsmål og besvarelse. Resultater og eksport er tilgjengelige både
 mens undersøkelsen er åpen og etter at sluttdatoen er passert.
 
-Manglende, feilformatert eller ukjent medlems-ID, ugyldig undersøkelse og
-allerede innsendt svar vises øverst. Ved databasefeil vises en melding om at
-registeret er utilgjengelig. Skjemaet er bare tilgjengelig med gyldig lenke.
+Manglende, ugyldig eller konsumert engangskode og allerede innsendt svar vises
+med en generell tilgangsmelding. Ved databasefeil vises en melding om at
+registeret er utilgjengelig. Skjemaet er bare tilgjengelig med gyldig surveyøkt.
 API-et validerer samme tilgang på nytt. En unik databaseindeks på
 `(member_id, survey_id)` hindrer også dobbeltsvar ved samtidige innsendinger.
 Endepunktet har i tillegg en enkel per-instans rategrense og origin-kontroll.
-Aktiver tilsvarende delt rategrense/WAF-regel for `/survey` og
-`/survey/api/responses` i driftsplattformen før produksjonslansering.
+Delt Netlify- og Postgres-rategrense beskytter verifikasjon og innsending.
 
-Lenken er en personlig tilgangshemmelighet og gir rett til å svare for tomten.
-Den viser medlemsopplysningene for den aktuelle tomten, inkludert kontaktinformasjon.
-Del den bare med de aktuelle kontaktene. Lenker utløper etter 180 dager og kan
-tilbakekalles ved å sette `access_revoked_at` i medlemsregisteret. Svarene er
-koblet til tomten og er ikke anonyme. Siden rendres dynamisk, og `no-referrer`
-hindrer at medlemslenken sendes som referanse ved navigasjon til andre nettsteder.
-Svar og medlemsopplysninger skal behandles som personopplysninger: dokumenter
-formål, tilgang og slettefrist før utsending.
+Engangskoden gir rett til å opprette en økt for den aktuelle tomten og
+undersøkelsen. Utløpet er senest undersøkelsens sluttdato og aldri mer enn 14
+dager. Etter utveksling fjernes koden fra adresselinjen. Surveyen får bare
+H-nummer, matrikkel-/seksjonsnummer og adresse; kontaktperson, e-poster,
+hjemmelshaver og tinglysningsdato returneres ikke. Tilgangen markeres ferdig i
+samme transaksjon som svaret lagres. Svar er fortsatt koblet til tomten og er
+ikke anonyme.
 
 ### Mine medlemsopplysninger, eierskifte og innmelding
 
 Forsiden viser alltid **Mine medlemsopplysninger** før artiklene. En registrert
 bruker oppgir H-nummer, nøyaktig gateadresse, hoved-e-post eller en registrert
-alternativ e-post og velger **Søk**. H-nummeroppslaget ignorerer store/små
+alternativ e-post og ber om en lenke. H-nummeroppslaget ignorerer store/små
 bokstaver samt mellomrom eller bindestrek mellom `H` og tallet; eksempelvis
 `H25`, `H-25`, `h25`, `h-25`, `H  25` og `25` behandles likt. Oppslaget skjer
-bare på serveren. Hvis nøyaktig ett aktivt medlem samsvarer og har en gyldig
-hoved-e-post, vises knappen **Send meg en sikker lenke**. Ingen e-post sendes
-før medlemmet trykker på denne knappen. Det
-offentlige svaret oppgir om søket ga treff. Ved treff vises H-nummer,
-gateadresse og en server-maskert hoved-e-post, for eksempel
-`ib.***********@*****.com`; den fullstendige adressen returneres aldri til
-nettleseren. Ved ikke-treff vises den normaliserte søkeverdien. Flere treff
-behandles som ikke-treff fordi medlemmet ikke kan identifiseres entydig.
+bare på serveren. Offentlig respons er alltid den samme, uansett treff,
+ikke-treff, manglende e-post eller nylig utsendelse. Den avslører aldri `found`,
+H-nummer, adresse eller maskert e-post. Edge- og Postgres-baserte grenser bruker
+plattformverifisert klient-IP, HMAC av oppslaget, nettleserindikator og samlet
+systemgrense.
 
-Tilgangslenken inneholder en kryptografisk tilfeldig hemmelighet på 32 bytes og
-varer i 24 timer. Bare SHA-256-hashen lagres i `member_access_tokens`. Når lenken
-åpnes, valideres den server-side, den rå hemmeligheten flyttes til en
-`HttpOnly`, `SameSite=Lax`-cookie med samme utløp, og nettleseren videresendes
-til en ren `/mine-opplysninger`-URL. Secret, e-postinnhold og full
-mottakeradresse skrives ikke til applikasjonsloggene. Nye lenker tilbakekaller
-tidligere aktive selvbetjeningslenker for samme medlem. Et mislykket MailerSend-
-forsøk tilbakekaller den nye lenken, slik at medlemmet kan prøve igjen.
+Tilgangslenken inneholder en kryptografisk tilfeldig engangskode på 32 bytes og
+varer i 15 minutter. Bare SHA-256-hashen lagres i `member_access_tokens`. Ved
+åpning konsumeres den atomisk og byttes mot en separat, tilfeldig og hashet
+medlemssesjon med 45 minutters inaktivitetsgrense og absolutt makstid. Bare
+sesjonshemmeligheten legges i en `__Host-`, `HttpOnly`, `Secure`,
+`SameSite=Lax`-cookie i produksjon; URL-koden brukes aldri som cookie.
 
-Medlemmet kan se registrerte eiendoms-, kontakt- og kommentaropplysninger,
+Medlemmet kan se registrerte eiendoms- og kontaktopplysninger,
 undersøkelsessvar med spørsmålssnapshot, registrert e-postleveringshistorikk og
-egne medlemsforespørsler. En maskinlesbar kopi kan lastes ned som JSON. Bare
-`primary_contact_name`, `primary_contact_email` og `other_contact_emails` kan
-endres direkte. H-nummer, gårds-/bruksnummer, gateadresse, hjemmelshaver og
+egne medlemsforespørsler. Interne administratornotater returneres ikke og er
+ikke med i JSON-eksporten. `primary_contact_name` og `other_contact_emails` kan
+endres direkte. Endring av hoved-e-post krever en separat engangsbekreftelse
+først via gammel og deretter ny adresse; fullføring tilbakekaller alle tidligere
+medlem- og surveyøkter. H-nummer, gårds-/bruksnummer, gateadresse, hjemmelshaver og
 tinglysningsdato er skrivebeskyttet. De samme eiendomsfeltene er også
 skrivebeskyttet etter opprettelse i adminpanelets medlemsdetaljer.
 
@@ -827,7 +840,7 @@ endres aldri av godkjenningen. Godkjenningen tilbakekaller samtidig alle aktive
 selvbetjeningslenker for den tidligere eieren. **Meld inn ny tomt** kan brukes når minst
 H-nummer eller gateadresse ikke finnes. Skjemaet tar også imot gårds-/bruksnummer
 og valgfritt seksjonsnummer. Saken vises umiddelbart i oppgavelisten som
-ubekreftet. Oppgitt e-post kan bekreftes med en egen 24-timers lenke, og saken
+ubekreftet. Oppgitt e-post kan bekreftes med en egen 15-minutters lenke, og saken
 merkes da som bekreftet. Godkjenning oppretter medlemmet så lenge H-nummer/adresse
 fremdeles ikke kolliderer med et aktivt medlem.
 
@@ -838,16 +851,18 @@ oppgitt gårds-/bruksnummer. Saksbehandler må deretter kontrollere matrikkelenh
 mot Matrikkel-API-et eller bekrefte den manuelt; seksjonerte eiendommer kan ikke
 godkjennes før seksjonsnummeret er avklart. Godkjenning viser en ekstra
 advarsel om at e-postbekreftelsen overstyres. Begge endepunktene kontrollerer Microsoft Entra-
-administratortilgang server-side. Fordi den offentlige funksjonen nå bekrefter
-om H-nummer, adresse eller e-post finnes, kan den brukes til begrenset kartlegging
-av registeret selv om e-posten er maskert. Offentlige oppslag og endringer har
-origin-kontroll og per-instans rategrense; tilgangsmail og innmelding har i
-tillegg en 10-minutters duplikatbrems i databasen. Sett også en delt Netlify WAF-
-rategrense på `/api/member-access/*` og `/api/membership-requests*` i produksjon.
+administratortilgang server-side. Den offentlige funksjonen bekrefter aldri om
+H-nummer, adresse eller e-post finnes. Oppslag og endringer har origin-kontroll,
+Netlify edge-rategrense, delt Postgres-begrensning og duplikatbrems.
 
 Databaseendringen er additiv og oppretter:
 
-- `member_access_tokens` for hash, utløp, bruk og tilbakekalling
+- `application_environment` for eksplisitt database-miljø
+- `member_access_tokens` og `member_sessions` for engangskoder og hash-lagrede økter
+- `member_email_changes` for totrinns bekreftelse av hoved-e-post
+- `survey_access_tokens` og `survey_sessions` for avgrenset surveytilgang
+- `security_rate_limits` og append-only `security_events` for misbruksvern og
+  sikkerhetshendelser uten rå identifikatorer eller hemmeligheter
 - `member_requests` for status på e-postbekreftelse og manuell behandling av
   innmelding/eierskifte, inkludert gårds-/bruksnummer, seksjonsnummer og status
   for matrikkelkontroll
@@ -862,6 +877,11 @@ Utløpte selvbetjeningstoken og ubekreftede innmeldinger eldre enn syv dager ett
 utløp ryddes opportunistisk når samme type offentlig forespørsel brukes igjen.
 Godkjente, avviste og verifiserte saker slettes ikke automatisk. Fastsett derfor
 en dokumentert oppbevaringsfrist og eventuell planlagt slettejobb før produksjon.
+
+`security_events` er bare for autorisert sikkerhetsoppfølging. Standard
+oppbevaring er 12 måneder; sletting skal være en kontrollert, logget driftsjobb
+utført av databaseeier. Tabellen kan ikke oppdateres eller slettes gjennom
+applikasjonsrollen.
 
 Selvbetjeningen støtter innsyn, retting og en maskinlesbar kopi, men er ikke i
 seg selv en komplett implementasjon av alle personvernrettigheter. Forespørsler
@@ -887,14 +907,15 @@ Regler:
 
 - Tomt H-nummer utelates. `N/A` beholdes som et midlertidig H-nummer.
 - Rader uten `Matrikkel-GNR/BR` eller `Tomt/Adresse` utelates.
-- Flere `N/A`-rader får ulike interne ID-er og tilfeldige medlemslenker.
+- Flere `N/A`-rader får ulike interne ID-er. Tilgangslenker opprettes bare ved
+  en konkret utsendelse og importeres aldri.
 - `Matrikkel-eier` og `Matrikkel-tinglyst dato` bevares som tekst, inkludert ` / `.
   Eiernavn vises på separate linjer i både skjema og admin.
 - `Navn` ignoreres helt og er ikke påkrevd i CSV-en. Matrikkel-eier brukes alltid som kontaktnavn.
-- `Kommentar` lagres som adminfelt, men vises for det aktuelle medlemmet etter
-  gyldig 24-timers innlogging fordi selvbetjeningen gir innsyn i lagrede data.
+- `Kommentar` lagres som et internt adminnotat og returneres aldri i
+  selvbetjening eller automatisk JSON-eksport.
 - Gjentatt import oppdaterer medlemmer etter en intern `import_key` basert på
-  matrikkelnummer og adresse. Interne ID-er og medlemslenker beholdes også når
+  matrikkelnummer og adresse. Interne ID-er beholdes også når
   `N/A` erstattes med et H-nummer. Dersom matrikkelnummer/adresse endres, må
   eksisterende medlemsidentitet avklares før import; kjente H-numre er unike.
 - Dupliserte tomter eller kjente H-numre stopper importen. Ingen eksisterende
@@ -912,8 +933,7 @@ Regler:
 | Extra-epost | `other_contact_emails` (tekstliste) |
 | Kommentar | `admin_comment` (kun admin) |
 
-Importen av `2026-aktiv.csv`: 425 medlemmer, inkludert 14 med `N/A`.
-164 rader ble utelatt på grunn av manglende matrikkelnummer eller adresse.
+Konkrete importvolum og produksjonsstatus føres i intern driftsdokumentasjon.
 Kilde-CSV og medlemsdata ligger ikke i Git eller `public`.
 
 ### Synkronisering med Kartverket
@@ -923,7 +943,7 @@ hamburgermenyen. Siden ligger på `/admin/members/matrikkel`. Rollen er adskilt
 fra vanlig administratortilgang og konfigureres som en kommaseparert allowlist:
 
 ```env
-MATRIKKEL_SYNC_EMAILS=ib@turufjellvel.no
+MATRIKKEL_SYNC_EMAILS=<godkjent-driftskonto@turufjellvel.no>
 ```
 
 Variabelen må settes eksplisitt. Dersom den mangler eller er tom, har ingen
@@ -991,10 +1011,11 @@ av. Loggene inneholder bare type, interne medlem-/survey-ID-er, mottakerdomene,
 message ID, tidspunkt og resultat – aldri API-token, komplett e-postinnhold eller
 personlig survey-URL.
 
-Den samme tjenesten leverer survey-invitasjoner, 24-timers tilgang til **Mine
+Den samme tjenesten leverer survey-invitasjoner, 15-minutters engangstilgang til **Mine
 medlemsopplysninger** og e-postbekreftelse av nye innmeldinger. Selvbetjeningen
-krever derfor fungerende MailerSend-konfigurasjon, men bruker ingen nye
-miljøvariabler. `members` er fortsatt eneste autoritative medlemsregister.
+krever derfor fungerende MailerSend-konfigurasjon samt korrekt
+`APP_ENVIRONMENT`, `TOKEN_AUDIENCE` og `SECURITY_EVENT_HMAC_KEY`. `members` er
+fortsatt eneste autoritative medlemsregister.
 
 ### Lokal utvikling og testmail
 
@@ -1032,9 +1053,10 @@ survey.
 
 `survey-email-background` hevder én ventende levering atomisk og sender
 kontrollert med minst 6,1 sekunder mellom Email API-kall. Dette holder seg innen
-MailerSends dokumenterte lave rategrense og fungerer for dagens omtrent 425
-medlemmer uten ukontrollerte browser-kall. Personlig URL opprettes i minnet fra
-eksisterende tilfeldig `access_token` og survey-ID, og lagres eller logges ikke.
+MailerSends dokumenterte lave rategrense uten ukontrollerte browser-kall. For
+hver levering opprettes en ny, hashet engangskode bundet til medlem,
+undersøkelse og miljø. Den rå koden brukes bare til invitasjons-URL-en og
+lagres eller logges ikke.
 Hvis en worker avbrytes etter at den har hevdet en melding, markeres den etter 15
 minutter som `UNCERTAIN_AFTER_INTERRUPTION` i stedet for automatisk å kunne
 dobbeltsendes. Administrator ser sendt, levert, feilet og undertrykt per medlem
@@ -1092,8 +1114,11 @@ Endringen oppretter additivt:
 - `email_deliveries` for mottaker, type, emne, provider message ID og status
 - `email_webhook_events` for idempotente leveringshendelser
 - `email_suppressions` for adresser som ikke skal forsøkes sendt igjen
-- `member_access_tokens`, `member_requests` og `member_profile_updates` for
-  tidsbegrenset selvbetjening og administrativ behandling
+- `member_access_tokens`, `member_sessions`, `member_email_changes`,
+  `survey_access_tokens`, `survey_sessions`, `member_requests` og
+  `member_profile_updates` for engangstilgang og administrativ behandling
+- `security_rate_limits` og `security_events` for delt misbruksvern og
+  append-only sikkerhetslogging
 
 Full HTML, plain-text og survey-token lagres ikke. Mottakeradressen lagres fordi
 den kreves for leveringskobling, feilsøking og suppression; fastsett tilgang,
@@ -1147,18 +1172,24 @@ AUTH_MICROSOFT_ENTRA_ID_TENANT_ID=<Directory tenant ID>
 AUTH_MICROSOFT_ENTRA_ID_ID=<Application client ID>
 AUTH_MICROSOFT_ENTRA_ID_SECRET=<client secret-verdi>
 AUTH_URL=http://localhost:3000
-ADMIN_EMAILS=
+ADMIN_EMAILS=<kommaseparert liste over eksplisitt godkjente kontoer>
+ADMIN_REQUIRED_ROLES=<valgfrie Entra app-roller>
+APP_ENVIRONMENT=development
+TOKEN_AUDIENCE=tfv-development
+SECURITY_EVENT_HMAC_KEY=<unik hemmelighet, minst 32 bytes>
 ```
 
 `AUTH_SECRET` er generert lokalt. De tre Microsoft-verdiene må fortsatt fylles
 inn av en Microsoft 365-administrator. Ingen av variablene skal ha `NEXT_PUBLIC_`
 prefiks. `AUTH_URL` skal være det faktiske HTTPS-domenet i produksjon.
 
-Tilgang krever både riktig tenant og e-post på nøyaktig `@turufjellvel.no`.
-Alle slike kontoer har tilgang som standard. Sett `ADMIN_EMAILS` til en
-kommaseparert liste for å begrense til bestemte personer. Økter varer maksimalt
-åtte timer. Utlogging og endring i tillatt e-postliste håndheves på serveren.
-Innlogging er stengt når Microsoft-konfigurasjonen mangler.
+Tilgang krever riktig tenant, e-post på nøyaktig `@turufjellvel.no` og medlemskap
+i obligatorisk `ADMIN_EMAILS`. Manglende, tom eller ugyldig allowlist stenger
+admin. `ADMIN_REQUIRED_ROLES` kan i tillegg kreve Entra-app-roller for minste
+privilegium. Opprett rollene `TFV.ReadOnly`, `TFV.MemberAdmin`,
+`TFV.SurveyAdmin`, `TFV.CmsEditor`, `TFV.MatrikkelAdmin` og
+`TFV.SecurityAudit`, aktiver **Assignment required**, og krev MFA og egnet
+Conditional Access. Økter varer maksimalt åtte timer.
 
 ### Kontroller
 

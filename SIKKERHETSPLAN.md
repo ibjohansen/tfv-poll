@@ -1,6 +1,7 @@
 # Tiltaksplan etter ekstern sikkerhetsgjennomgang
 
-- Status: foreslått gjennomføringsplan
+- Status: implementert i kode 12. september 2026; produksjonsutrulling og
+  eksterne kontroller gjenstår som angitt nedenfor
 - Opprettet: 11. september 2026
 - Omfang: Turufjell medlemsservice, Netlify, Neon/Lakebase Postgres,
   Microsoft Entra ID og GitHub
@@ -25,6 +26,23 @@ Følgende prinsipper gjelder for hele arbeidet:
   isolert Neon-gren med syntetiske data. Pooled forbindelse brukes i Netlify,
   direkte forbindelse brukes til migrering.
 - Eksisterende sikkerhetskontroller skal beholdes og få regresjonstester.
+
+## Implementeringsstatus 12. september 2026
+
+| Område | Status | Gjenstår før ferdig produksjon |
+| --- | --- | --- |
+| Medlemslenke og e-postbytte | Implementert: 15-minutters engangskode, separat hashet 45-minutters økt og totrinns e-postbekreftelse | Dynamisk test med to kontrollerte postkasser |
+| Enumerering og ratebegrensning | Implementert: identisk offentlig respons, Netlify edge-regel og atomisk Postgres-begrensning | Bekreft edge-regelen i deployloggen; velg eventuelt personvernvurdert CAPTCHA |
+| Miljøisolasjon | Implementert: databasevakt, audience og miljøbundne token | Flytt lokal utvikling permanent til egen schema-only development-gren og roter gammel produksjonsrolle |
+| Administratorpolicy | Implementert: obligatorisk allowlist, app-role-støtte og rutebasert RBAC | Opprett/tildel Entra-app-roller, aktiver Assignment required, MFA og Conditional Access |
+| Surveytilgang | Implementert: ett hashet token per medlem/survey, separat økt og minimert profil | Koordiner ugyldiggjøring av gamle lenker og eventuell ny utsendelse; kjør oppryddingsmigrering etter deploy |
+| Internt notat | Fjernet fra selvbetjening/JSON og merket internt i admin | To autoriserte personer må gjennomgå eksisterende kommentarer |
+| CSP | Implementert med request-nonce og uten `'unsafe-inline'` i `script-src` | Verifiser alle produksjonsflyter og faktiske Netlify-headere |
+| Repository | Aktiv README er ryddet og `SECURITY.md` er lagt til | GitHub-eier må kontrollere historikk, secret scanning, push protection, Dependabot og branch protection |
+
+Den additive databasemigreringen er laget for å kjøres før deploy. Fjerning av
+de gamle surveykolonnene ligger separat i `database/security-cleanup.sql` og
+skal først kjøres etter at ny kode er publisert.
 
 ## Bekreftet utgangspunkt i dagens kode
 

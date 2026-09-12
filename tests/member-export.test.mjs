@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import { buildMemberWorkbook } from '../lib/member-workbook.js';
 
-test('member workbook includes member fields and personal survey URL without internal metadata', async () => {
+test('member workbook includes member fields without personal survey secrets or internal metadata', async () => {
   const member = {
     id: '25',
     access_token: '11111111111111111111111111111111',
@@ -44,10 +44,7 @@ test('member workbook includes member fields and personal survey URL without int
   ]) {
     assert.equal(headers[excludedHeader], undefined);
   }
-  assert.deepEqual(row.getCell(headers['Personlig undersøkelseslenke']).value, {
-    text: `https://example.no/survey?klm=${member.access_token}&xyz=${survey.id}`,
-    hyperlink: `https://example.no/survey?klm=${member.access_token}&xyz=${survey.id}`,
-  });
+  assert.equal(headers['Personlig undersøkelseslenke'], undefined);
 });
 
 test('non-numeric H-numbers remain text in the workbook', async () => {

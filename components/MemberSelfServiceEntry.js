@@ -12,7 +12,6 @@ export default function MemberSelfServiceEntry({ membershipStatus = '' }) {
   const [identifier, setIdentifier] = useState('');
   const [membership, setMembership] = useState(emptyMembership);
   const [busy, setBusy] = useState('');
-  const [matchedIdentifier, setMatchedIdentifier] = useState('');
   const [message, setMessage] = useState(
     membershipStatus === 'verified' ? 'E-postadressen er bekreftet. Innmeldingen er sendt til behandling.'
       : membershipStatus === 'invalid' ? 'Bekreftelseslenken er ugyldig eller utløpt.' : '',
@@ -21,30 +20,14 @@ export default function MemberSelfServiceEntry({ membershipStatus = '' }) {
 
   async function submitAccess(event) {
     event.preventDefault();
-    setBusy('search'); setMessage(''); setIsError(false);
+    setBusy('access'); setMessage(''); setIsError(false);
     try {
       const response = await fetch('/api/member-access/request', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'search', identifier }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identifier }),
       });
       const body = await response.json();
       if (!response.ok || !body.ok) throw new Error(body.message || 'Forespørselen kunne ikke behandles.');
-      setMessage(body.message); setIsError(body.found === false);
-      setMatchedIdentifier(body.found && body.canSend ? identifier : '');
-    } catch (error) { setMessage(error.message); setIsError(true); }
-    finally { setBusy(''); }
-  }
-
-  async function sendAccessLink() {
-    setBusy('send'); setMessage(''); setIsError(false);
-    try {
-      const response = await fetch('/api/member-access/request', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send', identifier: matchedIdentifier }),
-      });
-      const body = await response.json();
-      if (!response.ok || !body.ok) throw new Error(body.message || 'Lenken kunne ikke sendes.');
-      setMessage(body.message); setIsError(body.found === false || body.canSend === false);
-      setMatchedIdentifier('');
+      setMessage(body.message); setIdentifier('');
     } catch (error) { setMessage(error.message); setIsError(true); }
     finally { setBusy(''); }
   }
@@ -68,21 +51,20 @@ export default function MemberSelfServiceEntry({ membershipStatus = '' }) {
     <div className="member-self-service-intro">
       <p className="eyebrow">Medlemsservice</p>
       <h2 id="member-self-service-title">Mine medlemsopplysninger</h2>
-      <p>Be om en sikker lenke for å se hva vi har registrert, rette kontaktopplysninger eller melde eierskifte. Lenken sendes til registrert hoved-e-post og varer i 24 timer.</p>
+      <p>Be om en sikker engangslenke for å se hva vi har registrert, rette kontaktopplysninger eller melde eierskifte. Lenken sendes til registrert hoved-e-post og varer i 15 minutter.</p>
     </div>
     <div className="member-self-service-box">
       <div className="member-self-service-tabs" role="tablist" aria-label="Velg medlemstjeneste">
-        <button type="button" role="tab" aria-selected={mode === 'access'} onClick={() => { setMode('access'); setMessage(''); setMatchedIdentifier(''); }}>Jeg er registrert</button>
-        <button type="button" role="tab" aria-selected={mode === 'membership'} onClick={() => { setMode('membership'); setMessage(''); setMatchedIdentifier(''); }}>Meld inn ny tomt</button>
+        <button type="button" role="tab" aria-selected={mode === 'access'} onClick={() => { setMode('access'); setMessage(''); }}>Jeg er registrert</button>
+        <button type="button" role="tab" aria-selected={mode === 'membership'} onClick={() => { setMode('membership'); setMessage(''); }}>Meld inn ny tomt</button>
       </div>
       {mode === 'access' ? <form className="member-self-service-form" onSubmit={submitAccess}>
         <label htmlFor="member-identifier">H-nummer, gateadresse eller e-postadresse
-          <input id="member-identifier" value={identifier} onChange={(event) => { setIdentifier(event.target.value); setMatchedIdentifier(''); setMessage(''); }} maxLength={320} required />
+          <input id="member-identifier" value={identifier} onChange={(event) => { setIdentifier(event.target.value); setMessage(''); }} maxLength={320} required />
         </label>
-        <p>Ved treff viser vi bare tomten, adressen og en maskert hoved-e-post. Den sikre lenken sendes alltid til den fullstendige registrerte hovedadressen.</p>
-        <button className={matchedIdentifier ? 'admin-button' : 'primary-button'} type="submit" disabled={Boolean(busy)}>{busy === 'search' ? 'Søker …' : 'Søk'}</button>
+        <p>Av personvernhensyn viser vi ikke om opplysningen finnes i registeret. Hvis den samsvarer, sender vi lenken til den registrerte hovedadressen.</p>
+        <button className="primary-button" type="submit" disabled={Boolean(busy)}>{busy === 'access' ? 'Sender …' : 'Send sikker lenke'}</button>
         {message && <p className={isError ? 'form-error' : 'admin-success'} role="status">{message}</p>}
-        {matchedIdentifier && <button className="primary-button" type="button" onClick={sendAccessLink} disabled={Boolean(busy)}>{busy === 'send' ? 'Sender …' : 'Send meg en sikker lenke'}</button>}
       </form> : <form className="member-self-service-form membership-request-form" onSubmit={submitMembership}>
         <p>Bruk dette skjemaet bare når hverken tomten eller adressen finnes i medlemsregisteret. Innmeldingen behandles av Turufjell Vel etter at e-postadressen er bekreftet.</p>
         <div className="member-form-grid">

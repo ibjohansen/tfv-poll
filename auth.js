@@ -9,7 +9,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
     issuer: `https://login.microsoftonline.com/${process.env.AUTH_MICROSOFT_ENTRA_ID_TENANT_ID}/v2.0`,
     authorization: { params: { scope: 'openid profile email' } },
     profile(profile) {
-      return { id: profile.sub, name: profile.name, email: profile.email || profile.preferred_username, image: null };
+      return { id: profile.sub, name: profile.name, email: profile.email || profile.preferred_username, image: null, roles: profile.roles || [] };
     },
   })] : [],
   pages: { signIn: '/admin/login', error: '/admin/login' },
@@ -17,18 +17,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
   callbacks: {
     signIn({ profile, account }) {
       return account?.provider === 'microsoft-entra-id' && isAllowedAdmin({
-        email: profile?.email || profile?.preferred_username, tenantId: profile?.tid,
+        email: profile?.email || profile?.preferred_username, tenantId: profile?.tid, roles: profile?.roles || [],
       });
     },
     jwt({ token, profile }) {
       if (profile) {
         token.tenantId = profile.tid;
         token.email = profile.email || profile.preferred_username;
+        token.roles = profile.roles || [];
       }
       return token;
     },
     session({ session, token }) {
       session.user.tenantId = token.tenantId;
+      session.user.roles = token.roles || [];
       return session;
     },
   },

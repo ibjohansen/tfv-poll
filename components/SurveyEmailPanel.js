@@ -63,6 +63,7 @@ export default function SurveyEmailPanel({ surveyId, adminEmail }) {
   const progress = campaign?.total_count ? Math.round(((campaign.sent_count + campaign.failed_count + campaign.suppressed_count) / campaign.total_count) * 100) : 0;
   const canStart = overview.configured && overview.bulk_enabled && overview.survey?.can_send && !campaign && overview.recipient_count > 0;
   const canResume = overview.configured && overview.bulk_enabled && overview.survey?.can_send && ['pending', 'failed'].includes(campaign?.status);
+  const canReplace = overview.configured && overview.bulk_enabled && overview.survey?.can_send && campaign?.status === 'completed' && overview.recipient_count > 0;
 
   return <section className="survey-email" aria-labelledby="survey-email-heading">
     <div className="survey-results-summary"><div><p className="eyebrow">E-post</p><h3 id="survey-email-heading">Send undersøkelsen</h3><p>Personlige lenker opprettes server-side og vises aldri her.</p></div></div>
@@ -88,6 +89,7 @@ export default function SurveyEmailPanel({ surveyId, adminEmail }) {
         <dl className="survey-email-stats"><div><dt>Akseptert</dt><dd>{campaign.sent_count}</dd></div><div><dt>Levert</dt><dd>{campaign.delivered_count}</dd></div><div><dt>Feilet</dt><dd>{campaign.failed_count}</dd></div><div><dt>Undertrykt</dt><dd>{campaign.suppressed_count}</dd></div></dl>
         {campaign.error_message && <p className="form-error" role="alert">Jobben stoppet: {campaign.error_message}</p>}
         {canResume && <button className="admin-button" type="button" disabled={busy} onClick={() => setConfirmSend(true)}>Start bakgrunnsjobben på nytt</button>}
+        {canReplace && <button className="admin-button" type="button" disabled={busy} onClick={() => setConfirmSend(true)}>Send nye sikre lenker</button>}
       </> : <>
         <p>{overview.recipient_count} {overview.recipient_count === 1 ? 'medlem vil' : 'medlemmer vil'} motta denne undersøkelsen. En utsendelse kan ikke startes på nytt automatisk.</p>
         <button className="primary-button" type="button" disabled={!canStart || busy} onClick={() => setConfirmSend(true)}>{overview.bulk_enabled ? 'Start utsendelse' : 'Masseutsendelse deaktivert'}</button>
@@ -99,6 +101,6 @@ export default function SurveyEmailPanel({ surveyId, adminEmail }) {
       {overview.pages > 1 && <nav className="survey-email-pages" aria-label="Sider i leveringsstatus"><button className="admin-button" type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Forrige</button><span>Side {overview.page} av {overview.pages}</span><button className="admin-button" type="button" disabled={page >= overview.pages} onClick={() => setPage((value) => value + 1)}>Neste</button></nav>}
     </section>}
     {message && <p className={message.includes('akseptert') || message.includes('startet') ? 'admin-success' : 'form-error'} role="status">{message}</p>}
-    <ConfirmDialog open={confirmSend} eyebrow="Bekreft utsendelse" destructive={false} title={`Send til ${overview.recipient_count} medlemmer?`} description="Dette starter en personlig e-post til hvert medlem. Samme undersøkelse kan ikke masseutsendes flere ganger." confirmLabel="Start utsendelse" busy={busy === 'send'} onCancel={() => setConfirmSend(false)} onConfirm={() => post('send')} />
+    <ConfirmDialog open={confirmSend} eyebrow="Bekreft utsendelse" destructive={false} title={`Send til ${overview.recipient_count} medlemmer?`} description={canReplace ? 'Dette arkiverer den tidligere utsendelsen og sender nye engangslenker til alle aktuelle mottakere.' : 'Dette starter en personlig e-post til hvert medlem.'} confirmLabel="Start utsendelse" busy={busy === 'send' || busy === 'resend'} onCancel={() => setConfirmSend(false)} onConfirm={() => post(canReplace ? 'resend' : 'send')} />
   </section>;
 }

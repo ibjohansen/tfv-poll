@@ -12,11 +12,8 @@ CREATE TABLE IF NOT EXISTS survey_responses (
 CREATE INDEX IF NOT EXISTS survey_responses_created_at_idx
   ON survey_responses (created_at DESC);
 
--- Medlems-ID genereres tilfeldig, uavhengig av tomteopplysningene.
 CREATE TABLE IF NOT EXISTS members (
   id BIGSERIAL PRIMARY KEY,
-  access_token TEXT NOT NULL UNIQUE DEFAULT replace(gen_random_uuid()::text, '-', '')
-    CHECK (access_token ~ '^[a-f0-9]{32}$'),
   h_number TEXT NOT NULL,
   cadastral_number TEXT,
   section_number TEXT,
@@ -25,10 +22,8 @@ CREATE TABLE IF NOT EXISTS members (
   registration_date TEXT,
   primary_contact_name TEXT,
   primary_contact_email TEXT,
-  other_contact_emails TEXT[] NOT NULL DEFAULT '{}'
-  ,access_expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '180 days')
-  ,access_revoked_at TIMESTAMPTZ
-  ,deleted_at TIMESTAMPTZ
+  other_contact_emails TEXT[] NOT NULL DEFAULT '{}',
+  deleted_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS surveys (
@@ -73,8 +68,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS survey_responses_member_survey_idx
 ALTER TABLE members ADD COLUMN IF NOT EXISTS admin_comment TEXT;
 ALTER TABLE members ADD COLUMN IF NOT EXISTS section_number TEXT;
 ALTER TABLE members ADD COLUMN IF NOT EXISTS import_key TEXT UNIQUE;
-ALTER TABLE members ADD COLUMN IF NOT EXISTS access_expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '180 days');
-ALTER TABLE members ADD COLUMN IF NOT EXISTS access_revoked_at TIMESTAMPTZ;
 ALTER TABLE members ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 ALTER TABLE members ALTER COLUMN registration_date TYPE TEXT USING registration_date::text;
 ALTER TABLE members DROP CONSTRAINT IF EXISTS members_h_number_key;
@@ -327,16 +320,111 @@ CREATE TABLE IF NOT EXISTS member_access_tokens (
   id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
   member_id BIGINT NOT NULL REFERENCES members(id) ON DELETE RESTRICT,
   token_hash TEXT NOT NULL UNIQUE CHECK (token_hash ~ '^[a-f0-9]{64}$'),
+  environment TEXT NOT NULL CHECK (environment IN ('development', 'staging', 'production')),
+  audience TEXT NOT NULL CHECK (char_length(audience) BETWEEN 3 AND 100),
+  purpose TEXT NOT NULL DEFAULT 'member_login' CHECK (purpose = 'member_login'),
   expires_at TIMESTAMPTZ NOT NULL,
+  consumed_at TIMESTAMPTZ,
   last_used_at TIMESTAMPTZ,
   revoked_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE member_access_tokens ADD COLUMN IF NOT EXISTS environment TEXT;
+ALTER TABLE member_access_tokens ADD COLUMN IF NOT EXISTS audience TEXT;
+ALTER TABLE member_access_tokens ADD COLUMN IF NOT EXISTS purpose TEXT DEFAULT 'member_login';
+ALTER TABLE member_access_tokens ADD COLUMN IF NOT EXISTS consumed_at TIMESTAMPTZ;
+
 CREATE INDEX IF NOT EXISTS member_access_tokens_member_idx
   ON member_access_tokens (member_id, expires_at DESC);
+DROP INDEX IF EXISTS member_access_tokens_one_active_idx;
 CREATE UNIQUE INDEX IF NOT EXISTS member_access_tokens_one_active_idx
-  ON member_access_tokens (member_id) WHERE revoked_at IS NULL;
+  ON member_access_tokens (member_id)
+  WHERE revoked_at IS NULL AND consumed_at IS NULL;
+
+-- Den kortvarige e-postkoden byttes atomisk mot en separat, hash-lagret
+-- medlemssesjon. Den opprinnelige URL-hemmeligheten brukes aldri som cookie.
+CREATE TABLE IF NOT EXISTS member_sessions (
+  id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
+  member_id BIGINT NOT NULL REFERENCES members(id) ON DELETE RESTRICT,
+  session_token_hash TEXT NOT NULL UNIQUE CHECK (session_token_hash ~ '^[a-f0-9]{64}$'),
+  environment TEXT NOT NULL CHECK (environment IN ('development', 'staging', 'production')),
+  audience TEXT NOT NULL CHECK (char_length(audience) BETWEEN 3 AND 100),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  absolute_expires_at TIMESTAMPTZ NOT NULL,
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  revoked_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS member_sessions_member_idx
+  ON member_sessions (member_id, expires_at DESC);
+CREATE INDEX IF NOT EXISTS member_sessions_expiry_idx
+  ON member_sessions (expires_at) WHERE revoked_at IS NULL;
+
+-- Endring av hoved-e-post krever først kontroll over gammel adresse og deretter
+-- en separat engangsbekreftelse sendt til den nye adressen.
+CREATE TABLE IF NOT EXISTS member_email_changes (
+  id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
+  member_id BIGINT NOT NULL REFERENCES members(id) ON DELETE RESTRICT,
+  old_email TEXT NOT NULL CHECK (char_length(old_email) <= 254),
+  pending_email TEXT NOT NULL CHECK (char_length(pending_email) <= 254),
+  old_token_hash TEXT UNIQUE CHECK (old_token_hash IS NULL OR old_token_hash ~ '^[a-f0-9]{64}$'),
+  new_token_hash TEXT UNIQUE CHECK (new_token_hash IS NULL OR new_token_hash ~ '^[a-f0-9]{64}$'),
+  environment TEXT NOT NULL CHECK (environment IN ('development', 'staging', 'production')),
+  audience TEXT NOT NULL CHECK (char_length(audience) BETWEEN 3 AND 100),
+  status TEXT NOT NULL DEFAULT 'pending_old'
+    CHECK (status IN ('pending_old', 'pending_new', 'completed', 'cancelled', 'expired')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  old_confirmed_at TIMESTAMPTZ,
+  new_confirmed_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  cancelled_at TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS member_email_changes_one_pending_idx
+  ON member_email_changes (member_id)
+  WHERE status IN ('pending_old', 'pending_new');
+
+-- Ett hashet engangstoken og én kortvarig sesjon per medlem/undersøkelse.
+CREATE TABLE IF NOT EXISTS survey_access_tokens (
+  id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
+  member_id BIGINT NOT NULL REFERENCES members(id) ON DELETE RESTRICT,
+  survey_id TEXT NOT NULL REFERENCES surveys(id) ON DELETE RESTRICT,
+  token_hash TEXT NOT NULL UNIQUE CHECK (token_hash ~ '^[a-f0-9]{64}$'),
+  environment TEXT NOT NULL CHECK (environment IN ('development', 'staging', 'production')),
+  audience TEXT NOT NULL CHECK (char_length(audience) BETWEEN 3 AND 100),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  consumed_at TIMESTAMPTZ,
+  answered_at TIMESTAMPTZ,
+  revoked_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS survey_access_tokens_member_survey_idx
+  ON survey_access_tokens (member_id, survey_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS survey_access_tokens_one_active_idx
+  ON survey_access_tokens (member_id, survey_id)
+  WHERE consumed_at IS NULL AND answered_at IS NULL AND revoked_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS survey_sessions (
+  id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
+  member_id BIGINT NOT NULL REFERENCES members(id) ON DELETE RESTRICT,
+  survey_id TEXT NOT NULL REFERENCES surveys(id) ON DELETE RESTRICT,
+  session_token_hash TEXT NOT NULL UNIQUE CHECK (session_token_hash ~ '^[a-f0-9]{64}$'),
+  environment TEXT NOT NULL CHECK (environment IN ('development', 'staging', 'production')),
+  audience TEXT NOT NULL CHECK (char_length(audience) BETWEEN 3 AND 100),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  absolute_expires_at TIMESTAMPTZ NOT NULL,
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  answered_at TIMESTAMPTZ,
+  revoked_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS survey_sessions_member_survey_idx
+  ON survey_sessions (member_id, survey_id, expires_at DESC);
 
 -- Eierskifte og innmelding krever manuell behandling. Offisielle eiendomsdata
 -- endres aldri direkte fra det offentlige skjemaet.
@@ -374,6 +462,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS member_requests_one_pending_transfer_idx
 ALTER TABLE member_requests ADD COLUMN IF NOT EXISTS cadastral_number TEXT;
 ALTER TABLE member_requests ADD COLUMN IF NOT EXISTS section_number TEXT;
 ALTER TABLE member_requests ADD COLUMN IF NOT EXISTS matrikkel_review JSONB;
+ALTER TABLE member_requests ADD COLUMN IF NOT EXISTS verification_environment TEXT;
+ALTER TABLE member_requests ADD COLUMN IF NOT EXISTS verification_audience TEXT;
+ALTER TABLE member_requests ADD COLUMN IF NOT EXISTS verification_purpose TEXT;
+ALTER TABLE member_requests ADD COLUMN IF NOT EXISTS verification_consumed_at TIMESTAMPTZ;
 
 -- Minst mulig revisjonsspor for selvbetjente endringer. Tidligere og nye
 -- feltverdier dupliseres ikke; bare hvilke kontaktfelt som ble endret lagres.
@@ -387,9 +479,69 @@ CREATE TABLE IF NOT EXISTS member_profile_updates (
 CREATE INDEX IF NOT EXISTS member_profile_updates_member_idx
   ON member_profile_updates (member_id, created_at DESC);
 
+-- Databasen identifiserer eksplisitt hvilket miljø den tilhører. Verdien settes
+-- av scripts/setup-database.mjs i samme transaksjon som resten av skjemaet.
+CREATE TABLE IF NOT EXISTS application_environment (
+  singleton BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (singleton),
+  environment TEXT NOT NULL CHECK (environment IN ('development', 'staging', 'production')),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Delte, atomiske tellere gjør misbruksvernet uavhengig av hvilken Netlify-
+-- instans som mottar forespørselen. Nøkler lagres bare som HMAC.
+CREATE TABLE IF NOT EXISTS security_rate_limits (
+  scope TEXT NOT NULL CHECK (char_length(scope) BETWEEN 1 AND 80),
+  key_hash TEXT NOT NULL CHECK (key_hash ~ '^[a-f0-9]{64}$'),
+  bucket_start TIMESTAMPTZ NOT NULL,
+  request_count INTEGER NOT NULL DEFAULT 1 CHECK (request_count > 0),
+  expires_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (scope, key_hash, bucket_start)
+);
+
+CREATE INDEX IF NOT EXISTS security_rate_limits_expiry_idx
+  ON security_rate_limits (expires_at);
+
+-- Append-only logg uten rå identifikatorer, URL-er eller tokenverdier.
+CREATE TABLE IF NOT EXISTS security_events (
+  id BIGSERIAL PRIMARY KEY,
+  event_type TEXT NOT NULL CHECK (char_length(event_type) BETWEEN 1 AND 100),
+  actor_type TEXT NOT NULL CHECK (actor_type IN ('public', 'member', 'admin', 'system')),
+  result TEXT NOT NULL CHECK (char_length(result) BETWEEN 1 AND 80),
+  member_id BIGINT REFERENCES members(id) ON DELETE RESTRICT,
+  survey_id TEXT REFERENCES surveys(id) ON DELETE RESTRICT,
+  entity_id TEXT,
+  key_hmac TEXT CHECK (key_hmac IS NULL OR key_hmac ~ '^[a-f0-9]{64}$'),
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS security_events_time_idx
+  ON security_events (occurred_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS security_events_type_idx
+  ON security_events (event_type, occurred_at DESC);
+
+CREATE OR REPLACE FUNCTION protect_security_events()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $security_events$
+BEGIN
+  RAISE EXCEPTION 'security_events is append-only';
+END;
+$security_events$;
+
+DROP TRIGGER IF EXISTS security_events_append_only_trigger ON security_events;
+CREATE TRIGGER security_events_append_only_trigger
+BEFORE UPDATE OR DELETE ON security_events
+FOR EACH ROW EXECUTE FUNCTION protect_security_events();
+
 ALTER TABLE email_deliveries DROP CONSTRAINT IF EXISTS email_deliveries_email_type_check;
 ALTER TABLE email_deliveries ADD CONSTRAINT email_deliveries_email_type_check
-  CHECK (email_type IN ('survey_invitation', 'survey_test', 'member_access', 'membership_verification'));
+  CHECK (email_type IN (
+    'survey_invitation', 'survey_test', 'member_access', 'membership_verification',
+    'member_email_change_old', 'member_email_change_new', 'member_email_change_notice'
+  ));
 
 -- Revisjonsspor for sentrale forretningsdata. Aktørfeltet settes av applikasjonen,
 -- mens triggeren gjør at også direkte databaseendringer logges som "system".
@@ -534,3 +686,11 @@ DROP TRIGGER IF EXISTS cms_attachments_audit_trigger ON cms_attachments;
 CREATE TRIGGER cms_attachments_audit_trigger
 AFTER INSERT OR UPDATE OR DELETE ON cms_attachments
 FOR EACH ROW EXECUTE FUNCTION record_audit_change();
+
+-- Alle gamle, miljøløse selvbetjeningslenker tilbakekalles. De tre globale
+-- surveykolonnene fjernes med database/security-cleanup.sql først etter at ny
+-- kode er publisert, slik at den kjørende gamle versjonen ikke krasjer under
+-- den additive migreringen.
+UPDATE member_access_tokens
+SET revoked_at = COALESCE(revoked_at, NOW())
+WHERE environment IS NULL OR audience IS NULL;

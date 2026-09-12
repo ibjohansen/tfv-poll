@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  createAccessSecret, formatMemberLookupMessage, hashAccessSecret, isAccessSecret,
-  maskEmailAddress, MEMBER_ACCESS_TTL_SECONDS, normalizeContactDetails,
+  createAccessSecret, GENERIC_MEMBER_ACCESS_MESSAGE, hashAccessSecret, isAccessSecret,
+  MEMBER_ACCESS_TTL_SECONDS, normalizeContactDetails,
   normalizeCadastralNumber, normalizeHNumberLookup, normalizeMemberLookup,
   normalizeMembershipRequest, normalizeSectionNumber,
 } from '../lib/member-self-service-utils.js';
@@ -14,7 +14,7 @@ test('member access secrets are random and only stored as deterministic hashes',
   assert.notEqual(first, second);
   assert.match(hashAccessSecret(first), /^[a-f0-9]{64}$/);
   assert.notEqual(hashAccessSecret(first), first);
-  assert.equal(MEMBER_ACCESS_TTL_SECONDS, 86_400);
+  assert.equal(MEMBER_ACCESS_TTL_SECONDS, 900);
 });
 
 test('member lookup is normalized without accepting empty or oversized values', () => {
@@ -27,26 +27,9 @@ test('member lookup is normalized without accepting empty or oversized values', 
   assert.throws(() => normalizeMemberLookup('x'.repeat(321)), /Invalid member data/);
 });
 
-test('member lookup messages distinguish missing and found records without exposing the email address', () => {
-  assert.equal(formatMemberLookupMessage({ found: false, lookup: 'Ukjent 17' }), 'Ukjent 17 - ble ikke funnet i databasen.');
-  const maskedEmail = maskEmailAddress('ib.johansen@gmail.com');
-  assert.equal(maskedEmail, 'ib.***********@*****.com');
-  const message = formatMemberLookupMessage({
-    found: true,
-    lookup: '25',
-    hNumber: '25',
-    streetAddress: 'Fjellvegen 1',
-    maskedEmail,
-  });
-  assert.equal(message, 'Tomt H-25, Fjellvegen 1, ib.***********@*****.com er funnet.');
-  assert.equal(formatMemberLookupMessage({
-    found: true,
-    hNumber: '25',
-    streetAddress: 'Fjellvegen 1',
-    maskedEmail,
-    emailRequested: true,
-  }), 'Tomt H-25, Fjellvegen 1, ib.***********@*****.com er funnet, sjekk mailen din.');
-  assert.equal(message.includes('ib.johansen@gmail.com'), false);
+test('public member lookup message reveals no lookup result or member data', () => {
+  assert.match(GENERIC_MEMBER_ACCESS_MESSAGE, /Dersom opplysningene samsvarer/);
+  assert.doesNotMatch(GENERIC_MEMBER_ACCESS_MESSAGE, /funnet|H-|@/i);
 });
 
 test('only valid normalized contact fields are accepted', () => {

@@ -1,87 +1,65 @@
-import { isMockMode, saveMockResponse } from "@/lib/mock-store";
-import { NextResponse } from "next/server";
-import { getSql } from "@/lib/db";
-import { getMemberAccess } from "@/lib/membership";
-import { isRateLimited } from "@/lib/rate-limit";
+import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
+import { isMockMode } from '@/lib/mock-store';
+import {
+  getMockSurveyAccess, getSurveyAccess, submitMockSurveyResponse,
+  submitSurveyResponse, surveySessionCookieName,
+} from '@/lib/membership';
+import { isRateLimited } from '@/lib/rate-limit';
 
-export const runtime = "nodejs";
+export const runtime = 'nodejs';
 
-const allowedAnswers = new Set(["ja", "nei", "usikker"]);
+const allowedAnswers = new Set(['ja', 'nei', 'usikker']);
 
 function reply(body, status) {
-  return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
 function hasValidOrigin(request) {
-  const origin = request.headers.get("origin");
+  const origin = request.headers.get('origin');
   return !origin || origin === new URL(request.url).origin;
 }
 
 function hasValidAnswers(answers, questions) {
-  if (!answers || typeof answers !== "object" || Array.isArray(answers)) return false;
+  if (!answers || typeof answers !== 'object' || Array.isArray(answers)) return false;
   const ids = questions.map(({ id }) => id);
   return Object.keys(answers).length === ids.length && ids.every((id) => allowedAnswers.has(answers[id]));
 }
 
 function accessErrorStatus(status) {
-  if (status === "answered") return 409;
-  if (status === "ended") return 410;
+  if (status === 'answered') return 409;
+  if (status === 'ended') return 410;
   return 403;
 }
 
 export async function POST(request) {
-  if (!hasValidOrigin(request)) return reply({ ok: false, message: "Ugyldig forespørsel." }, 403);
-  if (isRateLimited(request)) return reply({ ok: false, message: "For mange forespørsler. Prøv igjen om litt." }, 429);
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return reply({ ok: false, message: "Ugyldig forespørsel." }, 400);
-  }
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return reply({ ok: false, message: "Ugyldig forespørsel." }, 400);
-  }
+  if (!hasValidOrigin(request)) return reply({ ok: false, message: 'Ugyldig forespørsel.' }, 403);
+  if (isRateLimited(request)) return reply({ ok: false, message: 'For mange forespørsler. Prøv igjen om litt.' }, 429);
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return reply({ ok: false, message: 'Ugyldig forespørsel.' }, 400);
 
   try {
-    const access = await getMemberAccess(body.memberToken, body.surveyId);
-    if (access.status !== "ready") {
+    const secret = (await cookies()).get(surveySessionCookieName())?.value;
+    const access = isMockMode()
+      ? await getMockSurveyAccess(body.mockToken, body.mockSurveyId)
+      : await getSurveyAccess(secret);
+    if (access.status !== 'ready') {
       return reply({ ok: false, message: access.message }, accessErrorStatus(access.status));
     }
-
-    // Honeypot. Ekte brukere ser aldri dette feltet.
     if (body.website) return reply({ ok: true }, 200);
-
     if (!hasValidAnswers(body.answers, access.survey.questions)) {
-      return reply({ ok: false, message: "Alle spørsmål må besvares." }, 400);
+      return reply({ ok: false, message: 'Alle spørsmål må besvares.' }, 400);
     }
-
-    let saved;
-    if (isMockMode()) {
-      saved = await saveMockResponse(access.member.id, body.surveyId, body.answers);
-    } else {
-      const sql = getSql();
-      const rows = await sql`
-        INSERT INTO survey_responses (member_id, survey_id, question_version, questions, answers, last_changed_by)
-        SELECT ${access.member.id}, ${body.surveyId}, ${access.survey.question_version}, questions, ${JSON.stringify(body.answers)}::jsonb, ${`member:${access.member.id}`}
-        FROM surveys
-        WHERE id = ${body.surveyId}
-          AND is_open = TRUE
-          AND deleted_at IS NULL
-          AND ends_on >= (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Oslo')::date
-        ON CONFLICT (member_id, survey_id) DO NOTHING
-        RETURNING id
-      `;
-      saved = rows.length > 0;
-    }
-    if (!saved) {
-      const latestAccess = await getMemberAccess(body.memberToken, body.surveyId);
-      const message = latestAccess.status === "ready"
-        ? "Det er allerede registrert en besvarelse for denne tomten i denne undersøkelsen."
-        : latestAccess.message;
-      return reply({ ok: false, message }, latestAccess.status === "ready" ? 409 : accessErrorStatus(latestAccess.status));
-    }
-    return reply({ ok: true }, 201);
+    const result = isMockMode()
+      ? await submitMockSurveyResponse(body.mockToken, body.mockSurveyId, body.answers)
+      : await submitSurveyResponse(secret, body.answers);
+    if (!result.saved) return reply({ ok: false, message: 'Det er allerede registrert en besvarelse for denne tomten.' }, 409);
+    const response = reply({ ok: true }, 201);
+    if (!isMockMode()) response.cookies.set(surveySessionCookieName(), '', {
+      maxAge: 0, path: '/', httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production',
+    });
+    return response;
   } catch {
-    return reply({ ok: false, message: "Vi klarte ikke å lagre svaret ditt. Prøv igjen om litt." }, 500);
+    return reply({ ok: false, message: 'Vi klarte ikke å lagre svaret ditt. Prøv igjen om litt.' }, 500);
   }
 }

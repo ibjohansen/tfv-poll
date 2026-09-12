@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { answerOptions } from "@/data/survey";
 
-export default function SurveyForm({ memberToken, surveyId, questions }) {
+export default function SurveyForm({ mockToken, mockSurveyId, questions }) {
   const router = useRouter();
   const [answers, setAnswers] = useState(() => Object.fromEntries(questions.map(({ id }) => [id, ""])));
   const [website, setWebsite] = useState("");
@@ -41,7 +41,7 @@ export default function SurveyForm({ memberToken, surveyId, questions }) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ answers, website, memberToken, surveyId }),
+        body: JSON.stringify({ answers, website, mockToken, mockSurveyId }),
       });
 
       const data = await response.json();

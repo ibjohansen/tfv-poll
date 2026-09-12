@@ -7,10 +7,6 @@ export default function MemberInfo({ access }) {
     ["Gårds- og bruksnummer", member.cadastral_number],
     ["Seksjonsnummer", member.section_number],
     ["Gateadresse og nummer", member.street_address],
-    ["Hjemmelshaver", member.title_holder],
-    ["Tinglysningsdato", member.registration_date],
-    ["Hovedkontakt navn", member.primary_contact_name],
-    ["Hovedkontakt e-post", member.primary_contact_email],
   ] : [];
 
   return (
@@ -29,12 +25,6 @@ export default function MemberInfo({ access }) {
               {label === "Gateadresse og nummer" && value && <MemberPropertyMap streetAddress={value} />}
             </div>
           ))}
-          <div>
-            <dt>Andre kontakt-e-postadresser</dt>
-            <dd>{member.other_contact_emails?.length ? (
-              <ul>{member.other_contact_emails.map((email, index) => <li key={index}>{email}</li>)}</ul>
-            ) : "Ingen registrert"}</dd>
-          </div>
         </dl>
       )}
     </section>

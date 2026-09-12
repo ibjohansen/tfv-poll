@@ -3,34 +3,34 @@ import assert from 'node:assert/strict';
 import { formatNorwegianDateTime, renderMemberAccessEmail, renderMembershipVerificationEmail, renderSurveyInvitationEmail, SYSTEM_EMAIL_FOOTER } from '../lib/email-templates.js';
 import { buildSurveyUrl, isPastSurveyEnd, parseTestRecipients, selectCampaignRecipients } from '../lib/survey-email-utils.js';
 
-test('survey URL uses the existing token and survey parameter names', () => {
-  const url = buildSurveyUrl({ baseUrl: 'https://medlemsservice.turufjellvel.no', accessToken: 'a'.repeat(32), surveyId: 'b'.repeat(32) });
-  assert.equal(url, `https://medlemsservice.turufjellvel.no/survey?klm=${'a'.repeat(32)}&xyz=${'b'.repeat(32)}`);
+test('survey URL uses a one-time 256-bit token without exposing member or survey IDs', () => {
+  const url = buildSurveyUrl({ baseUrl: 'https://medlemsservice.turufjellvel.no', accessToken: 'a'.repeat(64), surveyId: 'b'.repeat(32) });
+  assert.equal(url, `https://medlemsservice.turufjellvel.no/api/survey-access/verify?token=${'a'.repeat(64)}`);
   assert.throws(() => buildSurveyUrl({ baseUrl: 'https://example.test', accessToken: 'secret', surveyId: 'b'.repeat(32) }));
 });
 
 test('survey invitation has responsive HTML, CTA, visible URL and equivalent plain text', () => {
-  const surveyUrl = `https://medlemsservice.turufjellvel.no/survey?klm=${'a'.repeat(32)}&xyz=${'b'.repeat(32)}`;
+  const surveyUrl = `https://medlemsservice.turufjellvel.no/api/survey-access/verify?token=${'a'.repeat(64)}`;
   const rendered = renderSurveyInvitationEmail({ surveyTitle: 'Test <survey>', endsOn: '2026-12-31', surveyUrl, baseUrl: 'https://medlemsservice.turufjellvel.no' });
   assert.match(rendered.html, /viewport/);
   assert.match(rendered.html, /Åpne undersøkelsen/);
   assert.match(rendered.html, /Test &lt;survey&gt;/);
-  assert.match(rendered.html, /survey\?klm=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&amp;xyz=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/);
+  assert.match(rendered.html, /survey-access\/verify\?token=aaaaaaaa/);
   assert.match(rendered.text, /Torsdag 31\. desember 2026 kl\. 00:00/);
   assert.match(rendered.text, new RegExp(SYSTEM_EMAIL_FOOTER.replace('.', '\\.')));
-  assert.match(rendered.text, /klm=/);
+  assert.match(rendered.text, /token=/);
   assert.doesNotMatch(rendered.html, /<script|fonts\.googleapis/i);
 });
 
-test('member access and membership verification emails contain a visible 24-hour secret link', () => {
+test('member access and membership verification emails contain a visible 15-minute secret link', () => {
   const actionUrl = `https://medlemsservice.turufjellvel.no/api/member-access/verify?token=${'a'.repeat(64)}`;
   for (const rendered of [
     renderMemberAccessEmail({ actionUrl, baseUrl: 'https://medlemsservice.turufjellvel.no' }),
     renderMembershipVerificationEmail({ actionUrl, baseUrl: 'https://medlemsservice.turufjellvel.no' }),
   ]) {
-    assert.match(rendered.html, /varer i 24 timer/);
+    assert.match(rendered.html, /varer i 15 minutter/);
     assert.match(rendered.html, /token=aaaaaaaa/);
-    assert.match(rendered.text, /varer i 24 timer/);
+    assert.match(rendered.text, /varer i 15 minutter/);
     assert.match(rendered.text, new RegExp(SYSTEM_EMAIL_FOOTER.replace('.', '\\.')));
     assert.doesNotMatch(rendered.html, /<script|fonts\.googleapis/i);
   }

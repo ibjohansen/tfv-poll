@@ -1,7 +1,12 @@
-const developmentScriptSource = process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : '';
+import { isAuthConfigured } from './lib/admin-policy.js';
+import { getSecurityContext } from './lib/security-config.js';
+
+if (process.env.CONTEXT === 'production') {
+  getSecurityContext(process.env);
+  if (!isAuthConfigured(process.env)) throw new Error('Production admin authentication is not configured safely');
+}
 
 const securityHeaders = [
-  { key: 'Content-Security-Policy', value: `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src https://norgeskart.no https://www.norgeskart.no; form-action 'self'; img-src 'self' data: blob:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'${developmentScriptSource}; connect-src 'self' https://ws.geonorge.no` },
   { key: 'Referrer-Policy', value: 'no-referrer' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'X-Frame-Options', value: 'DENY' },

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 function formatDate(value) {
   if (!value) return 'Ikke registrert';
@@ -19,6 +20,7 @@ function changedFieldLabel(field) {
 }
 
 export default function MemberSelfServiceProfile({ initialProfile }) {
+  const router = useRouter();
   const [member, setMember] = useState(initialProfile.member);
   const [form, setForm] = useState({
     primary_contact_name: member.primary_contact_name || '',
@@ -26,6 +28,7 @@ export default function MemberSelfServiceProfile({ initialProfile }) {
     other_contact_emails: (member.other_contact_emails || []).join('\n'),
   });
   const [transfer, setTransfer] = useState({ primary_contact_name: '', primary_contact_email: '', other_contact_emails: '' });
+  const [newPrimaryEmail, setNewPrimaryEmail] = useState('');
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
@@ -46,9 +49,15 @@ export default function MemberSelfServiceProfile({ initialProfile }) {
     finally { setBusy(''); }
   }
 
+  async function logout() {
+    setBusy('logout');
+    try { await fetch('/api/member-access/logout', { method: 'POST' }); }
+    finally { router.push('/#medlemsopplysninger'); router.refresh(); }
+  }
+
   return <div className="member-profile-layout">
     <section className="member-profile-section" aria-labelledby="registered-data-title">
-      <div className="member-profile-heading"><div><p className="eyebrow">Innsyn</p><h2 id="registered-data-title">Registrerte opplysninger</h2></div><Link className="admin-button" href="/api/member-access/export" prefetch={false}>Last ned som JSON</Link></div>
+      <div className="member-profile-heading"><div><p className="eyebrow">Innsyn</p><h2 id="registered-data-title">Registrerte opplysninger</h2></div><div><Link className="admin-button" href="/api/member-access/export" prefetch={false}>Last ned som JSON</Link> <button className="admin-button" type="button" onClick={logout} disabled={Boolean(busy)}>Logg ut</button></div></div>
       <dl className="member-readonly-grid">
         <div><dt>H-nummer</dt><dd>{member.h_number || 'Ikke registrert'}</dd></div>
         <div><dt>Gårds- og bruksnummer</dt><dd>{member.cadastral_number || 'Ikke registrert'}</dd></div>
@@ -56,7 +65,6 @@ export default function MemberSelfServiceProfile({ initialProfile }) {
         <div><dt>Gateadresse</dt><dd>{member.street_address || 'Ikke registrert'}</dd></div>
         <div><dt>Hjemmelshaver</dt><dd>{member.title_holder || 'Ikke registrert'}</dd></div>
         <div><dt>Tinglysningsdato</dt><dd>{member.registration_date || 'Ikke registrert'}</dd></div>
-        <div><dt>Kommentar</dt><dd>{member.admin_comment || 'Ingen kommentar registrert'}</dd></div>
       </dl>
       <p className="member-form-note">Eiendomsopplysningene er skrivebeskyttet. Meld eierskifte nedenfor hvis de ikke lenger er riktige.</p>
     </section>
@@ -65,9 +73,19 @@ export default function MemberSelfServiceProfile({ initialProfile }) {
       <p className="eyebrow">Retting</p><h2 id="contact-data-title">Kontaktopplysninger</h2>
       <form className="member-self-service-form" onSubmit={(event) => { event.preventDefault(); submit('update', form); }}>
         <label>Kontaktperson<input value={form.primary_contact_name} onChange={(event) => setForm({ ...form, primary_contact_name: event.target.value })} maxLength={500} required /></label>
-        <label>Hoved-e-post<input type="email" value={form.primary_contact_email} onChange={(event) => setForm({ ...form, primary_contact_email: event.target.value })} maxLength={254} required /></label>
+        <label>Hoved-e-post<input type="email" value={form.primary_contact_email} readOnly aria-describedby="primary-email-note" /></label>
+        <span id="primary-email-note" className="member-form-note">Hoved-e-post endres separat med kontroll av både gammel og ny adresse.</span>
         <label>Andre e-postadresser<textarea value={form.other_contact_emails} onChange={(event) => setForm({ ...form, other_contact_emails: event.target.value })} rows={3} placeholder="Én adresse per linje" /></label>
         <button className="primary-button" type="submit" disabled={busy}>{busy === 'update' ? 'Lagrer …' : 'Lagre kontaktopplysninger'}</button>
+      </form>
+    </section>
+
+    <section className="member-profile-section" aria-labelledby="email-change-title">
+      <p className="eyebrow">Sikker endring</p><h2 id="email-change-title">Endre hoved-e-post</h2>
+      <p>Først sender vi en engangsbekreftelse til nåværende hoved-e-post. Etter godkjenning sender vi en ny bekreftelse til den nye adressen.</p>
+      <form className="member-self-service-form" onSubmit={(event) => { event.preventDefault(); submit('email_change', { primary_contact_email: newPrimaryEmail, other_contact_emails: '' }); }}>
+        <label>Ny hoved-e-post<input type="email" value={newPrimaryEmail} onChange={(event) => setNewPrimaryEmail(event.target.value)} maxLength={254} required /></label>
+        <button className="primary-button" type="submit" disabled={Boolean(busy)}>{busy === 'email_change' ? 'Sender …' : 'Start sikker e-postendring'}</button>
       </form>
     </section>
 

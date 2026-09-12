@@ -13,7 +13,7 @@ const fieldLabels = {
   h_number: 'H-nummer', cadastral_number: 'Gårds-/bruksnummer', section_number: 'Seksjonsnummer',
   street_address: 'Gateadresse', title_holder: 'Hjemmelshaver', registration_date: 'Tinglysningsdato',
   primary_contact_name: 'Hovedkontakt', primary_contact_email: 'Hoved-e-post', other_contact_emails: 'Andre e-poster',
-  admin_comment: 'Kommentar', title: 'Tittel', slug: 'URL', intro: 'Ingress', body: 'Innhold', category: 'Kategori',
+  admin_comment: 'Internt notat', title: 'Tittel', slug: 'URL', intro: 'Ingress', body: 'Innhold', category: 'Kategori',
   status: 'Status', is_open: 'Åpen', ends_on: 'Svarfrist', questions: 'Spørsmål', answers: 'Svar',
   deleted_at: 'Slettet tidspunkt', published_at: 'Publisert tidspunkt', sort_order: 'Rekkefølge', original_filename: 'Filnavn',
 };

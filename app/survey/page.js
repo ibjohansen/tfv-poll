@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { cookies } from 'next/headers';
 import MemberInfo from "@/components/MemberInfo";
-import { getMemberAccess } from "@/lib/membership";
+import { getMockSurveyAccess, getSurveyAccess, surveySessionCookieName } from "@/lib/membership";
 import BrandLogo from '@/components/BrandLogo';
 import SurveyForm from "@/components/SurveyForm";
 import { surveyDocuments, surveyLinkParameters } from "@/data/survey";
+import { isMockMode } from '@/lib/mock-store';
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -24,7 +26,10 @@ export default async function HomePage({ searchParams }) {
   const requestedSurveyId = params[surveyLinkParameters.survey];
   let access;
   try {
-    access = await getMemberAccess(memberToken, requestedSurveyId);
+    const sessionSecret = (await cookies()).get(surveySessionCookieName())?.value;
+    access = isMockMode() && memberToken
+      ? await getMockSurveyAccess(memberToken, requestedSurveyId)
+      : await getSurveyAccess(sessionSecret);
   } catch {
     access = { status: "unavailable", message: "Medlemsregisteret er midlertidig utilgjengelig. Prøv igjen senere." };
   }
@@ -106,7 +111,7 @@ export default async function HomePage({ searchParams }) {
             <p>Velg det alternativet som passer best for hvert spørsmål.</p>
           </div>
 
-          <SurveyForm memberToken={memberToken} surveyId={requestedSurveyId} questions={access.survey.questions} />
+          <SurveyForm mockToken={isMockMode() ? memberToken : undefined} mockSurveyId={isMockMode() ? requestedSurveyId : undefined} questions={access.survey.questions} />
         </section>}
 
         <footer className="page-footer">

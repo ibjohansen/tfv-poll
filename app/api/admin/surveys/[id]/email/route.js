@@ -43,8 +43,8 @@ export async function POST(request, { params }) {
       const delivery = await sendSurveyTestEmail(surveyId, input.recipient);
       return NextResponse.json({ ok: true, delivery }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
-    if (input.action !== 'send') return NextResponse.json({ ok: false, message: 'Ugyldig e-posthandling.' }, { status: 400 });
-    const result = await createSurveyEmailCampaign(surveyId);
+    if (!['send', 'resend'].includes(input.action)) return NextResponse.json({ ok: false, message: 'Ugyldig e-posthandling.' }, { status: 400 });
+    const result = await createSurveyEmailCampaign(surveyId, { replaceCompleted: input.action === 'resend' });
     let backgroundStarted = false;
     if (process.env.MAILERSEND_JOB_SECRET && process.env.NODE_ENV === 'production') {
       try {
