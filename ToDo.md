@@ -12,7 +12,10 @@
 
 ## Medlemsregister ##
 
-- 
+- hvordan utelukke medlemmer/tomter fra mailutsendeles?
+- feks. Turufjell, utbyggere, entreprenører
+- hvordan sende samlemail når samme epost er rgistrert på flere tomter
+- vise grupperinger, når samme mail er registrert på flere tomter
 
 ## Underøkelser ##
 

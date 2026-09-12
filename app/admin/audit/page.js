@@ -18,6 +18,17 @@ export default async function AdminAuditPage({ searchParams }) {
   const table = typeof params.table === 'string' && tables.includes(params.table) ? params.table : '';
   const page = /^\d{1,6}$/.test(params.page || '') ? Number(params.page) : 1;
   let data;
-  try { data = await getAdminAuditLog({ actor, table, page }); } catch { data = null; }
+  try {
+    data = await getAdminAuditLog({ actor, table, page });
+  } catch (error) {
+    // Keep the public response generic, but leave a safe diagnostic in the
+    // server log so database and authorization failures can be distinguished.
+    console.error('Admin audit log unavailable', {
+      name: error?.name || 'Error',
+      message: error?.message || 'Unknown error',
+      code: error?.code || error?.cause?.code || undefined,
+    });
+    data = null;
+  }
   return <main className="admin-shell"><AdminModuleHeader active="audit" title="Brukerendringer" email={session.user.email} /><section className="admin-content">{data ? <AdminAuditLog data={data} actor={actor} table={table} tables={tables} /> : <p className="form-error" role="alert">Endringsloggen er midlertidig utilgjengelig. Kontroller at databaseskjemaet er oppdatert.</p>}</section></main>;
 }
