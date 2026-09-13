@@ -6,6 +6,7 @@ const modules = [
   { href: '/admin', label: 'Oversikt', key: 'overview', icon: 'home' },
   { href: '/admin/inbox', label: 'Oppgaveliste', key: 'inbox', icon: 'inbox' },
   { href: '/admin/members', label: 'Medlemsregister', key: 'members', icon: 'members' },
+  { href: '/admin/members/matrikkel', label: 'Matrikkel', key: 'matrikkel', icon: 'members' },
   { href: '/admin/surveys', label: 'Undersøkelser', key: 'surveys', icon: 'surveys' },
   { href: '/admin/web', label: 'Web', key: 'web', icon: 'web' },
   { href: '/admin/audit', label: 'Brukerendringer', key: 'audit', icon: 'audit' },

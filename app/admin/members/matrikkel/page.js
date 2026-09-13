@@ -15,5 +15,5 @@ export default async function MatrikkelSyncPage() {
   let runs = [];
   let databaseReady = true;
   try { runs = await getMatrikkelRuns(); } catch { databaseReady = false; }
-  return <main className="admin-shell"><AdminModuleHeader active="members" title="Oppdater matrikkeldata" email={session.user.email} /><section className="admin-content"><MatrikkelSyncPanel initialRuns={runs} configured={isMatrikkelConfigured()} databaseReady={databaseReady} /></section></main>;
+  return <main className="admin-shell"><AdminModuleHeader active="matrikkel" title="Oppdater matrikkeldata" email={session.user.email} /><section className="admin-content"><MatrikkelSyncPanel initialRuns={runs} configured={isMatrikkelConfigured()} databaseReady={databaseReady} /></section></main>;
 }
