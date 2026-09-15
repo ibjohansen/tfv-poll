@@ -21,14 +21,14 @@ function ResultTable({ columns, rows, onSelect, caption }) {
   </div>;
 }
 
-export default function ResultsPanel({ addresses, properties, roads, comparison, onSelect }) {
+export default function ResultsPanel({ addresses, properties, boundaries, roads, comparison, onSelect }) {
   const [tab, setTab] = useState('addresses');
   const [filter, setFilter] = useState('');
   const [status, setStatus] = useState('');
   const [descending, setDescending] = useState(false);
   const search = normalizeAddress(filter);
   const includes = (values) => normalizeAddress(values.filter(Boolean).join(' ')).includes(search);
-  const tabs = [['addresses', 'Adresser'], ['properties', 'Eiendomsreferanser'], ['roads', 'Veier og stier'], ['comparison', 'Registerkontroll']];
+  const tabs = [['addresses', 'Adresser'], ['properties', 'Eiendomsreferanser'], ['boundaries', 'Teiger og grenser'], ['roads', 'Veier og stier'], ['comparison', 'Registerkontroll']];
   return <section className="map-results" aria-label="Kartresultater">
     <nav className="map-actions" aria-label="Resultatvisning">{tabs.map(([key, label]) => <button type="button" className="admin-button" aria-pressed={tab === key} key={key} onClick={() => { setTab(key); setFilter(''); }}>{label}</button>)}</nav>
     <div className="map-actions"><label>Søk i resultater <input type="search" value={filter} onChange={(event) => setFilter(event.target.value)} /></label>
@@ -38,11 +38,16 @@ export default function ResultsPanel({ addresses, properties, roads, comparison,
     {tab === 'addresses' && (addresses ? <ResultTable key={`addresses:${filter}:${descending}`} caption="Offisielle adresser fra Kartverket" rows={sortAddresses(addresses, descending).filter((a) => includes([addressLabel(a), propertyLabel(a), a.postalCode]))} onSelect={onSelect}
       columns={[["Adresse", addressLabel], ['Gnr/Bnr', propertyLabel], ['Postnr.', (a) => a.postalCode || '–'], ['Poststed', (a) => a.postalPlace || '–'], ['Kilde', (a) => a.source]]} /> : <p>Velg «Hent adresser» etter at polygonet er tegnet.</p>)}
     {tab === 'properties' && <>
-      <p>Referanser fra adresse-API-et. Punktene viser adressenes plassering, ikke eiendommens utstrekning. Ubebygde eiendommer uten adresse er ikke med. Seksjoner og eiendomsgrenser er ikke hentet.</p>
+      <p>Referanser fra adresse-API-et. Punktene viser adressenes plassering, ikke eiendommens utstrekning. For eiendommer uten adresse: hent eiendomsgrenser og velg «Teiger og grenser».</p>
       <ResultTable key={`properties:${filter}`} caption="Eiendomsreferanser knyttet til adressene" rows={(properties || []).filter((p) => includes([p.label, ...p.addresses.map(addressLabel)]))}
         onSelect={(p) => onSelect({ ...p, kind: 'property', name: p.label })}
         columns={[["Gnr/Bnr", (p) => p.label], ['Adresser', (p) => p.addresses.map(addressLabel).join(' · ')], ['Fnr.', (p) => p.fnr ?? '–'], ['Snr.', (p) => p.snr ?? 'Ikke tilgjengelig'], ['Kilde', (p) => p.source]]} />
     </>}
+    {tab === 'boundaries' && (boundaries ? <>
+      <p>Teiger som berører polygonet, også uten adresse. Flere matrikkelreferanser beholdes; nøyaktighet og tvist må vurderes. Hele teigen vises, ikke et avkuttet grensepolygon.</p>
+      <ResultTable key={`boundaries:${filter}`} caption="Registrerte teiger fra Kartverket / Geonorge" rows={boundaries.filter((p) => includes([p.name, p.id]))} onSelect={onSelect}
+        columns={[['Matrikkelreferanser', (p) => p.name], ['Nøyaktighetsklasse', (p) => p.accuracy || 'Ukjent'], ['Tvist', (p) => p.disputed === null ? 'Ukjent' : p.disputed ? 'Registrert tvist' : 'Ikke flagget'], ['Flere matrikkelenheter', (p) => p.multipleProperties === null ? 'Ukjent' : p.multipleProperties ? 'Ja – interne grenser kan være ukjente' : 'Nei'], ['Kilde', (p) => p.source]]} />
+    </> : <p>Velg «Hent eiendomsgrenser» for å finne teiger, også der ingen offisiell adresse finnes.</p>)}
     {tab === 'roads' && (roads ? <ResultTable key={`roads:${filter}`} caption="Supplerende veier og stier – ikke offisiell veifortegnelse" rows={roads.filter((r) => includes([r.name, r.roadType, r.reference]))} onSelect={onSelect}
       columns={[["Navn", (r) => r.name || 'Uten navn'], ['Type', (r) => r.roadType || '–'], ['Lengde i polygon', (r) => `${Math.round(r.lengthMeters).toLocaleString('nb-NO')} m`], ['Referanse', (r) => r.reference || '–'], ['Kilde', (r) => r.source]]} /> : <p>Velg «Hent veier og stier» for å laste veigeometri.</p>)}
     {tab === 'comparison' && (comparison ? <>
@@ -53,6 +58,13 @@ export default function ResultsPanel({ addresses, properties, roads, comparison,
           ['H-nr', (r) => r.register?.hNumber || '–'], ['Adresse i register', (r) => r.register?.address || '–'],
           ['Kartverket: Gnr/Bnr', (r) => r.officialAddresses.map(propertyLabel).join(' | ') || '–'], ['Register: Gnr/Bnr', (r) => r.register ? propertyLabel(r.register) : '–'],
           ['Status', (r) => <span className={`map-status is-${r.status.toLowerCase()}`}>{r.status}<br />{STATUS_LABELS[r.status]}</span>], ['Merknad', (r) => r.notes.join(' ')]]} />
+      {!!comparison.unlocatedRows?.length && <section aria-label="Registerposter med ukjent plassering">
+        <h3>Ukjent plassering · {comparison.unlocatedRows.length} registerposter</h3>
+        <p>Disse postene kan ligge utenfor polygonet. De er ikke klassifisert som manglende kartdata og inngår ikke i mangeltallene. Hent eiendomsgrenser og sammenlign på nytt for å kontrollere kjente matrikkelreferanser.</p>
+        <ResultTable key={`unlocated:${filter}`} caption="Uavklart geografisk plassering" rows={comparison.unlocatedRows.filter((r) => includes([r.register?.address, r.register?.hNumber, ...r.notes]))}
+          onSelect={(row) => onSelect({ ...row, kind: 'comparison', source: 'Turufjell vel' })}
+          columns={[["Registeradresse", (r) => r.register?.address || 'Adresse mangler'], ['H-nr', (r) => r.register?.hNumber || '–'], ['Gnr/Bnr register', (r) => propertyLabel(r.register)], ['Merknad', (r) => r.notes.join(' ')]]} />
+      </section>}
     </> : <p>Velg «Sammenlign register» for å kontrollere aktive registerposter. Registeret endres ikke.</p>)}
   </section>;
 }

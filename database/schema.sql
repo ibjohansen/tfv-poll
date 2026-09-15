@@ -66,6 +66,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS survey_responses_member_survey_idx
 
 -- Adminfelt og stabil importidentitet. Flere medlemmer kan vente på H-nummer.
 ALTER TABLE members ADD COLUMN IF NOT EXISTS admin_comment TEXT;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS membership_status TEXT NOT NULL DEFAULT 'member'
+  CHECK (membership_status IN ('member', 'exempt'));
 ALTER TABLE members ADD COLUMN IF NOT EXISTS section_number TEXT;
 ALTER TABLE members ADD COLUMN IF NOT EXISTS import_key TEXT UNIQUE;
 ALTER TABLE members ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
@@ -130,6 +132,13 @@ CREATE INDEX IF NOT EXISTS matrikkel_sync_items_status_idx
 ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS h_number_filter TEXT;
 ALTER TABLE matrikkel_sync_backups ADD COLUMN IF NOT EXISTS section_number TEXT;
 ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+-- Eldre installasjoner fikk ikke kolonnene fra CREATE TABLE IF NOT EXISTS.
+ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS worker_token TEXT;
+ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS worker_lease_expires_at TIMESTAMPTZ;
+ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS dispatch_attempts INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS last_dispatch_at TIMESTAMPTZ;
+ALTER TABLE matrikkel_sync_items ADD COLUMN IF NOT EXISTS worker_token TEXT;
+ALTER TABLE matrikkel_sync_items ADD COLUMN IF NOT EXISTS attempt_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE matrikkel_sync_runs DROP CONSTRAINT IF EXISTS matrikkel_sync_runs_status_check;
 ALTER TABLE matrikkel_sync_runs ADD CONSTRAINT matrikkel_sync_runs_status_check
   CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled'));
@@ -222,6 +231,8 @@ CREATE TABLE IF NOT EXISTS cms_pages (
 
 CREATE UNIQUE INDEX IF NOT EXISTS cms_pages_active_slug_idx
   ON cms_pages (slug) WHERE deleted_at IS NULL;
+ALTER TABLE cms_pages ADD COLUMN IF NOT EXISTS body_rich_text JSONB
+  CHECK (body_rich_text IS NULL OR (jsonb_typeof(body_rich_text) = 'object' AND octet_length(body_rich_text::text) <= 1000000));
 CREATE INDEX IF NOT EXISTS cms_pages_public_idx
   ON cms_pages (published_at DESC) WHERE status = 'published' AND deleted_at IS NULL;
 
@@ -297,6 +308,29 @@ CREATE UNIQUE INDEX IF NOT EXISTS email_deliveries_campaign_member_idx
   ON email_deliveries (campaign_id, member_id) WHERE campaign_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS email_deliveries_campaign_status_idx
   ON email_deliveries (campaign_id, status, created_at);
+ALTER TABLE email_deliveries ADD COLUMN IF NOT EXISTS requested_by TEXT;
+
+CREATE TABLE IF NOT EXISTS newsletter_campaigns (
+  id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
+  subject TEXT NOT NULL CHECK (char_length(subject) BETWEEN 1 AND 160),
+  body JSONB NOT NULL CHECK (jsonb_typeof(body) = 'object' AND octet_length(body::text) <= 1000000),
+  group_ids BIGINT[] NOT NULL CHECK (cardinality(group_ids) BETWEEN 1 AND 100),
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'pending', 'running', 'completed', 'failed')),
+  requested_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  queued_at TIMESTAMPTZ,
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  worker_token TEXT,
+  worker_lease_expires_at TIMESTAMPTZ,
+  error_message TEXT
+);
+ALTER TABLE email_deliveries ADD COLUMN IF NOT EXISTS newsletter_id TEXT REFERENCES newsletter_campaigns(id) ON DELETE RESTRICT;
+ALTER TABLE email_deliveries ADD COLUMN IF NOT EXISTS audience_member_ids BIGINT[];
+CREATE UNIQUE INDEX IF NOT EXISTS email_deliveries_newsletter_recipient_idx
+  ON email_deliveries (newsletter_id, recipient_email) WHERE newsletter_id IS NOT NULL AND email_type = 'newsletter';
+CREATE INDEX IF NOT EXISTS email_deliveries_newsletter_status_idx ON email_deliveries (newsletter_id, status, created_at);
 
 CREATE TABLE IF NOT EXISTS email_webhook_events (
   provider_event_id TEXT PRIMARY KEY,
@@ -313,6 +347,30 @@ CREATE TABLE IF NOT EXISTS email_suppressions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS member_hamlets (
+  id BIGSERIAL PRIMARY KEY,
+  name TEXT NOT NULL CHECK (char_length(btrim(name)) BETWEEN 1 AND 100),
+  deleted_at TIMESTAMPTZ,
+  last_changed_by TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS member_hamlets_name_idx ON member_hamlets (lower(btrim(name))) WHERE deleted_at IS NULL;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS hamlet_id BIGINT REFERENCES member_hamlets(id) ON DELETE RESTRICT;
+CREATE INDEX IF NOT EXISTS members_hamlet_idx ON members (hamlet_id) WHERE deleted_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS member_email_groups (
+  id BIGSERIAL PRIMARY KEY,
+  name TEXT NOT NULL CHECK (char_length(btrim(name)) BETWEEN 1 AND 100),
+  deleted_at TIMESTAMPTZ,
+  last_changed_by TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS member_email_groups_name_idx ON member_email_groups (lower(btrim(name))) WHERE deleted_at IS NULL;
+CREATE TABLE IF NOT EXISTS member_email_group_members (
+  group_id BIGINT NOT NULL REFERENCES member_email_groups(id) ON DELETE RESTRICT,
+  member_id BIGINT NOT NULL REFERENCES members(id) ON DELETE RESTRICT,
+  PRIMARY KEY (group_id, member_id)
+);
+CREATE INDEX IF NOT EXISTS member_email_group_members_member_idx ON member_email_group_members (member_id);
 
 -- Tidsbegrenset e-postinnlogging for medlemmenes selvbetjening. Bare SHA-256-
 -- hash av den tilfeldige lenkehemmeligheten lagres i databasen.
@@ -334,6 +392,8 @@ ALTER TABLE member_access_tokens ADD COLUMN IF NOT EXISTS environment TEXT;
 ALTER TABLE member_access_tokens ADD COLUMN IF NOT EXISTS audience TEXT;
 ALTER TABLE member_access_tokens ADD COLUMN IF NOT EXISTS purpose TEXT DEFAULT 'member_login';
 ALTER TABLE member_access_tokens ADD COLUMN IF NOT EXISTS consumed_at TIMESTAMPTZ;
+ALTER TABLE member_access_tokens ADD COLUMN IF NOT EXISTS contact_email TEXT;
+ALTER TABLE member_access_tokens ADD COLUMN IF NOT EXISTS member_ids BIGINT[];
 
 CREATE INDEX IF NOT EXISTS member_access_tokens_member_idx
   ON member_access_tokens (member_id, expires_at DESC);
@@ -359,6 +419,8 @@ CREATE TABLE IF NOT EXISTS member_sessions (
 
 CREATE INDEX IF NOT EXISTS member_sessions_member_idx
   ON member_sessions (member_id, expires_at DESC);
+ALTER TABLE member_sessions ADD COLUMN IF NOT EXISTS contact_email TEXT;
+ALTER TABLE member_sessions ADD COLUMN IF NOT EXISTS member_ids BIGINT[];
 CREATE INDEX IF NOT EXISTS member_sessions_expiry_idx
   ON member_sessions (expires_at) WHERE revoked_at IS NULL;
 
@@ -466,6 +528,7 @@ ALTER TABLE member_requests ADD COLUMN IF NOT EXISTS verification_environment TE
 ALTER TABLE member_requests ADD COLUMN IF NOT EXISTS verification_audience TEXT;
 ALTER TABLE member_requests ADD COLUMN IF NOT EXISTS verification_purpose TEXT;
 ALTER TABLE member_requests ADD COLUMN IF NOT EXISTS verification_consumed_at TIMESTAMPTZ;
+ALTER TABLE member_requests ADD COLUMN IF NOT EXISTS requested_comment TEXT CHECK (length(requested_comment) <= 2000);
 
 -- Minst mulig revisjonsspor for selvbetjente endringer. Tidligere og nye
 -- feltverdier dupliseres ikke; bare hvilke kontaktfelt som ble endret lagres.
@@ -478,6 +541,9 @@ CREATE TABLE IF NOT EXISTS member_profile_updates (
 
 CREATE INDEX IF NOT EXISTS member_profile_updates_member_idx
   ON member_profile_updates (member_id, created_at DESC);
+ALTER TABLE member_profile_updates ADD COLUMN IF NOT EXISTS comment TEXT CHECK (length(comment) <= 2000);
+ALTER TABLE member_profile_updates ADD COLUMN IF NOT EXISTS comment_read_at TIMESTAMPTZ;
+ALTER TABLE member_profile_updates ADD COLUMN IF NOT EXISTS last_changed_by TEXT;
 
 -- Databasen identifiserer eksplisitt hvilket miljø den tilhører. Verdien settes
 -- av scripts/setup-database.mjs i samme transaksjon som resten av skjemaet.
@@ -539,7 +605,7 @@ FOR EACH ROW EXECUTE FUNCTION protect_security_events();
 ALTER TABLE email_deliveries DROP CONSTRAINT IF EXISTS email_deliveries_email_type_check;
 ALTER TABLE email_deliveries ADD CONSTRAINT email_deliveries_email_type_check
   CHECK (email_type IN (
-    'survey_invitation', 'survey_test', 'member_access', 'membership_verification',
+    'survey_invitation', 'survey_test', 'newsletter', 'newsletter_test', 'member_access', 'membership_verification',
     'member_email_change_old', 'member_email_change_new', 'member_email_change_notice'
   ));
 
@@ -570,6 +636,30 @@ CREATE INDEX IF NOT EXISTS audit_log_actor_idx
   ON audit_log (changed_by, changed_at DESC);
 CREATE INDEX IF NOT EXISTS audit_log_entity_idx
   ON audit_log (table_name, row_id, changed_at DESC);
+
+-- Vanlige applikasjonsspørringer kan bare legge til hendelser. Ingen
+-- lagringstid antas: eventuell sletting krever en separat, godkjent
+-- vedlikeholdsmigrering utført av skjemaeier, aldri en admin-API-rute.
+CREATE OR REPLACE FUNCTION protect_audit_log()
+RETURNS TRIGGER LANGUAGE plpgsql
+AS $audit_protection$
+BEGIN
+  RAISE EXCEPTION 'audit_log is append-only';
+END;
+$audit_protection$;
+DROP TRIGGER IF EXISTS audit_log_append_only_trigger ON audit_log;
+CREATE TRIGGER audit_log_append_only_trigger
+BEFORE UPDATE OR DELETE ON audit_log
+FOR EACH ROW EXECUTE FUNCTION protect_audit_log();
+DROP TRIGGER IF EXISTS audit_log_no_truncate_trigger ON audit_log;
+CREATE TRIGGER audit_log_no_truncate_trigger
+BEFORE TRUNCATE ON audit_log
+FOR EACH STATEMENT EXECUTE FUNCTION protect_audit_log();
+REVOKE UPDATE, DELETE, TRUNCATE ON audit_log FROM PUBLIC;
+DROP TRIGGER IF EXISTS security_events_no_truncate_trigger ON security_events;
+CREATE TRIGGER security_events_no_truncate_trigger
+BEFORE TRUNCATE ON security_events
+FOR EACH STATEMENT EXECUTE FUNCTION protect_security_events();
 
 CREATE OR REPLACE FUNCTION prepare_audit_change()
 RETURNS TRIGGER
@@ -634,6 +724,33 @@ END;
 $audit$;
 
 DROP TRIGGER IF EXISTS members_audit_context_trigger ON members;
+-- A read-only projection of existing delivery/campaign lifecycle timestamps.
+-- Stable event IDs avoid duplicate audit inserts on polling, retries or resend.
+CREATE OR REPLACE VIEW admin_activity_log AS
+  SELECT 'audit:' || id::text AS id, table_name, row_id, operation, changed_by, before_value, after_value, changed_at FROM audit_log
+  UNION ALL
+  SELECT 'campaign:' || c.id || ':' || e.action, 'email_campaigns', c.id, 'INSERT', c.requested_by, NULL::jsonb,
+    jsonb_build_object('action', e.action, 'survey_id', c.survey_id, 'count', c.total_count, 'status', e.status,
+      'sent_count', CASE WHEN e.action = 'campaign_finished' THEN c.sent_count ELSE NULL END,
+      'failed_count', CASE WHEN e.action = 'campaign_finished' THEN c.failed_count ELSE NULL END), e.occurred_at
+  FROM email_campaigns c CROSS JOIN LATERAL (VALUES
+    ('campaign_created', c.created_at, 'pending'), ('campaign_started', c.started_at, 'running'),
+    ('campaign_finished', c.completed_at, c.status)
+  ) e(action, occurred_at, status) WHERE e.occurred_at IS NOT NULL
+  UNION ALL
+  SELECT 'testmail:' || d.id || ':' || e.action, 'email_deliveries', d.id, 'INSERT', COALESCE(d.requested_by, 'unknown'), NULL::jsonb,
+    jsonb_build_object('action', e.action, 'survey_id', d.survey_id, 'newsletter_id', d.newsletter_id, 'count', 1, 'status', e.status), e.occurred_at
+  FROM email_deliveries d CROSS JOIN LATERAL (VALUES
+    ('testmail_requested', d.created_at, 'processing'),
+    ('testmail_finished', COALESCE(d.sent_at, d.failed_at), d.status)
+  ) e(action, occurred_at, status) WHERE d.email_type IN ('survey_test', 'newsletter_test') AND e.occurred_at IS NOT NULL
+  UNION ALL
+  SELECT 'newsletter:' || n.id || ':' || e.action, 'newsletter_campaigns', n.id, 'INSERT', n.requested_by, NULL::jsonb,
+    jsonb_build_object('action', e.action, 'newsletter_id', n.id, 'status', e.status), e.occurred_at
+  FROM newsletter_campaigns n CROSS JOIN LATERAL (VALUES
+    ('campaign_started', n.started_at, 'running'), ('campaign_finished', n.completed_at, n.status)
+  ) e(action, occurred_at, status) WHERE e.occurred_at IS NOT NULL;
+
 CREATE TRIGGER members_audit_context_trigger
 BEFORE INSERT OR UPDATE OR DELETE ON members
 FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
@@ -649,6 +766,15 @@ FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
 DROP TRIGGER IF EXISTS member_requests_audit_trigger ON member_requests;
 CREATE TRIGGER member_requests_audit_trigger
 AFTER INSERT OR UPDATE OR DELETE ON member_requests
+FOR EACH ROW EXECUTE FUNCTION record_audit_change();
+
+DROP TRIGGER IF EXISTS member_profile_updates_audit_context_trigger ON member_profile_updates;
+CREATE TRIGGER member_profile_updates_audit_context_trigger
+BEFORE INSERT OR UPDATE OR DELETE ON member_profile_updates
+FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
+DROP TRIGGER IF EXISTS member_profile_updates_audit_trigger ON member_profile_updates;
+CREATE TRIGGER member_profile_updates_audit_trigger
+AFTER INSERT OR UPDATE OR DELETE ON member_profile_updates
 FOR EACH ROW EXECUTE FUNCTION record_audit_change();
 
 DROP TRIGGER IF EXISTS surveys_audit_context_trigger ON surveys;

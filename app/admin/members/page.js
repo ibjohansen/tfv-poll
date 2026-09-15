@@ -5,6 +5,7 @@ import { getAdminMemberById, getAdminMembers } from '@/lib/admin-members';
 import { getAdminSurveys } from '@/lib/admin-surveys';
 import AdminMemberDirectory from '@/components/AdminMemberDirectory';
 import AdminModuleHeader from '@/components/AdminModuleHeader';
+import { getMemberGroups } from '@/lib/member-groups';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -19,10 +20,14 @@ export default async function AdminMembersPage({ searchParams }) {
   const direction = params.dir === 'desc' ? 'desc' : 'asc';
   const incompleteContact = params.contact === 'incomplete';
   const hasComment = params.comment === 'present';
+  const membershipStatus = ['member', 'exempt'].includes(params.membership) ? params.membership : '';
+  const hamletId = /^[1-9][0-9]{0,15}$/.test(params.hamlet || '') ? params.hamlet : '';
+  const groupId = /^[1-9][0-9]{0,15}$/.test(params.group || '') ? params.group : '';
   const selectedId = /^\d+$/.test(params.member || '') ? params.member : '';
   let data;
   let surveys;
   let initialSelected;
-  try { [data, surveys, initialSelected] = await Promise.all([getAdminMembers(search, 1, sort, direction, incompleteContact, hasComment), getAdminSurveys(), selectedId ? getAdminMemberById(selectedId) : null]); } catch { data = null; }
-  return <main className="admin-shell"><AdminModuleHeader active="members" title="Medlemsregister" email={session.user.email} /><section className="admin-content">{!data ? <p className="form-error" role="alert">Medlemsregisteret er midlertidig utilgjengelig. Prøv igjen senere.</p> : <AdminMemberDirectory key={`${search}-${sort}-${direction}-${incompleteContact}-${hasComment}-${selectedId}`} data={data} surveys={surveys} search={search} sort={sort} direction={direction} incompleteContact={incompleteContact} hasComment={hasComment} initialSelected={initialSelected} />}</section></main>;
+  let groups;
+  try { [data, surveys, initialSelected, groups] = await Promise.all([getAdminMembers(search, 1, sort, direction, incompleteContact, hasComment, { membershipStatus, hamletId, groupId }), getAdminSurveys(), selectedId ? getAdminMemberById(selectedId) : null, getMemberGroups()]); } catch { data = null; }
+  return <main className="admin-shell"><AdminModuleHeader active="members" title="Medlemsregister" email={session.user.email} /><section className="admin-content">{!data ? <p className="form-error" role="alert">Medlemsregisteret er midlertidig utilgjengelig. Prøv igjen senere.</p> : <AdminMemberDirectory key={`${search}-${sort}-${direction}-${incompleteContact}-${hasComment}-${selectedId}-${membershipStatus}-${hamletId}-${groupId}`} data={data} surveys={surveys} search={search} sort={sort} direction={direction} incompleteContact={incompleteContact} hasComment={hasComment} initialSelected={initialSelected} membershipStatus={membershipStatus} hamletId={hamletId} groupId={groupId} groups={groups} />}</section></main>;
 }

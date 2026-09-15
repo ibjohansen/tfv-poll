@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { normalizeAddress, normalizeCadastral, propertyLabel, sortAddresses } from '../lib/map/normalization.js';
 import { compareRegisterWithMapData } from '../lib/map/comparison.js';
 import { propertiesFromAddresses } from '../lib/map/kartverket-property-service.js';
-import { official, register } from './fixtures/map.mjs';
+import { official, register, square } from './fixtures/map.mjs';
 
 test('Norwegian address normalization handles case, whitespace, unicode and separated house letters', () => {
   assert.equal(normalizeAddress('Øvre Sprenåsen 37'), normalizeAddress('øvre sprenåsen 37 \u00a0'));
@@ -77,9 +77,24 @@ test('duplicate register rows are flagged as possible rather than two certain ma
 
 test('never match owner names alone or same parcel numbers across known municipalities', () => {
   const report = compareRegisterWithMapData([{ id: '1', owners: ['Testnavn'] }, { ...register, id: '2', municipalityNumber: '0301' }], [{ ...official, owners: ['Testnavn'] }]);
-  assert.equal(report.counts.MISSING_IN_MAP_DATA, 2);
+  assert.equal(report.counts.MISSING_IN_MAP_DATA, 0);
+  assert.equal(report.unlocatedRows.length, 2);
+  assert.ok(report.unlocatedRows.every((row) => row.status === null));
   assert.equal(report.counts.MISSING_IN_REGISTER, 1);
-  assert.match(report.rows[0].notes.join(' '), /utenfor polygonet/);
+  assert.match(report.unlocatedRows[0].notes.join(' '), /utenfor polygonet/);
+});
+
+test('unmatched plots are geographically scoped without guessing locations or omitting unknowns', () => {
+  const plots = [{ ...register, id: 'inside', latitude: 60.465, longitude: 9.495 },
+    { ...register, id: 'outside', latitude: 60.48, longitude: 9.495 }, { ...register, id: 'unknown', bnr: 999 },
+    { ...register, id: 'parcel' }];
+  const boundaries = [{ references: [{ gnr: 10, bnr: 524, municipalityNumber: '3320' }] }];
+  const report = compareRegisterWithMapData(plots, [], { polygon: square, boundaries });
+  assert.deepEqual(report.rows.map((r) => r.scope), ['point_in_polygon', 'parcel_intersects']);
+  assert.equal(report.outsideCount, 1); assert.equal(report.unlocatedRows.length, 1);
+  assert.equal(report.counts.MISSING_IN_MAP_DATA, 2);
+  const foreign = compareRegisterWithMapData([{ ...register, municipalityNumber: '0301' }], [], { polygon: square, boundaries });
+  assert.equal(foreign.unlocatedRows.length, 1);
 });
 
 test('property references retain all address locations and distinct leaseholds', () => {

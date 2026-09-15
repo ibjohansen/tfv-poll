@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
 function requestTitle(request) {
+  if (request.request_type === 'profile_update') return `Kommentar til retting · ${request.h_number}`;
   return request.request_type === 'ownership_transfer' ? `Eierskifte · ${request.h_number}` : `Ny innmelding · ${request.h_number || request.street_address}`;
 }
 
@@ -44,6 +45,20 @@ export default function AdminMemberRequests({ initialRequests, showEmpty = false
     finally { setBusy(false); }
   }
 
+  async function acknowledge(request) {
+    setBusy(true); setMessage('');
+    try {
+      const response = await fetch(`/api/admin/member-requests/${request.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'acknowledge_comment' }),
+      });
+      const body = await response.json();
+      if (!response.ok || !body.ok) throw new Error(body.message || 'Kommentaren kunne ikke markeres som lest.');
+      setRequests((current) => current.filter((item) => item.id !== request.id));
+      setMessage('Kommentaren er markert som lest. Historikken er beholdt.'); router.refresh();
+    } catch (error) { setMessage(error.message); }
+    finally { setBusy(false); }
+  }
+
   async function updateProperty(request, action) {
     const draft = propertyDrafts[request.id] || {};
     setBusy(true); setMessage('');
@@ -71,6 +86,7 @@ export default function AdminMemberRequests({ initialRequests, showEmpty = false
     <div className="admin-section-header"><div><p className="eyebrow">Til behandling</p><h2 id="member-requests-title">Henvendelser</h2></div><span>{requests.length}</span></div>
     {!requests.length && <p className="admin-inbox-empty">Oppgavelisten er tom. Nye innmeldinger og eierskifter vises her, også før e-postadressen er bekreftet.</p>}
     {requests.length > 0 && <div className="admin-member-request-list">{requests.map((request) => <article key={request.id}>
+      {request.requested_comment && <section aria-label="Kommentar fra medlem"><strong>Inneholder kommentar fra medlem</strong><p className="member-comment-text">{request.requested_comment}</p></section>}
       <div className="admin-member-request-summary"><h3>{requestTitle(request)}</h3><p>{request.street_address || 'Adresse ikke oppgitt'} · {request.title_holder || 'Ingen registrert hjemmelshaver'}</p><span className={`admin-request-verification ${request.status === 'pending_verification' ? 'is-unverified' : 'is-verified'}`}>{request.status === 'pending_verification' ? 'Ikke bekreftet av innsender' : 'E-post bekreftet'}</span></div>
       <dl><div><dt>Gnr./bnr.</dt><dd>{request.cadastral_number || 'Ikke oppgitt'}</dd></div><div><dt>Seksjon</dt><dd>{request.section_number || 'Ikke oppgitt'}</dd></div><div><dt>Ny kontaktperson</dt><dd>{request.requested_contact_name}</dd></div><div><dt>Ny hoved-e-post</dt><dd>{request.requested_primary_email}</dd></div><div><dt>Andre adresser</dt><dd>{request.requested_other_emails?.join(', ') || 'Ingen'}</dd></div></dl>
       {request.request_type === 'membership' && <section className={`admin-property-review is-${request.matrikkel_review?.status || 'pending'}`} aria-label="Matrikkelavklaring">
@@ -83,7 +99,8 @@ export default function AdminMemberRequests({ initialRequests, showEmpty = false
         </div>
         <div className="admin-property-actions"><button className="admin-button" type="button" disabled={busy} onClick={() => updateProperty(request, 'check_property')}>Kontroller i Matrikkelen</button><button className="admin-button" type="button" disabled={busy} onClick={() => updateProperty(request, 'confirm_property')}>Bekreft manuelt</button></div>
       </section>}
-      <div className="admin-member-request-actions"><button className="admin-button" type="button" disabled={busy} onClick={() => setDecision({ request, action: 'reject' })}>Avvis</button><button className="primary-button" type="button" disabled={busy || (request.request_type === 'membership' && !['verified', 'manual'].includes(request.matrikkel_review?.status))} onClick={() => setDecision({ request, action: 'approve' })}>Godkjenn</button></div>
+      {request.request_type === 'profile_update' ? <div className="admin-member-request-actions"><p>Kontaktopplysningene er allerede rettet av medlemmet.</p><button className="admin-button" type="button" disabled={busy} onClick={() => acknowledge(request)}>Marker kommentar som lest</button></div>
+        : <div className="admin-member-request-actions"><button className="admin-button" type="button" disabled={busy} onClick={() => setDecision({ request, action: 'reject' })}>Avvis</button><button className="primary-button" type="button" disabled={busy || (request.request_type === 'membership' && !['verified', 'manual'].includes(request.matrikkel_review?.status))} onClick={() => setDecision({ request, action: 'approve' })}>Godkjenn</button></div>}
     </article>)}</div>}
     {message && <p className={/(godkjent|avvist|verifisert|bekreftet)/i.test(message) ? 'admin-success' : 'form-error'} role="status">{message}</p>}
     <ConfirmDialog open={Boolean(decision)} eyebrow={decision?.request.status === 'pending_verification' ? 'Ubekreftet henvendelse' : 'Bekreft behandling'} destructive={decision?.action === 'reject'} title={decision ? `${decision.action === 'approve' ? 'Godkjenne' : 'Avvise'} «${requestTitle(decision.request)}»?` : ''} description={decisionDescription(decision)} confirmLabel={decision?.action === 'approve' && decision?.request.status === 'pending_verification' ? 'Godkjenn likevel' : decision?.action === 'approve' ? 'Godkjenn' : 'Avvis'} busy={busy} onCancel={() => setDecision(null)} onConfirm={resolve} />

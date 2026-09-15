@@ -1,13 +1,13 @@
 import { cookies } from 'next/headers';
-import { getMemberSelfServiceProfile } from '@/lib/member-self-service';
+import { getMemberSelfServiceExport } from '@/lib/member-self-service';
 import { memberSessionCookieName } from '@/lib/member-self-service-utils';
 
 export const runtime = 'nodejs';
 
-export async function GET() {
+export async function GET(request) {
   const secret = (await cookies()).get(memberSessionCookieName())?.value;
   let profile;
-  try { profile = await getMemberSelfServiceProfile(secret); }
+  try { profile = await getMemberSelfServiceExport(secret, request?.nextUrl?.searchParams.get('member') ?? undefined); }
   catch (error) {
     console.error('Member export failed', { code: error.code || error.cause?.code, occurredAt: new Date().toISOString() });
     return Response.json({ message: 'Tjenesten er midlertidig utilgjengelig.' }, { status: 503, headers: { 'Cache-Control': 'no-store, private' } });

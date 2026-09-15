@@ -9,21 +9,33 @@ export async function loadModule(path, dependencies = {}, globals = {}) {
   const url = new URL(`../../${path}`, import.meta.url);
   const context = createContext({
     URL, URLSearchParams, Request, Response, Headers, FormData, File, Blob,
-    Buffer, Uint8Array, Date, Error, TypeError, JSON, setTimeout, clearTimeout,
+    Buffer, Uint8Array, Date, Error, TypeError, JSON, AbortSignal, AbortController, setTimeout, clearTimeout,
     process: { env: { NODE_ENV: 'test' } },
     console: { error() {}, info() {}, warn() {} },
     fetch: () => { throw new Error('Unexpected network access in test'); },
     ...globals,
   });
-  const sourceModule = new SourceTextModule(await readFile(url, 'utf8'), { identifier: url.href, context });
   const imports = { 'server-only': {}, 'next/server': { NextResponse }, '@/lib/api-errors': { apiErrorStatus, readJsonObject }, ...dependencies };
-  await sourceModule.link((specifier) => {
+  const mocks = new Map();
+  function dependency(specifier) {
+    if (mocks.has(specifier)) return mocks.get(specifier);
     if (!Object.hasOwn(imports, specifier)) throw new Error(`Unmocked dependency: ${specifier} in ${path}`);
     const exports = imports[specifier];
-    return new SyntheticModule(Object.keys(exports), function () {
+    const mockModule = new SyntheticModule(Object.keys(exports), function () {
       for (const [name, value] of Object.entries(exports)) this.setExport(name, value);
     }, { context });
+    mocks.set(specifier, mockModule);
+    return mockModule;
+  }
+  const sourceModule = new SourceTextModule(await readFile(url, 'utf8'), { identifier: url.href, context,
+    importModuleDynamically: async (specifier) => {
+      const mockModule = dependency(specifier);
+      if (mockModule.status === 'unlinked') await mockModule.link(() => { throw new Error('Unexpected nested test dependency'); });
+      if (mockModule.status === 'linked') await mockModule.evaluate();
+      return mockModule;
+    },
   });
+  await sourceModule.link(dependency);
   await sourceModule.evaluate();
   return sourceModule.namespace;
 }

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import RichTextEditor from '@/components/RichTextEditor';
 import { cmsCategories, createSlug, isValidCmsSlug, normalizeSlugInput } from '@/lib/cms-validation';
 import { fileTypeLabel, formatFileSize } from '@/lib/file-format';
 
@@ -35,6 +36,7 @@ function pagePayload(page, status) {
     slug: page.slug,
     intro: page.intro || '',
     body: page.body || '',
+    bodyRichText: page.body_rich_text || null,
     category: page.category,
     imageAlt: page.image_alt || '',
     imageCaption: page.image_caption || '',
@@ -337,7 +339,7 @@ function CmsEditorForm({ page, busy, message, storageConfigured, onUpdate, onTit
         <label>URL <span aria-hidden="true">*</span><div className="cms-slug-field"><span>/</span><input value={page.slug} maxLength={100} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" required onChange={(event) => onSlugChange(event.target.value)} /></div><small>Foreslås fra tittelen. Bruk små bokstaver, tall og bindestrek.</small></label>
         <label>Kategori <span aria-hidden="true">*</span><select value={page.category} onChange={(event) => onUpdate('category', event.target.value)}>{cmsCategories.map((category) => <option key={category}>{category}</option>)}</select></label>
         <label>Ingress<textarea value={page.intro || ''} maxLength={500} rows={4} onChange={(event) => onUpdate('intro', event.target.value)} /><small>{(page.intro || '').length}/500 tegn. Kort introduksjon anbefales.</small></label>
-        <label>Hovedtekst<textarea value={page.body || ''} maxLength={100000} rows={12} onChange={(event) => onUpdate('body', event.target.value)} /><small>Vanlige linjeskift blir avsnitt. HTML og Markdown brukes ikke.</small></label>
+        <RichTextEditor key={page.id || 'new'} value={page.body_rich_text} plainText={page.body || ''} onChange={(value) => onUpdate('body_rich_text', value)} disabled={busy} />
       </fieldset>
 
       <section className="cms-editor-section" aria-labelledby="cms-image-title">

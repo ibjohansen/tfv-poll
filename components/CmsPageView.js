@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import RichTextContent from '@/components/RichTextContent';
 import { fileTypeLabel, formatFileSize } from '@/lib/file-format';
 
 function paragraphs(text) {
@@ -23,7 +24,7 @@ export default function CmsPageView({ page, preview = false }) {
         </figure>
       )}
 
-      {page.body && <div className="cms-article-body">{paragraphs(page.body).map((text, index) => <p key={index}>{text}</p>)}</div>}
+      {(page.body_rich_text || page.body) && <div className="cms-article-body">{page.body_rich_text ? <RichTextContent value={page.body_rich_text} /> : paragraphs(page.body).map((text, index) => <p key={index}>{text}</p>)}</div>}
 
       {page.attachments?.length > 0 && (
         <section className="cms-documents" aria-labelledby="cms-documents-title">

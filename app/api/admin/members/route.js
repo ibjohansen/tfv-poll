@@ -14,7 +14,7 @@ export async function GET(request) {
   const incompleteContact = searchParams.get('contact') === 'incomplete';
   const hasComment = searchParams.get('comment') === 'present';
   try {
-    const data = await getAdminMembers(search, page, sort, direction, incompleteContact, hasComment);
+    const data = await getAdminMembers(search, page, sort, direction, incompleteContact, hasComment, { membershipStatus: searchParams.get('membership') || '', hamletId: searchParams.get('hamlet') || '', groupId: searchParams.get('group') || '' });
     return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     const status = apiErrorStatus(error);

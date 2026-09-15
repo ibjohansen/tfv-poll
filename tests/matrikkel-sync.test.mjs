@@ -17,6 +17,7 @@ async function setup(options = {}) {
     const query = strings.join('?');
     state.queries.push({ query, values });
     if (state.databaseFailure?.(query)) throw new Error('Database unavailable');
+    if (query.includes('pg_advisory_xact_lock')) return [];
     if (query.includes("AND status = 'pending' AND started_at IS NULL")) {
       if (!state.run || state.run.status !== 'pending' || state.run.started_at || state.run.deleted_at) return [];
       state.run.status = 'failed';
@@ -35,7 +36,7 @@ async function setup(options = {}) {
     }
     if (query.includes('SELECT id, status FROM matrikkel_sync_runs')) return state.run ? [{ ...state.run }] : [];
     if (query.includes('WITH candidates AS')) {
-      const candidates = state.members.filter(m => !state.items.has(m.member_id)).slice(0, values[1]);
+      const candidates = state.members.filter(m => !state.items.has(m.member_id)).slice(0, values[2]);
       for (const m of candidates) state.items.set(m.member_id, { status: 'processing' });
       return candidates;
     }
@@ -43,11 +44,11 @@ async function setup(options = {}) {
       if (state.cancelBeforeItem) state.run.status = 'cancelled';
       return [{ status: state.run.status }];
     }
-    if (query.includes('WITH member_update AS')) {
+    if (query.includes('member_update AS')) {
       if (state.deletedMember) return [];
-      const m = state.members.find(m => m.member_id === values[5]);
-      Object.assign(m, { cadastral_number: values[0], section_number: values[1], title_holder: values[2], registration_date: values[3] });
-      state.items.set(m.member_id, { status: values[7], proposed: JSON.parse(values[10]), matchType: values[9] });
+      const m = state.members.find(m => m.member_id === values[7]);
+      Object.assign(m, { cadastral_number: values[2], section_number: values[3], title_holder: values[4], registration_date: values[5] });
+      state.items.set(m.member_id, { status: values[8], proposed: JSON.parse(values[11]), matchType: values[10] });
       return [{ member_id: m.member_id }];
     }
     if (query.includes("message = 'Medlemmet finnes ikke lenger.'")) {
@@ -55,9 +56,12 @@ async function setup(options = {}) {
       return [];
     }
     if (query.includes('UPDATE matrikkel_sync_items SET status = ?')) {
-      state.items.set(values[7], { status: values[0], proposed: values[3] && JSON.parse(values[3]), message: values[5] });
+      state.items.set(values[9], { status: values[2], proposed: values[5] && JSON.parse(values[5]), message: values[7] });
       return [];
     }
+    if (query.includes('attempt_count = attempt_count + 1')) return [{ member_id: values[1] }];
+    if (query.includes('worker_token = NULL')) return [];
+    if (query.includes('attempt_count >= 3')) return [];
     if (query.includes("UPDATE matrikkel_sync_items SET status = 'error'")) {
       for (const item of state.items.values()) if (item.status === 'processing') Object.assign(item, { status: 'error', message: values[0] });
       return [];
@@ -76,6 +80,7 @@ async function setup(options = {}) {
     }
     throw new Error(`Unexpected SQL: ${query}`);
   };
+  sql.transaction = (queries) => Promise.all(queries);
   const api = await loadModule('lib/matrikkel-sync.js', {
     'node:crypto': { randomUUID }, './db.js': { getSql: () => sql },
     './admin-access.js': { requireMatrikkelSync: async () => { if (state.denied) throw new Error('Unauthorized'); return { email: 'Admin@Example.test' }; } },
@@ -109,9 +114,10 @@ async function setup(options = {}) {
 test('new run snapshots selection, records actor and rejects invalid or concurrent starts', async () => {
   const { api, state } = await setup();
   assert.equal((await api.createMatrikkelRun({ hNumber: ' H-7 ' })).backup_count, 1);
-  assert.ok(state.queries[0].values.includes('admin@example.test'));
-  assert.ok(state.queries[0].values.includes('H-7'));
-  assert.match(state.queries[0].query, /INSERT INTO matrikkel_sync_backups/);
+  assert.match(state.queries[0].query, /pg_advisory_xact_lock/);
+  assert.ok(state.queries[1].values.includes('admin@example.test'));
+  assert.ok(state.queries[1].values.includes('H-7'));
+  assert.match(state.queries[1].query, /INSERT INTO matrikkel_sync_backups/);
   const count = state.queries.length;
   await assert.rejects(api.createMatrikkelRun({ hNumber: "'; DROP TABLE members" }), /Invalid H-number/);
   assert.equal(state.queries.length, count);
@@ -174,7 +180,7 @@ test('exact match updates property, collapses duplicate owners and records reque
   assert.equal(state.members[0].title_holder, 'Ny eier');
   assert.equal(state.members[0].registration_date, '2026-01-01');
   assert.equal(state.items.get('7').status, 'updated');
-  assert.equal(state.queries.find(q => q.query.includes('WITH member_update AS')).values[4], 'admin@example.test');
+  assert.equal(state.queries.find(q => q.query.includes('member_update AS')).values[6], 'admin@example.test');
 });
 
 test('unchanged values and repeated processing are idempotent', async () => {
@@ -220,7 +226,8 @@ test('same property on multiple rows uses one lookup and processes each member o
   await api.processMatrikkelRun(runId);
   assert.equal(state.lookups.length, 1);
   assert.equal(state.items.size, 2);
-  assert.match(state.queries.find(q => q.query.includes('WITH candidates AS')).query, /ON CONFLICT \(run_id, member_id\) DO NOTHING/);
+  assert.match(state.queries.find(q => q.query.includes('WITH candidates AS')).query, /ON CONFLICT \(run_id, member_id\) DO UPDATE/);
+  assert.match(state.queries.find(q => q.query.includes('WITH candidates AS')).query, /matrikkel_sync_items.status = 'processing' AND matrikkel_sync_items.attempt_count < 3/);
 });
 
 test('one failed address does not prevent other members from completing', async () => {
@@ -254,7 +261,7 @@ test('resource initialization failure marks claimed items and run failed, then p
 });
 
 test('database write failure does not report an update as successful', async () => {
-  const { api, state } = await setup({ databaseFailure: query => query.includes('WITH member_update AS') });
+  const { api, state } = await setup({ databaseFailure: query => query.includes('member_update AS') });
   await api.processMatrikkelRun(runId);
   assert.equal(state.items.get('7').status, 'error');
   assert.equal(state.members[0].title_holder, member.title_holder);
@@ -297,7 +304,7 @@ test('batch limit is a bounded integer for fractional, zero and oversized inputs
   for (const [batchSize, expected] of [[1.5, 1], [-2, 1], [0, 5], [100, 10]]) {
     const { api, state } = await setup();
     await api.processMatrikkelRun(runId, { batchSize });
-    assert.equal(state.queries.find(q => q.query.includes('WITH candidates AS')).values[1], expected);
+    assert.equal(state.queries.find(q => q.query.includes('WITH candidates AS')).values[2], expected);
   }
 });
 

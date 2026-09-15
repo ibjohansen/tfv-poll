@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+.member-comment-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.shared-contact-badge { display: block; font-size: .8rem; margin-top: .25rem; }
+.cms-rich-editor { display: grid; gap: .75rem; }
+.cms-rich-toolbar { display: flex; gap: .5rem; align-items: end; flex-wrap: wrap; }
+.cms-rich-toolbar button[aria-pressed="true"] { background: #494038; color: #fff; }
+.cms-rich-text { min-height: 16rem; padding: 1rem; border: 1px solid #b8ad9f; border-radius: .5rem; background: #fff; }
+.cms-rich-text:focus-visible { outline: 2px solid #705338; outline-offset: 2px; }
+.cms-rich-text p, .cms-article-body p { margin-block: .75rem; }
+.cms-rich-text ul, .cms-article-body ul { list-style: disc; padding-left: 1.5rem; }
+.cms-rich-text ol, .cms-article-body ol { list-style: decimal; padding-left: 1.5rem; }
+.cms-rich-text h2, .cms-article-body h2 { font-size: 1.5rem; font-weight: 650; margin-block: 1.2rem .5rem; }
+.cms-rich-text h3, .cms-article-body h3 { font-size: 1.2rem; font-weight: 650; margin-block: 1rem .5rem; }
+.cms-rich-text blockquote, .cms-article-body blockquote { border-left: 3px solid #b8ad9f; padding-left: 1rem; margin-block: 1rem; }
+.cms-rich-text a, .cms-article-body a { text-decoration: underline; }
+
 /* Kartmodulen bruker samme knapper, typografi og farger som resten av admin. */
 .map-explorer { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; min-width: 0; }
 .map-explorer-canvas { height: min(60vh, 640px); min-height: 350px; width: 100%; border: 1px solid #d7d2c9; border-radius: 12px; z-index: 0; }
@@ -2518,3 +2533,7 @@ input, textarea, select { caret-color: var(--accent); }
     background: var(--surface-muted);
   }
 }
+.member-groups-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; min-width: 0; }
+.member-groups-layout > *, .member-groups-layout .admin-detail-form { min-width: 0; }
+.member-group-selection { list-style: none; padding: 0; max-height: 24rem; overflow: auto; }
+.member-group-selection label { display: flex; align-items: center; gap: .75rem; padding: .6rem; }

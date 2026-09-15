@@ -24,7 +24,7 @@ export async function PATCH(request) {
       return NextResponse.json({ ok: true, request: result, message: 'Eierskiftet er sendt til behandling.' }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
     if (input.action === 'email_change') {
-      await requestMemberEmailChange(secret, input.primary_contact_email);
+      await requestMemberEmailChange(secret, input.primary_contact_email, { memberId: input.memberId });
       return NextResponse.json({ ok: true, message: 'En bekreftelseslenke er sendt til den nåværende hoved-e-postadressen.' }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
     if (input.action !== 'update') return NextResponse.json({ ok: false, message: 'Ugyldig handling.' }, { status: 400 });

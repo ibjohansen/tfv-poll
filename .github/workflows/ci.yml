@@ -15,7 +15,19 @@ concurrency:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17.4-alpine
+        env:
+          POSTGRES_USER: tfv_test
+          POSTGRES_PASSWORD: tfv_test_local_only
+          POSTGRES_DB: tfv_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tfv_test -d tfv_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -28,3 +40,11 @@ jobs:
         run: npm ci
       - name: Lint, test and build
         run: npm run check
+      - name: Test real Postgres migrations, triggers and concurrency
+        run: npm run test:integration
+        env:
+          TEST_DATABASE_URL: postgresql://tfv_test:tfv_test_local_only@127.0.0.1:5432/tfv_test
+      - name: Install test browser
+        run: npx playwright install --with-deps chromium
+      - name: Test desktop and mobile browser flows with synthetic data
+        run: npm run test:e2e

@@ -396,6 +396,15 @@ export const surveyDocuments = [
 
 ## GitHub
 
+Prosjektet er privat, med `license: UNLICENSED` i `package.json`; det gis ikke
+en åpen kildekode-lisens. Se [npm om privat lisensmerking](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/#license).
+Arbeidsregler finnes i AGENTS.md og denne filen; egne CONTRIBUTING- og
+CODE_OF_CONDUCT-filer er utelatt for det lille, lukkede utviklingsmiljøet.
+`.editorconfig` samordner editoroppsett, og CHANGELOG.md har en «Ikke publisert»-seksjon.
+Foreslåtte GitHub topics: `nextjs`, `react`, `javascript`, `netlify`, `neon`,
+`membership-management`, `geojson`. Topics/beskrivelse på GitHub må oppdateres
+separat av repository-eier; ingen GitHub-innstilling er endret her.
+
 Prosjektet bruker `main` som produksjonsgren. Pushes til `main` og alle pull requests
 kontrolleres av GitHub Actions-konfigurasjonen i `.github/workflows/ci.yml`:
 
@@ -428,17 +437,45 @@ og [GitHubs påkrevde statuskontroller](https://docs.github.com/en/repositories/
 
 ### Automatiserte tester og brukerlogg
 
+Utvidede tester:
+
+```bash
+# Egen lokal Postgres, database tfv_test. Aldri DATABASE_URL eller .env.local.
+TEST_DATABASE_URL=postgresql://tfv_test:tfv_test_local_only@127.0.0.1:55438/tfv_test npm run test:integration
+# Valgfri måling av loggsøk på 100 000 syntetiske poster; måledata rulles tilbake:
+TEST_DATABASE_URL=postgresql://tfv_test:tfv_test_local_only@127.0.0.1:55438/tfv_test node scripts/benchmark-audit.mjs
+# Installer nettleseren én gang:
+npx playwright install chromium
+npm run test:e2e
+```
+
+Postgres-testene nekter andre verter enn loopback, andre databasenavn enn
+`tfv_test` og databaser merket som produksjon/staging. Bruk en separat
+testcontainer, ikke en eksisterende utviklingsdatabase. Dataene er syntetiske.
+Playwright starter en midlertidig appkopi uten `.env`-filer, uten DB-forbindelse,
+med deaktivert e-post og eksisterende mockregister. Administrator får en signert
+testsesjon med en separat syntetisk hemmelighet; ingen innloggingsbakdør er
+lagt til i applikasjonen. Entra OAuth testes ikke av denne flyten.
+En fixture-side med virkelige komponenter og syntetiske data kopieres kun til
+den midlertidige appen. Den finnes ikke under prosjektets `app/` eller i
+produksjonsbygget. Flytene dekker også profil, oppgaveliste, logg, grupper,
+nyhetsbrev, CMS-riktekst og utsendingsfeil. Alle leverandørkall er blokkert/mocket.
+Installerte Chrome kan brukes lokalt med `PLAYWRIGHT_CHANNEL=chrome npm run test:e2e`.
+CI kjører også begge testnivåene i `quality`, med egen Postgres-container og Chromium.
+
 Kjør `npm test` for modul- og rutetester, eller `npm run check` for lint, tester
 og produksjonsbygg. Rutetestene bruker ekte Next.js Request/Response-objekter
 og kjører rutekoden med eksplisitt erstattede avhengigheter. Testkommandoens
 `--experimental-vm-modules` brukes bare til denne isolasjonen; det er ikke
-et runtime-flagg for Netlify. Ingen nye testavhengigheter er installert.
+et runtime-flagg for Netlify. `pg` og `@playwright/test` er utviklingsavhengigheter;
+Tiptap (`@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`) brukes i editoren.
+`proj4` brukes server-side til WFS-koordinater; eksisterende XML-parser beholdes.
 
 [Kvalitetsgjennomgangen](docs/quality-review.md) beskriver rutedekning,
 begrensninger, anbefalte neste tester og vurderingen av hvilke hendelser som
 bør registreres. Testene kobler ikke til Neon, Microsoft, MailerSend eller
-Kartverket. Reelle transaksjoner og nettleserflyter trenger egne tester med
-syntetiske data i et isolert miljø.
+Kartverket. Reelle transaksjoner testes nå i lokal Postgres og nettleserflyter
+med syntetiske data. Entra OAuth og Netlify/Neon-produksjon er ikke simulert fullt ut.
 
 `/admin/audit` har søk i aktør, post-ID og før-/etterverdier, samt filtre for
 bruker, område, endringstype, status og datointervall. Datoene er hele kalenderdager
@@ -471,6 +508,43 @@ Se [kartmodulens datakilder, begrensninger og bruk](docs/map-explorer.md).
 funksjonsmappe. Netlify håndterer Next.js App Router gjennom sin Next.js-adapter,
 mens den lange matrikkelsynkroniseringen kjøres som en Netlify Background
 Function. Survey-utsendelser kjøres på samme måte i en egen bakgrunnsfunksjon.
+Den planlagte funksjonen `background-watchdog` kontrollerer matrikkeljobber
+hvert femte minutt, bare når Netlify `CONTEXT` og `APP_ENVIRONMENT` er
+`production`. Den prøver høyst tre gjenopptakinger før synlig feilstatus.
+Den bruker eksisterende `DATABASE_URL`, `MATRIKKEL_JOB_SECRET` og Netlifys `URL`.
+Ingen ny produksjonsvariabel skal opprettes. Funksjonen kan ikke startes via
+en offentlig URL; se [Netlify Scheduled Functions](https://docs.netlify.com/build/functions/scheduled-functions/).
+
+Medlemsstatus og medlemskommentarer krever også den additive migreringen før
+ny kode publiseres. Eksisterende tomter får `membership_status = 'member'`;
+ingen unntak utledes fra navn. Kommentarer lagres separat fra interne adminnotater.
+Samme migrering innfører grender/e-postgrupper, fler-tomtstilgang,
+`cms_pages.body_rich_text`, nyhetsbrev og den lesbare hendelsesvisningen
+`admin_activity_log`. Ingen medlemsdata flyttes til eksterne tjenester.
+
+Nye beskyttede ruter er `/admin/members/groups`, `/api/admin/member-groups`,
+`/admin/members/newsletters` og `/api/admin/newsletters`, alle med eksisterende
+`members`-rettighet. Nyhetsbrev bruker den nye `newsletter-background`-funksjonen
+og eksisterende `MAILERSEND_JOB_SECRET`, `MAILERSEND_ENABLED`,
+`MAILERSEND_BULK_ENABLED` og avsenderoppsett. Ingen nye miljøvariabler kreves.
+Ingen reell utsending er utført under utviklingen. Utkast kan lagres uten å
+aktivere masseutsending; faktisk køstart krever eksisterende bulk-bryter.
+Ved lokal utvikling krever start av nyhetsbrev en konfigurert Netlify-funksjon;
+appen starter ikke en langvarig reservejobb fra nettleseren.
+
+Fler-tomtstilgang bruker hoved-e-post som eksisterende autorisasjonsgrense.
+Ekstra kontaktadresser gir ikke utvidet selvbetjeningstilgang. Engangslenken
+lagrer et serverbestemt tomteutvalg og normalisert hovedadresse, og kontrollerer
+fortsatt e-posttilknytning/aktiv status ved hvert oppslag. Eldre økter uten utvalg
+har fortsatt bare tilgang til den opprinnelige tomten. `?member=<id>` velger tomt
+på profilsiden og egeneksport; ukjent/ikke tillatt ID gir ingen medlemsdata.
+Egeneksport logges i `security_events` uten eksportinnhold.
+
+CMS bevarer vanlig tekst i `body`, mens formatert innhold lagres i et sanert
+JSON-tre. Gammel tekst tolkes aldri som HTML. Formateringen følger nettstedets
+typografi. Se [Tiptaps Next.js-integrasjon](https://tiptap.dev/docs/editor/getting-started/install/nextjs).
+Favicon leveres fra de offentlige metadata-rutene `/icon` og `/apple-icon`,
+generert ved bygg fra eksisterende grafisk logo. Ingen nye miljøvariabler trengs.
 Se også [Netlifys Next.js-veiledning](https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/)
 og [veiledningen for Background Functions](https://docs.netlify.com/build/functions/background-functions/).
 
@@ -529,6 +603,14 @@ Skjemaet oppretter også `audit_log` og triggere på `members`, `member_requests
 `surveys`, `survey_responses`, `cms_pages` og `cms_attachments`. Loggen starter
 når migreringen kjøres; den rekonstruerer ikke historikk fra tidligere
 endringer. Tilgangstoken, verifiseringshash og interne lagringsnøkler utelates.
+
+Før publisering av worker-gjenopptaking må den additive migreringen kjøres:
+den legger til manglende reservasjon-/forsøkskolonner på eksisterende
+matrikkeltabeller. `audit_log` beskyttes mot UPDATE, DELETE og TRUNCATE;
+`security_events` beskyttes også mot TRUNCATE. Dette erstatter ikke en separat
+runtime-rolle uten skjemaeierskap: en skjemaeier kan deaktivere triggere.
+Lagringstid og vedlikeholdsrolle må avklares før en separat, kontrollert
+oppryddingsmigrering utformes; ingen logg slettes automatisk.
 
 Sikkerhetsmigreringen er todelt. `db:setup` er additiv og kan kjøres før ny
 kode deployes. Etter at ny surveyflyt er publisert og gamle lenker er erstattet,
@@ -712,7 +794,7 @@ URI i Entra oppdateres. Utløs en ny deploy etter endringen.
    hvis forrige bygg ble kjørt før miljøvariablene ble lagt inn.
 3. Kontroller at byggeloggen avsluttes uten feil.
 4. Kontroller at Next.js-funksjonene og
-   `matrikkel-sync-background` og `survey-email-background` finnes i Netlifys
+   `matrikkel-sync-background`, `survey-email-background`, `newsletter-background` og `background-watchdog` finnes i Netlifys
    funksjonsoversikt. Kontroller også at edge-funksjonen
    `public-member-rate-limit` er oppdaget og aktivert i deployloggen.
 5. Kontroller at den publiserte deployen bruker committen som var godkjent i
@@ -726,6 +808,14 @@ Etter at GitHub-repositoriet er koblet til Netlify, utløser senere pushes til
 Utfør kontrollene i denne rekkefølgen:
 
 - Åpne `/` og kontroller toppbilde, publiserte artikler og artikkelpanelet.
+- Kontroller favicon i lys/mørk nettleserflate, og at `/icon` og `/apple-icon`
+  gir PNG uten innlogging. Kontroller også i Safari/Firefox før endelig godkjenning.
+- Med syntetisk testtomt: bytt mellom ordinært medlem og unntak, kontroller
+  registerfilter/antall/eksport og at en unntatt tomt ikke kan motta eller besvare
+  en medlemsundersøkelse. Ingen ekte tomter skal brukes til denne testen.
+- Send en valgfri kommentar med retting/eierskifte fra et testmedlem. Kontroller
+  ren tekst i oppgaveliste, medlemshistorikk og brukerlogg; kvitter lest og bekreft
+  at historikken beholdes. Test delte hoved-/ekstraadresser på separate tomter.
 - Kontroller at **Mine medlemsopplysninger** alltid vises før artiklene. Be om
   lenke med en kontrollert testbruker via H-nummer, adresse og e-post. Bekreft
   at treff og ikke-treff gir identisk HTTP-status, responsstruktur og tekst,
@@ -741,19 +831,24 @@ Utfør kontrollene i denne rekkefølgen:
 - Åpne `/admin/map` med medlemsadministrator. Tegn, rediger og slett et lite
   polygon ved Turufjell; kontroller areal, bakgrunnskart, adressepunkter, veier,
   lagvalg, tabellsøk og zoom fra tabellrad, også på mobil og med tastatur.
+  Hent eiendomsgrenser fra åpen Kartverket-WFS: kontroller teiger med og uten
+  adresse, alle matrikkelreferanser, nøyaktighetsklasse og kilde. Et avkortet
+  eller endret uttrekk skal avvises. Teiggrenser er ikke grensepåvisning.
   Kontroller at redigering/sletting fjerner gamle resultater, også under lasting.
 - Kontroller at begge `/api/admin/map/*`-rutene svarer 401 uten sesjon og 403
   med rolle uten `members`-rettighet. Test feil fra ekstern karttjeneste og
   retry i isolert miljø. Kontroller at ufullstendige adressedata ikke gir en
   sammenligningsrapport med falske «mangler»-tall.
 - Kontroller registersammenligningen med kjent testgrunnlag, inkludert ulike
-  gnr/bnr på samme adresse, seksjonsnummer og flere kandidater. «Uten treff i
-  kartutsnittet» kan bety utenfor polygonet, ikke at Kartverket mangler adressen.
-  Sammenligningen skal aldri endre registeret. Fullstendige eiendomsgrenser og
-  eiendommer uten adresse er ikke implementert.
+  gnr/bnr på samme adresse, seksjonsnummer og flere kandidater. Ukjent plassering
+  skal vises separat og ikke telle som manglende kartdata. Knyttede teiger kan
+  berøre polygonet uten at adressepunktet er kjent; dette merkes uttrykkelig.
+  Hent sammenligningen på nytt etter grensehenting. Registeret skal aldri endres.
 - Med godkjent testgrunnlag: kontroller adresse-CSV, sammenlignings-CSV og GeoJSON
   samt kopiering. Bare sammenlignings-CSV skal ha interne kontaktopplysninger;
   GeoJSON skal ikke ha medlemmer, e-post, telefon eller tilgangslenker.
+  Hentede teiger skal følge GeoJSON-eksporten med full geometri og kilde;
+  CSV skal skille ukjent plassering fra geografisk avgrensede mangler.
   Kart-/registereksport skal vises i brukerloggen med aktør, format og antall,
   uten eksportinnhold. Oppbevar eventuell kontaktfil sikkert og slett etter test.
 - Logg inn med en godkjent administratorkonto og kontroller modulene Medlemsregister,
@@ -801,9 +896,37 @@ Utfør kontrollene i denne rekkefølgen:
   i isolert testmiljø først; en stoppet kjøring skal beholde statusen etterpå.
 - For matrikkeljobben: kontroller at funksjonskallet går direkte til
   `/.netlify/functions/matrikkel-sync-background`, uten `Location: /admin/login`.
-  Bare denne eksakte funksjonsruten skal omgå Next-innlogging; `/admin` og
+  Bare de tre eksakte bakgrunnsrutene for matrikkel, survey-e-post og nyhetsbrev skal omgå Next-innlogging; `/admin` og
   `/api/admin/matrikkel/*` skal fortsatt kreve innlogging og riktig rolle.
   Jobbhemmeligheten kontrolleres inne i funksjonen før databasebehandling.
+- Kontroller tilsvarende at `survey-email-background` avviser feil
+  jobbhemmelighet, at direkte `202` er eneste godkjente oppstartskvittering,
+  og at redirect/HTML/timeout gir synlig feil for en fortsatt ventende kampanje.
+  Ikke start masseutsendelse for å teste dette; bruk isolerte syntetiske tester.
+- Kontroller at `background-watchdog` vises som **Scheduled**, med neste
+  kjøring. Test aldri ved å forstyrre en ekte pågående produksjonsjobb.
+  I isolert miljø: simuler akseptert jobb uten oppstart og utløpt reservasjon;
+  bekreft gjenopptaking, maksimalt tre forsøk og ingen doble medlemsoppdateringer.
+- Kontroller grender/e-postgrupper med syntetiske tomter: tilordning, flytting,
+  filtrering, antall medlemmer og unike adresser. Sletting av en gruppe skal
+  beholde medlemsdata og logges med administratorens identitet.
+- Test fler-tomtstilgang med to syntetiske tomter på samme hoved-e-post, én på en
+  annen hovedadresse og én hvor adressen endres etter lenkeutstedelse. Bare det
+  gyldige tilgangsutvalget skal vises, også ved manipulert `member`-parameter.
+- Kontroller CMS-riktekst på mobil/desktop, lenker og tidligere artikler, uten
+  HTML-tolkning av gammel tekst. Kontroller lagre-feil uten tap av editorinnhold.
+- Nyhetsbrev: bruk bare godkjente testmottakere/grupper. Kontroller deduplisering
+  på tvers av grupper, forhåndsvisning, testmail og faktisk fremdrift etter `202`.
+  `newsletter-background` skal avvise feil hemmelighet/metode/ID. Ingen kampanje
+  skal sendes om igjen ved gjenopptaking; usikre leveringer krever kontroll.
+  Maksimalt 5000 unike adresser per kampanje. Statuslisten viser inntil 250 siste
+  leveringer; samlet telling beregnes fra alle. Ved worker-krasj kan administrator
+  gjenoppta etter at 16-minuttersreservasjonen er utløpt. Watchdog dekker foreløpig
+  bare Matrikkel. Mottakerreservasjoner og gjeldende medlemsstatus kontrolleres før sending.
+- Brukerloggen skal vise e-postlivsløp med stabil hendelses-ID, uten mottakerliste
+  eller meldingstekst. Gamle testmailer uten aktør merkes `unknown`, ikke gjettet bruker.
+- Stopp/godkjenning/skjuling i matrikkelmodulen skal logges med innlogget
+  aktør. Skjuling av kjøringen skal ikke fjerne handlingen fra brukerloggen.
 - Kontroller at et godkjent oppstartskall mottar `202`, og deretter at
   `started_at` og behandlede poster faktisk oppdateres. I Netlify-funksjonsloggen
   skal `Matrikkel background processing started` og en avslutning/feil vises.

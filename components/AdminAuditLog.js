@@ -4,11 +4,14 @@ import { auditPageHref } from '@/lib/audit-filters';
 const tableLabels = {
   members: 'Medlem',
   member_requests: 'Henvendelse',
+  member_profile_updates: 'Medlemsretting',
   surveys: 'Undersøkelse',
   survey_responses: 'Undersøkelsessvar',
   cms_pages: 'Webside',
   cms_attachments: 'Webvedlegg',
   admin_actions: 'Administrativ handling',
+  email_campaigns: 'E-postkampanje', email_deliveries: 'Testmail',
+  newsletter_campaigns: 'Nyhetsbrevkampanje',
 };
 const operationLabels = { INSERT: 'Opprettet', UPDATE: 'Endret', DELETE: 'Slettet' };
 const fieldLabels = {
@@ -19,6 +22,10 @@ const fieldLabels = {
   status: 'Status', is_open: 'Åpen', ends_on: 'Svarfrist', questions: 'Spørsmål', answers: 'Svar',
   deleted_at: 'Slettet tidspunkt', published_at: 'Publisert tidspunkt', sort_order: 'Rekkefølge', original_filename: 'Filnavn',
   action: 'Handling', count: 'Antall poster', scope: 'Utvalg', survey_id: 'Undersøkelses-ID',
+  run_id: 'Matrikkelkjøring', member_id: 'Medlems-ID',
+  comment: 'Kommentar fra medlem', requested_comment: 'Kommentar fra medlem', comment_read_at: 'Kommentar lest',
+  membership_status: 'Medlemsstatus', hamlet_id: 'Grend-ID', body_rich_text: 'Formatert innhold',
+  kind: 'Type', group_id: 'Gruppering-ID', name: 'Navn',
 };
 
 function formatDate(value) {
@@ -42,18 +49,29 @@ function changedFields(entry) {
 
 function entityLabel(entry) {
   const value = entry.after_value || entry.before_value || {};
+  if (value.action === 'newsletter_saved') return 'Nyhetsbrevutkast lagret';
+  if (value.action === 'newsletter_queued') return 'Nyhetsbrev bestilt';
+  if (entry.table_name === 'newsletter_campaigns') return value.action === 'campaign_started' ? 'Nyhetsbrev startet' : 'Nyhetsbrev avsluttet';
+  if (['email_campaigns', 'email_deliveries'].includes(entry.table_name)) return ({ campaign_created: 'Kampanje opprettet', campaign_started: 'Utsending startet', campaign_finished: 'Kampanje avsluttet', testmail_requested: 'Testmail bestilt', testmail_finished: 'Testmail behandlet' })[value.action] || 'E-posthendelse';
+  if (entry.table_name === 'admin_actions' && value.action?.startsWith('group_')) return `${value.kind === 'hamlet' ? 'Grend' : 'E-postgruppe'} · ${({ group_create: 'opprettet', group_rename: 'navn endret', group_add: 'tomter tilordnet', group_remove: 'tomter fjernet', group_delete: 'slettet' })[value.action] || value.action}`;
   if (entry.table_name === 'members') return value.h_number ? `Medlem ${value.h_number}` : `Medlem #${entry.row_id}`;
   if (entry.table_name === 'member_requests') return `${value.request_type === 'membership' ? 'Innmelding' : 'Eierskifte'} ${value.h_number || `#${entry.row_id}`}`;
   if (entry.table_name === 'surveys') return value.title || `Undersøkelse #${entry.row_id}`;
   if (entry.table_name === 'survey_responses') return `Svar #${entry.row_id}`;
   if (entry.table_name === 'cms_pages') return value.title || `Webside #${entry.row_id}`;
-  if (entry.table_name === 'admin_actions') return ({ member_export: 'Medlemsregister eksportert', survey_results_export: 'Undersøkelsesresultater eksportert', map_export: 'Kart-/registerrapport eksportert' })[value.action] || 'Administrativ handling';
+  if (entry.table_name === 'admin_actions') return ({ member_export: 'Medlemsregister eksportert', survey_results_export: 'Undersøkelsesresultater eksportert', map_export: 'Kart-/registerrapport eksportert',
+    matrikkel_approve: 'Matrikkelforslag godkjent', matrikkel_cancel: 'Matrikkelkjøring stoppet', matrikkel_hide: 'Matrikkelkjøring skjult' })[value.action] || 'Administrativ handling';
   return value.original_filename || `Vedlegg #${entry.row_id}`;
 }
 
 function entityHref(entry) {
+  if (entry.after_value?.newsletter_id) return '/admin/members/newsletters';
+  if (['email_campaigns', 'email_deliveries'].includes(entry.table_name)) return '/admin/surveys';
+  if (entry.table_name === 'admin_actions' && entry.after_value?.action?.startsWith('group_')) return '/admin/members/groups';
+  if (entry.table_name === 'admin_actions' && entry.after_value?.action?.startsWith('matrikkel_')) return '/admin/members/matrikkel';
   if (entry.table_name === 'members') return `/admin/members?member=${encodeURIComponent(entry.row_id)}`;
   if (entry.table_name === 'member_requests') return '/admin/inbox';
+  if (entry.table_name === 'member_profile_updates') return '/admin/inbox';
   if (['surveys', 'survey_responses'].includes(entry.table_name)) return '/admin/surveys';
   if (['cms_pages', 'cms_attachments'].includes(entry.table_name)) return '/admin/web';
   return null;
@@ -79,7 +97,7 @@ export default function AdminAuditLog({ data, filters, tables }) {
       const fields = changedFields(entry);
       const href = entityHref(entry);
       return <li key={entry.id}>
-        <div className="admin-audit-summary"><div><span className={`admin-audit-operation is-${entry.operation.toLowerCase()}`}>{entry.table_name === 'admin_actions' ? 'Eksportert' : operationLabels[entry.operation]}</span><strong>{tableLabels[entry.table_name]} · {entityLabel(entry)}</strong></div><time dateTime={entry.changed_at}>{formatDate(entry.changed_at)}</time></div>
+        <div className="admin-audit-summary"><div><span className={`admin-audit-operation is-${entry.operation.toLowerCase()}`}>{entry.table_name === 'admin_actions' ? 'Utført' : operationLabels[entry.operation]}</span><strong>{tableLabels[entry.table_name]} · {entityLabel(entry)}</strong></div><time dateTime={entry.changed_at}>{formatDate(entry.changed_at)}</time></div>
         <p>Utført av <strong>{entry.changed_by}</strong>{fields.length && entry.table_name !== 'admin_actions' ? ` · ${fields.length} endrede felt` : ''}</p>
         <div className="admin-audit-actions">{href && <Link href={href}>Åpne posten</Link>}<details><summary>Vis full logg</summary><div className="admin-audit-values">{fields.map((field) => <section key={field}><h3>{fieldLabels[field] || field}</h3><div><div><span>Før</span><pre>{formatValue(entry.before_value?.[field])}</pre></div><div><span>Etter</span><pre>{formatValue(entry.after_value?.[field])}</pre></div></div></section>)}</div></details></div>
       </li>;

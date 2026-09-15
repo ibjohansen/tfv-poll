@@ -9,7 +9,7 @@ konfigurasjonsendring utføres av kartfunksjonen.
 1. Åpne **Kart og registerkontroll** fra administrasjonsmenyen.
 2. Velg **Tegn polygon**, klikk/trykk inn hjørner og velg **Fullfør polygon**.
    Kartet starter ved Turufjell, nær Istjernvegen, i Flå kommune.
-3. Hent adresser, veier/stier og registersammenligning hver for seg. En feil
+3. Hent adresser, eiendomsgrenser, veier/stier og registersammenligning hver for seg. En feil
    i Overpass skal ikke hindre adressesøket.
 4. Filtrer/sorter tabellene. Klikk en adresse, referanse eller vei for å zoome
    og vise detaljer. Slå kartlag av/på med avkrysningsboksene.
@@ -29,9 +29,10 @@ lagres ikke i databasen eller automatisk på tvers av sidebesøk.
 ## Integrasjon og dataansvar
 
 Eksisterende Next.js App Router, Node-runtime, JavaScript og global CSS beholdes.
-Nye direkte avhengigheter er `leaflet` og `@turf/turf`. Leaflet lastes bare i
-nettleseren gjennom `next/dynamic` med `ssr: false`. Ingen nytt styling- eller
-testrammeverk er innført.
+Kartavhengigheter er `leaflet`, `@turf/turf` og `proj4`; eksisterende
+`fast-xml-parser` brukes for GML. Leaflet lastes bare i
+nettleseren gjennom `next/dynamic` med `ssr: false`. Ingen nytt stylingrammeverk
+er innført. Playwright tester kartet i et isolert nettlesermiljø.
 
 | Lag | Ansvar |
 | --- | --- |
@@ -39,6 +40,7 @@ testrammeverk er innført.
 | `lib/map/browser-client.js` | Kall til egne beskyttede API-ruter |
 | `lib/map/kartverket-address-service.js` | Kartverkets adresseadapter, paginering og normalisering |
 | `lib/map/kartverket-property-service.js` | Matrikkelreferanser og adresseplasseringer; ikke eiendomsgrenser |
+| `lib/map/kartverket-boundary-service.js` | Åpent WFS/GML-uttrekk, UTM-transformasjon og teiggeometri |
 | `lib/map/osm-road-service.js` | Utskiftbar veiadapter og klipping av geometri |
 | `lib/map/geo.js`, `normalization.js` | GeoJSON, Turf-operasjoner og normalisering |
 | `lib/map/register-service.js` | Minimale, serverbaserte registeroppslag |
@@ -46,10 +48,10 @@ testrammeverk er innført.
 | `lib/map/service.js`, `cache.js`, `http.js`, `api.js` | Orkestrering, offentlig datacache, tidsgrenser og tilgang |
 | `lib/map/export.js` | CSV-/GeoJSON-format og vern mot regnearkformler |
 
-`POST /api/admin/map/search` tar `{ polygon, datatype }`, der `datatype` er
-`addresses`, `roads` eller `comparison`. `polygon` er en GeoJSON Polygon eller
+`POST /api/admin/map/search` tar `{ polygon, datatype, includeBoundaries? }`, der `datatype` er
+`addresses`, `roads`, `properties` eller `comparison`. `polygon` er en GeoJSON Polygon eller
 Feature med Polygon-geometri. `POST /api/admin/map/export` tar
-`{ polygon, format, includeRoads? }`, med `addresses-csv`, `comparison-csv`
+`{ polygon, format, includeRoads?, includeBoundaries? }`, med `addresses-csv`, `comparison-csv`
 eller `geojson` som format. Klienten får ikke velge eksterne URL-er.
 
 Begge rutene og siden krever eksisterende `members`-rettighet. Med konfigurert
@@ -141,21 +143,52 @@ NVDB har eget veglenke-/referansesystem og annen geometri-/pagineringstilpasning
 MVP bruker tillatt Overpass-alternativ; `findRoadsInPolygon` kan byttes uten
 endringer i visningskomponentene.
 
-### Eiendomsgrenser: undersøkt, ikke implementert
+### Eiendomsgrenser: implementert og kontrollert mot åpen WFS
 
 [Offisiell metadataoppføring](https://kartkatalog.geonorge.no/Metadata/uuid/339d49c3-06a5-4310-9605-fced1fe465cb)
 peker på [WFS GetCapabilities](https://wfs.geonorge.no/skwms1/wfs.matrikkelen-eiendomskart-teig?Service=WFS&Request=GetCapabilities).
 Det faktiske capabilities-dokumentet svarte uten autentisering og annonserte
 bl.a. `app:Teig` og `app:Eiendomsgrense`, GML 3.2, EPSG:25833/25832/25835 og
 `ImplementsResultPaging=FALSE`. GeoJSON/4326 er ikke annonsert. Derfor er det
-ikke implementert en uverifisert GeoJSON/WFS-URL eller naiv sideinndeling.
+ikke brukt en konstruert GeoJSON/WFS-URL eller naiv sideinndeling.
 
-Før grenseimport kreves verifisert GetFeature-filter, koordinattransformasjon,
-GML-håndtering inkludert flere teiger/hull og kontroll på ufullstendige uttrekk.
-Første versjon viser alle matrikkelreferansene knyttet til hentede adresser,
-med adresseplasseringer. Kartlaget for eiendomsgrenser er deaktivert og merket
-som senere arbeid. API-er for eiere, hjemmelshavere eller beskyttet Matrikkel
-SOAP brukes ikke av kartmodulen. Eiendommer uten adresse er ikke dekket.
+Adapteren bruker samme HTTPS-endepunkt med `service=WFS`, `version=2.0.0`,
+`request=GetFeature`, `typeNames=app:Teig`, `srsName=urn:ogc:def:crs:EPSG::25832`,
+`bbox=minØ,minN,maxØ,maxN,urn:ogc:def:crs:EPSG::25832` og `count=2001`.
+BBox-kantene fortettes før projeksjon, med 2 m utvidelse. `proj4` bruker UTM32,
+GRS80 og øst/nord; GeoJSON blir lengde/bredde. Dette er kartvisning/analyse,
+ikke en landmålings- eller centimeternøyaktig datumtransformasjon.
+
+`DescribeFeatureType` bekreftet 20211101-skjemaet og matrikkelfeltene.
+`Polygon`, hull, `MultiSurface` og `Surface/PolygonPatch` støttes. Ukjente
+geometriformater, feil CRS/dimensjon, dupliserte ID-er, eksterne XML-entiteter
+og lenkereferanser avvises; ingen geometri eller matrikkelreferanser gjettes.
+Alle strukturerte matrikkelreferanser beholdes. Komprimert `matrikkelnummerTekst`
+tolkes ikke som fullstendig identifikasjon. Eiernavn og andre uvedkommende felt
+projiseres ikke inn i datamodellen.
+
+Et faktisk 150 m-utsnitt ga 12 GML-objekter mens resultatmetadata feilaktig sa
+`numberReturned=0` og `numberMatched=unknown`. Separate `resultType=hits` ga 12.
+Adapteren teller derfor før og etter uthenting, sammenligner med antall unike
+objekter, og avviser ukjent/endrede antall eller mer enn 2000 treff. Den bruker
+ikke WFS-paginering. Grensejobben har 22 sekunders totalfrist, høyst ett nytt
+forsøk ved nettverks-/serverfeil, 8 MB svargrense og 150 000 koordinatpunkter.
+Alle objekter eksaktfiltreres med Turf `booleanIntersects`, og teigens fulle
+geometri beholdes. Uttrekk uten adresse er derfor også med. Tellingene er ikke
+et transaksjonelt snapshot av Kartverkets database; kildeendringer med samme
+antall objekter kan ikke oppdages sikkert. Hentetid følger resultat og eksport.
+
+Den ferdige adapteren ga 11 teiger i et annet lite Turufjell-polygon. Dette er
+en kontroll av adapteren, ikke en opptelling av alle eiendommer i Turufjell.
+Tjenesten svarte uten autentisering, med CORS `*`. Ingen tallfestet kvote er
+publisert i den kontrollerte beskrivelsen; intern rategrense/cache gjelder.
+[Kartverkets katalogoppføring hos data.norge.no](https://data.norge.no/nb/data-services/82e8b72d-3ad8-3f36-8c3b-5904c777bf7f/matrikkelen-eiendomskart-teig-wfs)
+oppgir CC BY 4.0. © Kartverket / Geonorge vises i UI og eksport.
+
+Nøyaktighetsklasse, tvist og flere matrikkelenheter vises. Teiggrenser kan
+inneholde hjelpelinjer; de er ikke grunnlag for grensepåvisning. Matrikkelenheter
+uten registrert kartgeometri og rettigheter uten egen teig kan ikke finnes med
+dette uttrekket. Beskyttet Matrikkel SOAP og eiersøk brukes ikke av kartmodulen.
 
 ## Sammenligning og personvern
 
@@ -163,8 +196,14 @@ Hele det aktive interne registeret sammenlignes med adresseutvalget i polygonet.
 Registeret mangler egne geografiske koordinater; en ukoblet post kan derfor
 ikke sikkert plasseres innenfor polygonet. Nøkkeltall skiller mellom
 offisielle adresser i polygonet og aktive poster i **hele registeret**.
-`MISSING_IN_MAP_DATA` betyr bare uten treff i valgt utsnitt, aldri bevist
-manglende offisiell adresse. Dette presiseres også i hver relevant CSV-rad.
+Ukoblede poster med ukjent plassering ligger nå i `unlocatedRows`, vises
+separat og inngår **ikke** i mangeltall. Kjente punkter utenfor utelates.
+`MISSING_IN_MAP_DATA` krever et kjent punkt innenfor eller en matrikkelreferanse
+i en hentet teig som berører polygonet. Sistnevnte er merket `parcel_intersects`:
+det beviser ikke adresseplassering, og teigen kan være uten adresse.
+CSV har egen kolonne for geografisk grunnlag; ukjent plassering er uttrykkelig
+ikke klassifisert som manglende kartdata. Henting av nye grenser nullstiller
+sammenligningen, slik at administrator må beregne den på nytt.
 
 Gnr/bnr indekseres først, med eksakt normalisert adresse som supplement og
 disambiguering. Motstridende kjent eiendomsidentitet/adresse er `CONFLICT`.
@@ -191,7 +230,7 @@ Registerdata, sammenligning og eksport cachelagres ikke. Samtidige identiske
 søk deler offentlig innhenting. En avbrutt delt forespørsel kan måtte prøves
 igjen av en annen klient; feil cachelagres ikke.
 
-Eksterne kall har 18 sekunders tidsgrense per forsøk og 25 sekunders samlet
+Adresse-/veikall har 18 sekunders tidsgrense per forsøk og 25 sekunders samlet
 forespørselsfrist. Ett nytt forsøk tillates ved nettverksfeil/5xx; 429 gir
 beskjed om å vente uten automatisk retry. Maksimal ekstern JSON-body er 5 MB,
 og veidata begrenses til 30 000 koordinater. Frontenden har avbryt-knapp og
@@ -215,18 +254,15 @@ ufullstendige svar, feil, retry, cache, autorisasjon, CSRF, størrelsesgrenser,
 dataminimering og eksportlogging. Eksterne tjenester og database er mocket.
 Eksisterende testoppsett og `npm run check` brukes uendret.
 
-Avsluttende lokal kontroll: `npm run check` bestod med 198 tester, lint og
-produksjonsbygg. `npm audit` fant ingen sårbarheter, og `git diff --check`
-bestod. En isolert Next.js-nettlesertest brukte den faktiske kartkomponenten
-med syntetisk register og uten databaseforbindelse. Tegning, areal,
-koordinatredigering, konfliktvisning, kartvalg/detaljer og sletting under
-innhenting ble kontrollert. Mobiltesten avdekket og fikk rettet horisontal
-overflyt: ved 390 px er sidebredden 390 px, mens den brede tabellen ruller
-inne i sin egen beholder. Dette er en utført røykprøve, ikke en varig
-automatisert E2E-suite eller en test av reell Entra-innlogging.
+Varige tester ligger i `tests/e2e/application.spec.js` for desktop og mobil.
+Kartdelen dekker tegning, redigering/sletting, teiglag og detaljer, kansellering,
+sene svar og CSV-nedlasting. WFS-testene dekker UTM-kontrollpunkter, hull,
+flere flater/referanser, ukjent CRS, XML-entiteter, avkorting og endret antall.
+Grenseadapteren er i tillegg kontrollert manuelt mot et lite åpent uttrekk.
+Den samlede kvalitetspakken og avgrensningene er beskrevet i `quality-review.md`.
 
 Se produksjonssjekklisten i README for reell Entra-innlogging og en kontrollert
 registereksport etter publisering. Ingen slik produksjonskontroll eller
-produksjonsdataeksport er utført under utviklingen. Fullstendige grenser,
-autoritative veidata, geografisk avgrensning av ukoblede registerposter og
-varig nettleser-E2E i isolert miljø er videre arbeid.
+produksjonsdataeksport er utført under utviklingen. Større driftskapasitet og
+en eventuell offisiell veiadapter krever videre avklaring. Behold Overpass for
+dagens små administratoruttrekk; ikke opprett ny infrastruktur uten godkjenning.

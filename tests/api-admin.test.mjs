@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadModule, request, routeContext } from './helpers/load-module.mjs';
+import { loadModule, plain, request, routeContext } from './helpers/load-module.mjs';
 
 // This inventory exercises every application-owned admin handler. Service
 // errors model the boundary; domain validation and permissions have own tests.
@@ -47,7 +47,7 @@ const exportsByModule = {
   'member-self-service': ['resolveAdminMemberRequest', 'updateAdminMemberRequestProperty'],
   'admin-surveys': ['getAdminSurveys', 'createAdminSurvey', 'updateAdminSurvey', 'deleteAdminSurvey'],
   'admin-survey-results': ['getAdminSurveyResults', 'createAdminSurveyResultsExport'],
-  'survey-email': ['getSurveyEmailOverview', 'sendSurveyTestEmail', 'createSurveyEmailCampaign'],
+  'survey-email': ['getSurveyEmailOverview', 'sendSurveyTestEmail', 'createSurveyEmailCampaign', 'failPendingSurveyEmailCampaign'],
   'cms-pages': ['getAdminCmsPages', 'createAdminCmsPage', 'getAdminCmsPage', 'updateAdminCmsPage', 'deleteAdminCmsPage', 'setAdminCmsPageStatus'],
   'cms-files': ['uploadAdminCmsFile', 'deleteAdminCmsFile', 'reorderAdminCmsAttachments', 'updateAdminCmsAttachment'],
   'matrikkel-sync': ['getMatrikkelRuns', 'getMatrikkelRun', 'createMatrikkelRun', 'failPendingMatrikkelRun', 'deleteMatrikkelRunLog', 'cancelMatrikkelRun', 'processMatrikkelRun', 'approveMatrikkelItem'],
@@ -65,6 +65,7 @@ async function setup(path, overrides = {}) {
   ]));
   dependencies['@/lib/rate-limit'] = { isEmailRateLimited: () => state.limited };
   dependencies['@/lib/matrikkel-background'] = { dispatchMatrikkelRun: async () => { throw new Error('Unexpected background dispatch'); } };
+  dependencies['@/lib/survey-email-background'] = { dispatchSurveyEmailCampaign: async () => { throw new Error('Unexpected background dispatch'); } };
   dependencies['@/lib/admin-access'] = { requireMatrikkelSync: async () => {
     if (state.error?.message === 'Unauthorized') throw state.error;
   } };
@@ -113,7 +114,7 @@ for (const [path, method, module, operation, status, options = {}] of cases) {
 test('member search normalizes pagination and preserves combined filters', async () => {
   const { route, calls } = await setup('members');
   await route.GET(request('/api/admin/members?q=%20Test%20&page=NaN&dir=desc&contact=incomplete&comment=present'));
-  assert.deepEqual(calls[0].args, ['Test', 1, 'h_number', 'desc', true, true]);
+  assert.deepEqual(plain(calls[0].args), ['Test', 1, 'h_number', 'desc', true, true, { membershipStatus: '', hamletId: '', groupId: '' }]);
 });
 
 test('admin write handlers with origin protection reject cross-site requests before mutation', async () => {

@@ -5,6 +5,11 @@ ingen produksjonsdeploy, GitHub-push, Entra-endring eller Neon-migrering er kjø
 Se [kvalitetsgjennomgangen](docs/quality-review.md) for funn, testdekning,
 vurdering av brukerloggen og begrensninger. Uferdige produktoppgaver beholdes.
 
+**Avklaringer før de siste punktene kan fullføres:** Delingspraksis/standardverdi
+for Turufjell AS, datapunkter og lagringstid for statistikk, loggens lagringstid
+og databaseprivilegier, samt eksplisitt tillatelse til Neon-/GitHub-endringer og
+produksjonsverifikasjon. Ingen av disse valgene er antatt eller aktivert.
+
 ## Matrikkel – oppstartsfeil rettet lokalt 15. september 2026
 
 Produksjonsdiagnosen viste at funksjonskallet ble sendt til `/admin/login`
@@ -26,11 +31,13 @@ Kjøringen ble derfor stående før første oppslag, uten funksjonslogg.
 - [ ] Etter godkjent deploy: kjør bare **Test H-nummer 25** først, og verifiser
   både faktisk behandlingsstart i databasen og funksjonsloggen. `202` alene er
   ikke bevis på behandling. Se produksjonssjekklisten i README.
-- [ ] Legg til overvåking av oppdrag som får `202`, men aldri starter (f.eks.
-  feil ved funksjonsinnlasting/konfigurasjon). Dette og gjenopptakelse etter
-  worker-krasj er separate oppgaver, ikke løst av rutefiksen.
-- [ ] Gjennomgå samme innloggings-/kvitteringsmønster for survey-e-postjobben
-  separat. Den ruten er ikke åpnet eller endret i matrikkelrettelsen.
+- [x] Overvåking implementert lokalt: `background-watchdog` kontrollerer
+  oppdrag uten oppstart og utløpte reservasjoner hvert femte minutt, med høyst
+  tre gjenopptakinger før synlig feil. Reelle Postgres-tester dekker samtidighet.
+  Aktivering og faktisk plattformkjøring krever godkjent migrering/deploy.
+- [x] Survey-e-postjobben har samme eksakte proxy-unntak, POST-/hemmelighetskontroll,
+  timeout og krav om direkte `202`. Ubekreftet oppstart gir synlig feilstatus.
+  Begge workers kan nå lastes i ren Node uten å laste Next/Auth ved oppstart.
 
 ## Kart og registerkontroll – implementert MVP 15. september 2026
 
@@ -50,21 +57,25 @@ tilgang, testdekning og kjente begrensninger. Ingen automatisk registerretting.
 - [x] Steg 6, eksportdel: CSV/GeoJSON, kopiering av adresser/veinavn,
   formelinjeksjonsvern og eksportlogging uten filinnhold/personopplysninger.
 - [x] Enhets-/rutetester med mocket database og eksterne karttjenester.
-- [ ] Steg 6, eiendomsgrenser: Implementer og test WFS/GML-adapter med
-  verifisert UTM-transformasjon, flere teiger/hull og komplett geografisk
-  uttrekk uten å forutsette paginering eller GeoJSON-støtte som ikke annonseres.
-- [ ] Finn også eiendommer uten offisiell adresse; dagens referanseliste er
-  adressebasert og er ikke en fullstendig liste over matrikkelenheter.
-- [ ] Vurder NVDB/offisiell veiadapter og avklar driftsløsning ved større bruk.
+- [x] Steg 6, eiendomsgrenser: Åpen WFS/GML-adapter med UTM32-transformasjon,
+  flere flater/hull, alle matrikkelreferanser og kontrollert fullstendighet.
+  Separate tellekall før/etter; avkortede eller for store uttrekk avvises.
+  Kartlag, tabell, detaljer, GeoJSON og tester; liten reell kildekontroll bestod.
+- [x] Teiger uten offisiell adresse hentes nå uavhengig av adresse-API-et.
+  Enheter uten registrert kartgeometri er ikke dekket; dette er dokumentert.
+- [x] NVDB v4 er vurdert. Behold utskiftbar Overpass-adapter for små
+  administratoruttrekk; begrunnelse og offisiell dokumentasjon i kartveiledningen.
+- [ ] Avklar driftsløsning/avtale ved større bruk av veidata.
   Overpass er supplerende og kan ha både tjenestefeil og manglende veigeometri.
-- [ ] Etabler sikker geografisk avgrensning av ukoblede registerposter.
-  Dagens «MISSING_IN_MAP_DATA» gjelder bare valgt utsnitt og kan bety at posten
-  ligger utenfor polygonet; ukjente koordinater skal aldri gjettes.
+- [x] Ukjent plassering vises separat og teller ikke som manglende kartdata.
+  Kjente punkter utenfor utelates; teigkobling merkes som berøring av området,
+  ikke bevist adresseplassering. Samme avgrensning gjelder CSV og nøkkeltall.
 - [ ] Verifiser reell Entra-rolle, delt rate-limit og eksportlogg etter
   publisering med godkjent testgrunnlag; se README. Ingen produksjonsendring
   eller produksjonseksport er utført som del av implementeringen.
-- [ ] Etabler varige nettleser-E2E-tester i et isolert miljø med syntetisk
-  register, inkludert mobil, tastatur, avbryt/redigering under lasting og eksport.
+- [x] Varige Playwright-tester i isolert miljø med syntetisk register, desktop,
+  mobil, tastatur, polygontegning/redigering/sletting, avbryt/redigering under
+  lasting og CSV-nedlasting. Karttjenester er mocket; ingen reelle kartkall.
 
 ## P1 – Prioritet / bør gjøres først
 
@@ -74,9 +85,10 @@ Dette er oppgaver som enten reduserer teknisk risiko, styrker kvaliteten eller l
 
 - [x] **API-tester**
 
-  **Status: Rutetester implementert.** Alle 35 rutefiler under `app/api` og
+  **Status: Rutetester implementert.** Alle 37 rutefiler under `app/api` og
   `app/survey/api` er representert i testpakken. Eksterne tjenester er erstattet
-  med testdobler. Fullt OAuth-forløp, databaseintegrasjon og nettleserflyter gjenstår;
+  med testdobler. Postgres- og nettlesertester er nå også etablert. Fullt OAuth-forløp
+  og plattformverifikasjon gjenstår;
   dette er ikke det samme som full integrasjonsdekning. Se oversikten i
   `docs/quality-review.md`. Prompten nedenfor beholdes som akseptansekriterier.
 
@@ -108,7 +120,7 @@ Dette er oppgaver som enten reduserer teknisk risiko, styrker kvaliteten eller l
   **Status: Enhetstester implementert** i `tests/matrikkel-sync.test.mjs`.
   Feil ved samtidig kansellering og desimal batchstørrelse er rettet etter
   dokumentasjon av funn. Reelle transaksjoner, samtidighet og gjenopptakelse etter
-  worker-krasj gjenstår; se de nye P1-punktene nedenfor.
+  worker-krasj er nå også dekket med isolert Postgres; ekstern deploytest gjenstår.
 
   **Prompt:**
 
@@ -176,7 +188,12 @@ Dette er oppgaver som enten reduserer teknisk risiko, styrker kvaliteten eller l
 
 ### Medlemsregister
 
-- [ ] **Medlemsstatus per tomt**
+- [x] **Medlemsstatus per tomt**
+
+  **Status: Implementert lokalt.** `membership_status` har `member` som trygg
+  standard og `exempt` som eksplisitt unntak. Admin kan endre og filtrere;
+  eksport, survey-tilgang og e-postutvalg kontrollerer status. Køen kontrollerer
+  på nytt før sending. Grunnlaget skal også brukes av nyhetsbrevmodulen.
 
   De fleste tomter skal være ordinære medlemmer av Turufjell vel, men enkelte tomter skal kunne unntas, for eksempel tomter eid av Turufjell AS.
 
@@ -209,7 +226,13 @@ Dette er oppgaver som enten reduserer teknisk risiko, styrker kvaliteten eller l
 
 ---
 
-- [ ] **Samlet e-post når samme e-postadresse brukes på flere tomter**
+- [x] **Samlet e-post når samme e-postadresse brukes på flere tomter**
+
+  **Status: Implementert lokalt.** Én engangslenke per normalisert hoved-e-post,
+  med atomisk deduplisering av samtidige forespørsler. Lenken har et serverbestemt
+  tomteutvalg, kontrollert mot gjeldende hovedkontakt ved bruk. Tomtevelger vises
+  bare ved flere tomter. Ekstra e-post gir ikke ny selvbetjeningstilgang.
+  Overførte/slettede tomter og manipulerte ID-er avvises. Integrasjonstester.
 
   Samme person kan være registrert på flere tomter med samme e-postadresse.
 
@@ -235,7 +258,11 @@ Dette er oppgaver som enten reduserer teknisk risiko, styrker kvaliteten eller l
 
 ---
 
-- [ ] **Vis gruppering når samme e-postadresse tilhører flere tomter**
+- [x] **Vis gruppering når samme e-postadresse tilhører flere tomter**
+
+  **Status: Implementert lokalt.** Hoved- og ekstraadresser normaliseres uten
+  fuzzy matching. Registeret markerer delte adresser; detaljpanelet viser antall,
+  tomter og kontaktpersoner med separate lenker, også på tvers av sideinndeling.
 
   **Prompt:**
 
@@ -277,7 +304,12 @@ Dette er oppgaver som enten reduserer teknisk risiko, styrker kvaliteten eller l
 
 ---
 
-- [ ] **Kommentar ved endring av medlemsopplysninger**
+- [x] **Kommentar ved endring av medlemsopplysninger**
+
+  **Status: Implementert lokalt.** Valgfri kommentar på høyst 2000 tegn følger
+  rettingen/eierskiftet. Den vises som ren tekst i oppgaveliste og medlemshistorikk.
+  Administrator kan kvittere lest uten å slette historikk. Audit-triggere og
+  faktisk lagring er testet i isolert Postgres; eksisterende direkte retting beholdes.
 
   **Prompt:**
 
@@ -301,6 +333,11 @@ Dette er oppgaver som enten reduserer teknisk risiko, styrker kvaliteten eller l
 ---
 
 - [ ] **Reservasjon mot deling med Turufjell AS**
+
+  **Avventer avklaring:** Gjennomgangen fant kontaktfelter, eksport og
+  e-postutsending, men ingen særskilt Turufjell AS-integrasjon eller eksisterende
+  reservasjonsverdi. Koden kan ikke fastslå manuell delingspraksis.
+  Standardverdi og virkning på utvalg må avklares før implementering.
 
   **Prompt:**
 
@@ -326,18 +363,21 @@ Dette er oppgaver som enten reduserer teknisk risiko, styrker kvaliteten eller l
 
 ### Nye P1-punkter fra kvalitetsgjennomgangen
 
-- [ ] **Integrasjonstester mot isolert Postgres:** Bruk schema-only testgren og
-  syntetiske data. Test migrering to ganger, faktiske audittriggere, at token og
-  lagringsnøkler utelates, samtidige engangslenker og survey-svar, endret
-  spørsmålsversjon under innsending og samtidig stopp/arbeid i Matrikkel.
-- [ ] **Gjenopptakelse etter avbrutt worker:** Elementer kan bli stående som
-  `processing` etter krasj/timeout. Utform tidsbegrenset reservasjon, avgrenset
-  retry og test at medlemmer ikke oppdateres flere ganger. Manuell godkjenning
-  og sletting av kjøringslogg trenger også transaksjonstester.
+- [x] **Integrasjonstester mot isolert Postgres:** Lokale tester er etablert
+  med syntetiske data, uten tilgang til Neon-produksjon. Migrering to ganger,
+  audit-aktør, engangslenker, samtidige survey-svar, endret spørsmålsversjon og
+  samtidig Matrikkel-stopp/arbeid, verifiseringshash og lagringsnøkler er testet.
+  CI bruker en separat Postgres-container.
+- [ ] Godkjent Neon-schema-only-verifikasjon før produksjonsmigrering.
+- [x] **Gjenopptakelse etter avbrutt worker:** Implementert tidsbegrenset
+  reservasjon, maksimalt tre behandlingsforsøk og beskyttelse mot gammel worker.
+  Ekte transaksjonstester dekker gjenopptaking, dobbel kjøring, stopp, samtidig
+  manuell godkjenning og loggskjuling med varig aktørlogg.
 - [ ] **Brukerloggens integritet og lagringstid:** Vurder append-only-beskyttelse
   og databaseprivilegier for `audit_log`, samt kontrollert sletting etter
-  avklart lagringstid. Dagens UI er skrivebeskyttet, men tabellen har ikke samme
-  beskyttelse som `security_events`.
+  avklart lagringstid. UPDATE/DELETE/TRUNCATE-beskyttelse er implementert og
+  testet lokalt. Separat runtime-/vedlikeholdsrolle og lagringstid gjenstår;
+  skjemaeier kan deaktivere triggere, og ingen automatisk sletting er innført.
 - [ ] **GitHub-grenbeskyttelse:** Verifiser påkrevd `quality`-sjekk og PR-krav på
   `main`, slik at kvalitetskontrollen faktisk stopper dårlige endringer før
   Netlify publiserer. Ekstern innstilling, ikke utført i denne gjennomgangen.
@@ -350,14 +390,16 @@ Dette er viktige funksjoner som bygger videre på medlemsregisteret og prosjekte
 
 ### Test
 
-- [ ] **UI-tester**
+- [x] **UI-tester**
 
-  **Status: Ikke implementert.** Prioriter komplette nettleserflyter for
-  `SurveyForm`, `MemberSelfServiceEntry`, `MemberSelfServiceProfile`,
-  `AdminMemberRequests`, `AdminMemberDirectory` og `AdminAuditLog`, deretter CMS
-  og e-postpanelet. Test tastatur/fokus, mobil, valideringsfeil, utløpt økt og
-  versjonskonflikt i survey. Rene presentasjonskomponenter trenger ikke tester
-  bare for å øke dekningen. Se `docs/quality-review.md` for avgrensning.
+  **Status: Implementert lokalt.** Playwright kjører isolert appkopi uten `.env`
+  eller produksjonstilgang. 14 scenarier på desktop/mobil dekker survey,
+  medlemsinngang/-profil, oppgaveliste, registerpanel, brukerlogg, CMS,
+  grupper, nyhetsbrev, survey-e-post og kart. Tastatur/fokus, validering,
+  utløpt økt, versjonskonflikt, lagringsfeil, retry og avbrutt lasting er med.
+  Test-fixtures finnes bare i den midlertidige appkopien, aldri i produksjonsbygget.
+  Dette er prioritert regresjonsdekning, ikke full E2E mot Entra, Neon og
+  e-postleverandør. Se `docs/quality-review.md` for avgrensning.
 
   **Prompt:**
 
@@ -382,7 +424,7 @@ Dette er viktige funksjoner som bygger videre på medlemsregisteret og prosjekte
 
 ### Medlemsregister
 
-- [ ] **Søk i brukerendringer**
+- [x] **Søk i brukerendringer**
 
   **Status: Funksjonen implementert.** Brukerloggen har søk i navn, e-post,
   post-ID og før-/etterverdier, filtre på aktør, område, endringstype, status og
@@ -390,9 +432,11 @@ Dette er viktige funksjoner som bygger videre på medlemsregisteret og prosjekte
   SQL-parametere er testet. Ingen ny API-rute er nødvendig; den eksisterende
   serversiden behandler søket.
 
-  **Gjenstår:** Mål store fritekstsøk på syntetiske data og velg eventuell
-  søkeindeks/nøkkelbasert paginering. Dagens JSON-delstrengsøk har ikke egen
-  søkeindeks; ytelse ved stor loggmengde er ikke verifisert.
+  **Målt lokalt:** 100 000 syntetiske loggposter: friteksttelling ca. 140 ms,
+  vanlig søk side 25 ca. 12 ms, aktør/dato ca. 0,3 ms. Dagens indekser beholdes;
+  ingen ekstra søkeindeks eller endret pagineringsmodell er nødvendig på dette
+  testgrunnlaget. Reproduserbart rollback-skript og begrensninger i kvalitetsrapporten.
+  Neon-produksjonsytelse og millionmengder er ikke verifisert.
 
   **Prompt:**
 
@@ -415,7 +459,11 @@ Dette er viktige funksjoner som bygger videre på medlemsregisteret og prosjekte
 
 ---
 
-- [ ] **Grender**
+- [x] **Grender**
+
+  **Status: Implementert lokalt.** Oppretting, navneendring, tilordning/flytting,
+  registerfilter og telling av tomter/medlemmer. Datamodellen gir høyst én grend
+  per tomt. Samtidige flyttinger og sletting uten tap av medlemmer er testet.
 
   **Prompt:**
 
@@ -440,7 +488,12 @@ Dette er viktige funksjoner som bygger videre på medlemsregisteret og prosjekte
 
 ---
 
-- [ ] **E-postgrupper**
+- [x] **E-postgrupper**
+
+  **Status: Implementert lokalt.** Administrasjon på `/admin/members/groups`,
+  enkeltutvalg eller alle søketreff, navneendring, fjerning og trygg sletting.
+  Koblingstabellen dupliserer ingen kontaktdata. Unike e-poster for ordinære
+  medlemmer telles. API-, Postgres- og nettlesertester på desktop/mobil.
 
   **Prompt:**
 
@@ -468,7 +521,12 @@ Dette er viktige funksjoner som bygger videre på medlemsregisteret og prosjekte
 
 ### CMS
 
-- [ ] **Rikteksteditor for artikler**
+- [x] **Rikteksteditor for artikler**
+
+  **Status: Implementert lokalt.** Tiptap med begrenset JSON-format, sanitering
+  på serveren og trygg React-rendering, uten fri HTML. Avsnitt, H2/H3, fet/kursiv,
+  lister, sitater og lenker støttes. Gammel tekst vises fortsatt bokstavelig.
+  Enhets-, Postgres- og nettlesertester dekker sanitering, formatering og lagring.
 
   **Prompt:**
 
@@ -508,7 +566,12 @@ Dette er viktige funksjoner som bygger videre på medlemsregisteret og prosjekte
 
 ### Applikasjon
 
-- [ ] **Favicon**
+- [x] **Favicon**
+
+  **Status: Implementert lokalt.** Eksakt grafisk SVG-del gjenbrukes til PNG
+  via Next ImageResponse: 64 px nettleserikon og 180 px Apple-ikon, med universell
+  lys bakgrunn. Resten av profileringen er uendret. Tidligere ikon er bevart
+  som `public/turufjell-vel-legacy-icon.png`. Generert ikon og bygg er kontrollert.
 
   **Prompt:**
 
@@ -534,15 +597,19 @@ Dette er viktige funksjoner som bygger videre på medlemsregisteret og prosjekte
 
 - [x] Logg generering av medlems- og resultatseksport med aktør, tidspunkt,
   eksporttype, antall poster, utvalg og undersøkelses-ID. Ingen kopi av innholdet.
-- [ ] Samlet hendelsesvisning for testmail, kampanjestart/resend og ferdig/feilet
-  utsending; gjenbruk eksisterende kampanje-/leveringsdata og unngå doble hendelser.
-- [ ] Registrer aktør ved Matrikkel-stopp, manuell godkjenning og skjuling av
+- [x] Samlet hendelsesvisning for testmail, kampanjestart/resend og ferdig/feilet
+  utsending. `admin_activity_log` gjenbruker tidsstempler med stabile hendelses-ID-er.
+  Testmail lagrer bestillende aktør. Mottakere og innhold dupliseres ikke i visningen.
+- [x] Registrer aktør ved Matrikkel-stopp, manuell godkjenning og skjuling av
   kjøringsloggen, slik at revisjonssporet beholdes selv om kjøringen skjules.
-- [ ] Vurder admin-innlogging, avvist tilgang, rolleendringer og medlemmets egen
-  dataeksport som sikkerhetshendelser. Avklar hva Entra allerede logger og hva
-  som faktisk trengs i appen. Ikke logg rå tokens, OAuth-payload eller IP-er her.
-- [ ] Test bakgrunnsfunksjonenes jobbhemmelighet, retry etter timeout, dobbel
-  invocation og delvise e-postfeil uten reelle utsendinger.
+- [x] Vurdert Entra-innlogging/rollelogg og avvist apptilgang. Behold Entra som
+  identitetskilde og eksisterende minimale avvisningshendelser i plattformloggen.
+  Medlemmets egeneksport gir nå én minimal `security_events`-hendelse. Ingen rå
+  tokens, OAuth-payload eller IP-er er lagt til. Begrunnelse i kvalitetsrapporten.
+- [x] Test bakgrunnsfunksjonenes jobbhemmelighet, retry etter timeout, dobbel
+  invocation og delvise e-postfeil uten reelle utsendinger. SQL-låsing og avbrutte
+  leveringer er testet. Usikker levering etter krasj merkes for kontroll, ikke
+  blind ny utsending. Plattformretry må fortsatt verifiseres ved godkjent deploy.
 
 Begrunnelse og sammenligning med GitHub og Microsoft Purview finnes i
 `docs/quality-review.md`. Vanlige sidevisninger er ikke del av brukerloggen.
@@ -555,7 +622,14 @@ Dette er nyttig funksjonalitet, men den er ikke nødvendig for neste versjon og 
 
 ### Nyhetsbrev
 
-- [ ] **Nyhetsbrevkampanjer**
+- [x] **Nyhetsbrevkampanjer**
+
+  **Status: Implementert lokalt.** Utkast med riktekst, gruppeutvalg, forhåndsvisning,
+  mottakertelling, testmail og separat Netlify-bakgrunnsjobb. Innhold og utvalg
+  låses ved oppstart; unike adresser dedupliseres i databasen. Gjeldende medlemsstatus,
+  gruppetilknytning og leveringsreservasjoner kontrolleres før sending. Delvise feil,
+  parallelle starter og usikker levering er testet uten reell utsending.
+  Funksjonen må verifiseres etter godkjent migrering/deploy; se README.
 
   Avhenger av at e-postgrupper er på plass.
 
@@ -599,6 +673,11 @@ Dette er nyttig funksjonalitet, men den er ikke nødvendig for neste versjon og 
 ### Applikasjon
 
 - [ ] **Intern bruksstatistikk**
+
+  **Avventer produkt-/personvernavklaring:** Ingen ny besøksinstrumentering
+  eller identifikator er aktivert. Avklar formål, hvilke grove målinger som
+  faktisk trengs, eventuell sessionsammenkobling og lagringstid først.
+  Teknisk vurdering og foreslått dataminimering er beskrevet i kvalitetsrapporten.
 
   Det er ikke ønskelig å bruke Google Analytics eller andre tredjepartstjenester.
 
@@ -655,7 +734,13 @@ Dette er nyttig funksjonalitet, men den er ikke nødvendig for neste versjon og 
 
 ---
 
-- [ ] **Repository-metadata og prosjektfiler**
+- [x] **Repository-metadata og prosjektfiler**
+
+  **Status: Implementert lokalt.** `.editorconfig`, `CHANGELOG.md`, beskrivelse
+  og repository-URL er lagt til. `private: true` beholdes, med `UNLICENSED`;
+  ingen åpen lisens, CONTRIBUTING eller CODE_OF_CONDUCT er lagt til for dette
+  lille lukkede prosjektet. Foreslåtte GitHub topics er dokumentert i README;
+  ingen eksterne repository-innstillinger er endret.
 
   Repositoryet mangler enkelte standardfiler og metadata.
 
@@ -699,7 +784,7 @@ Eventuelle funn fra sikkerhetsgjennomgangen legges inn som egne P1- eller P2-sak
 
 ## Ferdig
 
-- [x] Rutetester for alle 35 API-rutefiler, inkludert kartmodulen, med de avgrensningene som er dokumentert.
+- [x] Rutetester for alle 37 API-rutefiler, inkludert kart, grupper og nyhetsbrev, med dokumenterte avgrensninger.
 - [x] Egen Matrikkel-testpakke for kontrollflyt, feil, batcher og gjentatt behandling.
 - [x] Rettet overskriving av stoppet Matrikkel-status og desimaltall i batchgrenser.
 - [x] Rettet 400/500 ved manglende roller og tekniske feil; avvis ugyldig JSON
@@ -718,13 +803,13 @@ Eventuelle funn fra sikkerhetsgjennomgangen legges inn som egne P1- eller P2-sak
 # Anbefalt rekkefølge
 
 1. [ ] Databaseintegrasjon, worker-gjenopptakelse og GitHub-grenbeskyttelse
-2. [ ] Samlet tilgang for samme e-post på flere tomter (dagens e-postoppslag avviser flere treff)
-3. [ ] Medlemsstatus per tomt og visuell gruppering av felles e-post
-4. [ ] Kommentar ved endringsforslag
+2. [x] Samlet tilgang for samme hoved-e-post på flere tomter
+3. [x] Medlemsstatus per tomt og visuell gruppering av felles e-post
+4. [x] Kommentar ved endringsforslag
 5. [ ] Avklar praksis/standardverdi for reservasjon mot deling med Turufjell AS
 6. [ ] Brukerloggens integritet, lagringstid og gjenstående administrative hendelser
-7. [ ] Nettlesertester og tester av bakgrunnsjobber
-8. [ ] Ytelsestest av søk i store brukerlogger
-9. [ ] Grender og e-postgrupper
-10. [ ] CMS rikteksteditor og favicon
-11. [ ] Nyhetsbrev, eventuell bruksstatistikk og repository-opprydding
+7. [x] Nettlesertester og tester av bakgrunnsjobber
+8. [x] Ytelsestest av søk i store brukerlogger
+9. [x] Grender og e-postgrupper
+10. [x] CMS rikteksteditor og favicon
+11. [ ] Nyhetsbrev og repository-opprydding er implementert; bruksstatistikk venter på personvernavklaring

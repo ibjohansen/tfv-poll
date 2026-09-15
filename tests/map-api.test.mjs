@@ -84,6 +84,7 @@ async function service({ complete = true, failAudit = false } = {}) {
     } },
     './osm-road-service.js': { findRoadsInPolygon: async () => ({ roads: [] }) },
     './kartverket-property-service.js': { propertiesFromAddresses },
+    './kartverket-boundary-service.js': { findPropertiesInPolygon: async () => ({ boundaries: [], complete: true, fetchedAt: '2026-09-15' }) },
     './register-service.js': { getRegisterProperties: async (options) => { calls.register.push(options); return [{ ...register, owners: ['Internal owner'], emails: ['private@example.invalid'] }]; } },
     './comparison.js': { compareRegisterWithMapData }, './export.js': { addressesCsv, comparisonCsv, mapGeoJson },
   });

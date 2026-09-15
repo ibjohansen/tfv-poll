@@ -1,6 +1,7 @@
 import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
-import { createSurveyEmailCampaign, getSurveyEmailOverview, sendSurveyTestEmail } from '@/lib/survey-email';
+import { createSurveyEmailCampaign, failPendingSurveyEmailCampaign, getSurveyEmailOverview, sendSurveyTestEmail } from '@/lib/survey-email';
+import { dispatchSurveyEmailCampaign } from '@/lib/survey-email-background';
 import { isEmailRateLimited } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -43,16 +44,19 @@ export async function POST(request, { params }) {
     if (!['send', 'resend'].includes(input.action)) return NextResponse.json({ ok: false, message: 'Ugyldig e-posthandling.' }, { status: 400 });
     const result = await createSurveyEmailCampaign(surveyId, { replaceCompleted: input.action === 'resend' });
     let backgroundStarted = false;
-    if (process.env.MAILERSEND_JOB_SECRET && process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === 'production' && ['pending', 'running', 'failed'].includes(result.campaign.status)) {
       try {
-        const response = await fetch(new URL('/.netlify/functions/survey-email-background', request.nextUrl.origin), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-MailerSend-Job-Secret': process.env.MAILERSEND_JOB_SECRET },
-          body: JSON.stringify({ campaignId: result.campaign.id }),
-        });
-        backgroundStarted = response.status === 202 || response.ok;
+        await dispatchSurveyEmailCampaign(result.campaign.id, request.nextUrl.origin);
+        backgroundStarted = true;
       } catch (error) {
         console.error('Survey email background start failed', { campaignId: result.campaign.id, code: error.code, occurredAt: new Date().toISOString() });
+        const campaign = await failPendingSurveyEmailCampaign(result.campaign.id);
+        if (campaign?.status !== 'running' && campaign?.status !== 'completed') {
+          return NextResponse.json({ ok: false, ...result, campaign: campaign || result.campaign, backgroundStarted: false,
+            message: 'Kunne ikke bekrefte oppstart av e-postjobben. Ingen ny utsendelse er bekreftet. Kontroller status før du prøver igjen.' },
+          { status: 503, headers: { 'Cache-Control': 'no-store, private' } });
+        }
+        backgroundStarted = true;
       }
     }
     return NextResponse.json({ ok: true, ...result, backgroundStarted }, { status: result.existing ? 200 : 201, headers: { 'Cache-Control': 'no-store, private' } });

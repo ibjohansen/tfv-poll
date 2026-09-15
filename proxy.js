@@ -4,6 +4,7 @@ import { adminPermissions, isAllowedAdmin, isAuthConfigured } from './lib/admin-
 import { isPublicPath } from './lib/route-access';
 
 function permissionForPath(pathname) {
+  if (pathname.startsWith('/api/admin/member-groups') || pathname.startsWith('/api/admin/newsletters')) return 'members';
   if (pathname.startsWith('/admin/map') || pathname.startsWith('/api/admin/map')) return 'members';
   if (pathname.startsWith('/admin/audit')) return 'audit';
   if (pathname.startsWith('/admin/members/matrikkel') || pathname.startsWith('/api/admin/matrikkel')) return 'matrikkel';
@@ -55,7 +56,7 @@ export async function proxy(request) {
 }
 
 export const config = {
-  // Denne ene maskin-til-maskin-ruten autentiseres med jobbhemmeligheten i
+  // Disse eksakte maskin-til-maskin-rutene autentiseres med jobbhemmeligheten i
   // funksjonen, ikke med nettlesercookie. Ikke åpne hele /.netlify/functions/.
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon.png|\\.netlify/functions/matrikkel-sync-background/?$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon.png|\\.netlify/functions/(?:matrikkel-sync-background|survey-email-background|newsletter-background)/?$).*)'],
 };

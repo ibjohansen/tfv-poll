@@ -23,10 +23,10 @@ export default async function handler(request) {
   let run;
   console.info('Matrikkel background processing started', { runId: input.runId, occurredAt: new Date().toISOString() });
   try {
-    do { run = await processMatrikkelRun(input.runId, { batchSize: 10 }); }
-    while (run?.status === 'running' && Date.now() < deadline);
+    do { run = await processMatrikkelRun(input.runId, { batchSize: 10, deadline }); }
+    while (run?.status === 'running' && !run.workerBusy && Date.now() < deadline);
 
-    if (run?.status === 'running') {
+    if (run?.status === 'running' && !run.workerBusy) {
       await dispatchMatrikkelRun(input.runId, new URL(request.url).origin);
       console.info('Matrikkel background continuation accepted', { runId: input.runId, occurredAt: new Date().toISOString() });
     } else {

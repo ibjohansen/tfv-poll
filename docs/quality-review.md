@@ -1,53 +1,84 @@
 # Kvalitetsgjennomgang – 14.–15. september 2026
 
-## Funn i Matrikkel-flyten, registrert før retting
+## Lokal leveranse og avgrensning
 
-- Oppdateringen til `running` og sluttellingen kontrollerte ikke om en annen
-  forespørsel nettopp hadde stoppet kjøringen. En forsinket worker kunne derfor
-  overskrive `cancelled` med `running` eller `completed`. Feilhåndteringen kunne
-  tilsvarende overskrive status med `failed`. Rettes med vilkår på status i selve
-  SQL-oppdateringen og lesing av gjeldende status hvis oppdateringen ikke treffer.
-- Desimaltall i `batchSize` kunne bli sendt videre som SQL `LIMIT`. Normaliseres
-  til heltall før spørringen.
-- Brå avslutning av en worker kan etterlate elementer som `processing` uten
-  tidsbegrenset reservasjon. Gjenopptakelse av slike kjøringer trenger en egen
-  lease-/retry-løsning og samtidighetstester mot Postgres; se ToDo.
+Endringene er implementert i arbeidskopien. Ingen produksjonsdeploy, push,
+Neon-migrering, Entra-/Netlify-endring eller reell e-postutsending er utført.
+Produksjonskontroller og valg om personvern/drift står fortsatt åpne i ToDo.
 
-Enhetstestene erstatter database og Kartverket med syntetiske implementasjoner.
-De kan bekrefte kontrollflyt og spørringsparametere, men kan ikke bevise låsing,
-transaksjonsisolasjon eller at SQL faktisk kjører i Postgres.
+Implementert:
 
-## Implementert
+- Medlemsstatus, sikker fler-tomtstilgang via felles hoved-e-post, visuell
+  kontaktgruppering, kommentarer med historikk/lest-status, grender og e-postgrupper.
+- CMS-riktekst med begrenset JSON, serversanitering og trygg React-rendering.
+  Eksisterende tekst vises bokstavelig, uten HTML-tolkning.
+- Nyhetsbrevutkast, forhåndsvisning, testmail og deduplisert bakgrunnskø.
+  Ingen åpnings- eller klikksporing.
+- Matrikkel-reservasjoner, gjenopptaking, tidsfrister og watchdog. Oppstart
+  krever direkte 202; samtidige starter serialiseres før snapshot opprettes.
+- Append-only-beskyttelse for brukerlogg, aktør ved sensitive adminhandlinger,
+  samlet e-posthendelsesvisning og minimal sikkerhetshendelse ved egeneksport.
+- Åpen WFS/GML-adapter for teiger, kontrollert koordinattransformasjon,
+  ukoblede registerposter med ukjent plassering utenfor mangeltall.
+- CI med egne Postgres-/nettlesertester, favicon og repository-metadata.
 
-- Rettet uttrekk av `COUNT(*)` i brukerloggen. Resultatet er en radliste; den
-  tidligere destruktureringen ga `undefined` og dermed null treff og én side.
-- Lagt til søk og filtrering i brukerloggen, med bundne SQL-parametere, validerte
-  datointervaller i norsk tid og filtre som følger med ved sidebytte.
-- Registrert genererte medlems- og resultatseksporter med et begrenset sett
-  metadata i den eksisterende loggen. Filen returneres først når logging lykkes.
-- Standardisert feilstatus fra adminruter: validering 400, manglende innlogging
-  401 (enkelte eksisterende modulgrenser bruker 403), manglende rolle 403,
-  ikke funnet 404, konflikt 409, ukjente tekniske feil 500 og enkelte utilgjengelige
-  tjenester 503. JSON må være et objekt. Ugyldig JSON starter ikke en full sync.
-- Kontrollert feilhåndtering ved medlemsverifikasjon og medlemseksport;
-  ugyldige lenker renses fra URL og gamle cookies slettes.
-- Beholdt eksisterende CI og avgrenset push-triggeren til `main`, i tillegg til
-  pull requests. Dokumentert behovet for påkrevd statuskontroll i GitHub.
-- Supplert ren tekst-versjonen av lenke-e-postene med kopier/lim inn-hjelp.
-- Beskyttet survey-snapshot ved spørsmålendringer: skjemaet sender vist versjon,
-  API-et avviser manglende/utdatert versjon, og SQL-innsettingen krever samme
-  versjon som spørsmålsteksten den lagrer. Ved konflikt tilbys ny lasting og
-  gamle svar forkastes. Ingen databaseendring er nødvendig.
+## Konkrete feil funnet og rettet
+
+Opprinnelig Matrikkel-worker kunne overskrive samtidig stopp, og desimal
+batchstørrelse kunne nå SQL LIMIT. Senere kunne en avbrutt worker bli stående
+som processing uten trygg gjenopptaking. Disse feilene er rettet med vilkår
+i SQL, heltallsgrenser, tidsbegrensede worker-token og atomiske oppdateringer.
+
+Et NOT EXISTS-vilkår alene hindret ikke to samtidige Matrikkel-starter.
+Oppretting bruker nå transaksjonslås i en separat spørring før neste
+READ COMMITTED-snapshot. Ekte samtidighetstest bekrefter én kjøring/backup.
+
+Brukerloggens COUNT(*) ble tidligere feil destrukturert. Telling, sideinndeling,
+bundne filterparametere og Oslo-datogrenser er rettet og testet.
+
+Nettlesertester avdekket mobiloverflyt i gruppetabellen og at Tiptaps
+setEditable utløste en innholdsoppdatering ved lagring. Dette markerte et
+lagret nyhetsbrev som endret og sperret forhåndsvisning. Tabellbeholder og
+editorhendelsen er rettet. Bekreftelsesdialoger har tastaturavgrensning,
+Escape, fokusretur og separate tilgjengelighets-ID-er.
+
+Survey-snapshot kontrollerer både klientversjon og gjeldende spørsmål i
+samme SQL-innsetting. Endrede spørsmål gir konflikt, ikke feil snapshot.
+Ny lasting nullstiller tidligere svar.
+
+## Tester
+
+Tre nivåer med ulike garantier:
+
+- `npm run check`: lint, 240 modul-/rutetester og produksjonsbygg.
+  Nettverk og DB erstattes eksplisitt i rutetestene. Fire faktiske
+  bakgrunnsentrypoints importeres også i ren Node uten Auth/produksjonsmiljø.
+- `npm run test:integration`: 33 tester i egen lokal Postgres med syntetiske
+  data. Faktisk migrering to ganger, triggere, før/etter-redaksjon, engangsbruk,
+  samtidige svar, medlemsstatus, kommentarer, flertomtstilgang, grupper,
+  riktekst, kølevering, worker-krasj, stopp, godkjenning og watchdog.
+- `npm run test:e2e`: 14 scenarier i både desktop og mobil (28 kjøringer).
+  Isolert appkopi, ingen .env, ingen DB eller aktive e-postlegitimasjoner.
+  Test-fixture-siden kopieres bare til den midlertidige appen og finnes ikke
+  i produksjonsbygget. Virkelige komponenter brukes, med syntetiske props
+  og simulerte API-svar for sensitive/muterende flyter.
+
+Nettleserdekning: SurveyForm, MemberSelfServiceEntry, MemberSelfServiceProfile,
+AdminMemberRequests, AdminMemberDirectory, AdminAuditLog, CMS-editor,
+AdminMemberGroups, AdminNewsletters, SurveyEmailPanel og MapExplorer.
+Inkluderer tastatur/fokus, mobil, utløp, validering, versjonskonflikt, lagringsfeil,
+retry, kansellert utsending, oppstartsfeil, polygontegning/grenselag og eksport.
+
+Det er ikke full E2E mot ekte Entra, Neon, MailerSend eller Netlify Functions.
+CMS-filopplasting har rutetester, ikke en komplett nettleser-/Object Storage-flyt.
+Safari/Firefox og fysisk mobil er ikke kjørt. Ingen dekningsprosent brukes som
+erstatning for disse avgrensningene.
 
 ## API-dekning
 
-De opprinnelige 33 `route.js`-filene under `app/api` og `app/survey/api` er representert.
-Kartmodulen tilfører to beskyttede ruter (`/api/admin/map/search` og
-`/api/admin/map/export`) med egne rutetester i `tests/map-api.test.mjs`.
-Totalt er dermed 35 rutefiler representert. Se også [kartmodulens testdekning
-og kildevurdering](map-explorer.md).
-Dette er tester av rutefunksjonene og tjenestegrensene, ikke full ende-til-ende-
-dekning av hver underliggende tjeneste.
+Alle 37 route.js-filer under app/api og app/survey/api er representert.
+Dette er rutefunksjons-/tjenestegrensetester, ikke full integrasjonsdekning.
+Kartets tjenester/kilder er dokumentert i [kartveiledningen](map-explorer.md).
 
 | Ruter | Testfil | Dekning |
 | --- | --- | --- |
@@ -62,78 +93,91 @@ dekning av hver underliggende tjeneste.
 | `/api/webhooks/mailersend` | `api-public.test.mjs` | Faktisk HMAC-verifikasjon, endret payload, størrelsesgrense, ugyldig JSON og lagringsfeil |
 | `/api/auth/[...nextauth]` | `api-public.test.mjs` | Kun delegering av GET/POST til Auth.js; OAuth-forløpet må integrasjonstestes |
 | `/api/survey-access/verify`, `/survey/api/responses` | `api-survey.test.mjs` | Cookieutveksling, gyldige svar, øktavgrensning, ugyldige svar, origin, rategrense, honeypot og duplikater |
+| `/api/admin/map/search`, `/api/admin/map/export` | `map-api.test.mjs` | Tilgang, CSRF, body-/tidsgrenser, cache, delvise svar og eksportlogg |
+| `/api/admin/member-groups` | `member-groups.test.mjs` | Input, rolle/origin, CRUD og sikre feil; SQL i integrasjonstestene |
+| `/api/admin/newsletters` | `newsletters.test.mjs` | Input, rettighet/origin, oppstartsfeil; kø og levering i integrasjonstestene |
 
-`admin-access.test.mjs` tester de faktiske servervaktene mot tenant-, allowlist-
-og rollepolicy og at eiendomsidentitet ikke kan endres via kontaktoppdatering.
-`admin-audit.test.mjs` tester telling, sideinndeling, filtervalidering,
-SQL-parametere, eksportmetadata og at eksport krever lagret logghendelse.
+## Hva logges og hvorfor?
 
-`matrikkel-sync.test.mjs` dekker nye kjøringer med snapshot, eksisterende tomter,
-endrede og uendrede data, gjentatt behandling, flere rader for samme eiendom,
-ufullstendige data, manglende adresse, fuzzy-treff, A5 og seksjoner, eksterne feil,
-databasefeil, delvise batcher, slettet medlem og kansellering. Synkroniseringen
-oppdager ikke nye tomter og sletter ikke tomter automatisk; det er derfor ikke
-testet som eksisterende funksjonalitet. Manuell godkjenning og loggsletting er
-dekket på rutenivå; deres transaksjoner trenger egne databasetester.
+[GitHubs administrative hendelser](https://docs.github.com/en/organizations/keeping-your-organization-secure/managing-security-settings-for-your-organization/audit-log-events-for-your-organization)
+og [Microsoft Purviews aktivitetskategorier](https://learn.microsoft.com/en-us/purview/audit-log-activities)
+brukes som mønster for aktør, handling, mål, tidspunkt og resultat, uten å
+kopiere deres omfattende datainnsamling.
 
-Oppfølgingsrettelsen for matrikkeloppstart 15. september er dekket av
-`matrikkel-background.test.mjs` og `matrikkel-proxy.test.mjs`: faktisk
-Next-matcher for det smale ruteunntaket, avvist omdirigering/HTML-200, timeout,
-konfigurasjonsfeil, autentisering med jobbhemmelighet, videresending og trygge
-loggmeldinger. `matrikkel-sync.test.mjs` dekker også betinget feilmarkering som
-bevarer samtidige start/stopp og hindrer en forsinket worker i å behandle en
-feilmarkert kjøring. Databasen og nettverket er fortsatt simulert. Verifisering
-av den pakkede funksjonen i Netlify, overvåking etter `202` og gjenopptakelse
-etter worker-krasj gjenstår; en grønn Next-build tester ikke Netlify-pakkingen.
-
-## Hva bør logges?
-
-GitHub dokumenterer administrative handlinger som tilgangsendringer,
-konfigurasjonsendringer og eksport av revisjonslogg, med aktør, handling og
-tidspunkt. Microsoft Purview har tilsvarende hendelser for administrasjon,
-filer og deling. Dette er et nyttig mønster for denne appen, uten at vi trenger
-alle datafeltene disse produktene samler inn. Kilder:
-[GitHub-hendelser](https://docs.github.com/en/organizations/keeping-your-organization-secure/managing-security-settings-for-your-organization/audit-log-events-for-your-organization),
-[Purview-hendelser](https://learn.microsoft.com/en-us/purview/audit-log-activities),
-[søk i Purview](https://learn.microsoft.com/en-us/purview/audit-search).
-
-| Hendelse | Nåværende dekning / anbefaling |
+| Hendelse | Løsning |
 | --- | --- |
-| Endring av medlemmer, henvendelser, undersøkelser, svar og CMS | Eksisterende databasetriggere med aktør og før/etter. Behold. |
-| Eksport av medlemsregister og resultater | Implementert nå med aktør, antall, type og utvalg. Ingen kopi av eksportinnhold. |
-| Medlemslenker, tokenforbruk, e-postbytte, utlogging og rategrense | Flere hendelser ligger allerede i `security_events`. Unngå å kopiere dem som rå persondata til brukerloggen. |
-| Testmail, kampanjestart, resend og avsluttet/feilet kjøring | Kampanjer og leveranser har egne tabeller. Legg senere til en samlet hendelsesvisning med referanse, aktør, resultat og antall; unngå dublering per mottaker. |
-| Matrikkel-start, stopp, manuell godkjenning og skjuling av kjøringslogg | Kjøringene og endringene finnes delvis i egne logger. Registrer eksplisitt hvem som stopper/godkjenner/skjuler, og la revisjonssporet overleve skjuling. |
-| Admin-innlogging, avvist tilgang og rolleendring | Innlogging/rolleadministrasjon håndteres i Entra. Avklar kobling til Entra-loggen; eventuelle apphendelser bør ha resultat og stabil aktør-ID, uten OAuth-payload. |
-| Medlemmets eksport av egne data | Aktuelt som én hendelse i `security_events`, med medlems-ID og resultat, uten hele profilen. |
-| Vanlig lesing, sidevisninger, IP og nettleserfingeravtrykk | Ikke lagt til. Dette er ikke nødvendig for endringshistorikken; eventuell bruksstatistikk er et separat produktvalg. |
+| Medlems-/henvendelses-/CMS-/surveyendringer | Eksisterende audit-triggere, utvidet med profilkommentarer. Hemmeligheter redigeres bort. |
+| Grender og e-postgrupper | Aktør, gruppe-ID/type og antall. Ingen kopiert medlemsliste i hendelsen. |
+| Medlems-/resultat-/kart-eksport | Aktør, type, antall og utvalg. Ingen eksportinnhold. Loggfeil stopper levering. |
+| Medlemmets egeneksport | Én security_events-hendelse for valgt tomt; ingen kopi av profilen. |
+| Matrikkel-stopp, godkjenning og skjuling | Varig aktørhendelse i audit_log; overlever skjuling av kjøringen. |
+| Kampanje/testmail | admin_activity_log viser metadata fra kampanjer/leveranser og bestillende aktør. Ingen e-postadresser eller innhold kopieres til visningen. |
+| Admin-innlogging og rolle-/tilgangsendringer i identitetsplattformen | Entra-logger beholdes som kilde; ingen lokal kopi av OAuth-payload eller identitetshistorikk. |
+| Avvist apptilgang | Eksisterende proxy-hendelse med område, resultat og tidspunkt. Ingen rå IP, token eller medlemsfelt. |
+| Vanlig lesing/sidevisning | Ikke del av brukerloggen; bruksstatistikk er et separat uavklart produktvalg. |
 
-`audit_log` er skrivebeskyttet i grensesnittet, men har ikke samme append-only-
-trigger som `security_events`. En egen databaseendring bør vurdere rettigheter,
-beskyttelse mot endring/sletting og en kontrollert løsning for vedtatt lagringstid.
-Ikke innfør automatisk sletting eller ny innsamling av persondata uten avklart behov.
+Entra dokumenterer [innloggingshendelser](https://learn.microsoft.com/en-us/entra/identity/monitoring-health/concept-sign-ins)
+og [audit av blant annet brukere, grupper og apper](https://learn.microsoft.com/en-us/entra/identity/monitoring-health/concept-audit-logs).
+En avvisning fra appens egen rollepolicy er ikke det samme som en mislykket
+Entra-innlogging; derfor beholdes den minimale apphendelsen. Vi har ikke
+verifisert tilgang/lagringstid for den faktiske tenantens logger.
 
-## Neste tester og avklaringer
+admin_activity_log er en avledet visning av nåværende kampanje-/leveringstider,
+ikke et uforanderlig snapshot av hvert gjenopptakingsforsøk. audit_log har nå
+UPDATE/DELETE/TRUNCATE-vern, men skjemaeieren kan deaktivere triggere. Separat
+runtime-/vedlikeholdsrolle og vedtatt lagringstid krever ekstern avklaring.
+Ingen automatisk sletting eller endring av produksjonsrettigheter er innført.
 
-1. Postgres-integrasjon i en schema-only testgren med syntetiske data: kjør
-   migreringen to ganger; test faktiske audittriggere, før/etterverdier uten
-   hemmeligheter, samtidig tokenforbruk, duplikatsvar og Matrikkel-stopp.
-2. Survey-versjon mens skjemaet er åpent: versjonskontrollen er implementert og
-   enhetstestet. Bekreft også mot faktisk Postgres at endrede spørsmål under
-   innsending aldri gir feil snapshot, og test ny lasting av skjemaet i nettleser.
-3. E-postkø og bakgrunnsfunksjoner: autentisering av jobbhemmelighet, retry etter
-   timeout, dobbel invocation, leveringsfeil og idempotens. Ikke send ekte e-post.
-4. Nettlesertester for de viktigste brukerreisene: personlig lenke, utløp og
-   utlogging, kontaktendring/e-postbytte, medlemsbehandling, survey og CMS-upload.
-   Ta med tastatur, fokus, feilfeedback og mobilbredde. Ingen automatiserte
-   React-/nettlesertester er lagt til i denne endringen.
-5. Søk i store brukerlogger: mål `EXPLAIN` på syntetiske data før valg av
-   søkeindeks eller nøkkelbasert paginering. Dagens dato-/aktørfiltre kan benytte
-   eksisterende indekser; fritekstsøket er et delstrengsøk i JSON-verdiene og har
-   ikke egen søkeindeks. Ytelsen ved stor loggmengde er ikke verifisert.
-6. Flere tomter per e-post: dagens oppslag krever ett treff, slik at e-postsøk
-   med flere treff ikke sender lenke. Ny tilgangsmodell må teste både felles
-   oversikt og at et e-postbytte aldri gir videre tilgang til feil tomt.
+## Søk ved større loggmengder
 
-Reservering mot deling med Turufjell AS krever avklaring av eksisterende praksis
-og standardverdi, slik ToDo beskriver. Den er ikke innført som en antakelse.
+`scripts/benchmark-audit.mjs` bruker den samme låste testdatabaseavgrensningen
+som integrasjonstestene. Den legger til 100 000 syntetiske poster i en
+transaksjon, kjører EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) mot den faktiske
+admin_activity_log-visningen, og ruller alle målepostene tilbake.
+
+Målt på lokal Postgres 17.4, 15.09.2026:
+
+| Spørring | DB-tid | Plan |
+| --- | ---: | --- |
+| Sjelden delstreng, telling | 140,2 ms | Parallell sekvensiell gjennomgang |
+| Vanlig delstreng, side 25 | 11,7 ms | Indeks og inkrementell sortering, LIMIT/OFFSET |
+| Aktør og siste døgn, første side | 0,3 ms | Indeks og inkrementell sortering |
+
+Dagens indekser og paginering beholdes på dette grunnlaget. Friteksttelling er
+fortsatt lineær i loggmengden; det er ikke lagt til pg_trgm eller duplisert
+persondata i en søkekolonne. Målingen er lokal og hovedsakelig varm cache,
+uten Neon-nettverk, samtidighetslast eller millioner av rader. Ved målt treghet
+i større volum bør trigramindeks og nøkkelbasert navigasjon vurderes på nytt.
+
+## Uavklarte produktvalg
+
+Reservasjon mot Turufjell AS: gjennomgangen fant kontaktfelter, admin-/kart-
+eksport og e-postutsending, men ingen egen integrasjon eller eksisterende
+reservasjonsverdi. Koden viser ikke dagens manuelle delingspraksis. ToDo krever
+at denne og standardverdien avklares først. Ingen antatt ja/nei-verdi er innført.
+
+Intern bruksstatistikk: implementering er utsatt til formål, datagrunnlag og
+lagringstid er valgt. Et minimert forslag er dagsaggregater per tillatt
+sidetype, uten rå URL/query, personlige lenker, medlems-ID eller rå referrer.
+Nettleser/OS bør eventuelt være grove kategorier og viewport faste intervaller,
+ikke eksakte dimensjoner. Sammenkobling av disse dimensjonene kan øke
+identifiserbarhet og bør ikke innføres som standard.
+
+Enkeltvisninger kan telles uten varig besøks-ID. Pålitelige besøkstall,
+navigasjonsforløp og besøkstid krever mer sammenkobling; sideavslutning og
+varighet kan ikke måles fullstendig når fanen/appen termineres eller nettverket
+forsvinner. Ikke presenter estimater som presise tall. Rå referrer og URL-query
+kan røpe personlige lenker. Ingen instrumentering, cookies eller ny innsamling
+er aktivert, og ingen foreslått lagringstid er behandlet som vedtatt.
+
+## Ekstern verifikasjon som fortsatt krever godkjenning
+
+- Isolert Neon schema-only-test før produksjonsmigrering.
+- GitHub-påkrevd quality-status og PR-krav; workflow-filen setter ikke dette.
+- Netlify-pakking, faktisk workerstart/watchdog og test av H-nummer 25.
+- Reell Entra-rolle, delt ratebegrensning og eksportlogg med godkjent testgrunnlag.
+- Lagringstid/privilegier og eventuell større driftsavtale for veidata.
+
+Produksjonsprosedyren i README er oppdatert med nye ruter, funksjoner og
+skjemaendringer. Den må følges før publisering; grønne lokale tester er ikke
+en godkjenning til å utføre eksterne endringer.

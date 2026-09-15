@@ -8,7 +8,7 @@ import * as cmsValidation from '../lib/cms-validation.js';
 import * as webhookUtils from '../lib/mailersend-webhook.js';
 
 const secret = 'a'.repeat(64);
-const methods = ['requestMemberAccess', 'verifyMemberAccess', 'verifyMemberEmailChange', 'createMembershipRequest', 'verifyMembershipRequest', 'getMemberSelfServiceProfile', 'updateMemberSelfServiceProfile', 'requestMemberEmailChange', 'createOwnershipTransferRequest', 'revokeMemberSession'];
+const methods = ['requestMemberAccess', 'verifyMemberAccess', 'verifyMemberEmailChange', 'createMembershipRequest', 'verifyMembershipRequest', 'getMemberSelfServiceProfile', 'getMemberSelfServiceExport', 'updateMemberSelfServiceProfile', 'requestMemberEmailChange', 'createOwnershipTransferRequest', 'revokeMemberSession'];
 async function memberRoute(path) {
   const state = { result: null, error: null, limited: false, sharedLimited: false, cookie: secret };
   const calls = [], callbacks = [];

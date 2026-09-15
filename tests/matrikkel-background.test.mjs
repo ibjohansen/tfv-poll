@@ -224,7 +224,10 @@ test('authorized worker processes the run and logs only job metadata', async () 
   const { worker, state } = await setupWorker();
   assert.equal(worker.config.background, true);
   assert.equal((await worker.default(workerRequest())).status, 204);
-  assert.deepEqual(state.processed, [[runId, { batchSize: 10 }]]);
+  assert.equal(state.processed.length, 1);
+  assert.equal(state.processed[0][0], runId);
+  assert.equal(state.processed[0][1].batchSize, 10);
+  assert.equal(typeof state.processed[0][1].deadline, 'number');
   assert.equal(state.continuations.length, 0);
   assert.match(JSON.stringify(state.logs), /processing started/);
   assert.match(JSON.stringify(state.logs), /processing finished/);

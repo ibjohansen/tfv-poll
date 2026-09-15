@@ -50,6 +50,7 @@ export default function SurveyEmailPanel({ surveyId, adminEmail }) {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...extra }),
       });
       const body = await response.json();
+      if (body.campaign) setOverview((current) => current ? { ...current, campaign: body.campaign } : current);
       if (!response.ok || !body.ok) throw new Error(body.message || 'E-posthandlingen feilet.');
       setMessage(action === 'test' ? `${body.delivery.recipientCount} ${body.delivery.recipientCount === 1 ? 'testmail er' : 'testmailer er'} akseptert av MailerSend.` : body.backgroundStarted ? 'Utsendelsen er startet.' : 'Utsendelsen er opprettet, men bakgrunnsjobben startet ikke. Kontroller Netlify-oppsettet.');
       await load();
