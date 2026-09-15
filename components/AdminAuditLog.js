@@ -47,7 +47,7 @@ function entityLabel(entry) {
   if (entry.table_name === 'surveys') return value.title || `Undersøkelse #${entry.row_id}`;
   if (entry.table_name === 'survey_responses') return `Svar #${entry.row_id}`;
   if (entry.table_name === 'cms_pages') return value.title || `Webside #${entry.row_id}`;
-  if (entry.table_name === 'admin_actions') return value.action === 'member_export' ? 'Medlemsregister eksportert' : 'Undersøkelsesresultater eksportert';
+  if (entry.table_name === 'admin_actions') return ({ member_export: 'Medlemsregister eksportert', survey_results_export: 'Undersøkelsesresultater eksportert', map_export: 'Kart-/registerrapport eksportert' })[value.action] || 'Administrativ handling';
   return value.original_filename || `Vedlegg #${entry.row_id}`;
 }
 

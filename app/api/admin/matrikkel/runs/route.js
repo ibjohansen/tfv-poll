@@ -1,6 +1,7 @@
 import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
-import { createMatrikkelRun, getMatrikkelRun, getMatrikkelRuns } from '@/lib/matrikkel-sync';
+import { createMatrikkelRun, failPendingMatrikkelRun, getMatrikkelRun, getMatrikkelRuns } from '@/lib/matrikkel-sync';
+import { dispatchMatrikkelRun } from '@/lib/matrikkel-background';
 
 export const runtime = 'nodejs';
 
@@ -25,16 +26,24 @@ export async function POST(request) {
   if (!sameOrigin(request)) return NextResponse.json({ ok: false, message: 'Ugyldig forespørsel.' }, { status: 403 });
   try {
     const input = await readJsonObject(request);
-    const run = await createMatrikkelRun({ hNumber: input.hNumber });
+    let run = await createMatrikkelRun({ hNumber: input.hNumber });
     let backgroundStarted = false;
-    if (process.env.MATRIKKEL_JOB_SECRET && process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === 'production' && run.status === 'pending') {
       try {
-        const response = await fetch(new URL('/.netlify/functions/matrikkel-sync-background', request.nextUrl.origin), {
-          method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Matrikkel-Job-Secret': process.env.MATRIKKEL_JOB_SECRET },
-          body: JSON.stringify({ runId: run.id }),
-        });
-        backgroundStarted = response.status === 202 || response.ok;
-      } catch (error) { console.error('Matrikkel background start failed', { runId: run.id, message: error.message }); }
+        await dispatchMatrikkelRun(run.id, request.nextUrl.origin);
+        backgroundStarted = true;
+      } catch (error) {
+        console.error('Matrikkel background dispatch failed', { runId: run.id, code: error.code, status: error.status, occurredAt: new Date().toISOString() });
+        run = { ...run, ...await failPendingMatrikkelRun(run.id) };
+        if (run.status === 'failed' || run.status === 'pending') {
+          return NextResponse.json({ ok: false, run, backgroundStarted: false,
+            message: run.error_message || 'Kunne ikke bekrefte oppstart. Kontroller kjørestatus før du prøver igjen.',
+          }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+        }
+        // Worker kan ha startet selv om kvitteringen gikk tapt. Ikke start
+        // en ekstra behandling fra nettleseren eller overskriv kjørestatus.
+        backgroundStarted = run.status === 'running';
+      }
     }
     return NextResponse.json({ ok: true, run, backgroundStarted }, { status: 201, headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {

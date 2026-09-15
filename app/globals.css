@@ -1,4 +1,51 @@
 @import "tailwindcss";
+
+/* Kartmodulen bruker samme knapper, typografi og farger som resten av admin. */
+.map-explorer { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; min-width: 0; }
+.map-explorer-canvas { height: min(60vh, 640px); min-height: 350px; width: 100%; border: 1px solid #d7d2c9; border-radius: 12px; z-index: 0; }
+.map-actions, .map-layer-controls { display: flex; flex-wrap: wrap; gap: .65rem 1rem; align-items: center; }
+.map-layer-controls { border: 1px solid #d7d2c9; border-radius: 10px; padding: .75rem 1rem; }
+.map-layer-controls label { display: flex; align-items: center; gap: .35rem; min-height: 36px; }
+.map-drawing-controls { display: grid; gap: .65rem; }
+.map-coordinate-list { max-height: 300px; overflow: auto; padding: .5rem 1.5rem; }
+.map-coordinate-list li { display: flex; flex-wrap: wrap; align-items: end; gap: .5rem; margin: .75rem 0; }
+.map-coordinate-list label { display: grid; gap: .25rem; }
+.map-coordinate-list input { max-width: 150px; border: 1px solid #b8ad9f; border-radius: 6px; padding: .45rem; }
+.map-vertex { border: 2px solid #705338; border-radius: 50%; background: white; color: #352616; font: bold 12px/22px sans-serif; text-align: center; }
+.map-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .75rem; }
+.map-summary > div { display: grid; gap: .25rem; background: #fff; border: 1px solid #e0d9cf; border-radius: 10px; padding: .85rem; }
+.map-summary strong { font-size: 1.6rem; color: #493f39; }
+.map-summary span, .map-source-note { font-size: .85rem; }
+.map-results { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; min-width: 0; }
+.map-results > * { min-width: 0; }
+.map-actions .admin-button { max-width: 100%; white-space: normal; }
+.map-results input, .map-results select { border: 1px solid #b8ad9f; border-radius: 6px; padding: .5rem; max-width: 100%; background: white; }
+.map-results label { display: grid; gap: .25rem; }
+.map-actions button[aria-pressed="true"] { background: #493f39; color: white; }
+.map-table-scroll { overflow: auto; min-width: 0; max-width: 100%; border: 1px solid #e0d9cf; border-radius: 10px; max-height: 600px; }
+.map-results-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+.map-results-table caption { text-align: left; padding: .75rem; color: #665950; }
+.map-results-table th, .map-results-table td { text-align: left; vertical-align: top; padding: .75rem; border-bottom: 1px solid #e0d9cf; min-width: 100px; }
+.map-results-table th { background: #f4f0e9; }
+.map-results-table td { background: white; overflow-wrap: anywhere; }
+.map-row-link { text-align: left; color: #365966; text-decoration: underline; text-underline-offset: 3px; min-height: 32px; cursor: pointer; }
+.map-status { font-size: .75rem; font-weight: 600; }
+.map-status.is-conflict { color: #99321d; }
+.map-status.is-match { color: #326145; }
+.map-status.is-possible_match { color: #795000; }
+.map-object-details { border: 1px solid #c7b9a9; background: #fff; border-radius: 10px; padding: 1rem; }
+.map-object-details dl { display: grid; grid-template-columns: minmax(100px, 1fr) 2fr; gap: .4rem 1rem; }
+.map-object-details h2, .map-object-details h3 { font-weight: 600; }
+.map-register-detail { margin-top: .75rem; border-top: 1px solid #e0d9cf; padding-top: .75rem; }
+.map-warning { border-left: 3px solid #a97526; padding: .5rem .75rem; background: #faf5e9; }
+.map-exports { display: grid; gap: .65rem; }
+.map-explorer .muted { font-size: .85rem; color: #665950; }
+.map-explorer button:focus-visible, .map-explorer input:focus-visible, .map-explorer select:focus-visible { outline: 2px solid #20636c; outline-offset: 3px; }
+@media (max-width: 640px) {
+  .map-explorer-canvas { min-height: 360px; height: 52vh; }
+  .map-actions .admin-button { min-height: 44px; }
+  .map-object-details dl { grid-template-columns: 1fr; }
+}
 @config "../tailwind.config.js";
 @source inline("inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center transition-all duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-base rounded-md py-2.5 px-5 shadow-sm hover:shadow-lg bg-primary border-primary text-primary-foreground hover:bg-primary-light hover:border-primary-light");
 

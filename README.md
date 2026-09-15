@@ -457,6 +457,16 @@ Dette bruker dagens skjema og krever ingen ny migrering eller miljøvariabel.
 
 ## Produksjonssetting: Netlify + Neon + Microsoft Entra ID
 
+Kartmodulen ligger på `/admin/map`, med beskyttede Node-ruter
+`POST /api/admin/map/search` og `POST /api/admin/map/export`. De bruker eksisterende
+`members`-rettighet og pooled databaseforbindelse; ingen nye miljøvariabler,
+Entra-roller, bakgrunnsfunksjoner eller skjemamigreringer trengs.
+Node må kunne nå `ws.geonorge.no` og `overpass-api.de` over HTTPS, og nettleseren
+må kunne hente kartbilder fra `cache.kartverket.no`. CSP er utvidet kun for
+denne bildekilden. Sørg for passende delt/WAF-rate-limit på de to rutene ved
+produksjonsbruk; den lokale 20/minutt-grensen er bare per-instans.
+Se [kartmodulens datakilder, begrensninger og bruk](docs/map-explorer.md).
+
 `netlify.toml` inneholder byggkommando, publiseringsmappe, Node-versjon og
 funksjonsmappe. Netlify håndterer Next.js App Router gjennom sin Next.js-adapter,
 mens den lange matrikkelsynkroniseringen kjøres som en Netlify Background
@@ -623,6 +633,9 @@ openssl rand -base64 32
 | `MATRIKKEL_JOB_SECRET` | En annen unik hemmelighet på minst 32 bytes |
 
 Generer `MATRIKKEL_JOB_SECRET` separat; ikke bruk samme verdi som `AUTH_SECRET`.
+Den samme verdien må være tilgjengelig for både Next.js-ruten og
+`matrikkel-sync-background` i produksjonens Functions-scope. Ingen ny
+miljøvariabel eller databasemigrering trengs for oppstartsrettelsen.
 
 #### Påkrevd for MailerSend
 
@@ -725,6 +738,24 @@ Utfør kontrollene i denne rekkefølgen:
   venstre, og at loginbildet viser et vesentlig bredere utsnitt uten å miste
   fokuspunktet.
 - Åpne `/admin` i et privat vindu og kontroller at du sendes til innlogging.
+- Åpne `/admin/map` med medlemsadministrator. Tegn, rediger og slett et lite
+  polygon ved Turufjell; kontroller areal, bakgrunnskart, adressepunkter, veier,
+  lagvalg, tabellsøk og zoom fra tabellrad, også på mobil og med tastatur.
+  Kontroller at redigering/sletting fjerner gamle resultater, også under lasting.
+- Kontroller at begge `/api/admin/map/*`-rutene svarer 401 uten sesjon og 403
+  med rolle uten `members`-rettighet. Test feil fra ekstern karttjeneste og
+  retry i isolert miljø. Kontroller at ufullstendige adressedata ikke gir en
+  sammenligningsrapport med falske «mangler»-tall.
+- Kontroller registersammenligningen med kjent testgrunnlag, inkludert ulike
+  gnr/bnr på samme adresse, seksjonsnummer og flere kandidater. «Uten treff i
+  kartutsnittet» kan bety utenfor polygonet, ikke at Kartverket mangler adressen.
+  Sammenligningen skal aldri endre registeret. Fullstendige eiendomsgrenser og
+  eiendommer uten adresse er ikke implementert.
+- Med godkjent testgrunnlag: kontroller adresse-CSV, sammenlignings-CSV og GeoJSON
+  samt kopiering. Bare sammenlignings-CSV skal ha interne kontaktopplysninger;
+  GeoJSON skal ikke ha medlemmer, e-post, telefon eller tilgangslenker.
+  Kart-/registereksport skal vises i brukerloggen med aktør, format og antall,
+  uten eksportinnhold. Oppbevar eventuell kontaktfil sikkert og slett etter test.
 - Logg inn med en godkjent administratorkonto og kontroller modulene Medlemsregister,
   Oppgaveliste, Undersøkelser, Web og Brukerendringer. Velg et medlem med gateadresse, og kontroller
   at eiendomskartet er lukket under adressefeltet i detaljpanelet og kan åpnes.
@@ -768,6 +799,21 @@ Utfør kontrollene i denne rekkefølgen:
 - Kjør bare **Test H-nummer 25** i matrikkelmodulen. Kontroller logg og resultat
   før en full matrikkelkjøring startes. Test samtidig stopp og bakgrunnsarbeid
   i isolert testmiljø først; en stoppet kjøring skal beholde statusen etterpå.
+- For matrikkeljobben: kontroller at funksjonskallet går direkte til
+  `/.netlify/functions/matrikkel-sync-background`, uten `Location: /admin/login`.
+  Bare denne eksakte funksjonsruten skal omgå Next-innlogging; `/admin` og
+  `/api/admin/matrikkel/*` skal fortsatt kreve innlogging og riktig rolle.
+  Jobbhemmeligheten kontrolleres inne i funksjonen før databasebehandling.
+- Kontroller at et godkjent oppstartskall mottar `202`, og deretter at
+  `started_at` og behandlede poster faktisk oppdateres. I Netlify-funksjonsloggen
+  skal `Matrikkel background processing started` og en avslutning/feil vises.
+  `202` er bare kvittering for mottatt oppdrag, ikke en fullført tilgangskontroll
+  eller bekreftelse på startet behandling.
+- I isolert miljø: simuler `200` med innloggings-HTML, `307`, timeout og manglende
+  jobbhemmelighet. API-et skal svare `503` med tydelig melding, og en fortsatt
+  ventende kjøring skal få `failed` uten endrede medlemmer eller slettet snapshot.
+  En allerede startet/stoppet kjøring skal ikke overskrives. Feilen skal vises
+  også etter ny sidevisning; nettleseren skal ikke starte reservebehandling.
 - Kontroller at `/api/admin/surveys` returnerer `401` uten innlogget sesjon.
 - Kontroller at `/api/admin/member-requests/<id>` returnerer `401` uten
   innlogget sesjon, og at `/mine-opplysninger` ikke viser data uten gyldig cookie.
@@ -1025,6 +1071,30 @@ inn normalt, uten denne escapingen.
 Ingen av variablene skal ha `NEXT_PUBLIC_`-prefiks. `MATRIKKEL_JOB_SECRET`
 brukes bare til å autentisere den interne bakgrunnsjobben. Prodtest avvises som
 standard; ved en bevisst lokal test kan `MATRIKKEL_ALLOW_PRODTEST=true` settes.
+
+Oppstart og videreføring bruker `lib/matrikkel-background.js`: HTTPS, ingen
+omdirigeringer, 10 sekunders timeout og bare HTTP `202` som gyldig kvittering.
+Next-proxyens matcher unntar kun den eksakte matrikkelfunksjonen (og eventuell
+avsluttende skråstrek) fra cookieinnlogging. Funksjonen krever fortsatt POST,
+korrekt jobbhemmelighet og gyldig jobb-ID; admin-API-et beholder rollebeskyttelsen.
+Dette unngår feilen der en omdirigering til innlogging ga HTML med `200` som
+ble tolket som «jobb startet» uten at noen behandling skjedde.
+
+Ved avvist/ubekreftet oppstart markeres bare en fortsatt ventende, ikke startet
+kjøring som feilet. Snapshot beholdes og nye forsøk kan opprettes; en worker
+som kommer senere, skal ikke behandle den feilmarkerte kjøringen. Dersom worker
+allerede har startet, beholdes statusen. Nettleserbasert reservebehandling brukes
+bare i utvikling, aldri ved produksjonsfeil. Jobbens videresending bruker samme
+verifiserte oppstart mot gjeldende deploys origin.
+
+Feilsøking: Ved tom funksjonslogg, kontroller rutingen før Matrikkel-API-et.
+Oppstartsfeil logges som `Matrikkel background dispatch failed` i Next-funksjonen
+med jobb-ID, feilkode og eventuell HTTP-status. Worker logger start, avslutning,
+autentiseringsavvisning og videreføring uten medlemsdata eller hemmeligheter.
+Netlify kan returnere `202` før worker avviser et kall; kontroller derfor alltid
+lagret fremdrift og funksjonsloggen. Hvis en akseptert jobb aldri starter eller
+worker blir avbrutt, bruk **Stopp kjøring** og undersøk årsaken før nytt forsøk.
+Automatisk overvåking/gjenopptakelse gjenstår; se ToDo.
 
 Oppslaget bruker `street_address` som eneste søkenøkkel og kan bare skrive:
 

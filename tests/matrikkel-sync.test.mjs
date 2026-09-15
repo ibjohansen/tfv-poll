@@ -17,6 +17,15 @@ async function setup(options = {}) {
     const query = strings.join('?');
     state.queries.push({ query, values });
     if (state.databaseFailure?.(query)) throw new Error('Database unavailable');
+    if (query.includes("AND status = 'pending' AND started_at IS NULL")) {
+      if (!state.run || state.run.status !== 'pending' || state.run.started_at || state.run.deleted_at) return [];
+      state.run.status = 'failed';
+      state.run.error_message = 'Bakgrunnsjobben kunne ikke startes.';
+      return [{ ...state.run }];
+    }
+    if (query.includes('SELECT id, status FROM matrikkel_sync_runs') && query.includes('deleted_at IS NULL')) {
+      return state.run && !state.run.deleted_at ? [{ ...state.run }] : [];
+    }
     if (query.includes('WITH created AS')) return state.createConflict ? [] : [{ ...state.run, backup_count: state.members.length }];
     if (query.includes('SELECT id, status, requested_by')) return state.run ? [{ ...state.run }] : [];
     if (query.includes("started_at = COALESCE")) {
@@ -115,6 +124,47 @@ test('permission and mock checks happen before database access', async () => {
     const { api, state } = await setup(options);
     await assert.rejects(api.createMatrikkelRun());
     assert.equal(state.queries.length, 0);
+  }
+});
+
+test('failed dispatch marks only an unstarted pending run failed and preserves members and backups', async () => {
+  const { api, state } = await setup();
+  assert.equal((await api.failPendingMatrikkelRun(runId)).status, 'failed');
+  assert.deepEqual(state.members, [member]);
+  assert.equal(state.items.size, 0);
+  assert.equal(state.queries.length, 1);
+  const query = state.queries[0];
+  assert.match(query.query, /status = 'pending' AND started_at IS NULL AND deleted_at IS NULL/);
+  assert.match(query.query, /completed_at = NOW\(\)/);
+  assert.doesNotMatch(query.query, /UPDATE members|DELETE|UPDATE matrikkel_sync_items/);
+  assert.deepEqual(query.values, [runId]);
+  assert.equal((await api.processMatrikkelRun(runId)).status, 'failed', 'late worker must not process a failed start');
+  assert.equal(state.lookups.length, 0);
+});
+
+test('dispatch failure preserves concurrent processing and terminal states', async () => {
+  for (const status of ['running', 'completed', 'cancelled', 'failed']) {
+    const { api, state } = await setup();
+    state.run.status = status;
+    assert.equal((await api.failPendingMatrikkelRun(runId)).status, status);
+    assert.equal(state.queries.length, 2);
+    assert.deepEqual(state.members, [member]);
+  }
+  const { api, state } = await setup();
+  state.run.started_at = '2026-09-15T12:00:00Z';
+  assert.equal((await api.failPendingMatrikkelRun(runId)).status, 'pending');
+});
+
+test('dispatch failure status helper requires permission and rejects invalid, missing or deleted runs', async () => {
+  const denied = await setup({ denied: true });
+  await assert.rejects(denied.api.failPendingMatrikkelRun(runId), /Unauthorized/);
+  assert.equal(denied.state.queries.length, 0);
+  const invalid = await setup();
+  await assert.rejects(invalid.api.failPendingMatrikkelRun('../invalid'), /Invalid run ID/);
+  assert.equal(invalid.state.queries.length, 0);
+  for (const run of [null, { id: runId, status: 'pending', deleted_at: '2026-09-15T12:00:00Z' }]) {
+    const { api } = await setup({ run });
+    await assert.rejects(api.failPendingMatrikkelRun(runId), /Run not found/);
   }
 });
 

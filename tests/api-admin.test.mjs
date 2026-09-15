@@ -50,7 +50,7 @@ const exportsByModule = {
   'survey-email': ['getSurveyEmailOverview', 'sendSurveyTestEmail', 'createSurveyEmailCampaign'],
   'cms-pages': ['getAdminCmsPages', 'createAdminCmsPage', 'getAdminCmsPage', 'updateAdminCmsPage', 'deleteAdminCmsPage', 'setAdminCmsPageStatus'],
   'cms-files': ['uploadAdminCmsFile', 'deleteAdminCmsFile', 'reorderAdminCmsAttachments', 'updateAdminCmsAttachment'],
-  'matrikkel-sync': ['getMatrikkelRuns', 'getMatrikkelRun', 'createMatrikkelRun', 'deleteMatrikkelRunLog', 'cancelMatrikkelRun', 'processMatrikkelRun', 'approveMatrikkelItem'],
+  'matrikkel-sync': ['getMatrikkelRuns', 'getMatrikkelRun', 'createMatrikkelRun', 'failPendingMatrikkelRun', 'deleteMatrikkelRunLog', 'cancelMatrikkelRun', 'processMatrikkelRun', 'approveMatrikkelItem'],
 };
 
 async function setup(path, overrides = {}) {
@@ -64,6 +64,7 @@ async function setup(path, overrides = {}) {
     }])),
   ]));
   dependencies['@/lib/rate-limit'] = { isEmailRateLimited: () => state.limited };
+  dependencies['@/lib/matrikkel-background'] = { dispatchMatrikkelRun: async () => { throw new Error('Unexpected background dispatch'); } };
   dependencies['@/lib/admin-access'] = { requireMatrikkelSync: async () => {
     if (state.error?.message === 'Unauthorized') throw state.error;
   } };

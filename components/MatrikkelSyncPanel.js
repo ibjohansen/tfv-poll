@@ -56,10 +56,12 @@ export default function MatrikkelSyncPanel({ initialRuns, configured, databaseRe
     try {
       const response = await fetch('/api/admin/matrikkel/runs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hNumber: scope === 'test' ? '25' : null }) });
       const body = await response.json();
+      const isFinished = ['completed', 'failed', 'cancelled'].includes(body.run?.status);
+      if (body.run) {
+        setConfirm(false); setActiveId(isFinished ? null : body.run.id); setActive(body.run);
+        setRuns((current) => [body.run, ...current.filter((run) => run.id !== body.run.id)].slice(0, 10));
+      }
       if (!response.ok || !body.ok) throw new Error(body.message);
-      const isFinished = ['completed', 'failed', 'cancelled'].includes(body.run.status);
-      setConfirm(false); setActiveId(isFinished ? null : body.run.id); setActive(body.run);
-      setRuns((current) => [body.run, ...current]);
       if (!body.backgroundStarted && !isFinished) processNext(body.run.id);
     } catch (error) { setConfirm(false); setMessage(error.message || 'Kunne ikke starte synkroniseringen.'); }
     finally { setStarting(false); }

@@ -41,7 +41,11 @@ transaksjonsisolasjon eller at SQL faktisk kjører i Postgres.
 
 ## API-dekning
 
-Alle 33 `route.js`-filer under `app/api` og `app/survey/api` er representert.
+De opprinnelige 33 `route.js`-filene under `app/api` og `app/survey/api` er representert.
+Kartmodulen tilfører to beskyttede ruter (`/api/admin/map/search` og
+`/api/admin/map/export`) med egne rutetester i `tests/map-api.test.mjs`.
+Totalt er dermed 35 rutefiler representert. Se også [kartmodulens testdekning
+og kildevurdering](map-explorer.md).
 Dette er tester av rutefunksjonene og tjenestegrensene, ikke full ende-til-ende-
 dekning av hver underliggende tjeneste.
 
@@ -71,6 +75,16 @@ databasefeil, delvise batcher, slettet medlem og kansellering. Synkroniseringen
 oppdager ikke nye tomter og sletter ikke tomter automatisk; det er derfor ikke
 testet som eksisterende funksjonalitet. Manuell godkjenning og loggsletting er
 dekket på rutenivå; deres transaksjoner trenger egne databasetester.
+
+Oppfølgingsrettelsen for matrikkeloppstart 15. september er dekket av
+`matrikkel-background.test.mjs` og `matrikkel-proxy.test.mjs`: faktisk
+Next-matcher for det smale ruteunntaket, avvist omdirigering/HTML-200, timeout,
+konfigurasjonsfeil, autentisering med jobbhemmelighet, videresending og trygge
+loggmeldinger. `matrikkel-sync.test.mjs` dekker også betinget feilmarkering som
+bevarer samtidige start/stopp og hindrer en forsinket worker i å behandle en
+feilmarkert kjøring. Databasen og nettverket er fortsatt simulert. Verifisering
+av den pakkede funksjonen i Netlify, overvåking etter `202` og gjenopptakelse
+etter worker-krasj gjenstår; en grønn Next-build tester ikke Netlify-pakkingen.
 
 ## Hva bør logges?
 

@@ -4,6 +4,7 @@ import { adminPermissions, isAllowedAdmin, isAuthConfigured } from './lib/admin-
 import { isPublicPath } from './lib/route-access';
 
 function permissionForPath(pathname) {
+  if (pathname.startsWith('/admin/map') || pathname.startsWith('/api/admin/map')) return 'members';
   if (pathname.startsWith('/admin/audit')) return 'audit';
   if (pathname.startsWith('/admin/members/matrikkel') || pathname.startsWith('/api/admin/matrikkel')) return 'matrikkel';
   if (pathname.startsWith('/admin/members') || pathname.startsWith('/admin/inbox') || pathname.startsWith('/api/admin/members') || pathname.startsWith('/api/admin/member-requests')) return 'members';
@@ -15,7 +16,7 @@ function permissionForPath(pathname) {
 function contentSecurityPolicy(nonce) {
   const development = process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : '';
   const upgrade = process.env.NODE_ENV === 'production' ? '; upgrade-insecure-requests' : '';
-  return `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src https://norgeskart.no https://www.norgeskart.no; form-action 'self'; img-src 'self' data: blob:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development}; connect-src 'self' https://ws.geonorge.no${upgrade}`;
+  return `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src https://norgeskart.no https://www.norgeskart.no; form-action 'self'; img-src 'self' data: blob: https://cache.kartverket.no; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development}; connect-src 'self' https://ws.geonorge.no${upgrade}`;
 }
 
 function nextWithCsp(request, nonce, csp) {
@@ -54,5 +55,7 @@ export async function proxy(request) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon.png).*)'],
+  // Denne ene maskin-til-maskin-ruten autentiseres med jobbhemmeligheten i
+  // funksjonen, ikke med nettlesercookie. Ikke åpne hele /.netlify/functions/.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon.png|\\.netlify/functions/matrikkel-sync-background/?$).*)'],
 };

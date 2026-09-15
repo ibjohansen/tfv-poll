@@ -5,6 +5,67 @@ ingen produksjonsdeploy, GitHub-push, Entra-endring eller Neon-migrering er kjø
 Se [kvalitetsgjennomgangen](docs/quality-review.md) for funn, testdekning,
 vurdering av brukerloggen og begrensninger. Uferdige produktoppgaver beholdes.
 
+## Matrikkel – oppstartsfeil rettet lokalt 15. september 2026
+
+Produksjonsdiagnosen viste at funksjonskallet ble sendt til `/admin/login`
+(`307`), og at innloggingssidens `200` feilaktig ble tolket som startet jobb.
+Kjøringen ble derfor stående før første oppslag, uten funksjonslogg.
+
+- [x] Unnta bare `/.netlify/functions/matrikkel-sync-background` fra
+  nettleserinnlogging; behold jobbhemmelighet, POST-krav og validering av jobb-ID.
+- [x] Avvis omdirigeringer, godta bare `202` og begrens oppstartskallet til
+  10 sekunder. Bruk samme kontroll ved videresending til neste worker.
+- [x] Lagre synlig feilstatus ved avvist/ubekreftet oppstart dersom kjøringen
+  fortsatt venter. Behold samtidig start/stopp og snapshot; ikke fall tilbake
+  til langvarig nettleserbehandling i produksjon.
+- [x] Logg oppstart, avslutning, avvist jobbhemmelighet og videresendingsfeil
+  med jobbmetadata, uten medlemsopplysninger eller hemmeligheter.
+- [x] Regresjonstester for faktisk Next-matcher, `200`/redirect/timeout,
+  feilkonfigurasjon, jobbhemmelighet, videresending og samtidige statusendringer.
+  Eksterne kall og database er simulert; ingen nye npm-pakker eller migrering.
+- [ ] Etter godkjent deploy: kjør bare **Test H-nummer 25** først, og verifiser
+  både faktisk behandlingsstart i databasen og funksjonsloggen. `202` alene er
+  ikke bevis på behandling. Se produksjonssjekklisten i README.
+- [ ] Legg til overvåking av oppdrag som får `202`, men aldri starter (f.eks.
+  feil ved funksjonsinnlasting/konfigurasjon). Dette og gjenopptakelse etter
+  worker-krasj er separate oppgaver, ikke løst av rutefiksen.
+- [ ] Gjennomgå samme innloggings-/kvitteringsmønster for survey-e-postjobben
+  separat. Den ruten er ikke åpnet eller endret i matrikkelrettelsen.
+
+## Kart og registerkontroll – implementert MVP 15. september 2026
+
+Se [kartmodulens dokumentasjon](docs/map-explorer.md) for verifiserte kilder,
+tilgang, testdekning og kjente begrensninger. Ingen automatisk registerretting.
+
+- [x] Steg 1: Leaflet-kart ved Turufjell, ett GeoJSON-polygon, tegning,
+  redigering/sletting, koordinatkontroller for tastatur og areal med Turf.
+- [x] Steg 2: Åpent Kartverket-adressesøk via beskyttet Node-proxy,
+  paginering, eksakt polygonfiltrering, adressepunkter, sortering, søk og CSV.
+- [x] Steg 3: Matrikkelreferanser og adresseplasseringer fra åpne data.
+  Ukjent seksjonsnummer beholdes som ukjent; ikke komplettert fra eierdata.
+- [x] Steg 4: Utskiftbar Overpass-adapter for supplerende veier/stier,
+  klippet geometri, lengde i polygon og aggregering av kompatible segmenter.
+- [x] Steg 5: Separat registersammenligning med fem statuser, flere kandidater,
+  konfliktverdier, manglende gnr/bnr, nøkkeltall og tydelig kildeansvar.
+- [x] Steg 6, eksportdel: CSV/GeoJSON, kopiering av adresser/veinavn,
+  formelinjeksjonsvern og eksportlogging uten filinnhold/personopplysninger.
+- [x] Enhets-/rutetester med mocket database og eksterne karttjenester.
+- [ ] Steg 6, eiendomsgrenser: Implementer og test WFS/GML-adapter med
+  verifisert UTM-transformasjon, flere teiger/hull og komplett geografisk
+  uttrekk uten å forutsette paginering eller GeoJSON-støtte som ikke annonseres.
+- [ ] Finn også eiendommer uten offisiell adresse; dagens referanseliste er
+  adressebasert og er ikke en fullstendig liste over matrikkelenheter.
+- [ ] Vurder NVDB/offisiell veiadapter og avklar driftsløsning ved større bruk.
+  Overpass er supplerende og kan ha både tjenestefeil og manglende veigeometri.
+- [ ] Etabler sikker geografisk avgrensning av ukoblede registerposter.
+  Dagens «MISSING_IN_MAP_DATA» gjelder bare valgt utsnitt og kan bety at posten
+  ligger utenfor polygonet; ukjente koordinater skal aldri gjettes.
+- [ ] Verifiser reell Entra-rolle, delt rate-limit og eksportlogg etter
+  publisering med godkjent testgrunnlag; se README. Ingen produksjonsendring
+  eller produksjonseksport er utført som del av implementeringen.
+- [ ] Etabler varige nettleser-E2E-tester i et isolert miljø med syntetisk
+  register, inkludert mobil, tastatur, avbryt/redigering under lasting og eksport.
+
 ## P1 – Prioritet / bør gjøres først
 
 Dette er oppgaver som enten reduserer teknisk risiko, styrker kvaliteten eller legger grunnlaget for funksjonalitet som andre oppgaver er avhengige av.
@@ -13,7 +74,7 @@ Dette er oppgaver som enten reduserer teknisk risiko, styrker kvaliteten eller l
 
 - [x] **API-tester**
 
-  **Status: Rutetester implementert.** Alle 33 rutefiler under `app/api` og
+  **Status: Rutetester implementert.** Alle 35 rutefiler under `app/api` og
   `app/survey/api` er representert i testpakken. Eksterne tjenester er erstattet
   med testdobler. Fullt OAuth-forløp, databaseintegrasjon og nettleserflyter gjenstår;
   dette er ikke det samme som full integrasjonsdekning. Se oversikten i
@@ -638,7 +699,7 @@ Eventuelle funn fra sikkerhetsgjennomgangen legges inn som egne P1- eller P2-sak
 
 ## Ferdig
 
-- [x] Rutetester for alle 33 API-rutefiler, med de avgrensningene som er dokumentert.
+- [x] Rutetester for alle 35 API-rutefiler, inkludert kartmodulen, med de avgrensningene som er dokumentert.
 - [x] Egen Matrikkel-testpakke for kontrollflyt, feil, batcher og gjentatt behandling.
 - [x] Rettet overskriving av stoppet Matrikkel-status og desimaltall i batchgrenser.
 - [x] Rettet 400/500 ved manglende roller og tekniske feil; avvis ugyldig JSON

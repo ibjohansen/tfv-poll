@@ -1,0 +1,232 @@
+# Kart og registerkontroll
+
+Implementert lokalt 15. september 2026. Inngang: `/admin/map`.
+Ingen registerretting, import, migrering, produksjonsdeploy eller ekstern
+konfigurasjonsendring utføres av kartfunksjonen.
+
+## Bruk
+
+1. Åpne **Kart og registerkontroll** fra administrasjonsmenyen.
+2. Velg **Tegn polygon**, klikk/trykk inn hjørner og velg **Fullfør polygon**.
+   Kartet starter ved Turufjell, nær Istjernvegen, i Flå kommune.
+3. Hent adresser, veier/stier og registersammenligning hver for seg. En feil
+   i Overpass skal ikke hindre adressesøket.
+4. Filtrer/sorter tabellene. Klikk en adresse, referanse eller vei for å zoome
+   og vise detaljer. Slå kartlag av/på med avkrysningsboksene.
+5. Rediger ved å dra hjørner eller endre koordinatlisten. Listen støtter også
+   innsetting/fjerning av hjørner. Piltastene flytter kartet, og knappen for
+   kartsenter legger til et punkt uten mus. Fullfør og hent data på nytt.
+6. Eksporter eller kopier adresser/veinavn. Eksport gjelder hele søket,
+   ikke tabellfilteret. En utløpt kartcache gir et nytt grunnlag ved eksport.
+
+Bare ett enkelt polygon uten hull støttes. Arealet må være 1 m²–25 km²,
+maksimalt 200 hjørner og 5 km omsluttende søkeradius. Alle hjørner må ligge
+innenfor 20 km av startpunktet. Disse er **applikasjonsgrenser**, ikke en
+definisjon av Turufjells område eller leverandørenes API-kvoter.
+Polygonet finnes bare i sidens minne og eventuell GeoJSON-eksport; det
+lagres ikke i databasen eller automatisk på tvers av sidebesøk.
+
+## Integrasjon og dataansvar
+
+Eksisterende Next.js App Router, Node-runtime, JavaScript og global CSS beholdes.
+Nye direkte avhengigheter er `leaflet` og `@turf/turf`. Leaflet lastes bare i
+nettleseren gjennom `next/dynamic` med `ssr: false`. Ingen nytt styling- eller
+testrammeverk er innført.
+
+| Lag | Ansvar |
+| --- | --- |
+| `components/MapExplorer/` | Kart, polygontegning, tabeller, detaljer, eksportknapper |
+| `lib/map/browser-client.js` | Kall til egne beskyttede API-ruter |
+| `lib/map/kartverket-address-service.js` | Kartverkets adresseadapter, paginering og normalisering |
+| `lib/map/kartverket-property-service.js` | Matrikkelreferanser og adresseplasseringer; ikke eiendomsgrenser |
+| `lib/map/osm-road-service.js` | Utskiftbar veiadapter og klipping av geometri |
+| `lib/map/geo.js`, `normalization.js` | GeoJSON, Turf-operasjoner og normalisering |
+| `lib/map/register-service.js` | Minimale, serverbaserte registeroppslag |
+| `lib/map/comparison.js` | Ren, testbar sammenligning uten I/O eller registerendringer |
+| `lib/map/service.js`, `cache.js`, `http.js`, `api.js` | Orkestrering, offentlig datacache, tidsgrenser og tilgang |
+| `lib/map/export.js` | CSV-/GeoJSON-format og vern mot regnearkformler |
+
+`POST /api/admin/map/search` tar `{ polygon, datatype }`, der `datatype` er
+`addresses`, `roads` eller `comparison`. `polygon` er en GeoJSON Polygon eller
+Feature med Polygon-geometri. `POST /api/admin/map/export` tar
+`{ polygon, format, includeRoads? }`, med `addresses-csv`, `comparison-csv`
+eller `geojson` som format. Klienten får ikke velge eksterne URL-er.
+
+Begge rutene og siden krever eksisterende `members`-rettighet. Med konfigurert
+Entra-rollemodell betyr dette `TFV.MemberAdmin`; `TFV.ReadOnly` eller bare
+`TFV.MatrikkelAdmin` er ikke nok. Den eksisterende allowlist-modellen uten
+rollekrav beholdes. Ingen ny Entra-rolle eller miljøvariabel behøves.
+
+## Verifiserte datakilder
+
+Dokumentasjon, parameterformat og små anonyme HTTP-kall kontrollert 15.09.2026.
+
+### Kartverket: adresser og matrikkelreferanser
+
+- [Offisiell brukerveiledning](https://www.kartverket.no/api-og-data/eiendomsdata/brukarrettleiing-adresse-api)
+- [Swagger](https://ws.geonorge.no/adresser/v1/) og
+  [faktisk OpenAPI-spesifikasjon](https://ws.geonorge.no/adresser/v1/openapi.json)
+- [Kartverkets vilkår for åpne data](https://www.kartverket.no/api-og-data/vilkar-for-bruk)
+
+Brukt endepunkt: `GET https://ws.geonorge.no/adresser/v1/punktsok`.
+Parametere: `lat`, `lon`, `radius` i hele meter, `koordsys=4326`,
+`utkoordsys=4326`, `treffPerSide=1000`, `side` fra 0, `asciiKompatibel=false`.
+Spesifikasjonen har `/sok` og `/punktsok`, ikke et vilkårlig polygonendepunkt.
+
+Polygonets beregnede bbox omsluttes av en sirkel, med radius til fjerneste
+bbox-hjørne pluss en liten avrundingsmargin. Alle sider hentes sekvensielt,
+deretter filtreres punktene med Turf `booleanPointInPolygon`. Grensepunkter
+inkluderes. Maksimalt 10 000 treff i sirkelen; overskridelse, gjentatte
+resultater, endret total, uventet CRS eller manglende sider gir eksplisitt feil.
+Manglende koordinater gir advarsel og sperrer sammenligning/eksport, slik at
+ufullstendige data ikke gir en tilsynelatende komplett avviksrapport.
+
+Svar kontrolleres for `EPSG:4326`; GeoJSON bruker `[lengdegrad, breddegrad]`.
+Kartverket kan ellers levere 4258 som standard, derfor angis CRS eksplisitt.
+Ukjente feltverdier beholdes som `null`. `snr` er alltid `null` fra denne
+adapteren: dokumentasjonen sier at adressekoblingen ikke går til seksjon.
+`bruksenhetsnummer` er ikke seksjonsnummer og omtolkes ikke til dette.
+Adressepunkt er heller ikke matrikkelenhetens sentrum.
+
+Ingen autentisering kreves. Faktisk svar hadde `Access-Control-Allow-Origin: *`.
+En numerisk forespørselskvote er ikke angitt i den kontrollerte
+adresseveiledningen/OpenAPI-en; ingen slik kvote er antatt. CC BY 4.0 og
+synlig © Kartverket-attribusjon følger de publiserte vilkårene.
+
+Den nye adapteren ble prøvd på et lite utsnitt ved Istjernvegen: 21 adresser,
+inkludert `Istjernvegen 54`, `10/524`. Dette er en integrasjonskontroll, ikke
+en fasit på antall adresser i hele Turufjell.
+
+### Bakgrunnskart
+
+[Kartverkets cache-dokumentasjon](https://cache.kartverket.no/) viser Leaflet-
+eksemplet som brukes: `https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/{z}/{y}/{x}.png`.
+Bildene er Web Mercator (EPSG:3857); Leaflet projiserer GeoJSON-koordinatene.
+En faktisk flis svarte 200 uten nøkkel, CORS `*` og fem dagers HTTP-cache.
+Ingen fliser forhåndslastes eller eksporteres. CSP tillater bare den konkrete
+kartvertens bilder i tillegg til eksisterende bildekilder. Global
+`Referrer-Policy: no-referrer` er uendret. Kartverket ser vanlige flisforespørsler
+fra nettleseren, ikke registerfelt.
+
+### OpenStreetMap / Overpass: supplerende veier og stier
+
+- [Overpass bbox og geometri](https://dev.overpass-api.de/overpass-doc/en/full_data/bbox.html)
+- [Ressursdeling, kvoter og feilstatus](https://dev.overpass-api.de/overpass-doc/en/preface/commons.html)
+- [OSM-lisens og attribusjon](https://www.openstreetmap.org/copyright)
+
+Brukt endepunkt: `POST https://overpass-api.de/api/interpreter`, med URL-kodet
+`data`-parameter. Spørringen bruker `[out:json][timeout:15][maxsize:16777216]`,
+`way["highway"](sør,vest,nord,øst)` og `out tags geom`. Ingen autentisering.
+HTTP-svaret bekreftet CORS `*`; kallet kjøres likevel fra Node. Adapterens
+anonyme kontroll returnerte 9 veigrupper med til sammen omtrent 667 m klippet
+geometri i samme lille utsnitt. Et tidligere kontrollkall ga 504; offentlig
+Overpass er en delt tjeneste uten garantert tilgjengelighet.
+
+Geometri er geografisk lengde-/breddegrad. Hver linje deles ved kryssing av
+polygonkanten. Bare delene innenfor beholdes og lengdeberegnes med Turf;
+konkave polygoner, kryssende linjer og linjer på kanten er testet. Segmenter
+samles bare når navn, veitype, referanse, dekke og tilgang stemmer. Uten navn
+beholdes de separat. OSM-ID-er og datakilde beholdes ved eksport.
+
+Overpass velger veier etter noder i bbox. En liten margin fanger flere
+kantkryssende veier, men kan ikke garantere full dekning for svært lange
+segmenter uten noder i nærheten. OSM-data er derfor tydelig et supplement,
+ikke en autoritativ/fullstendig veifortegnelse. Overpass' generelle anbefaling
+om høyst omtrent 10 000 kall og 1 GB per dag er ingen app-spesifikk garanti.
+Ved større bruk må egen tjeneste eller annen driftsavtale vurderes.
+
+NVDB er vurdert gjennom [Vegnett API v4](https://nvdb.atlas.vegvesen.no/docs/produkter/nvdbapil/v4/Vegnett/)
+og [NVDB API Les oversikt](https://nvdb-docs.atlas.vegvesen.no/nvdbapil/v3/introduksjon/Oversikt/).
+NVDB har eget veglenke-/referansesystem og annen geometri-/pagineringstilpasning.
+MVP bruker tillatt Overpass-alternativ; `findRoadsInPolygon` kan byttes uten
+endringer i visningskomponentene.
+
+### Eiendomsgrenser: undersøkt, ikke implementert
+
+[Offisiell metadataoppføring](https://kartkatalog.geonorge.no/Metadata/uuid/339d49c3-06a5-4310-9605-fced1fe465cb)
+peker på [WFS GetCapabilities](https://wfs.geonorge.no/skwms1/wfs.matrikkelen-eiendomskart-teig?Service=WFS&Request=GetCapabilities).
+Det faktiske capabilities-dokumentet svarte uten autentisering og annonserte
+bl.a. `app:Teig` og `app:Eiendomsgrense`, GML 3.2, EPSG:25833/25832/25835 og
+`ImplementsResultPaging=FALSE`. GeoJSON/4326 er ikke annonsert. Derfor er det
+ikke implementert en uverifisert GeoJSON/WFS-URL eller naiv sideinndeling.
+
+Før grenseimport kreves verifisert GetFeature-filter, koordinattransformasjon,
+GML-håndtering inkludert flere teiger/hull og kontroll på ufullstendige uttrekk.
+Første versjon viser alle matrikkelreferansene knyttet til hentede adresser,
+med adresseplasseringer. Kartlaget for eiendomsgrenser er deaktivert og merket
+som senere arbeid. API-er for eiere, hjemmelshavere eller beskyttet Matrikkel
+SOAP brukes ikke av kartmodulen. Eiendommer uten adresse er ikke dekket.
+
+## Sammenligning og personvern
+
+Hele det aktive interne registeret sammenlignes med adresseutvalget i polygonet.
+Registeret mangler egne geografiske koordinater; en ukoblet post kan derfor
+ikke sikkert plasseres innenfor polygonet. Nøkkeltall skiller mellom
+offisielle adresser i polygonet og aktive poster i **hele registeret**.
+`MISSING_IN_MAP_DATA` betyr bare uten treff i valgt utsnitt, aldri bevist
+manglende offisiell adresse. Dette presiseres også i hver relevant CSV-rad.
+
+Gnr/bnr indekseres først, med eksakt normalisert adresse som supplement og
+disambiguering. Motstridende kjent eiendomsidentitet/adresse er `CONFLICT`.
+Ukjent seksjon/feste og flere kandidater er `POSSIBLE_MATCH`. Kandidater
+beholdes; dupliserte registerkoblinger blir ikke to sikre treff. Eiere brukes
+aldri som matchnøkkel. Ingen fuzzy matching eller automatisk overskriving.
+Manglende gnr/bnr eller adresse vises som datakvalitetsmerknader selv ved
+adressebasert samsvar. Registerlaget viser kun sikre koblinger ved den
+offisielle adressens koordinater, ikke uavhengig innmålte medlemspunkter.
+
+Serveroppslag velger eksplisitte kolonner og utelater slettede poster, tokens
+og intern historikk. Normal sammenligning inneholder H-nummer,
+registeradresse/-referanse og navn fra registeret. E-post hentes bare ved
+administratoreksport. Telefonskjema finnes ikke i dagens register: feltet
+eksporteres tomt, og innsamling av telefonnumre er ikke innført.
+Eksport inneholder aldri personlige tilgangslenker.
+
+JSON-body begrenses til 32 kB. Feilautoriserte og cross-origin-forespørsler
+avvises før behandling. Alle svar er `Cache-Control: no-store, private`.
+Offentlige kartresultater caches separat i fem minutter, maksimalt åtte
+utvalg og to samtidige innhentinger per Node-instans. Nøkkelen bruker eksakt
+polygongeometri, datatype og adapterversjon; det unngår kantfeil ved avrunding.
+Registerdata, sammenligning og eksport cachelagres ikke. Samtidige identiske
+søk deler offentlig innhenting. En avbrutt delt forespørsel kan måtte prøves
+igjen av en annen klient; feil cachelagres ikke.
+
+Eksterne kall har 18 sekunders tidsgrense per forsøk og 25 sekunders samlet
+forespørselsfrist. Ett nytt forsøk tillates ved nettverksfeil/5xx; 429 gir
+beskjed om å vente uten automatisk retry. Maksimal ekstern JSON-body er 5 MB,
+og veidata begrenses til 30 000 koordinater. Frontenden har avbryt-knapp og
+forkaster svar for et slettet/endret polygon. Eksisterende per-instans
+rate-limit (20/minutt per klient) brukes som bakstopper, ikke som global
+Netlify-/WAF-kvote. Ingen delt rate-limit-infrastruktur er etablert her.
+
+CSV har UTF-8 BOM, komma, CRLF, korrekt escaping og vern mot formelinjeksjon.
+Sammenlignings-CSV merker interne felt som Turufjell vel og beholder begge
+konfliktverdier. GeoJSON inneholder søkepolygon og geografiske data med kilde,
+ikke registeret. Brukerloggen registrerer generert eksport, innlogget aktør,
+format og antall, men ikke polygon, navn, e-post, telefon eller filinnhold.
+Feil ved logging stopper eksportlevering. Dette bekrefter generering,
+ikke at nettleseren fullførte nedlastingen.
+
+## Tester og gjenstående kontroll
+
+`tests/map-*.test.mjs` dekker geometri, normalisering, alle fem statuser,
+flertydighet, datakvalitetsmerknader, CSV/GeoJSON, adaptere, paginering,
+ufullstendige svar, feil, retry, cache, autorisasjon, CSRF, størrelsesgrenser,
+dataminimering og eksportlogging. Eksterne tjenester og database er mocket.
+Eksisterende testoppsett og `npm run check` brukes uendret.
+
+Avsluttende lokal kontroll: `npm run check` bestod med 198 tester, lint og
+produksjonsbygg. `npm audit` fant ingen sårbarheter, og `git diff --check`
+bestod. En isolert Next.js-nettlesertest brukte den faktiske kartkomponenten
+med syntetisk register og uten databaseforbindelse. Tegning, areal,
+koordinatredigering, konfliktvisning, kartvalg/detaljer og sletting under
+innhenting ble kontrollert. Mobiltesten avdekket og fikk rettet horisontal
+overflyt: ved 390 px er sidebredden 390 px, mens den brede tabellen ruller
+inne i sin egen beholder. Dette er en utført røykprøve, ikke en varig
+automatisert E2E-suite eller en test av reell Entra-innlogging.
+
+Se produksjonssjekklisten i README for reell Entra-innlogging og en kontrollert
+registereksport etter publisering. Ingen slik produksjonskontroll eller
+produksjonsdataeksport er utført under utviklingen. Fullstendige grenser,
+autoritative veidata, geografisk avgrensning av ukoblede registerposter og
+varig nettleser-E2E i isolert miljø er videre arbeid.
