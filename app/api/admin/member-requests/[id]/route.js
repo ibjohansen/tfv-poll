@@ -1,3 +1,4 @@
+import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { resolveAdminMemberRequest, updateAdminMemberRequestProperty } from '@/lib/member-self-service';
 
@@ -11,16 +12,14 @@ function sameOrigin(request) {
 export async function PATCH(request, { params }) {
   if (!sameOrigin(request)) return NextResponse.json({ ok: false, message: 'Ugyldig forespørsel.' }, { status: 403 });
   try {
-    const input = await request.json().catch(() => ({}));
+    const input = await readJsonObject(request);
     const id = (await params).id;
     const result = input.action === 'check_property' || input.action === 'confirm_property'
       ? await updateAdminMemberRequestProperty(id, input, input.action === 'check_property')
       : await resolveAdminMemberRequest(id, input.action);
     return NextResponse.json({ ok: true, request: result }, { headers: { 'Cache-Control': 'no-store, private' } });
   } catch (error) {
-    const status = error.message === 'Unauthorized' ? 403
-      : error.message === 'Member request not found' ? 404
-        : ['Member request conflict', 'Member request property unresolved'].includes(error.message) ? 409 : 400;
+    const status = apiErrorStatus(error, 403);
     const message = status === 403 ? 'Du har ikke tilgang.'
       : status === 404 ? 'Forespørselen finnes ikke lenger.'
         : status === 409 ? 'Matrikkelopplysningene må avklares før godkjenning.'

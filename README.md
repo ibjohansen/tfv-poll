@@ -51,6 +51,8 @@ Sertifikatkontrollen skal ikke deaktiveres.
 - Undersøkelsen ligger på `/survey`; invitasjonens engangskode utveksles via
   `/api/survey-access/verify` og fjernes straks fra adresselinjen.
 - Svar sendes til `/survey/api/responses`, og dokumenter ligger under `/survey/dokumenter/`.
+  Skjemaet sender vist `questionVersion`; endret spørsmålsversjon avvises med
+  konflikt før lagring, og medlemmet må laste inn spørsmålene på nytt.
 - Andre sider og API-er krever autorisert innlogging som standard, også nye ruter.
   Innloggingsendepunkter og nødvendige statiske ressurser er offentlige.
 - Query-formatet `?klm=...&xyz=...` finnes bare i syntetisk mockmodus og skal
@@ -394,7 +396,7 @@ export const surveyDocuments = [
 
 ## GitHub
 
-Prosjektet bruker `main` som produksjonsgren. Alle pushes og pull requests
+Prosjektet bruker `main` som produksjonsgren. Pushes til `main` og alle pull requests
 kontrolleres av GitHub Actions-konfigurasjonen i `.github/workflows/ci.yml`:
 
 ```bash
@@ -407,6 +409,51 @@ produksjonsbygg. Bygget bruker Next.js' støttede `--webpack`-flagg for stabil
 kjøring i CI- og Functions-miljøer; lokal utvikling bruker fortsatt standardbyggeren.
 Lokale miljøfiler, Neon-koblingen og Netlifys lokale
 cachemappe er utelatt fra Git gjennom `.gitignore`.
+
+GitHub Actions er ikke et krav for å bruke Netlify. Vi beholder Actions fordi
+arbeidsflyten gir en separat kvalitetskontroll på pull requests uten tilgang
+til produksjonshemmeligheter. Netlify bygger og publiserer applikasjonen med
+`npm run build`; den kommandoen kjører ikke lint eller tester. Push til en
+arbeidsgren uten pull request kjører ikke CI. Dette unngår doble CI-kjøringer
+for samme endring på arbeidsgrenen og pull requesten.
+
+Konfigurer `quality` fra arbeidsflyten **Code quality** som en påkrevd statuskontroll
+for `main`, og krev pull request før innfletting. Dette er en separat
+GitHub-innstilling; workflow-filen aktiverer ikke grenbeskyttelse. Netlify venter
+ikke automatisk på Actions når noen pusher direkte til `main`. Hvis direkte
+push fortsatt skal tillates, må en egen kvalitetsport avtales, for eksempel
+`npm run check` som Netlify-byggkommando. Se
+[Netlifys byggkonfigurasjon](https://docs.netlify.com/build/configure-builds/overview/)
+og [GitHubs påkrevde statuskontroller](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches#require-status-checks-before-merging).
+
+### Automatiserte tester og brukerlogg
+
+Kjør `npm test` for modul- og rutetester, eller `npm run check` for lint, tester
+og produksjonsbygg. Rutetestene bruker ekte Next.js Request/Response-objekter
+og kjører rutekoden med eksplisitt erstattede avhengigheter. Testkommandoens
+`--experimental-vm-modules` brukes bare til denne isolasjonen; det er ikke
+et runtime-flagg for Netlify. Ingen nye testavhengigheter er installert.
+
+[Kvalitetsgjennomgangen](docs/quality-review.md) beskriver rutedekning,
+begrensninger, anbefalte neste tester og vurderingen av hvilke hendelser som
+bør registreres. Testene kobler ikke til Neon, Microsoft, MailerSend eller
+Kartverket. Reelle transaksjoner og nettleserflyter trenger egne tester med
+syntetiske data i et isolert miljø.
+
+`/admin/audit` har søk i aktør, post-ID og før-/etterverdier, samt filtre for
+bruker, område, endringstype, status og datointervall. Datoene er hele kalenderdager
+i `Europe/Oslo`, inkludert valgt sluttdato. Filtrering og sideinndeling skjer på
+serveren med 50 poster per side. Store fritekstsøk trenger fortsatt måling og
+eventuell indeksering; se kvalitetsgjennomgangen.
+
+Generering av medlems- og resultatseksporter logges i eksisterende `audit_log`
+under området **Administrativ handling** (`table_name = admin_actions`). Hendelsen
+inneholder administrator, tidspunkt, eksporttype, antall poster, utvalg og
+undersøkelses-ID. Ingen medlemsliste, rå e-postadresser, token eller filinnhold
+legges til i hendelsen. Den bekrefter at filen er generert, ikke at nettleseren
+har mottatt den. Kan hendelsen ikke lagres, returneres ikke eksportfilen.
+Mock-eksport av undersøkelsesresultater oppretter ingen databasehendelse.
+Dette bruker dagens skjema og krever ingen ny migrering eller miljøvariabel.
 
 ## Produksjonssetting: Netlify + Neon + Microsoft Entra ID
 
@@ -426,6 +473,8 @@ appregistreringen i Microsoft Entra ID.
 1. Kontroller at siste commit ligger på `main` i `ibjohansen/tfv-poll`.
 2. Åpne fanen **Actions** i GitHub og kontroller at arbeidsflyten
    **Code quality** er grønn for committen som skal publiseres.
+   Kontroller at `quality` er påkrevd før innfletting til `main` og at direkte
+   pushes ikke omgår kontrollen. En grønn Netlify-deploy alene bekrefter bare bygget.
 3. Kjør den samme kontrollen lokalt dersom det er gjort endringer etter siste
    push:
 
@@ -687,7 +736,9 @@ Utfør kontrollene i denne rekkefølgen:
   vises, også i kombinasjon med søk.
 - Gjør en kontrollert endring på et testmedlem. Åpne `/admin/audit`, kontroller
   riktig innlogget bruker, tidspunkt og før-/etterverdi, og bruk lenken tilbake
-  til medlemsposten. Kontroller også filtrering på bruker og område. Bekreft at
+  til medlemsposten. Kontroller søk, filtrering på bruker, område, type og status,
+  datointervall (begge datoer inkludert) og at side 2 vises når det er flere enn
+  50 treff. Bekreft at
   tilgangstoken, verifiseringshash og lagringsnøkler ikke finnes i loggen.
 - Send ett kontrollert eierskifte og én ny innmelding med testdata. Oppgi
   gårds-/bruksnummer og eventuelt seksjonsnummer. Kontroller at innmeldingen
@@ -697,7 +748,13 @@ Utfør kontrollene i denne rekkefølgen:
   krever kontroll eller eksplisitt manuell bekreftelse før saken kan godkjennes.
   Fjern testdataene etterpå.
 - Åpne en undersøkelse, kontroller kakediagrammene under **Resultater**, og last
-  ned en Excel-eksport.
+  ned en Excel-eksport. Eksporter også et utvalg av testmedlemmer. Kontroller at
+  begge eksporter vises i brukerloggen med riktig administrator og antall poster,
+  uten eksportinnhold eller personlige lenker i logghendelsen.
+- I isolert testmiljø: åpne survey, endre spørsmålstekst i admin og send fra det
+  gamle skjemaet. Kontroller 409 uten lagret svar, ny lasting med tomme svar og
+  riktig versjon/tekst i snapshot etter ny innsending. Gamle åpne skjemaer uten
+  `questionVersion` må lastes på nytt etter deploy.
 - Velg **Utsendelse**, send først en testmail til en eksplisitt testadresse, og
   kontroller MailerSend-statusen. Start ikke masseutsendelsen før domenekontrollen
   nedenfor er fullført.
@@ -709,7 +766,8 @@ Utfør kontrollene i denne rekkefølgen:
   at eiendomskartet søker på gateadressen i Flå, starter med adresseinformasjonen
   minimert, og at **Åpne i Norgeskart** åpner kartet på Norgeskarts nettside.
 - Kjør bare **Test H-nummer 25** i matrikkelmodulen. Kontroller logg og resultat
-  før en full matrikkelkjøring startes.
+  før en full matrikkelkjøring startes. Test samtidig stopp og bakgrunnsarbeid
+  i isolert testmiljø først; en stoppet kjøring skal beholde statusen etterpå.
 - Kontroller at `/api/admin/surveys` returnerer `401` uten innlogget sesjon.
 - Kontroller at `/api/admin/member-requests/<id>` returnerer `401` uten
   innlogget sesjon, og at `/mine-opplysninger` ikke viser data uten gyldig cookie.

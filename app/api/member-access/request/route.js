@@ -19,7 +19,8 @@ export async function POST(request) {
     return NextResponse.json({ ok: false, message: 'For mange forsøk. Vent litt før du prøver igjen.' }, { status: 429 });
   }
   try {
-    const input = await request.json().catch(() => ({}));
+    const body = await request.json().catch(() => null);
+    const input = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
     const marker = getPublicBrowserMarker(request);
     const limited = await consumeMemberAccessLimits({
       request, identifier: input.identifier, browserMarker: marker.value, sql: getSql(),

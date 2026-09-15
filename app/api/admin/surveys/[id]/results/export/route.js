@@ -1,3 +1,4 @@
+import { apiErrorStatus } from '@/lib/api-errors';
 import { createAdminSurveyResultsExport } from '@/lib/admin-survey-results';
 
 export const runtime = 'nodejs';
@@ -14,9 +15,7 @@ export async function GET(_request, { params }) {
       },
     });
   } catch (error) {
-    const status = error.message === 'Unauthorized' ? 401
-      : error.message === 'Survey not found' ? 404
-        : error.message === 'Invalid survey ID' ? 400 : 500;
+    const status = apiErrorStatus(error);
     console.error('Admin survey results export failed', { code: error.code || error.cause?.code, message: error.message });
     const message = status === 404 ? 'Undersøkelsen finnes ikke.'
       : status === 400 ? 'Undersøkelses-ID-en er ugyldig.'

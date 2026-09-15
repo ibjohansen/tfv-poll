@@ -1,3 +1,4 @@
+import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { createAdminCmsPage, getAdminCmsPages } from '@/lib/cms-pages';
 
@@ -11,7 +12,7 @@ function errorResponse(error) {
   if (error.message === 'Unauthorized') return response({ ok: false, message: 'Innlogging kreves.' }, 401);
   if (code === '23505') return response({ ok: false, message: 'URL-en er allerede i bruk. Velg en annen URL.' }, 409);
   if (error.message === 'Mock data cannot be changed') return response({ ok: false, message: 'CMS-et kan ikke endres i mock-modus.' }, 409);
-  return response({ ok: false, message: 'Kontroller tittel, URL, kategori og tekstlengder.' }, 400);
+  return response({ ok: false, message: 'Kontroller tittel, URL, kategori og tekstlengder.' }, apiErrorStatus(error, 400));
 }
 
 export async function GET(request) {
@@ -27,7 +28,7 @@ export async function GET(request) {
 export async function POST(request) {
   if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return response({ ok: false, message: 'Ugyldig forespørsel.' }, 403);
   try {
-    return response({ ok: true, page: await createAdminCmsPage(await request.json()) }, 201);
+    return response({ ok: true, page: await createAdminCmsPage(await readJsonObject(request)) }, 201);
   } catch (error) {
     console.error('CMS page create failed', { code: error.code || error.cause?.code, message: error.message });
     return errorResponse(error);

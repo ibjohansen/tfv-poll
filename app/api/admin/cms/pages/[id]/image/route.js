@@ -1,3 +1,4 @@
+import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { deleteAdminCmsFile, uploadAdminCmsFile } from '@/lib/cms-files';
 
@@ -10,7 +11,7 @@ function uploadError(error) {
   if (error.message === 'Unauthorized') return response({ ok: false, message: 'Innlogging kreves.' }, 401);
   if (error.message === 'Page not found') return response({ ok: false, message: 'Lagre siden før du laster opp et bilde.' }, 404);
   if (error.message === 'CMS storage is not configured') return response({ ok: false, message: 'Fillagring er ikke konfigurert. Kjør Neon-oppsettet først.' }, 503);
-  return response({ ok: false, message: 'Bildet må være JPG, PNG eller WebP og maksimalt 10 MB.' }, 400);
+  return response({ ok: false, message: 'Bildet må være JPG, PNG eller WebP og maksimalt 10 MB.' }, apiErrorStatus(error, 400));
 }
 
 export async function POST(request, { params }) {
@@ -29,11 +30,11 @@ export async function POST(request, { params }) {
 export async function DELETE(request, { params }) {
   if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return response({ ok: false, message: 'Ugyldig forespørsel.' }, 403);
   try {
-    const { imageId } = await request.json();
+    const { imageId } = await readJsonObject(request);
     await deleteAdminCmsFile((await params).id, imageId, 'image');
     return response({ ok: true });
   } catch (error) {
-    const status = error.message === 'Unauthorized' ? 401 : error.message === 'File not found' ? 404 : 400;
+    const status = apiErrorStatus(error);
     return response({ ok: false, message: status === 404 ? 'Bildet finnes ikke lenger.' : 'Kunne ikke fjerne bildet.' }, status);
   }
 }

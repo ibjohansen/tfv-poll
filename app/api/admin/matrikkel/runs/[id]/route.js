@@ -1,3 +1,4 @@
+import { apiErrorStatus } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { cancelMatrikkelRun, deleteMatrikkelRunLog } from '@/lib/matrikkel-sync';
 
@@ -14,9 +15,7 @@ export async function DELETE(request, { params }) {
       : await deleteMatrikkelRunLog((await params).id);
     return NextResponse.json({ ok: true, run }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
-    const status = error.message === 'Unauthorized' ? 403
-      : error.message === 'Run not found' ? 404
-        : ['Run already finished', 'Run still active'].includes(error.message) ? 409 : 400;
+    const status = apiErrorStatus(error, 403);
     console.error('Matrikkel sync cancellation failed', {
       id: (await params).id,
       message: error.message,

@@ -47,13 +47,19 @@ export async function POST(request) {
       return reply({ ok: false, message: access.message }, accessErrorStatus(access.status));
     }
     if (body.website) return reply({ ok: true }, 200);
+    if (!Number.isSafeInteger(body.questionVersion) || body.questionVersion < 1 || body.questionVersion > 2147483647) {
+      return reply({ ok: false, message: 'Last inn undersøkelsen på nytt før du sender inn svaret.' }, 400);
+    }
+    if (body.questionVersion !== access.survey.question_version) {
+      return reply({ ok: false, code: 'SURVEY_CHANGED', message: 'Spørsmålene er endret siden du åpnet skjemaet. Last inn undersøkelsen på nytt og svar på de oppdaterte spørsmålene.' }, 409);
+    }
     if (!hasValidAnswers(body.answers, access.survey.questions)) {
       return reply({ ok: false, message: 'Alle spørsmål må besvares.' }, 400);
     }
     const result = isMockMode()
       ? await submitMockSurveyResponse(body.mockToken, body.mockSurveyId, body.answers)
-      : await submitSurveyResponse(secret, body.answers);
-    if (!result.saved) return reply({ ok: false, message: 'Det er allerede registrert en besvarelse for denne tomten.' }, 409);
+      : await submitSurveyResponse(secret, body.answers, { questionVersion: body.questionVersion });
+    if (!result.saved) return reply({ ok: false, code: 'SURVEY_CONFLICT', message: 'Svaret ble ikke lagret. Undersøkelsen eller tilgangen kan ha endret seg, eller tomten har allerede svart. Last inn undersøkelsen på nytt.' }, 409);
     const response = reply({ ok: true }, 201);
     if (!isMockMode()) response.cookies.set(surveySessionCookieName(), '', {
       maxAge: 0, path: '/', httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production',

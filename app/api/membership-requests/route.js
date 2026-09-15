@@ -3,6 +3,7 @@ import { createMembershipRequest } from '@/lib/member-self-service';
 import { isMemberAccessRateLimited } from '@/lib/rate-limit';
 import { getSql } from '@/lib/db';
 import { consumeMemberAccessLimits, getPublicBrowserMarker, PUBLIC_BROWSER_COOKIE } from '@/lib/shared-rate-limit';
+import { apiErrorStatus } from '@/lib/api-errors';
 
 export const runtime = 'nodejs';
 
@@ -16,6 +17,7 @@ export async function POST(request) {
   if (isMemberAccessRateLimited(request)) return NextResponse.json({ ok: false, message: 'For mange forsøk. Vent litt før du prøver igjen.' }, { status: 429 });
   try {
     const input = await request.json();
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return NextResponse.json({ ok: false, message: 'Ugyldig forespørsel.' }, { status: 400 });
     const marker = getPublicBrowserMarker(request);
     const identifier = input.primary_contact_email || input.h_number || input.street_address;
     const limited = await consumeMemberAccessLimits({
@@ -33,6 +35,7 @@ export async function POST(request) {
     return response;
   } catch (error) {
     console.error('Membership request failed', { code: error.code || error.cause?.code, occurredAt: new Date().toISOString() });
-    return NextResponse.json({ ok: false, message: 'Forespørselen kunne ikke behandles. Kontroller feltene og prøv igjen.' }, { status: 400, headers: { 'Cache-Control': 'no-store, private' } });
+    const status = apiErrorStatus(error);
+    return NextResponse.json({ ok: false, message: status >= 500 ? 'Tjenesten er midlertidig utilgjengelig. Prøv igjen senere.' : 'Forespørselen kunne ikke behandles. Kontroller feltene og prøv igjen.' }, { status, headers: { 'Cache-Control': 'no-store, private' } });
   }
 }

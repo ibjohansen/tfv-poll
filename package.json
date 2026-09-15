@@ -12,7 +12,7 @@
     "db:setup": "node --use-system-ca --env-file=.env.local scripts/setup-database.mjs",
     "db:security-cleanup": "node --use-system-ca --env-file=.env.local scripts/security-cleanup.mjs",
     "members:import": "node --use-system-ca --env-file=.env.local scripts/import-members.mjs",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --experimental-vm-modules --test tests/*.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1128.0",

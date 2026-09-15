@@ -1,3 +1,4 @@
+import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { reorderAdminCmsAttachments, uploadAdminCmsFile } from '@/lib/cms-files';
 
@@ -18,18 +19,18 @@ export async function POST(request, { params }) {
     if (error.message === 'Unauthorized') return response({ ok: false, message: 'Innlogging kreves.' }, 401);
     if (error.message === 'CMS storage is not configured') return response({ ok: false, message: 'Fillagring er ikke konfigurert. Kjør Neon-oppsettet først.' }, 503);
     if (error.message === 'Too many attachments') return response({ ok: false, message: 'En side kan ha maksimalt 20 vedlegg.' }, 409);
-    return response({ ok: false, message: 'Filtypen støttes ikke, eller filen er større enn 20 MB.' }, 400);
+    return response({ ok: false, message: 'Filtypen støttes ikke, eller filen er større enn 20 MB.' }, apiErrorStatus(error, 400));
   }
 }
 
 export async function PATCH(request, { params }) {
   if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return response({ ok: false, message: 'Ugyldig forespørsel.' }, 403);
   try {
-    const { ids } = await request.json();
+    const { ids } = await readJsonObject(request);
     await reorderAdminCmsAttachments((await params).id, ids);
     return response({ ok: true });
   } catch (error) {
-    const status = error.message === 'Unauthorized' ? 401 : 400;
+    const status = apiErrorStatus(error);
     return response({ ok: false, message: 'Kunne ikke endre rekkefølgen på vedleggene.' }, status);
   }
 }

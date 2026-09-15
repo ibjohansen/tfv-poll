@@ -1,3 +1,4 @@
+import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { getAdminMembers } from '@/lib/admin-members';
 import { createAdminMember } from '@/lib/admin-member-updates';
@@ -16,12 +17,12 @@ export async function GET(request) {
     const data = await getAdminMembers(search, page, sort, direction, incompleteContact, hasComment);
     return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
-    const status = error.message === 'Unauthorized' ? 401 : 500;
+    const status = apiErrorStatus(error);
     return NextResponse.json({ message: 'Kunne ikke hente flere medlemmer.' }, { status, headers: { 'Cache-Control': 'no-store' } });
   }
 }
 
 export async function POST(request) {
-  try { return NextResponse.json({ ok: true, member: await createAdminMember(await request.json()) }, { status: 201, headers: { 'Cache-Control': 'no-store' } }); }
-  catch (error) { return NextResponse.json({ ok: false, message: error.message === 'H-nummer is required' ? 'H-nummer må fylles ut.' : 'Kontroller medlemsopplysningene.' }, { status: error.message === 'Unauthorized' ? 401 : 400, headers: { 'Cache-Control': 'no-store' } }); }
+  try { return NextResponse.json({ ok: true, member: await createAdminMember(await readJsonObject(request)) }, { status: 201, headers: { 'Cache-Control': 'no-store' } }); }
+  catch (error) { return NextResponse.json({ ok: false, message: error.message === 'H-nummer is required' ? 'H-nummer må fylles ut.' : 'Kontroller medlemsopplysningene.' }, { status: apiErrorStatus(error), headers: { 'Cache-Control': 'no-store' } }); }
 }

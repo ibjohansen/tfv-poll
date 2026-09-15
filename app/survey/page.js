@@ -111,7 +111,7 @@ export default async function HomePage({ searchParams }) {
             <p>Velg det alternativet som passer best for hvert spørsmål.</p>
           </div>
 
-          <SurveyForm mockToken={isMockMode() ? memberToken : undefined} mockSurveyId={isMockMode() ? requestedSurveyId : undefined} questions={access.survey.questions} />
+          <SurveyForm key={`${access.survey.id}:${access.survey.question_version}`} questionVersion={access.survey.question_version} mockToken={isMockMode() ? memberToken : undefined} mockSurveyId={isMockMode() ? requestedSurveyId : undefined} questions={access.survey.questions} />
         </section>}
 
         <footer className="page-footer">

@@ -1,3 +1,4 @@
+import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { deleteAdminCmsPage, getAdminCmsPage, updateAdminCmsPage } from '@/lib/cms-pages';
 
@@ -10,7 +11,7 @@ function statusFor(error) {
   if (error.message === 'Unauthorized') return 401;
   if (error.message === 'Page not found') return 404;
   if ((error.code || error.cause?.code) === '23505') return 409;
-  return 400;
+  return apiErrorStatus(error, 400);
 }
 
 function messageFor(error) {
@@ -32,7 +33,7 @@ export async function GET(_request, { params }) {
 export async function PATCH(request, { params }) {
   if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return response({ ok: false, message: 'Ugyldig forespørsel.' }, 403);
   try {
-    return response({ ok: true, page: await updateAdminCmsPage((await params).id, await request.json()) });
+    return response({ ok: true, page: await updateAdminCmsPage((await params).id, await readJsonObject(request)) });
   } catch (error) {
     console.error('CMS page update failed', { id: (await params).id, code: error.code || error.cause?.code, message: error.message });
     return response({ ok: false, message: messageFor(error) }, statusFor(error));

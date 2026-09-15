@@ -31,6 +31,8 @@ test('member access and membership verification emails contain a visible 15-minu
     assert.match(rendered.html, /varer i 15 minutter/);
     assert.match(rendered.html, /token=aaaaaaaa/);
     assert.match(rendered.text, /varer i 15 minutter/);
+    assert.match(rendered.text, /skal ikke videresendes/);
+    assert.match(rendered.text, /kopiere adressen.*lime den inn i nettleseren/);
     assert.match(rendered.text, new RegExp(SYSTEM_EMAIL_FOOTER.replace('.', '\\.')));
     assert.doesNotMatch(rendered.html, /<script|fonts\.googleapis/i);
   }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { exchangeSurveyAccessToken, getSurveyAccess } from '../lib/membership.js';
+import { exchangeSurveyAccessToken, getSurveyAccess, submitSurveyResponse } from '../lib/membership.js';
 
 const secret = 'a'.repeat(64);
 const env = {
@@ -67,4 +67,36 @@ test('one-time survey token is consumed while creating a separate hashed session
 test('database environment mismatch fails closed', async () => {
   const sql = async () => [{ environment: 'production' }];
   await assert.rejects(getSurveyAccess(secret, { sql, env }), /Database environment mismatch/);
+});
+
+test('survey submission requires the displayed version before any response write', async () => {
+  const row = {
+    id: '42', survey_id: 'b'.repeat(32), is_open: true, ends_on: '2099-12-31',
+    question_version: 2, questions: [{ id: 'q1', text: 'Ny spørsmålstekst' }],
+  };
+  const statements = [];
+  await assert.rejects(submitSurveyResponse(secret, { q1: 'ja' }, { sql: sqlMock([], statements), env }), /Invalid survey version/);
+  assert.equal(statements.length, 0);
+  const result = await submitSurveyResponse(secret, { q1: 'ja' }, { sql: sqlMock([[row]], statements), env, questionVersion: 1 });
+  assert.equal(result.saved, false);
+  assert.equal(statements.some(query => query.includes('INSERT INTO survey_responses')), false);
+});
+
+test('response snapshot and version condition are part of the same insert statement', async () => {
+  const queries = [];
+  const sql = async (strings, ...values) => {
+    const query = strings.join('?');
+    queries.push({ query, values });
+    if (query.includes('application_environment')) return [{ environment: 'development' }];
+    if (query.includes('INSERT INTO security_events')) return [];
+    if (query.includes('INSERT INTO survey_responses')) return [{ id: '1', member_id: '42', survey_id: 'b'.repeat(32) }];
+    return [{ id: '42', survey_id: 'b'.repeat(32), is_open: true, ends_on: '2099-12-31', question_version: 2, questions: [{ id: 'q1', text: 'Spørsmål' }] }];
+  };
+  assert.equal((await submitSurveyResponse(secret, { q1: 'ja' }, { sql, env, questionVersion: 2 })).saved, true);
+  const insert = queries.find(({ query }) => query.includes('INSERT INTO survey_responses'));
+  assert.match(insert.query, /SELECT v.member_id, v.survey_id, s.question_version, s.questions/);
+  assert.match(insert.query, /AND s.question_version = \?/);
+  assert.ok(insert.values.includes(2));
+  assert.ok(insert.values.includes(JSON.stringify({ q1: 'ja' })));
+  assert.doesNotMatch(JSON.stringify(queries), new RegExp(secret));
 });

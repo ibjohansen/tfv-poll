@@ -1,3 +1,4 @@
+import { apiErrorStatus } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { approveMatrikkelItem } from '@/lib/matrikkel-sync';
 
@@ -12,7 +13,7 @@ export async function POST(request, { params }) {
     const run = await approveMatrikkelItem(values.id, values.memberId);
     return NextResponse.json({ ok: true, run }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
-    const status = error.message === 'Unauthorized' ? 403 : error.message === 'Item not found' ? 404 : 400;
+    const status = apiErrorStatus(error, 403);
     console.error('Matrikkel review approval failed', { message: error.message, code: error.code || error.cause?.code });
     return NextResponse.json({ ok: false, message: status === 403 ? 'Du har ikke tilgang.' : 'Kunne ikke godkjenne oppslaget.' }, { status });
   }

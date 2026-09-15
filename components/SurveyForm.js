@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { answerOptions } from "@/data/survey";
 
-export default function SurveyForm({ mockToken, mockSurveyId, questions }) {
+export default function SurveyForm({ mockToken, mockSurveyId, questions, questionVersion }) {
   const router = useRouter();
   const [answers, setAnswers] = useState(() => Object.fromEntries(questions.map(({ id }) => [id, ""])));
   const [website, setWebsite] = useState("");
@@ -41,10 +41,16 @@ export default function SurveyForm({ mockToken, mockSurveyId, questions }) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ answers, website, mockToken, mockSurveyId }),
+        body: JSON.stringify({ answers, website, mockToken, mockSurveyId, questionVersion }),
       });
 
       const data = await response.json();
+
+      if (data.code === 'SURVEY_CHANGED' || data.code === 'SURVEY_CONFLICT') {
+        setStatus('changed');
+        setErrorMessage(data.message);
+        return;
+      }
 
       if (response.status === 409) {
         router.refresh();
@@ -59,6 +65,15 @@ export default function SurveyForm({ mockToken, mockSurveyId, questions }) {
       setStatus("idle");
       setErrorMessage(error.message);
     }
+  }
+
+  if (status === 'changed') {
+    return <section className="form-error" role="alert"><p>{errorMessage}</p><button className="primary-button" type="button" onClick={() => {
+      setAnswers(Object.fromEntries(questions.map(({ id }) => [id, ''])));
+      setErrorMessage('');
+      setStatus('idle');
+      router.refresh();
+    }}>Last inn undersøkelsen på nytt</button></section>;
   }
 
   if (status === "success") {

@@ -1,47 +1,669 @@
-# ToDo #
+# ToDo
 
-## Test ##
+Gjennomgått 14.–15. september 2026. Kvalitetsarbeidet nedenfor er implementert lokalt;
+ingen produksjonsdeploy, GitHub-push, Entra-endring eller Neon-migrering er kjørt.
+Se [kvalitetsgjennomgangen](docs/quality-review.md) for funn, testdekning,
+vurdering av brukerloggen og begrensninger. Uferdige produktoppgaver beholdes.
 
-- Testdekningen er reell, men smal: 18 testfiler dekker enkelt-lib-moduler (rate-limit, tokens, e-postmaler osv.), men det finnes ingen tester på selve API-rutene (app/api/*) og ingen UI-tester for de 19 komponentene. lib/matrikkel-sync.js (363 linjer, kompleks synk-logikk) har heller ingen egen testfil. Dette trekker det reelle testarbeidet noe ned sammenlignet med hva 12 350 linjer normalt ville tilsi.
-- 
-## Sikkerhet ##
+## P1 – Prioritet / bør gjøres først
 
-- grundig gjennomgang basert på repo - innbruddsforsøk
-- 
+Dette er oppgaver som enten reduserer teknisk risiko, styrker kvaliteten eller legger grunnlaget for funksjonalitet som andre oppgaver er avhengige av.
 
-## Applikasjon ##
+### Test
 
-- Favicon må bruke logo med lys bakgrunn, eller kan sånn logo være følsom for lyst/mørkt brukergrensesnitt?
-- Mangler	Kommentar
-  LICENSE-fil	Ingen LICENSE/LICENSE.md. package.json har heller ikke et "license"-felt. Siden "private": true er satt, er dette trolig bevisst (internt/lukket prosjekt for velforeningen), men verdt å bekrefte at det er tilsiktet
-  Repo-beskrivelse og topics	Bekreftet fra GitHub-siden tidligere ("No description, website, or topics provided")
-  CONTRIBUTING.md / CODE_OF_CONDUCT.md	Ikke til stede — normalt greit å utelate for et lukket, ett-utvikler-prosjekt
-  CHANGELOG.md	Ingen endringslogg, til tross for at dette er et system i aktiv produksjonsdrift med jevnlige sikkerhetsoppdateringer
-  .editorconfig	Ikke funnet
-- .github/workflows/ mangler i denne zip-en — GitHub-siden din viste tidligere at denne mappen finnes i repoet (med ci.yml), men den er ikke med i filen du lastet opp. Sannsynligvis har zip-verktøyet ditt hoppet over denne skjulte mappen. Jeg får dermed ikke sett selve CI-konfigurasjonen.
-  .neon og skills-lock.json er inkludert, selv om begge er eksplisitt gitignored. Dette er ikke hemmeligheter (.neon inneholder bare et Neon org-/prosjekt-ID, ingen passord), men det bekrefter at zip-en er tatt av arbeidsmappen din lokalt — ikke en ren git clone/git archive. Ikke kritisk, men verdt å være obs på neste gang du deler kode, i tilfelle andre gitignorede filer (f.eks. .env.local) skulle blitt med ved et uhell. Denne gangen var det rent — ingen ekte secrets funnet noe sted i arkivet.
-  skills-lock.json avslører for øvrig at prosjektet bruker AI-agent-skills (neondatabase/agent-skills) i utviklingen, og SIKKERHETSPLAN.md viser at koden nylig (11.–12. september 2026) gjennomgikk en ekstern sikkerhetsgjennomgang med 8 funn som er lukket i kode. Litt ironisk kontekst gitt at vi estimerer "uten AI", men nyttig bakgrunn.
+- [x] **API-tester**
 
-## Medlemsregister ##
+  **Status: Rutetester implementert.** Alle 33 rutefiler under `app/api` og
+  `app/survey/api` er representert i testpakken. Eksterne tjenester er erstattet
+  med testdobler. Fullt OAuth-forløp, databaseintegrasjon og nettleserflyter gjenstår;
+  dette er ikke det samme som full integrasjonsdekning. Se oversikten i
+  `docs/quality-review.md`. Prompten nedenfor beholdes som akseptansekriterier.
 
-- hvordan utelukke medlemmer/tomter fra mailutsendeles?
-- feks. Turufjell, utbyggere, entreprenører
-- hvordan sende samlemail når samme epost er rgistrert på flere tomter
-- vise grupperinger, når samme mail er registrert på flere tomter
-- linken som sendes ved forespørsel varer i 15 min, den burde stå på forsoden Lenken er personlig, varer i 15 minutter og skal ikke videresendes. Hvis knappen ikke virker, kopier denne adressen
-- mulighet til å reservere seg mot å utveksle info med Turufjell AS
-- Når man vil endre detaljer, så bør man få mulighet for å lage en kommentar, da skal det komme en melding i oppgavelisten
-- gruppere tomter, i grender
-- 
+  **Prompt:**
 
-## Undersøkelser ##
+  > Gå gjennom alle API-rutene under `app/api/*` og etabler automatiserte tester for disse.
+  >
+  > Testene skal minimum dekke:
+  >
+  > * forventet respons ved gyldige kall
+  > * validering av input
+  > * manglende obligatoriske parametere
+  > * ugyldige data
+  > * autentisering og autorisasjon der dette brukes
+  > * utløpte eller ugyldige tokens
+  > * rate limiting der dette er relevant
+  > * databasefeil og andre forventede feilsituasjoner
+  > * korrekte HTTP-statuskoder
+  > * at sensitiv informasjon ikke eksponeres i feilmeldinger
+  >
+  > Bruk eksisterende testverktøy og mønstre i prosjektet der dette finnes. Ikke endre produksjonskode med mindre det er nødvendig for å gjøre koden testbar.
+  >
+  > Lag til slutt en kort oversikt over hvilke API-ruter som er dekket og eventuelle områder som fortsatt mangler testdekning.
 
-- 
+---
 
-## CMS ##
+- [x] **Tester for Matrikkel-synkronisering**
 
-- Tekstformattering
+  **Status: Enhetstester implementert** i `tests/matrikkel-sync.test.mjs`.
+  Feil ved samtidig kansellering og desimal batchstørrelse er rettet etter
+  dokumentasjon av funn. Reelle transaksjoner, samtidighet og gjenopptakelse etter
+  worker-krasj gjenstår; se de nye P1-punktene nedenfor.
 
-## Nyhetsbrev ##
+  **Prompt:**
 
-- lage nyhetsbrev som kan sendes
+  > Lag en grundig testpakke for `lib/matrikkel-sync.js`.
+  >
+  > Analyser først hele synkroniseringsflyten og identifiser alle viktige scenarier og edge cases.
+  >
+  > Test minimum:
+  >
+  > * nye eiendommer
+  > * eksisterende eiendommer
+  > * endrede eiendomsdata
+  > * manglende eller ufullstendige data
+  > * duplikater
+  > * slettede eller ikke lenger tilgjengelige objekter dersom dette håndteres
+  > * feil fra eksterne tjenester
+  > * databasefeil
+  > * delvis gjennomført synkronisering
+  > * idempotens: samme datasett skal kunne behandles flere ganger uten uønskede sideeffekter
+  >
+  > Mock eksterne tjenester og database der dette er hensiktsmessig.
+  >
+  > Ikke endre synkroniseringslogikken med mindre du avdekker en konkret feil. Hvis du finner feil eller risikoområder, dokumenter disse separat før eventuell endring.
+
+---
+
+### GitHub Actions / CI
+
+- [x] **Etabler og dokumenter GitHub Actions / CI**
+
+  **Status: Eksisterende CI er gjennomgått og beholdt.**
+  `.github/workflows/ci.yml` fantes allerede og kjører `npm ci` og `npm run check`
+  (lint, tester, bygg) med Node fra `.nvmrc` og npm-cache. Triggeren er nå pull
+  request og push til `main`, for å unngå doble kjøringer på arbeidsgrener.
+
+  GitHub Actions er ikke nødvendig for Netlify-deploy, men gir prosjektet en egen
+  kvalitetskontroll før innfletting. Netlify kjører i dag bare `npm run build`.
+  **Gjenstår i GitHub:** Kontroller/aktiver påkrevd `quality`-status og PR-krav for
+  `main`. Dette er ikke automatisk konfigurert av workflow-filen og er ikke endret
+  eksternt. Netlify venter ikke automatisk på Actions ved direkte push til `main`.
+
+  **Prompt:**
+
+  > Etabler en enkel og robust GitHub Actions-pipeline for prosjektet.
+  >
+  > Pipeline skal kjøre automatisk ved pull request og push til relevante branches.
+  >
+  > Den skal minimum:
+  >
+  > * installere dependencies med låst dependency-versjon
+  > * kjøre lint
+  > * kjøre automatiserte tester
+  > * bygge applikasjonen
+  > * feile dersom noen av disse stegene feiler
+  >
+  > Bruk en støttet Node.js LTS-versjon og cache npm-dependencies dersom det er hensiktsmessig.
+  >
+  > Ikke implementer automatisk produksjonsdeploy med mindre prosjektets eksisterende deployoppsett klart tilsier dette.
+  >
+  > Sørg for at secrets aldri hardkodes i workflow-filene.
+  >
+  > Dokumenter kort hvordan workflowen fungerer.
+
+---
+
+### Medlemsregister
+
+- [ ] **Medlemsstatus per tomt**
+
+  De fleste tomter skal være ordinære medlemmer av Turufjell vel, men enkelte tomter skal kunne unntas, for eksempel tomter eid av Turufjell AS.
+
+  **Prompt:**
+
+  > Legg til medlemsstatus på tomtenivå.
+  >
+  > Standard skal være at en tomt regnes som «vanlig medlem».
+  >
+  > Administrator skal kunne fjerne denne statusen for enkelte tomter, eksempelvis tomter som eies av Turufjell AS og ikke skal behandles som ordinære medlemmer.
+  >
+  > Vurder om feltet bør modelleres som:
+  >
+  > * boolean `isMember`
+  > * eller en medlemskategori/status dersom det er sannsynlig at vi får flere medlemstyper senere
+  >
+  > Velg den løsningen som gir best langsiktig modell uten å gjøre systemet unødvendig komplisert.
+  >
+  > Medlemsstatus skal kunne brukes i:
+  >
+  > * filtrering
+  > * telling/statistikk
+  > * e-postutvalg
+  > * undersøkelser
+  > * nyhetsbrev
+  >
+  > Eksisterende tomter skal migreres på en trygg måte.
+  >
+  > Legg til tester.
+
+---
+
+- [ ] **Samlet e-post når samme e-postadresse brukes på flere tomter**
+
+  Samme person kan være registrert på flere tomter med samme e-postadresse.
+
+  **Prompt:**
+
+  > Endre utsending av personlig medlemslenke slik at en person som har samme e-postadresse registrert på flere tomter, ikke mottar én separat e-post per tomt.
+  >
+  > Personen skal i stedet motta én samlet e-post.
+  >
+  > Etter åpning av den personlige lenken skal brukeren kunne se alle tomtene vedkommende har tilgang til.
+  >
+  > Ta hensyn til:
+  >
+  > * sikker tokenhåndtering
+  > * at tilgang kun gis til tomter knyttet til den aktuelle e-postadressen
+  > * utløpstid
+  > * eksisterende rate limiting
+  > * at en e-postadresse kan være knyttet til både én og flere tomter
+  >
+  > Eksisterende funksjonalitet for brukere med kun én tomt skal fortsatt fungere enkelt og uten unødvendige ekstra steg.
+  >
+  > Legg til tester for begge tilfeller.
+
+---
+
+- [ ] **Vis gruppering når samme e-postadresse tilhører flere tomter**
+
+  **Prompt:**
+
+  > Oppdater medlemsregisteret i administrasjonsgrensesnittet slik at det blir tydelig når samme e-postadresse er registrert på flere tomter.
+  >
+  > Lag en visuell gruppering eller annen intuitiv markering slik at administrator enkelt kan se:
+  >
+  > * hvilke tomter som deler samme e-postadresse
+  > * hvor mange tomter adressen er knyttet til
+  > * hvilke personer/navn som eventuelt er registrert på de forskjellige tomtene
+  >
+  > Det skal fortsatt være mulig å åpne og redigere den enkelte tomt separat.
+  >
+  > Unngå å slå sammen data som faktisk tilhører forskjellige medlems-/tomteposter.
+
+---
+
+- [x] **Informasjon om personlig lenke**
+
+  **Status: Ferdig.** Forsiden og HTML-e-posten hadde allerede budskapet og riktig
+  levetid. Ren tekst-versjonen er supplert med kopier/lim inn-hjelp. Tester bekrefter
+  15 minutter, personlig lenke og at den ikke skal videresendes.
+
+  **Prompt:**
+
+  > Gjør det tydelig både på forsiden og i e-posten med personlig lenke at lenken er personlig og kun varer i 15 minutter.
+  >
+  > Bruk følgende budskap eller en språklig forbedret variant:
+  >
+  > «Lenken er personlig, varer i 15 minutter og skal ikke videresendes.»
+  >
+  > I e-posten skal det i tillegg stå:
+  >
+  > «Hvis knappen ikke virker, kan du kopiere adressen nedenfor og lime den inn i nettleseren.»
+  >
+  > Sørg for at teksten er lett synlig uten å virke unødvendig dramatisk.
+  >
+  > Ikke endre faktisk tokenlevetid med mindre den i dag ikke er 15 minutter.
+
+---
+
+- [ ] **Kommentar ved endring av medlemsopplysninger**
+
+  **Prompt:**
+
+  > Utvid funksjonen for endring av medlemsopplysninger slik at medlemmet kan legge ved en valgfri kommentar til endringsforslaget.
+  >
+  > Kommentaren skal:
+  >
+  > * lagres sammen med endringsforslaget
+  > * være synlig for administrator
+  > * vises i oppgavelisten
+  > * inngå i endringshistorikken
+  >
+  > Når et endringsforslag inneholder kommentar, skal dette fremgå tydelig i oppgavelisten.
+  >
+  > Kommentar skal valideres og ha en rimelig maksimal lengde.
+  >
+  > Vis aldri kommentaren som HTML.
+  >
+  > Legg til nødvendige tester.
+
+---
+
+- [ ] **Reservasjon mot deling med Turufjell AS**
+
+  **Prompt:**
+
+  > Implementer en funksjon der medlemmet kan reservere seg mot at kontaktinformasjon deles eller utveksles med Turufjell AS.
+  >
+  > Før implementasjon skal du undersøke eksisterende datamodell og hvordan personopplysninger brukes i systemet.
+  >
+  > Funksjonen skal:
+  >
+  > * være tydelig formulert for medlemmet
+  > * lagres med tidspunkt for siste endring
+  > * kunne endres senere av medlemmet
+  > * være synlig for administrator
+  > * kunne brukes som filter ved eksport eller utvalg av medlemmer
+  >
+  > Standardverdien må ikke endres uten at eksisterende praksis og krav er avklart.
+  >
+  > Registrer også endringen i relevant endringshistorikk/audit-logg.
+  >
+  > Legg til tester.
+
+---
+
+### Nye P1-punkter fra kvalitetsgjennomgangen
+
+- [ ] **Integrasjonstester mot isolert Postgres:** Bruk schema-only testgren og
+  syntetiske data. Test migrering to ganger, faktiske audittriggere, at token og
+  lagringsnøkler utelates, samtidige engangslenker og survey-svar, endret
+  spørsmålsversjon under innsending og samtidig stopp/arbeid i Matrikkel.
+- [ ] **Gjenopptakelse etter avbrutt worker:** Elementer kan bli stående som
+  `processing` etter krasj/timeout. Utform tidsbegrenset reservasjon, avgrenset
+  retry og test at medlemmer ikke oppdateres flere ganger. Manuell godkjenning
+  og sletting av kjøringslogg trenger også transaksjonstester.
+- [ ] **Brukerloggens integritet og lagringstid:** Vurder append-only-beskyttelse
+  og databaseprivilegier for `audit_log`, samt kontrollert sletting etter
+  avklart lagringstid. Dagens UI er skrivebeskyttet, men tabellen har ikke samme
+  beskyttelse som `security_events`.
+- [ ] **GitHub-grenbeskyttelse:** Verifiser påkrevd `quality`-sjekk og PR-krav på
+  `main`, slik at kvalitetskontrollen faktisk stopper dårlige endringer før
+  Netlify publiserer. Ekstern innstilling, ikke utført i denne gjennomgangen.
+
+---
+
+## P2 – Neste steg
+
+Dette er viktige funksjoner som bygger videre på medlemsregisteret og prosjektets grunnstruktur.
+
+### Test
+
+- [ ] **UI-tester**
+
+  **Status: Ikke implementert.** Prioriter komplette nettleserflyter for
+  `SurveyForm`, `MemberSelfServiceEntry`, `MemberSelfServiceProfile`,
+  `AdminMemberRequests`, `AdminMemberDirectory` og `AdminAuditLog`, deretter CMS
+  og e-postpanelet. Test tastatur/fokus, mobil, valideringsfeil, utløpt økt og
+  versjonskonflikt i survey. Rene presentasjonskomponenter trenger ikke tester
+  bare for å øke dekningen. Se `docs/quality-review.md` for avgrensning.
+
+  **Prompt:**
+
+  > Kartlegg React-komponentene i prosjektet og etabler et hensiktsmessig nivå av automatiserte UI-/komponenttester.
+  >
+  > Prioriter komponenter som:
+  >
+  > * inneholder brukerinput
+  > * endrer data
+  > * viser medlemsinformasjon
+  > * håndterer innlogging eller personlige lenker
+  > * brukes i administrasjonsgrensesnittet
+  > * har kompleks tilstand eller betinget rendering
+  >
+  > Test både normal bruk og relevante feilsituasjoner.
+  >
+  > Ikke lag tester kun for å øke coverage-tallet. Prioriter tester som beskytter faktisk funksjonalitet mot regresjoner.
+  >
+  > Oppsummer til slutt hvilke komponenter som er testet, hvilke som ikke er testet, og hvilke områder som bør prioriteres videre.
+
+---
+
+### Medlemsregister
+
+- [ ] **Søk i brukerendringer**
+
+  **Status: Funksjonen implementert.** Brukerloggen har søk i navn, e-post,
+  post-ID og før-/etterverdier, filtre på aktør, område, endringstype, status og
+  datointervall, samt rettet telling og sideinndeling. Datovalidering og bundne
+  SQL-parametere er testet. Ingen ny API-rute er nødvendig; den eksisterende
+  serversiden behandler søket.
+
+  **Gjenstår:** Mål store fritekstsøk på syntetiske data og velg eventuell
+  søkeindeks/nøkkelbasert paginering. Dagens JSON-delstrengsøk har ikke egen
+  søkeindeks; ytelse ved stor loggmengde er ikke verifisert.
+
+  **Prompt:**
+
+  > Implementer søk og filtrering i historikken over brukerendringer.
+  >
+  > Administrator skal kunne søke etter relevante endringer basert på tilgjengelige data, eksempelvis:
+  >
+  > * navn
+  > * e-postadresse
+  > * medlems-/tomteinformasjon
+  > * endringstype
+  > * status
+  > * dato eller datointervall
+  >
+  > Bruk eksisterende datamodell og designsystem.
+  >
+  > Søk skal skje effektivt også dersom antallet endringer blir betydelig større enn i dag.
+  >
+  > Legg til nødvendige API-endringer, validering og tester.
+
+---
+
+- [ ] **Grender**
+
+  **Prompt:**
+
+  > Implementer støtte for å knytte tomter til en «grend».
+  >
+  > En grend skal være en administrerbar gruppering av tomter.
+  >
+  > Administrator skal kunne:
+  >
+  > * opprette en grend
+  > * endre navn på en grend
+  > * legge én eller flere tomter til en grend
+  > * flytte tomter mellom grender
+  > * filtrere medlemsregisteret på grend
+  > * se antall tomter og medlemmer per grend
+  >
+  > En tomt skal i utgangspunktet tilhøre maksimalt én grend.
+  >
+  > Ikke hardkod grendene i kildekoden.
+  >
+  > Legg til databaseendringer, API, frontend og tester.
+
+---
+
+- [ ] **E-postgrupper**
+
+  **Prompt:**
+
+  > Implementer administrerbare e-postgrupper i medlemsregisteret.
+  >
+  > Administrator skal kunne:
+  >
+  > * markere én, flere eller alle relevante medlems-/tomteposter
+  > * opprette en ny gruppe basert på utvalget
+  > * legge medlemmer til eksisterende gruppe
+  > * fjerne medlemmer fra en gruppe
+  > * endre gruppens navn
+  > * slette en gruppe uten å slette medlemsdata
+  > * se hvor mange unike e-postadresser gruppen inneholder
+  >
+  > Samme e-postadresse skal ikke få flere kopier av samme utsending bare fordi adressen finnes på flere tomter.
+  >
+  > Gruppene skal senere kunne benyttes av nyhetsbrevmodulen.
+  >
+  > Design datamodellen slik at gruppemedlemskap og medlemsregisteret ikke dupliserer persondata unødvendig.
+  >
+  > Legg til API, UI og tester.
+
+---
+
+### CMS
+
+- [ ] **Rikteksteditor for artikler**
+
+  **Prompt:**
+
+  > Implementer en enkel rikteksteditor for CMS-artikler.
+  >
+  > Støtt minimum:
+  >
+  > * avsnitt
+  > * overskrifter
+  > * fet tekst
+  > * kursiv
+  > * punktlister
+  > * nummererte lister
+  > * lenker
+  >
+  > Vurder i tillegg om blokksitat er hensiktsmessig.
+  >
+  > Ikke legg til støtte for:
+  >
+  > * fontvalg
+  > * skriftstørrelser
+  > * egendefinerte farger
+  > * fri HTML
+  > * avansert layout
+  >
+  > Innholdet skal følge nettstedets eksisterende typografi og design.
+  >
+  > Velg et godt vedlikeholdt React-kompatibelt editorbibliotek dersom det er hensiktsmessig.
+  >
+  > Riktekstinnhold skal saniteres for å unngå XSS.
+  >
+  > Eksisterende artikler må fortsatt kunne vises.
+  >
+  > Legg til relevante tester.
+
+---
+
+### Applikasjon
+
+- [ ] **Favicon**
+
+  **Prompt:**
+
+  > Oppdater favicon for applikasjonen slik at det benytter den grafiske delen av Turufjell vel-logoen.
+  >
+  > Undersøk hvordan favicon fungerer i nettlesere med både lyst og mørkt brukergrensesnitt.
+  >
+  > Målet er at logoen skal være tydelig og gjenkjennelig i begge tilfeller.
+  >
+  > Vurder om vi bør:
+  >
+  > * bruke én universell favicon med lys bakgrunn
+  > * bruke transparent bakgrunn
+  > * tilby egne varianter for lyst og mørkt grensesnitt dersom dette støttes på en robust måte
+  >
+  > Implementer den løsningen som gir best kompatibilitet på moderne Chrome, Edge, Safari og Firefox.
+  >
+  > Ikke endre den øvrige logoen eller profileringen.
+
+---
+
+### Brukerlogg og bakgrunnsjobber
+
+- [x] Logg generering av medlems- og resultatseksport med aktør, tidspunkt,
+  eksporttype, antall poster, utvalg og undersøkelses-ID. Ingen kopi av innholdet.
+- [ ] Samlet hendelsesvisning for testmail, kampanjestart/resend og ferdig/feilet
+  utsending; gjenbruk eksisterende kampanje-/leveringsdata og unngå doble hendelser.
+- [ ] Registrer aktør ved Matrikkel-stopp, manuell godkjenning og skjuling av
+  kjøringsloggen, slik at revisjonssporet beholdes selv om kjøringen skjules.
+- [ ] Vurder admin-innlogging, avvist tilgang, rolleendringer og medlemmets egen
+  dataeksport som sikkerhetshendelser. Avklar hva Entra allerede logger og hva
+  som faktisk trengs i appen. Ikke logg rå tokens, OAuth-payload eller IP-er her.
+- [ ] Test bakgrunnsfunksjonenes jobbhemmelighet, retry etter timeout, dobbel
+  invocation og delvise e-postfeil uten reelle utsendinger.
+
+Begrunnelse og sammenligning med GitHub og Microsoft Purview finnes i
+`docs/quality-review.md`. Vanlige sidevisninger er ikke del av brukerloggen.
+
+---
+
+## P3 – Backlog / senere
+
+Dette er nyttig funksjonalitet, men den er ikke nødvendig for neste versjon og kan bygges når grunnfunksjonene er stabile.
+
+### Nyhetsbrev
+
+- [ ] **Nyhetsbrevkampanjer**
+
+  Avhenger av at e-postgrupper er på plass.
+
+  **Prompt:**
+
+  > Design og implementer en nyhetsbrevmodul som bygger videre på e-postgruppene i medlemsregisteret.
+  >
+  > Administrator skal kunne:
+  >
+  > * opprette en ny nyhetsbrevkampanje
+  > * angi tittel/emne
+  > * skrive innhold
+  > * velge én eller flere mottakergrupper
+  > * se antall unike mottakere før utsending
+  > * forhåndsvise nyhetsbrevet
+  > * sende testmail til valgfri adresse
+  > * sende kampanjen
+  > * se status for utsendingen
+  >
+  > Systemet skal sørge for at samme e-postadresse kun mottar én kopi av kampanjen selv om adressen finnes i flere valgte grupper eller er knyttet til flere tomter.
+  >
+  > Lagre minimum:
+  >
+  > * kampanjen
+  > * tidspunkt for utsending
+  > * mottakergrunnlag
+  > * antall mottakere
+  > * status
+  > * eventuelle sendefeil
+  >
+  > Vurder om utsending bør skje i batcher eller via eksisterende kø-/mailmekanisme for å unngå timeout og belastning.
+  >
+  > Ikke bygg funksjonalitet for markedsføringssporing som åpningspixler eller tredjeparts tracking.
+  >
+  > Gjenbruk eksisterende e-postinfrastruktur og designmønstre der dette er mulig.
+  >
+  > Legg til nødvendige tester.
+
+---
+
+### Applikasjon
+
+- [ ] **Intern bruksstatistikk**
+
+  Det er ikke ønskelig å bruke Google Analytics eller andre tredjepartstjenester.
+
+  **Prompt:**
+
+  > Design og implementer en enkel, personvernvennlig og egenhostet løsning for bruksstatistikk.
+  >
+  > Det skal ikke brukes Google Analytics eller andre eksterne analysetjenester.
+  >
+  > Statistikken skal lagres i vår egen backend og kunne vises i en egen administrasjonsmodul.
+  >
+  > Aktuelle datapunkter:
+  >
+  > * nettlesertype
+  > * operativsystem når dette kan identifiseres på en rimelig og stabil måte
+  > * skjerm-/viewportstørrelse
+  > * besøkte sider
+  > * tidspunkt for sidevisning
+  > * omtrentlig varighet på besøk/session
+  > * navigasjon mellom interne sider
+  > * referrer når denne er tilgjengelig
+  > * hvilken side brukeren forlater løsningen fra, dersom dette kan estimeres pålitelig
+  >
+  > Før implementasjon:
+  >
+  > 1. vurder hvilke data som faktisk kan samles inn pålitelig i moderne nettlesere
+  > 2. vurder personvernkonsekvenser
+  > 3. unngå fingerprinting
+  > 4. unngå innsamling av unødvendige personopplysninger
+  > 5. vurder nødvendig lagringstid
+  >
+  > Lag deretter:
+  >
+  > * backend-endepunkt for mottak av events
+  > * egnet datamodell
+  > * frontend-instrumentering
+  > * administrasjonsside med aggregert statistikk
+  >
+  > Administrasjonssiden bør minimum kunne vise:
+  >
+  > * sidevisninger
+  > * besøk/sessioner
+  > * mest besøkte sider
+  > * gjennomsnittlig besøkstid
+  > * nettleserfordeling
+  > * operativsystem
+  > * skjermstørrelser
+  > * referrers
+  > * utvikling over tid
+  >
+  > Bruk primært aggregerte data i visningen.
+  >
+  > Dokumenter hvilke data som registreres og hvorfor.
+
+---
+
+- [ ] **Repository-metadata og prosjektfiler**
+
+  Repositoryet mangler enkelte standardfiler og metadata.
+
+  `package.json` har `"private": true`, og prosjektet er et lukket prosjekt for Turufjell vel. Det er derfor ikke nødvendigvis ønskelig med en åpen kildekode-lisens.
+
+  **Prompt:**
+
+  > Gjennomgå repositoryet og rydd opp i prosjektmetadata og standardfiler.
+  >
+  > Gjør følgende:
+  >
+  > * vurder om det bør finnes en `LICENSE`-fil når prosjektet er privat og ikke skal distribueres som open source
+  > * ikke legg til en standard open source-lisens uten eksplisitt grunnlag
+  > * legg til en kort og presis repository-beskrivelse der dette kan defineres i prosjektet
+  > * foreslå relevante GitHub topics
+  > * vurder om `CONTRIBUTING.md` og `CODE_OF_CONDUCT.md` har noen verdi i et lukket prosjekt med svært få utviklere
+  > * opprett `.editorconfig`
+  > * opprett `CHANGELOG.md` med en enkel struktur som kan brukes videre
+  >
+  > Ikke legg til filer kun fordi de er vanlige i open source-prosjekter. Tilpass anbefalingene til at dette er en privat produksjonsapplikasjon for Turufjell vel.
+  >
+  > Oppsummer hva du har lagt til og hva du bevisst har valgt å utelate.
+
+---
+
+## Undersøkelser
+
+Foreløpig ingen definerte utviklingsoppgaver.
+
+---
+
+## Sikkerhet
+
+En separat sikkerhetsgjennomgang og penetrasjonstest basert på repository og kjørende løsning er igangsatt med ekstern part.
+
+**Status:** Ingen utviklingsoppgave nå.
+
+Eventuelle funn fra sikkerhetsgjennomgangen legges inn som egne P1- eller P2-saker når rapporten foreligger.
+
+---
+
+## Ferdig
+
+- [x] Rutetester for alle 33 API-rutefiler, med de avgrensningene som er dokumentert.
+- [x] Egen Matrikkel-testpakke for kontrollflyt, feil, batcher og gjentatt behandling.
+- [x] Rettet overskriving av stoppet Matrikkel-status og desimaltall i batchgrenser.
+- [x] Rettet 400/500 ved manglende roller og tekniske feil; avvis ugyldig JSON
+  før adminendringer, slik at ødelagt input ikke starter en full synkronisering.
+- [x] Rettet antall treff og sideinndeling i brukerloggen; lagt til søk og filtre.
+- [x] Loggført generering av medlems- og resultatseksporter uten eksportinnhold.
+- [x] Beholdt og justert eksisterende CI; dokumentert forskjellen fra Netlify.
+- [x] Personlig 15-minutterslenke og kopier/lim inn-hjelp i e-post.
+- [x] Beskyttet survey-snapshot mot endrede spørsmål mellom visning og lagring:
+  klientversjon, API-validering og atomisk SQL-vilkår; medlemmet må laste inn
+  nye spørsmål og svare på nytt. Ingen skjemaendring nødvendig.
+- [x] Dokumentert resterende testbehov, loggføringsbehov og produksjonskontroller.
+
+---
+
+# Anbefalt rekkefølge
+
+1. [ ] Databaseintegrasjon, worker-gjenopptakelse og GitHub-grenbeskyttelse
+2. [ ] Samlet tilgang for samme e-post på flere tomter (dagens e-postoppslag avviser flere treff)
+3. [ ] Medlemsstatus per tomt og visuell gruppering av felles e-post
+4. [ ] Kommentar ved endringsforslag
+5. [ ] Avklar praksis/standardverdi for reservasjon mot deling med Turufjell AS
+6. [ ] Brukerloggens integritet, lagringstid og gjenstående administrative hendelser
+7. [ ] Nettlesertester og tester av bakgrunnsjobber
+8. [ ] Ytelsestest av søk i store brukerlogger
+9. [ ] Grender og e-postgrupper
+10. [ ] CMS rikteksteditor og favicon
+11. [ ] Nyhetsbrev, eventuell bruksstatistikk og repository-opprydding

@@ -1,3 +1,4 @@
+import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { createSurveyEmailCampaign, getSurveyEmailOverview, sendSurveyTestEmail } from '@/lib/survey-email';
 import { isEmailRateLimited } from '@/lib/rate-limit';
@@ -10,11 +11,7 @@ function sameOrigin(request) {
 }
 
 function errorResponse(error) {
-  const status = error.message === 'Unauthorized' ? 403
-    : ['Invalid survey ID', 'Invalid test recipient'].includes(error.message) ? 400
-      : error.message === 'Survey not found' ? 404
-        : ['Survey not sendable', 'No recipients'].includes(error.message) ? 409
-          : error.status || 500;
+  const status = apiErrorStatus(error, 403);
   const messages = {
     DISABLED: 'E-postsending er deaktivert.',
     CONFIGURATION: 'MailerSend er ikke ferdig konfigurert.',
@@ -38,7 +35,7 @@ export async function POST(request, { params }) {
   if (isEmailRateLimited(request)) return NextResponse.json({ ok: false, message: 'For mange e-posthandlinger. Vent ett minutt.' }, { status: 429 });
   const surveyId = (await params).id;
   try {
-    const input = await request.json().catch(() => ({}));
+    const input = await readJsonObject(request);
     if (input.action === 'test') {
       const delivery = await sendSurveyTestEmail(surveyId, input.recipient);
       return NextResponse.json({ ok: true, delivery }, { headers: { 'Cache-Control': 'no-store, private' } });

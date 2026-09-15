@@ -1,3 +1,4 @@
+import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { createMemberExport } from '@/lib/member-export';
 
 export const runtime = 'nodejs';
@@ -16,7 +17,7 @@ function exportBaseUrl(request) {
 export async function POST(request) {
   if (!sameOrigin(request)) return Response.json({ ok: false, message: 'Ugyldig forespørsel.' }, { status: 403 });
   try {
-    const input = await request.json();
+    const input = await readJsonObject(request);
     const result = await createMemberExport({ ...input, baseUrl: exportBaseUrl(request) });
     const date = new Date().toISOString().slice(0, 10);
     return new Response(new Uint8Array(result.buffer), {
@@ -28,9 +29,7 @@ export async function POST(request) {
       },
     });
   } catch (error) {
-    const status = error.message === 'Unauthorized' ? 401
-      : ['Invalid member selection', 'Invalid survey ID', 'No members selected'].includes(error.message) ? 400
-        : error.message === 'Survey not found' ? 404 : 500;
+    const status = apiErrorStatus(error);
     console.error('Admin member export failed', { code: error.code || error.cause?.code, message: error.message });
     const message = error.message === 'No members selected' ? 'Ingen medlemmer er valgt.'
       : error.message === 'Survey not found' ? 'Undersøkelsen finnes ikke.'
