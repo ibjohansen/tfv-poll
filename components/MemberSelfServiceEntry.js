@@ -47,6 +47,7 @@ export default function MemberSelfServiceEntry({membershipStatus = ''}) {
         try {
             const response = await fetch('/api/membership-requests', {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
+                signal: AbortSignal.timeout(25_000),
                 body: JSON.stringify({
                     ...membership,
                     other_contact_emails: membership.other_contact_emails.split(/[\n,;]+/).map((email) => email.trim()).filter(Boolean)
@@ -57,7 +58,9 @@ export default function MemberSelfServiceEntry({membershipStatus = ''}) {
             setMessage(body.message);
             setMembership(emptyMembership);
         } catch (error) {
-            setMessage(error.message);
+            setMessage(error.name === 'TimeoutError' || error.name === 'AbortError'
+                ? 'Innsendingen tok for lang tid. Prøv igjen.'
+                : error.message || 'Kunne ikke kontakte serveren. Prøv igjen.');
             setIsError(true);
         } finally {
             setBusy('');

@@ -7,6 +7,8 @@ test('error mapping distinguishes validation, permissions, conflicts and server 
   assert.equal(apiErrorStatus(new Error('Unauthorized'), 403), 403);
   assert.equal(apiErrorStatus(new SyntaxError('Malformed JSON')), 400);
   assert.equal(apiErrorStatus(Object.assign(new Error('constraint'), { cause: { code: '23505' } })), 409);
+  assert.equal(apiErrorStatus(Object.assign(new Error('deadline'), { name: 'TimeoutError' })), 504);
+  assert.equal(apiErrorStatus(Object.assign(new Error('cancelled'), { name: 'AbortError' })), 504);
   assert.equal(apiErrorStatus(Object.assign(new Error('database'), { code: '08006' })), 500);
   assert.equal(apiErrorStatus(Object.assign(new Error('bad status'), { status: 200 })), 500);
 });

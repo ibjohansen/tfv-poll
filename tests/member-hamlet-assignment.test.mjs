@@ -1,14 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModule, plain } from './helpers/load-module.mjs';
-import { containsPoint, validatePolygon } from '../lib/map/geo.js';
-import { normalizeCadastral } from '../lib/map/normalization.js';
+import * as assignmentUtils from '../lib/map/hamlet-assignment-utils.js';
 import { square } from './fixtures/map.mjs';
 
 async function moduleWith(lookup) {
   return loadModule('lib/map/member-hamlet-assignment.js', {
     '../matrikkel-client.js': { lookupAddress: lookup },
-    './geo.js': { containsPoint, validatePolygon }, './normalization.js': { normalizeCadastral },
+    './hamlet-assignment-utils.js': assignmentUtils,
   });
 }
 

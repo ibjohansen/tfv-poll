@@ -140,6 +140,7 @@ flowchart TB
   norgeskart["Kartverket Norgeskart\ninnbygd eiendomskart"]
   geodata["Kartverket / Geonorge / Overpass\nadresser, teiger, veier og stier"]
   worker["Netlify Background Function\nmatrikkelsynkronisering"]
+  hamletworker["Netlify Background Function\ngrende- og tomtekobling"]
   emailworker["Netlify Background Function\nsurvey-utsendelse"]
   mailer["MailerSend Email API\nlevering og suppression"]
 
@@ -150,6 +151,7 @@ flowchart TB
   next -->|"S3 API, server-side credentials"| storage
   next -->|"Leverer"| files
   next -->|"Starter rollebeskyttet jobb"| worker
+  next -->|"Lagrer kontrollert grend og starter rematch"| hamletworker
   next -->|"Starter bekreftet utsendelse"| emailworker
   emailworker -->|"Personlige meldinger over HTTPS"| mailer
   mailer -->|"Signerte delivery/bounce-webhooks"| next
@@ -157,6 +159,8 @@ flowchart TB
   browser -->|"Adresseoppslag og kartvisning"| norgeskart
   next -->|"Avgrensede server-side oppslag"| geodata
   worker -->|"Snapshot, status og oppdateringer"| db
+  hamletworker -->|"Entydige grendekoblinger"| db
+  hamletworker -->|"Offisielle adressepunkter"| geodata
 ```
 
 `DATABASE_URL` brukes bare på serveren. Nettleseren mottar aldri database-
@@ -187,6 +191,7 @@ gang til.
 | `lib/matrikkel-client.js` | Server-side klient for Adresse-API, A5-avvik og Matrikkelens SOAP-tjenester. |
 | `lib/matrikkel-sync.js` | Oppretter sikkerhetskopi, behandler medlemmer og lagrer fremdrift og avvik. |
 | `netlify/functions/matrikkel-sync-background.mjs` | Kjører lange synkroniseringer uten å holde nettleserforespørselen åpen. |
+| `lib/map/hamlet-member-sync.js` og `netlify/functions/hamlet-member-sync-background.mjs` | Beregner alle kontrollerte grender samlet og oppdaterer sikre tomtekoblinger etter polygonendringer. |
 | `lib/mailer-service.js` og `lib/survey-email.js` | Validerer og sender e-post server-side, bygger personlig survey-invitasjon og holder MailerSend-detaljer utenfor resten av applikasjonen. |
 | `lib/email-templates.js` | Rendrer også de profilerte tilgangs- og innmeldingsmailene som HTML og ren tekst. |
 | `app/api/webhooks/mailersend` | Validerer HMAC-signatur og registrerer nødvendige leverings- og bounce-hendelser idempotent. |
@@ -553,11 +558,14 @@ Grendene er navngitte polygoner i `member_hamlets`, ikke hardkodede kartutkast.
 Valg i kart eller nedtrekksliste utfører samme handling og zoomer til polygonet.
 Administrator kan opprette, redigere, kontrollere og fjerne polygonet med
 versjonskontroll; fjerning av geometri sletter ikke grenden eller eksisterende
-medlemstilknytninger. Kartet ligger til høyre for grendeeditoren på brede skjermer
+medlemstilknytninger. Når et polygon lagres som kontrollert, startes en samlet
+rematch av alle kontrollerte grender i bakgrunnen. Kartet ligger til høyre for grendeeditoren på brede skjermer
 og tilpasser seg mobilvisning.
 
 Adresse- og eiendomsobjekter kobles til medlemsregisteret med matrikkelreferanse
-eller eksakt normalisert adresse. Et entydig kartobjekt åpner det samme
+eller eksakt normalisert adresse. Rematchen oppretter, flytter eller fjerner bare
+en grendekobling når offisielt adressepunkt og matrikkeldata gir et sikkert
+resultat; uklare og overlappende treff beholdes for manuell kontroll. Et entydig kartobjekt åpner det samme
 detaljpanelet med automatisk lagring som medlemsregisteret. Manglende hjemmelshaver
 eller flere mulige registerposter opplyses eksplisitt; løsningen velger aldri en
 eier eller tomt på grunnlag av fuzzy treff. Nye tomter forsøkes koblet til én
@@ -589,8 +597,9 @@ gjenopptas idempotent uten å sende ferdigbehandlede leveringer på nytt.
 Kartmodulen ligger på `/admin/map`, med beskyttede Node-ruter
 `POST /api/admin/map/search`, `GET/POST /api/admin/map/hamlets` og
 `GET /api/admin/members/[id]`. De bruker eksisterende `members`-rettighet og
-pooled databaseforbindelse; ingen nye miljøvariabler, Entra-roller eller
-bakgrunnsfunksjoner trengs. Den additive produksjonsmigreringen 16. september
+pooled databaseforbindelse. Automatisk rematch bruker
+`hamlet-member-sync-background` og den server-side variabelen
+`HAMLET_JOB_SECRET`; ingen ny Entra-rolle eller databasemigrering trengs. Den additive produksjonsmigreringen 16. september
 la til `polygon`, `polygon_reviewed`, `polygon_version`, `polygon_updated_at` og
 versjoneringstriggeren på `member_hamlets`; se
 [migreringsstatus](docs/database-migration-2026-09-16.md). Ingen grender eller
@@ -615,7 +624,7 @@ e-post, telefon og interne notater inngår ikke i responsen. Ruten har en lokal
 rate-limit på 20 oppslag per minutt og trenger samme delte/WAF-beskyttelse som
 de øvrige offentlige rutene i produksjon. Ingen ny miljøvariabel er nødvendig.
 
-Eksisterende tomter kobles samlet etter kontrollert tørrkjøring:
+Eksisterende tomter kan fortsatt kontrolleres manuelt med en tørrkjøring:
 
 ```bash
 APP_ENVIRONMENT=production npm run hamlets:assign
@@ -625,9 +634,14 @@ APP_ENVIRONMENT=production HAMLET_ASSIGNMENT_CONFIRMED=true npm run hamlets:assi
 Andre kommando er en produksjonsendring og skal bare kjøres etter eksplisitt
 godkjenning. Den bruker direkte `DATABASE_URL_UNPOOLED`, avviser miljømismatch,
 kontrollerer at polygonversjonene er uendret, lagrer bare entydige MATCH-treff i
-én SQL-operasjon og skriver audit-hendelser. Tvetydige, overlappende eller
-ukoblede tomter må avklares manuelt. Nye tomter forsøkes koblet én gang ved
-opprettelse; medlemsfilter, grupper, detaljer og offentlig kart leser deretter
+én SQL-operasjon og skriver audit-hendelser. Dette er et vedlikeholdsverktøy;
+normal drift bruker automatisk full rematch hver gang et polygon lagres som
+kontrollert. Jobben avviser ufullstendige Kartverket-data og utdaterte
+polygonversjoner. Den flytter sikre treff og fjerner bare en kobling når et
+eksakt offisielt adressepunkt beviser at tomten ligger utenfor alle kontrollerte
+grender. Tvetydige eller uavklarte tomter beholdes for manuell kontroll.
+Nye tomter forsøkes koblet både ved direkte adminoppretting og ved godkjenning
+av en offentlig innmelding; medlemsfilter, grupper, detaljer og offentlig kart leser deretter
 den lagrede `hamlet_id`-koblingen. Når en lagret grend velges i adminkartet,
 avgrenses også registerlaget med denne koblingen; den tidligere manuelle
 «Koble register til valgt grend»-handlingen er fjernet. Filteret **Uten grend**
@@ -636,7 +650,7 @@ i medlemsregisteret viser poster som må gjennomgås manuelt.
 `netlify.toml` inneholder byggkommando, publiseringsmappe, Node-versjon og
 funksjonsmappe. Netlify håndterer Next.js App Router gjennom sin Next.js-adapter,
 mens den lange matrikkelsynkroniseringen kjøres som en Netlify Background
-Function. Survey-utsendelser kjøres på samme måte i en egen bakgrunnsfunksjon.
+Function. Grenderematch og survey-utsendelser kjøres på samme måte i egne bakgrunnsfunksjoner.
 Den planlagte Netlify-kjøringen av `background-watchdog` kontrollerer matrikkeljobber
 hvert femte minutt, bare når Netlify `CONTEXT` og `APP_ENVIRONMENT` er
 `production`. Den prøver høyst tre gjenopptakinger før synlig feilstatus.
@@ -887,6 +901,18 @@ Den samme verdien må være tilgjengelig for både Next.js-ruten og
 `matrikkel-sync-background` i produksjonens Functions-scope. Ingen ny
 miljøvariabel eller databasemigrering trengs for oppstartsrettelsen.
 
+#### Påkrevd for automatisk grendekobling
+
+| Variabel | Produksjonsverdi |
+| --- | --- |
+| `HAMLET_JOB_SECRET` | Egen tilfeldig intern hemmelighet på minst 32 bytes |
+
+Generer hemmeligheten separat fra `AUTH_SECRET`, `MATRIKKEL_JOB_SECRET` og
+MailerSend-hemmelighetene. Den må være tilgjengelig for både Next.js-ruten og
+`hamlet-member-sync-background` i produksjonens Functions-scope, uten
+`NEXT_PUBLIC_`-prefiks. Funksjonen bruker eksisterende pooled `DATABASE_URL`;
+ingen databasemigrering er nødvendig.
+
 #### Påkrevd for MailerSend
 
 | Variabel | Produksjonsverdi |
@@ -962,7 +988,7 @@ URI i Entra oppdateres. Utløs en ny deploy etter endringen.
    hvis forrige bygg ble kjørt før miljøvariablene ble lagt inn.
 3. Kontroller at byggeloggen avsluttes uten feil.
 4. Kontroller at Next.js-funksjonene og
-   `matrikkel-sync-background`, `survey-email-background`, `newsletter-background` og `background-watchdog` finnes i Netlifys
+   `matrikkel-sync-background`, `hamlet-member-sync-background`, `survey-email-background`, `newsletter-background` og `background-watchdog` finnes i Netlifys
    funksjonsoversikt. Kontroller også at edge-funksjonen
    `public-member-rate-limit` er oppdaget og aktivert i deployloggen.
 5. Kontroller at den publiserte deployen bruker committen som var godkjent i
@@ -1029,6 +1055,13 @@ Utfør kontrollene i denne rekkefølgen:
 - Opprett en syntetisk tomt med en eksakt adresse innenfor én kontrollert grend.
   Kontroller at grenden tilordnes automatisk. Utilgjengelig adressetjeneste,
   fuzzy treff eller overlappende grender skal ikke føre til en gjettet kobling.
+- Flytt kanten på et kontrollert grendepolygon over et syntetisk adressepunkt,
+  lagre og kontroller at grendekoblingen oppdateres uten å holde kartforespørselen
+  åpen. Et nytt kontrollert polygon skal tilsvarende koble en tidligere ukoblet
+  testtomt. Kontroller `Hamlet member sync started` og avslutning/feil i
+  Netlify-loggen, samt det aggregerte resultatet i brukerloggen. Ufullstendige
+  Kartverket-data eller en polygonversjon som endres under kjøringen skal ikke
+  gi delvis rapportert suksess.
 - Logg inn med en godkjent administratorkonto og kontroller modulene Medlemsregister,
   Oppgaveliste, Undersøkelser, Web og Brukerendringer. Velg et medlem med gateadresse, og kontroller
   at eiendomskartet er lukket under adressefeltet i detaljpanelet og kan åpnes.
@@ -1078,9 +1111,13 @@ Utfør kontrollene i denne rekkefølgen:
   i isolert testmiljø først; en stoppet kjøring skal beholde statusen etterpå.
 - For matrikkeljobben: kontroller at funksjonskallet går direkte til
   `/.netlify/functions/matrikkel-sync-background`, uten `Location: /admin/login`.
-  Bare de tre eksakte bakgrunnsrutene for matrikkel, survey-e-post og nyhetsbrev skal omgå Next-innlogging; `/admin` og
+  Bare de fire eksakte bakgrunnsrutene for matrikkel, grendekobling, survey-e-post og nyhetsbrev skal omgå Next-innlogging; `/admin` og
   `/api/admin/matrikkel/*` skal fortsatt kreve innlogging og riktig rolle.
   Jobbhemmeligheten kontrolleres inne i funksjonen før databasebehandling.
+- Kontroller at `hamlet-member-sync-background` avviser feil metode, ugyldig
+  grend-/versjons-ID og feil `HAMLET_JOB_SECRET`, og at bare direkte `202` godtas
+  som oppstartskvittering. Bruk syntetiske tomter i isolert miljø; ikke flytt en
+  reell grendegrense for å teste feilhåndtering.
 - Kontroller tilsvarende at `survey-email-background` avviser feil
   jobbhemmelighet, at direkte `202` er eneste godkjente oppstartskvittering,
   og at redirect/HTML/timeout gir synlig feil for en fortsatt ventende kampanje.
@@ -1414,8 +1451,8 @@ standard; ved en bevisst lokal test kan `MATRIKKEL_ALLOW_PRODTEST=true` settes.
 
 Oppstart og videreføring bruker `lib/matrikkel-background.js`: HTTPS, ingen
 omdirigeringer, 10 sekunders timeout og bare HTTP `202` som gyldig kvittering.
-Next-proxyens matcher unntar kun den eksakte matrikkelfunksjonen (og eventuell
-avsluttende skråstrek) fra cookieinnlogging. Funksjonen krever fortsatt POST,
+Next-proxyens matcher unntar kun de eksplisitt navngitte bakgrunnsfunksjonene
+(og eventuell avsluttende skråstrek) fra cookieinnlogging. Matrikkelfunksjonen krever fortsatt POST,
 korrekt jobbhemmelighet og gyldig jobb-ID; admin-API-et beholder rollebeskyttelsen.
 Dette unngår feilen der en omdirigering til innlogging ga HTML med `200` som
 ble tolket som «jobb startet» uten at noen behandling skjedde.

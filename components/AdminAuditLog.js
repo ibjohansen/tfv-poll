@@ -30,7 +30,11 @@ const fieldLabels = {
   matched_count: 'Sikre treff', linked_count: 'Nye grendekoblinger',
   already_linked_count: 'Allerede koblet', assigned_elsewhere_count: 'Tilhører annen grend',
   changed_count: 'Lagrede grendekoblinger', hamlet_count: 'Kontrollerte grender',
-  unassigned_count: 'Tomter uten entydig grend',
+  unassigned_count: 'Tomter uten entydig grend', moved_count: 'Flyttede grendekoblinger',
+  unlinked_count: 'Fjernede grendekoblinger', ambiguous_count: 'Tvetydige grendetreff',
+  unresolved_count: 'Uavklarte grendetreff', active_member_count: 'Aktive tomter', stored_count: 'Faktisk lagrede endringer',
+  official_address_count: 'Offisielle adresser i grendene',
+  trigger_hamlet_id: 'Utløsende grend', trigger_polygon_version: 'Utløsende polygonversjon',
 };
 
 function formatDate(value) {
@@ -55,7 +59,7 @@ function changedFields(entry) {
 function entityLabel(entry) {
   const value = entry.after_value || entry.before_value || {};
   if (value.action?.startsWith('hamlet_polygon_')) return `Grend · ${value.name} · ${value.action === 'hamlet_polygon_clear' ? 'polygon fjernet' : 'polygon lagret'}`;
-  if (value.action === 'hamlet_members_sync') return `Grend · ${value.linked_count || 0} tomter koblet fra kartkontroll`;
+  if (value.action === 'hamlet_members_sync') return `Grender · ${value.changed_count || 0} tomtekoblinger oppdatert fra kartkontroll`;
   if (value.action === 'hamlet_members_bulk_assignment') return `Grender · ${value.changed_count || 0} tomter koblet i engangskjøring`;
   if (value.action === 'newsletter_saved') return 'Nyhetsbrevutkast lagret';
   if (value.action === 'newsletter_queued') return 'Nyhetsbrev bestilt';

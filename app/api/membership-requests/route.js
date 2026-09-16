@@ -6,6 +6,7 @@ import { consumeMemberAccessLimits, getPublicBrowserMarker, PUBLIC_BROWSER_COOKI
 import { apiErrorStatus } from '@/lib/api-errors';
 
 export const runtime = 'nodejs';
+const SERVER_TIMEOUT_MS = 20_000;
 
 function sameOrigin(request) {
   const origin = request.headers.get('origin');
@@ -15,16 +16,27 @@ function sameOrigin(request) {
 export async function POST(request) {
   if (!sameOrigin(request)) return NextResponse.json({ ok: false, message: 'Ugyldig forespørsel.' }, { status: 403 });
   if (isMemberAccessRateLimited(request)) return NextResponse.json({ ok: false, message: 'For mange forsøk. Vent litt før du prøver igjen.' }, { status: 429 });
+  const startedAt = Date.now();
+  let stage = 'request_body';
+  const signal = AbortSignal.any([request.signal, AbortSignal.timeout(SERVER_TIMEOUT_MS)]);
+  const setStage = (nextStage) => {
+    stage = nextStage;
+    console.info('Membership request progress', { stage, elapsedMs: Date.now() - startedAt });
+  };
   try {
     const input = await request.json();
     if (!input || typeof input !== 'object' || Array.isArray(input)) return NextResponse.json({ ok: false, message: 'Ugyldig forespørsel.' }, { status: 400 });
     const marker = getPublicBrowserMarker(request);
     const identifier = input.primary_contact_email || input.h_number || input.street_address;
+    setStage('rate_limit');
     const limited = await consumeMemberAccessLimits({
       request, identifier, browserMarker: marker.value, sql: getSql(), scopePrefix: 'membership-request',
     });
     if (limited) return NextResponse.json({ ok: false, message: 'For mange forsøk. Vent litt før du prøver igjen.' }, { status: 429 });
-    await createMembershipRequest(input);
+    const result = await createMembershipRequest(input, { signal, onStage: setStage });
+    console.info('Membership request completed', {
+      outcome: result?.outcome || 'accepted', elapsedMs: Date.now() - startedAt,
+    });
     const response = NextResponse.json({
       ok: true,
       message: 'Hvis tomten ikke allerede er registrert, sender vi en bekreftelseslenke til hovedadressen du oppga.',
@@ -34,8 +46,14 @@ export async function POST(request) {
     });
     return response;
   } catch (error) {
-    console.error('Membership request failed', { code: error.code || error.cause?.code, occurredAt: new Date().toISOString() });
+    console.error('Membership request failed', {
+      code: error.code || error.cause?.code, name: error.name, stage,
+      elapsedMs: Date.now() - startedAt, occurredAt: new Date().toISOString(),
+    });
     const status = apiErrorStatus(error);
-    return NextResponse.json({ ok: false, message: status >= 500 ? 'Tjenesten er midlertidig utilgjengelig. Prøv igjen senere.' : 'Forespørselen kunne ikke behandles. Kontroller feltene og prøv igjen.' }, { status, headers: { 'Cache-Control': 'no-store, private' } });
+    const message = status === 504 ? 'Innsendingen tok for lang tid. Prøv igjen.'
+      : status >= 500 ? 'Tjenesten er midlertidig utilgjengelig. Prøv igjen senere.'
+        : 'Forespørselen kunne ikke behandles. Kontroller feltene og prøv igjen.';
+    return NextResponse.json({ ok: false, message }, { status, headers: { 'Cache-Control': 'no-store, private' } });
   }
 }

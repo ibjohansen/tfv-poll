@@ -58,15 +58,20 @@ const HamletControls = forwardRef(function HamletControls({ polygon, editing, dr
     const controller = new AbortController(); saveRequest.current = controller;
     setSaving(true); onBusy(true); setError(''); setNotice('');
     try {
-      const result = await persistMapHamlet({ action, id: current?.id, version: current?.version,
+      const saved = await persistMapHamlet({ action, id: current?.id, version: current?.version,
         name, polygon, reviewed }, AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]));
       if (controller.signal.aborted) return;
+      const result = saved.hamlet;
       const rows = [...hamlets.filter((h) => h.id !== result.id), result].sort((a, b) => a.name.localeCompare(b.name, 'nb'));
       setHamlets(rows); onList(rows); setCurrent(result); setChosen(result.id); setName(result.name);
       setCreating(false);
       setReviewedFor(result.reviewed ? geometryKey(result.polygon) : '');
       onUse(result);
-      setNotice(action === 'clear' ? 'Polygonet er fjernet. Grenden og medlemskoblingene er beholdt.' : `«${result.name}» er lagret i databasen.`);
+      const storedNotice = action === 'clear' ? 'Polygonet er fjernet. Grenden og medlemskoblingene er beholdt.' : `«${result.name}» er lagret i databasen.`;
+      setNotice(saved.rematch?.status === 'failed'
+        ? `${storedNotice} Automatisk oppdatering av grendekoblinger kunne ikke startes. Lagre den kontrollerte grenden på nytt eller kontakt drift.`
+        : ['queued', 'started'].includes(saved.rematch?.status)
+          ? `${storedNotice} Grendekoblingene oppdateres i bakgrunnen.` : storedNotice);
     } catch (failure) {
       if (!controller.signal.aborted) setError(failure.name === 'TimeoutError' || failure.name === 'AbortError'
         ? 'Lagring kunne ikke bekreftes. Last grendelisten på nytt og kontroller før du prøver igjen. Utkastet er beholdt.' : failure.message);

@@ -89,9 +89,12 @@ test('actual hamlet GET/POST routes enforce auth, CSRF, limits and private respo
       '../rate-limit.js': { isRateLimited: () => false }, './geo.js': { MapError }, './http.js': { readLimitedJson },
     });
     const route = await loadModule('app/api/admin/map/hamlets/route.js', {
+      'next/server': { after: () => {} },
       '@/lib/map/api': { handleMapRequest }, '@/lib/map/hamlet-service': {
         getMapHamlets: async () => { calls++; return []; }, saveMapHamlet: async () => { calls++; return hamlets.hamletRecord(row); },
       },
+      '@/lib/map/hamlet-sync-background': { dispatchHamletMemberSync: async () => {} },
+      '@/lib/map/hamlet-member-sync': { synchronizeMemberHamlets: async () => {} },
     });
     for (const method of ['GET', 'POST']) {
       const r = await route[method](request('/api/admin/map/hamlets', { method, ...(method === 'POST' ? { body: input } : {}) }));

@@ -91,3 +91,16 @@ test('suppression permission failure is reported distinctly', async () => {
     (error) => error instanceof MailerServiceError && error.code === 'SUPPRESSION_PERMISSION' && error.status === 503,
   );
 });
+
+test('suppression lookup propagates the request deadline', async () => {
+  const controller = new AbortController();
+  const reason = Object.assign(new Error('deadline'), { name: 'TimeoutError' });
+  const lookup = getMailerSendSuppressions({
+    env, signal: controller.signal,
+    fetchImpl: async (_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true });
+    }),
+  });
+  controller.abort(reason);
+  await assert.rejects(lookup, (error) => error === reason);
+});

@@ -58,5 +58,5 @@ export async function proxy(request) {
 export const config = {
   // Disse eksakte maskin-til-maskin-rutene autentiseres med jobbhemmeligheten i
   // funksjonen, ikke med nettlesercookie. Ikke åpne hele /.netlify/functions/.
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon.png|\\.netlify/functions/(?:matrikkel-sync-background|survey-email-background|newsletter-background)/?$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon.png|\\.netlify/functions/(?:matrikkel-sync-background|survey-email-background|newsletter-background|hamlet-member-sync-background)/?$).*)'],
 };

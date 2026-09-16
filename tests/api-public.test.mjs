@@ -108,6 +108,8 @@ test('membership registration validates request shape, accepts valid requests an
   const send = (body, headers) => route.POST(request('/api/membership-requests', { method: 'POST', body, headers }));
   assert.equal((await send({ primary_contact_email: 'test@example.test', h_number: 'H-7' })).status, 202);
   assert.equal(calls[0].name, 'createMembershipRequest');
+  assert.equal(typeof calls[0].args[1].signal.throwIfAborted, 'function');
+  assert.equal(typeof calls[0].args[1].onStage, 'function');
   for (const body of [null, [], 'invalid']) assert.equal((await send(body)).status, 400);
   assert.equal((await send({}, { origin: 'https://evil.test' })).status, 403);
   state.limited = true;
@@ -120,6 +122,10 @@ test('membership registration validates request shape, accepts valid requests an
   const response = await send({});
   assert.equal(response.status, 500);
   assert.doesNotMatch(await response.text(), /secret|password/);
+  state.error = Object.assign(new Error('deadline'), { name: 'TimeoutError' });
+  const timedOut = await send({ primary_contact_email: 'test@example.test', h_number: 'H-8' });
+  assert.equal(timedOut.status, 504);
+  assert.match((await timedOut.json()).message, /tok for lang tid/i);
 });
 
 test('profile actions preserve session scoping and return validation, session and conflict errors', async () => {

@@ -1,7 +1,9 @@
 # Kart og registerkontroll
 
 Implementert lokalt 15. september 2026. Inngang: `/admin/map`.
-Ingen automatisk registerretting, import, migrering, produksjonsdeploy eller
+Kartfunksjonen endrer aldri adresse-, matrikkel- eller kontaktfelter automatisk.
+Et kontrollert grendepolygon utløser derimot en sikker rematch av den separate
+`members.hamlet_id`-koblingen. Ingen import, migrering, produksjonsdeploy eller
 ekstern konfigurasjonsendring utføres av kartfunksjonen. Fra 16. september kan
 administrator eksplisitt lagre navn og polygon i eksisterende grender.
 Den additive produksjonsmigreringen ble utført og verifisert 16. september.
@@ -45,8 +47,8 @@ på smale skjermer.
 3. Rediger hjørnene, fullfør og velg **Lagre grendeendringer**. Navnet kan også
    endres. Ulagrede endringer krever bekreftelse før bytte til en annen grend.
 4. Når en lagret grend velges, avgrenses registerlaget med den lagrede
-   `members.hamlet_id`-koblingen. Offisielle adresser og grenser hentes fortsatt
-   for geografisk kontroll, men grendetilhørigheten beregnes ikke på nytt.
+   `members.hamlet_id`-koblingen. Når et polygon lagres som kontrollert,
+   beregnes koblingene for alle kontrollerte grender på nytt i bakgrunnen.
 5. **Fjern lagret polygon** fjerner bare geometrien, ikke grenden eller
    medlemskoblingene. **Slett polygon** i tegneverktøyet fjerner bare det lokale
    søkeområdet. Sletting av selve grenden gjøres fortsatt i gruppeadministrasjonen.
@@ -60,10 +62,13 @@ til søk om gangen. Utkast vises stiplet og merkes «må kontrolleres».
 Administrator kan bekrefte manuell kontroll av plasseringen; geometriendringer
 i editoren opphever denne bekreftelsen. Dette gjør ikke grensen til en offisiell
 matrikkelgrense. Lagrede polygoner er interne Turufjell vel-data, ikke Kartverket-data.
-Lagring eller valg av et polygon endrer ikke medlemmer. Kobling av eksisterende
-poster skjer bare ved den eksplisitte registerhandlingen beskrevet over. Nye
-tomter forsøkes automatisk koblet når en eksakt offisiell adresse ligger i
-nøyaktig ett kontrollert grendepolygon; usikre eller overlappende treff avvises.
+Valg av et polygon endrer ikke medlemmer. Lagring av et kontrollert polygon
+starter en full rematch i en Netlify Background Function. Sikre treff kan
+opprette eller flytte `hamlet_id`. En eksisterende kobling fjernes bare når et
+eksakt offisielt adresse-/matrikkeltreff plasserer tomten entydig utenfor alle
+kontrollerte grender. Uklare, overlappende eller utilgjengelige oppslag beholdes
+for manuell kontroll. Nye tomter forsøkes automatisk koblet både ved direkte
+adminoppretting og ved godkjenning av en offentlig innmelding.
 
 Navn, GeoJSON-geometri, kontrollstatus, versjon og endringstid lagres i
 `member_hamlets`. Den lagrede grendelisten leses fra databasen, ikke en hardkodet
@@ -93,6 +98,8 @@ er innført. Playwright tester kartet i et isolert nettlesermiljø.
 | `components/MapExplorer/` | Kart, polygontegning, tabeller og medlemsdetaljer |
 | `lib/map/browser-client.js` | Kall til egne beskyttede API-ruter |
 | `lib/map/hamlets.js`, `hamlet-service.js` | Validering, datamodell og varig lagring av grendepolygoner |
+| `lib/map/hamlet-member-sync.js`, `hamlet-sync-background.js` | Samlet, versjonskontrollert rematch og sikker oppstart av bakgrunnsjobb |
+| `netlify/functions/hamlet-member-sync-background.mjs` | Langvarig grende-/tomtekobling uten å holde kartforespørselen åpen |
 | `lib/map/kartverket-address-service.js` | Kartverkets adresseadapter, paginering og normalisering |
 | `lib/map/kartverket-property-service.js` | Matrikkelreferanser og adresseplasseringer; ikke eiendomsgrenser |
 | `lib/map/kartverket-boundary-service.js` | Åpent WFS/GML-uttrekk, UTM-transformasjon og teiggeometri |
@@ -113,17 +120,21 @@ avgrenser registerdelen til lagrede koblinger. Klienten får ikke velge eksterne
 lagring krever `name`, `polygon` og valgfri boolsk `reviewed`; endring/fjerning
 krever `id` og siste `version`. Lagrede GeoJSON-egenskaper normaliseres på server.
 Ruten har samme autentisering, CSRF-, størrelses- og rate-limit-vern som øvrig
-kart-API. Responsene er private og ikke cachebare. Demonstrasjonsmodus tillater
-ikke varig lagring. Valg av en grend henter data og registerkoblinger for denne
+kart-API. Responsene er private og ikke cachebare. Et kontrollert resultat
+returnerer også `rematch.status` (`queued`, `started` eller `failed`).
+Demonstrasjonsmodus tillater ikke varig lagring. Valg av en grend henter data og registerkoblinger for denne
 ved behov; løsningen
 forhåndshenter ikke alle grender og lagrer ikke kopier av Kartverket-data i Neon.
-Bare koblingen i `members.hamlet_id` lagres. Engangskjøringen skrev hver endret
-medlemspost og et aggregert sammendrag til brukerloggen uten medlems-ID-liste.
+Bare koblingen i `members.hamlet_id` lagres. Hver automatisk kjøring skriver
+endrede medlemsposter gjennom eksisterende audittrigger og et aggregert
+sammendrag til brukerloggen uten adresser, koordinater eller medlems-ID-liste.
 
 Alle kartrutene og siden krever eksisterende `members`-rettighet. Med konfigurert
 Entra-rollemodell betyr dette `TFV.MemberAdmin`; `TFV.ReadOnly` eller bare
 `TFV.MatrikkelAdmin` er ikke nok. Den eksisterende allowlist-modellen uten
-rollekrav beholdes. Ingen ny Entra-rolle eller miljøvariabel behøves.
+rollekrav beholdes. Ingen ny Entra-rolle eller databasemigrering behøves.
+Produksjon krever en egen server-side `HAMLET_JOB_SECRET` i Netlify Functions-
+konteksten; den må ikke ha `NEXT_PUBLIC_`-prefiks.
 
 ### Offentlig kart på forsiden
 
@@ -141,12 +152,15 @@ adressetreff gir ingen gjettet markør; posten står fortsatt i listen. Response
 inneholder ikke medlems-ID, navn, hjemmelshaver, e-post, telefon, reservasjoner
 eller interne notater. Kartverket mottar polygonet server-side, ikke registerdata.
 
-Eksisterende register fylles én gang med `npm run hamlets:assign`. Kommandoen er
+Eksisterende register ble opprinnelig fylt med `npm run hamlets:assign`. Kommandoen er nå et
+manuelt kontroll-/vedlikeholdsverktøy. Den er
 tørrkjøring som standard og beregner alle kontrollerte polygoner samlet, slik at
 overlapp oppdages før lagring. Produksjonslagring krever eksplisitt
 `APP_ENVIRONMENT=production`, `HAMLET_ASSIGNMENT_CONFIRMED=true` og `--apply`.
-Nye tomter får samme kobling ved opprettelse. Filtre, gruppetelling, detaljer og
-offentlig grendevisning leser deretter den lagrede fremmednøkkelen.
+Normal drift starter automatisk full rematch etter lagring av et kontrollert
+polygon. Nye tomter får samme sikre kobling ved opprettelse eller godkjenning.
+Filtre, gruppetelling, detaljer og offentlig grendevisning leser deretter den
+lagrede fremmednøkkelen; de gjør ikke egne geografiske grendeoppslag.
 
 Engangskjøringen ble utført og kontrollert i produksjon 16.09.2026. Den koblet
 424 av 428 aktive tomter til 11 kontrollerte grender, uten overlapp eller
@@ -354,6 +368,10 @@ Eksisterende testoppsett og `npm run check` brukes uendret.
 
 `tests/map-hamlets.test.mjs` dekker grendedata, tilgangskontroll, validering,
 konflikter og atomisk loggføring med simulert database.
+`tests/hamlet-member-sync.test.mjs` dekker full rematch, sikre opprettelser,
+flytting/fjerning, tvetydige/uavklarte treff, ufullstendige Kartverket-data og
+utdaterte polygonversjoner. `tests/hamlet-background.test.mjs` dekker direkte
+`202`, HTTPS, hemmelighetskontroll, inputvalidering og synlig oppstartsfeil.
 `tests/integration/map-hamlets.test.mjs` bruker isolert Postgres med syntetiske
 data og dekker gjentatt migrering, lagring/gjenlesing, samtidige endringer,
 navneendring/sletting fra gruppeadministrasjonen, bevarte medlemstilknytninger

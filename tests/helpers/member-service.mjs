@@ -7,7 +7,7 @@ import { normalizeEmail } from '../../lib/mailer-service.js';
 
 export const memberTestEnvironment = { NODE_ENV: 'test', APP_ENVIRONMENT: 'development', TOKEN_AUDIENCE: 'tfv-integration', SECURITY_EVENT_HMAC_KEY: 'synthetic-integration-test-hmac-key-only' };
 
-export function loadMemberService(sql, mail = null) {
+export function loadMemberService(sql, mail = null, hamletAssignment = { hamlet: null, status: 'lookup_failed' }) {
   const blocked = () => { throw new Error('Unexpected external service in member integration test'); };
   return loadModule('lib/member-self-service.js', {
     './db.js': { getSql: () => sql }, './member-self-service-utils.js': memberUtils,
@@ -20,5 +20,6 @@ export function loadMemberService(sql, mail = null) {
     './mailer-service.js': { normalizeEmail, sendEmail: mail || blocked,
       getMailerSendSuppressions: mail ? async () => [] : blocked, isSuppressedRecipient: mail ? () => false : blocked },
     './matrikkel-client.js': { MatrikkelClient: class { constructor() { blocked(); } }, addressProperty: blocked, lookupAddress: blocked, officialAddress: blocked },
+    './map/member-hamlet-assignment.js': { findHamletForNewMember: async () => hamletAssignment },
   }, { process: { env: memberTestEnvironment } });
 }
