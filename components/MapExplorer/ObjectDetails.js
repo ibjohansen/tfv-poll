@@ -7,6 +7,10 @@ export default function ObjectDetails({ selected, comparison, onClose, onSelect 
   return <section className="map-object-details" aria-label="Valgt kartobjekt" aria-live="polite">
     <div className="map-actions"><h2>{selected.address || selected.name || selected.register?.address || 'Valgt objekt'}</h2><button type="button" className="admin-button" onClick={onClose}>Lukk detaljer</button></div>
     <p>Kilde: {selected.source}</p>
+    {selected.kind === 'hamlet' && <p>{selected.reviewed ? 'Manuelt kontrollert' : 'Utkast – må kontrolleres'} · {selected.areaM2?.toLocaleString('nb-NO')} m².
+      {' '}Intern grendegrense, ikke offisiell eiendomsgrense. {selected.imageDraft
+        ? 'Dette er et ulagret utkast fra kartbildet. Bruk «Rediger polygon» og lagre grenden når du er klar.'
+        : 'Velg grenden i grendelisten for å bruke eller redigere polygonet.'}</p>}
     {selected.kind === 'address' && <dl><dt>Offisiell adresse · Kartverket</dt><dd>{addressLabel(selected)}</dd><dt>Matrikkelreferanse</dt><dd>{propertyLabel(selected)}</dd>
       <dt>Postadresse</dt><dd>{selected.postalCode || '–'} {selected.postalPlace || ''}</dd><dt>Koordinater (lengde, bredde)</dt><dd>{selected.longitude}, {selected.latitude}</dd></dl>}
     {selected.kind === 'road' && <p>Type: {selected.roadType || '–'} · Lengde i polygon: {Math.round(selected.lengthMeters)} m · Dekke: {selected.surface || 'Ukjent'} · Tilgang: {selected.access || 'Ukjent'}</p>}

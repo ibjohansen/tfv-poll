@@ -8,7 +8,7 @@ import { BACKGROUND_MAP } from '@/lib/map/sources';
 
 const latLng = ([lon, lat]) => [lat, lon];
 
-export default function MapView({ vertices, drawing, editing, onVerticesChange, addresses = [], roads = [], registerPoints = [], boundaries = [], layers, selected, onSelect, onError }) {
+export default function MapView({ vertices, drawing, editing, onVerticesChange, addresses = [], roads = [], registerPoints = [], boundaries = [], hamlets = [], layers, selected, onSelect, onError }) {
   const container = useRef(null);
   const mapRef = useRef(null);
   const overlay = useRef(null);
@@ -59,19 +59,22 @@ export default function MapView({ vertices, drawing, editing, onVerticesChange, 
       const active = selected?.id === item.id || selected?.feature?.id === item.id
         || (selected?.kind === 'property' && selected.addresses.some((a) => a.id === item.id));
       const layer = L.geoJSON(feature, {
-        style: { color: active ? '#b33b24' : color, weight: active ? 6 : 3, fillOpacity: 0.12 },
+        style: { color: active ? '#b33b24' : color, weight: active ? 6 : 3, fillOpacity: 0.12,
+          dashArray: item.kind === 'hamlet' && !item.reviewed ? '6 5' : undefined },
         pointToLayer: (_, coordinates) => L.circleMarker(coordinates, { radius: active ? 9 : 6, color: active ? '#b33b24' : color, fillOpacity: 0.9, weight: 2 }),
       }).addTo(group);
       const label = document.createElement('span');
-      label.textContent = `${item.address || item.name || 'Uten navn'} · ${item.source}`;
+      label.textContent = `${item.address || item.name || 'Uten navn'} · ${item.source}${item.kind === 'hamlet' && !item.reviewed ? ' · utkast' : ''}`;
       layer.bindTooltip(label);
       layer.on('click', () => { if (!drawing && !editing) onSelect(item); });
     }
+    if (layers.hamlets) hamlets.filter((h) => h.polygon).forEach((h) => addObject(h.polygon,
+      { ...h, id: `hamlet:${h.id}`, kind: 'hamlet', feature: h.polygon }, '#a34235'));
     if (layers.addresses) addresses.forEach((item) => addObject(item.feature, item, '#20636c'));
     if (layers.roads) roads.forEach((item) => addObject({ type: 'Feature', properties: {}, geometry: item.geometry }, item, '#826736'));
     if (layers.register) registerPoints.forEach((item) => addObject(item.feature, item, '#665493'));
     if (layers.boundaries) boundaries.forEach((item) => addObject(item.feature, item, '#38724b'));
-  }, [vertices, drawing, editing, addresses, roads, registerPoints, boundaries, layers, selected, onVerticesChange, onSelect]);
+  }, [vertices, drawing, editing, addresses, roads, registerPoints, boundaries, hamlets, layers, selected, onVerticesChange, onSelect]);
 
   useEffect(() => {
     const geometry = selected?.feature?.geometry || selected?.geometry;

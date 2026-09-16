@@ -1,14 +1,45 @@
 # ToDo
 
 Gjennomgått 14.–15. september 2026. Kvalitetsarbeidet nedenfor er implementert lokalt;
-ingen produksjonsdeploy, GitHub-push, Entra-endring eller Neon-migrering er kjørt.
+ingen produksjonsdeploy, GitHub-push eller Entra-endring er kjørt.
+Databasemigreringen er testet på en isolert Neon-schema-only-gren og deretter
+kjørt i produksjon etter eksplisitt godkjenning 15. september kl. 21:50 UTC.
+Gjenopprettingspunkt er opprettet, og eksisterende data er verifisert bevart;
+se [migreringsstatus](docs/database-migration-2026-09-15.md).
 Se [kvalitetsgjennomgangen](docs/quality-review.md) for funn, testdekning,
 vurdering av brukerloggen og begrensninger. Uferdige produktoppgaver beholdes.
 
 **Avklaringer før de siste punktene kan fullføres:** Delingspraksis/standardverdi
 for Turufjell AS, datapunkter og lagringstid for statistikk, loggens lagringstid
-og databaseprivilegier, samt eksplisitt tillatelse til Neon-/GitHub-endringer og
-produksjonsverifikasjon. Ingen av disse valgene er antatt eller aktivert.
+og databaseprivilegier, samt eksplisitt tillatelse til øvrige infrastruktur-/GitHub-
+endringer og funksjonell produksjonsverifikasjon. Skjemamigreringen er godkjent
+og utført for skjemaet fra 15. september; den nye grendepolygon-utvidelsen
+nedenfor trenger egen godkjenning. De øvrige valgene er ikke antatt eller aktivert.
+
+## Grendepolygoner – implementert lokalt 16. september 2026
+
+- [x] Lagre navngitte GeoJSON-polygoner i eksisterende `member_hamlets`, uten
+  hardkodede grender eller et parallelt register. Ingen nye npm-pakker.
+- [x] Opprette/velge grend, laste polygon som søkeområde, redigere og fjerne
+  lagret geometri uten å endre medlemstilknytninger. Vise alle grendegrenser
+  i eget kartlag, med tydelig skille mellom utkast og manuelt kontrollert plassering.
+- [x] Beskytte GET/POST med eksisterende medlemsadministratorrettighet,
+  servervalidering, versjonskontroll og atomisk brukerlogg. Beholde utkast ved feil.
+- [x] Teste validering, tilgang, samtidige lagringer, tilbakeføring ved loggfeil,
+  gjentatt migrering og bevaring av grend/medlemmer med isolert Postgres.
+  Nettlesertester dekker lagring, gjenåpning, redigering, konflikt og fjerning.
+- [x] Lage omtrentlige, redigerbare utkast for 11 navngitte områder med røde
+  grenser etter brukerens godkjenning. Separat GeoJSON-katalog og utkastvelger;
+  alltid ukontrollert ved innlasting, ingen automatisk databaseimport eller
+  overskriving av lagrede polygoner. Navnløse/ikke avgrensede områder utelates.
+- [ ] Kontrollere og justere utkastene manuelt i kartet, deretter lagre ønskede
+  grender. Bildeankrene er omtrentlige; utkastene er ikke offisielle grenser.
+- [ ] Godkjenne og utføre ny produksjonsmigrering for polygonkolonner og
+  versjoneringstrigger, deretter godkjent deploy og funksjonell verifikasjon.
+  Migreringen fra 15. september dekker ikke denne utvidelsen.
+
+Se [bruk og avgrensninger](docs/map-explorer.md#grender-og-lagrede-polygoner)
+og produksjonssjekklisten i README.
 
 ## Matrikkel – oppstartsfeil rettet lokalt 15. september 2026
 
@@ -34,7 +65,8 @@ Kjøringen ble derfor stående før første oppslag, uten funksjonslogg.
 - [x] Overvåking implementert lokalt: `background-watchdog` kontrollerer
   oppdrag uten oppstart og utløpte reservasjoner hvert femte minutt, med høyst
   tre gjenopptakinger før synlig feil. Reelle Postgres-tester dekker samtidighet.
-  Aktivering og faktisk plattformkjøring krever godkjent migrering/deploy.
+  Databasemigreringen er utført; aktivering og faktisk plattformkjøring må
+  fortsatt verifiseres etter godkjent deploy.
 - [x] Survey-e-postjobben har samme eksakte proxy-unntak, POST-/hemmelighetskontroll,
   timeout og krav om direkte `202`. Ubekreftet oppstart gir synlig feilstatus.
   Begge workers kan nå lastes i ren Node uten å laste Next/Auth ved oppstart.
@@ -368,15 +400,24 @@ Dette er oppgaver som enten reduserer teknisk risiko, styrker kvaliteten eller l
   audit-aktør, engangslenker, samtidige survey-svar, endret spørsmålsversjon og
   samtidig Matrikkel-stopp/arbeid, verifiseringshash og lagringsnøkler er testet.
   CI bruker en separat Postgres-container.
-- [ ] Godkjent Neon-schema-only-verifikasjon før produksjonsmigrering.
+- [x] Neon-schema-only-verifikasjon før produksjonsmigrering, utført
+  15. september 2026 mot produksjonens eksisterende skjema med bare syntetiske
+  data. Gjentatt migrering, databevaring, nye felt/tabeller og audit-vern bestod.
+- [x] Ferskt gjenopprettingspunkt opprettet umiddelbart før produksjonsmigrering.
+  Snapshot utløper 22. september 2026 kl. 21:50 UTC.
+  Se [migreringsstatus](docs/database-migration-2026-09-15.md).
+- [x] Produksjonsmigrering kjørt etter eksplisitt godkjenning 15. september
+  2026 kl. 21:50 UTC. Radantall og kontrollsummer for eksisterende kolonner
+  er uendret i alle 23 opprinnelige tabeller; nye skjemaobjekter er verifisert.
 - [x] **Gjenopptakelse etter avbrutt worker:** Implementert tidsbegrenset
   reservasjon, maksimalt tre behandlingsforsøk og beskyttelse mot gammel worker.
   Ekte transaksjonstester dekker gjenopptaking, dobbel kjøring, stopp, samtidig
   manuell godkjenning og loggskjuling med varig aktørlogg.
 - [ ] **Brukerloggens integritet og lagringstid:** Vurder append-only-beskyttelse
   og databaseprivilegier for `audit_log`, samt kontrollert sletting etter
-  avklart lagringstid. UPDATE/DELETE/TRUNCATE-beskyttelse er implementert og
-  testet lokalt. Separat runtime-/vedlikeholdsrolle og lagringstid gjenstår;
+  avklart lagringstid. UPDATE/DELETE/TRUNCATE-beskyttelse er testet på isolert
+  Neon-gren, og triggerne er verifisert aktive i produksjon. Separat
+  runtime-/vedlikeholdsrolle og lagringstid gjenstår;
   skjemaeier kan deaktivere triggere, og ingen automatisk sletting er innført.
 - [ ] **GitHub-grenbeskyttelse:** Verifiser påkrevd `quality`-sjekk og PR-krav på
   `main`, slik at kvalitetskontrollen faktisk stopper dårlige endringer før
@@ -629,7 +670,8 @@ Dette er nyttig funksjonalitet, men den er ikke nødvendig for neste versjon og 
   låses ved oppstart; unike adresser dedupliseres i databasen. Gjeldende medlemsstatus,
   gruppetilknytning og leveringsreservasjoner kontrolleres før sending. Delvise feil,
   parallelle starter og usikker levering er testet uten reell utsending.
-  Funksjonen må verifiseres etter godkjent migrering/deploy; se README.
+  Migreringen er utført; funksjonen må fortsatt verifiseres etter godkjent
+  deploy. Se README.
 
   Avhenger av at e-postgrupper er på plass.
 

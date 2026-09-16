@@ -355,6 +355,29 @@ CREATE TABLE IF NOT EXISTS member_hamlets (
   last_changed_by TEXT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS member_hamlets_name_idx ON member_hamlets (lower(btrim(name))) WHERE deleted_at IS NULL;
+-- Grendegrenser er interne, manuelt kontrollerte områder, ikke matrikkelgrenser.
+-- Ingen navn eller koordinater seeds fra et bilde uten geografisk forankring.
+ALTER TABLE member_hamlets ADD COLUMN IF NOT EXISTS polygon JSONB
+  CHECK (polygon IS NULL OR (
+    jsonb_typeof(polygon) = 'object' AND polygon->>'type' = 'Polygon'
+    AND jsonb_typeof(polygon->'coordinates') = 'array'
+    AND jsonb_array_length(polygon->'coordinates') = 1
+    AND octet_length(polygon::text) <= 30000
+  ) IS TRUE);
+ALTER TABLE member_hamlets ADD COLUMN IF NOT EXISTS polygon_reviewed BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE member_hamlets ADD COLUMN IF NOT EXISTS polygon_version INTEGER NOT NULL DEFAULT 1 CHECK (polygon_version > 0);
+ALTER TABLE member_hamlets ADD COLUMN IF NOT EXISTS polygon_updated_at TIMESTAMPTZ;
+CREATE OR REPLACE FUNCTION version_hamlet_polygon()
+RETURNS TRIGGER LANGUAGE plpgsql AS $hamlet_version$
+BEGIN
+  NEW.polygon_version := OLD.polygon_version + 1;
+  NEW.polygon_updated_at := NOW();
+  RETURN NEW;
+END;
+$hamlet_version$;
+DROP TRIGGER IF EXISTS member_hamlets_version_trigger ON member_hamlets;
+CREATE TRIGGER member_hamlets_version_trigger BEFORE UPDATE ON member_hamlets
+FOR EACH ROW EXECUTE FUNCTION version_hamlet_polygon();
 ALTER TABLE members ADD COLUMN IF NOT EXISTS hamlet_id BIGINT REFERENCES member_hamlets(id) ON DELETE RESTRICT;
 CREATE INDEX IF NOT EXISTS members_hamlet_idx ON members (hamlet_id) WHERE deleted_at IS NULL;
 

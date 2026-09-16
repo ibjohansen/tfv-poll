@@ -1,8 +1,10 @@
 # Kart og registerkontroll
 
 Implementert lokalt 15. september 2026. Inngang: `/admin/map`.
-Ingen registerretting, import, migrering, produksjonsdeploy eller ekstern
-konfigurasjonsendring utføres av kartfunksjonen.
+Ingen automatisk registerretting, import, migrering, produksjonsdeploy eller
+ekstern konfigurasjonsendring utføres av kartfunksjonen. Fra 16. september kan
+administrator eksplisitt lagre navn og polygon i eksisterende grender.
+Denne utvidelsen krever en ny, separat godkjent migrering før publisering.
 
 ## Bruk
 
@@ -23,8 +25,87 @@ Bare ett enkelt polygon uten hull støttes. Arealet må være 1 m²–25 km²,
 maksimalt 200 hjørner og 5 km omsluttende søkeradius. Alle hjørner må ligge
 innenfor 20 km av startpunktet. Disse er **applikasjonsgrenser**, ikke en
 definisjon av Turufjells område eller leverandørenes API-kvoter.
-Polygonet finnes bare i sidens minne og eventuell GeoJSON-eksport; det
-lagres ikke i databasen eller automatisk på tvers av sidebesøk.
+Et ulagret søkepolygon finnes bare i sidens minne og eventuell GeoJSON-eksport.
+Administrator kan nå lagre polygonet som en navngitt grend i databasen.
+
+### Grender og lagrede polygoner
+
+1. Velg **Ny grend**, tegn området og fullfør polygonet. Oppgi grendenavnet.
+   Ved inntegning fra referansebildet brukes bare områder med røde grenser;
+   områder uten avgrensning opprettes ikke automatisk.
+2. Velg **Lagre polygon som ny grend**. Grenden kommer i samme liste som under
+   medlemsadministrasjonens **Grender og e-postgrupper**, ikke i et eget register.
+3. For en eksisterende grend: velg den i **Lagret grend** og trykk **Bruk grend
+   i kartet**. Grender uten polygon kan også velges og deretter få et inntegnet
+   område. En grend med polygon blir gjeldende søkeområde og zoomes inn.
+4. Rediger hjørnene, fullfør og velg **Lagre grendeendringer**. Navnet kan også
+   endres. Ulagrede endringer krever bekreftelse før bytte til en annen grend.
+5. **Fjern lagret polygon** fjerner bare geometrien, ikke grenden eller
+   medlemskoblingene. **Slett polygon** i tegneverktøyet fjerner bare det lokale
+   søkeområdet. Sletting av selve grenden gjøres fortsatt i gruppeadministrasjonen.
+
+**Grendegrenser** viser alle lagrede polygoner samtidig. Bare ett polygon brukes
+til søk om gangen. Utkast vises stiplet og merkes «må kontrolleres».
+Administrator kan bekrefte manuell kontroll av plasseringen; geometriendringer
+i editoren opphever denne bekreftelsen. Dette gjør ikke grensen til en offisiell
+matrikkelgrense. Lagrede polygoner er interne Turufjell vel-data, ikke Kartverket-data.
+Grendepolygoner tilordner eller flytter aldri medlemmer automatisk.
+
+Navn, GeoJSON-geometri, kontrollstatus, versjon og endringstid lagres i
+`member_hamlets`. Den lagrede grendelisten leses fra databasen, ikke en hardkodet
+liste i UI. Ingen grender opprettes automatisk. Det finnes nå en separat,
+valgfri katalog med omtrentlige bildeutkast, etter brukerens godkjenning.
+
+Samtidige endringer gir `409`, og editoren beholder utkastet. **Last grendelisten
+på nytt** oppdaterer listen uten å overskrive utkast eller bytte dets versjon.
+Bruk en fersk grend eksplisitt før ny redigering etter konflikt. Navneendring
+eller sletting fra gruppeadministrasjonen gjør også en eldre editor utdatert.
+Identiske navn avvises uten å opprette duplikater. Lagring og brukerlogg skrives
+atomisk; loggen inneholder aktør, grend-ID, navn, versjon, kontrollstatus, areal
+og antall hjørner, ikke koordinatlister eller medlemsdata. Ingen lokale
+lagringsnøkler eller databaseforbindelser sendes til nettleseren.
+
+### Redigerbare kartutkast fra bildet
+
+Under **Kartutkast fra bildet** finnes 11 navngitte, rødt avgrensede områder:
+Slåttelia, Slåtta Vest, Slåtta Øst, Turuhaugen, Sprenåsen, Istjern, Molteputten,
+Nedre Kristnatten, Turusvingen, Veslesetra og Høgsetra. Navn er avlest fra bildet;
+de er ikke ment som en offisiell navneliste. Navnløse felt og områder uten røde
+grenser er utelatt, inkludert det store grønne området ved Turuhaugen.
+
+1. Velg et område og trykk **Bruk kartutkast**. Kartet zoomer til området,
+   navnet fylles inn og kontrollstatus er alltid «utkast». Dette skriver ikke til databasen.
+2. Velg **Rediger polygon**, flytt hjørnene eller endre koordinatfeltene og
+   trykk **Fullfør polygon**. Både grendenavn og geometri kan endres.
+3. Velg **Lagre polygon som ny grend**, eventuelt **Lagre grendeendringer**
+   dersom en grend med samme navn allerede finnes uten geometri. Denne beholder
+   ID og medlemstilknytninger. Manuell kontroll kan bekreftes når plasseringen er sjekket.
+4. Ved senere besøk velges den lagrede grenden fra **Lagret grend**.
+
+Et eksisterende polygon blir aldri erstattet ved å laste et bildeutkast,
+uansett kontrollstatus. Bruk den lagrede grenden for videre redigering.
+Bytte av kartutkast krever bekreftelse hvis det finnes ulagrede endringer.
+En ny kopi lastes hver gang; redigering endrer ikke referansekatalogen.
+
+GeoJSON-katalogen er `data/map-hamlet-drafts.json`; klargjøring og kobling til
+eventuell eksisterende grend ligger i `lib/map/hamlet-drafts.js`.
+Katalogen er **startmateriale, ikke en database-seed eller fasit**. Den innfører
+ingen nye API-ruter, miljøvariabler, avhengigheter eller migreringer utover
+polygonlagringen beskrevet over. Produksjonsdata er ikke importert/endret.
+
+Bildet er bare 342 × 277 piksler og har ingen koordinatrutenett. Røde hjørner er
+avlest manuelt; skjulte kanter under tekst og streker er forenklet. Grov nordvendt
+plassering bruker to **omtrentlige bildeankre**: Slåttemyrtjern og Øvre
+Høgsetervegen. Koordinatene til disse er hentet fra Kartverkets åpne
+[stedsnavn-API](https://www.kartverket.no/api-og-data/stedsnavndata/brukarrettleiing-stadnamn-api)
+16. september 2026 (`/punkt`, radius 3000 m rundt kartets startpunkt,
+`koordsys=4326`, `utkoordsys=4326`). © Kartverket, CC BY 4.0, gjelder
+ankerpunktene; Kartverket er **ikke** kilde til grendegrensene.
+SSR-ID, koordinater, omtrentlige bildepunkter og avtegnede hjørner er dokumentert
+i katalogen. En lineær tilpasning per akse gir redigerbare startkoordinater,
+ikke landmålingsnøyaktighet. Veipunktet er et representasjonspunkt og
+bildeplasseringen er skjønnsmessig. Ingen meternøyaktighet er dokumentert;
+alle utkast må kontrolleres mot terreng/veier før de brukes som analysegrunnlag.
 
 ## Integrasjon og dataansvar
 
@@ -38,6 +119,8 @@ er innført. Playwright tester kartet i et isolert nettlesermiljø.
 | --- | --- |
 | `components/MapExplorer/` | Kart, polygontegning, tabeller, detaljer, eksportknapper |
 | `lib/map/browser-client.js` | Kall til egne beskyttede API-ruter |
+| `lib/map/hamlets.js`, `hamlet-service.js` | Validering, datamodell og varig lagring av grendepolygoner |
+| `data/map-hamlet-drafts.json`, `lib/map/hamlet-drafts.js` | Valgfrie omtrentlige bildeutkast, separat fra lagrede grender |
 | `lib/map/kartverket-address-service.js` | Kartverkets adresseadapter, paginering og normalisering |
 | `lib/map/kartverket-property-service.js` | Matrikkelreferanser og adresseplasseringer; ikke eiendomsgrenser |
 | `lib/map/kartverket-boundary-service.js` | Åpent WFS/GML-uttrekk, UTM-transformasjon og teiggeometri |
@@ -54,7 +137,16 @@ Feature med Polygon-geometri. `POST /api/admin/map/export` tar
 `{ polygon, format, includeRoads?, includeBoundaries? }`, med `addresses-csv`, `comparison-csv`
 eller `geojson` som format. Klienten får ikke velge eksterne URL-er.
 
-Begge rutene og siden krever eksisterende `members`-rettighet. Med konfigurert
+`GET /api/admin/map/hamlets` returnerer aktive grender, også dem uten polygon.
+`POST /api/admin/map/hamlets` tar `action: create | save | clear`. Oppretting og
+lagring krever `name`, `polygon` og valgfri boolsk `reviewed`; endring/fjerning
+krever `id` og siste `version`. Lagrede GeoJSON-egenskaper normaliseres på server.
+Ruten har samme autentisering, CSRF-, størrelses- og rate-limit-vern som øvrig
+kart-API. Responsene er private og ikke cachebare. Demonstrasjonsmodus tillater
+ikke varig lagring. Søke-/resultateksport inkluderer fortsatt bare det aktive
+polygonet, ikke automatisk alle lagrede grender.
+
+Alle kartrutene og siden krever eksisterende `members`-rettighet. Med konfigurert
 Entra-rollemodell betyr dette `TFV.MemberAdmin`; `TFV.ReadOnly` eller bare
 `TFV.MatrikkelAdmin` er ikke nok. Den eksisterende allowlist-modellen uten
 rollekrav beholdes. Ingen ny Entra-rolle eller miljøvariabel behøves.
@@ -248,15 +340,36 @@ ikke at nettleseren fullførte nedlastingen.
 
 ## Tester og gjenstående kontroll
 
+Verifisert lokalt 16. september 2026 etter bildeutkastene: `npm run check`
+(lint, 250 enhetstester og produksjonsbygg) og 34 nettlesertester med
+`PLAYWRIGHT_CHANNEL=chrome npm run test:e2e` bestod. Polygonlagringen bestod
+tidligere samme dag 39 integrasjonstester mot isolert Postgres; denne
+utkastutvidelsen endrer ikke databasekode eller skjema. Testdatabasen med
+syntetiske data er fjernet etter kjøring.
+
 `tests/map-*.test.mjs` dekker geometri, normalisering, alle fem statuser,
 flertydighet, datakvalitetsmerknader, CSV/GeoJSON, adaptere, paginering,
 ufullstendige svar, feil, retry, cache, autorisasjon, CSRF, størrelsesgrenser,
 dataminimering og eksportlogging. Eksterne tjenester og database er mocket.
 Eksisterende testoppsett og `npm run check` brukes uendret.
 
+`tests/map-hamlets.test.mjs` dekker grendedata, tilgangskontroll, validering,
+konflikter og atomisk loggføring med simulert database.
+`tests/map-hamlet-drafts.test.mjs` dekker alle 11 avtegninger, gyldig geometri,
+fravær av arealoverlapp, kilde/kontrollstatus, uavhengige redigeringskopier,
+navnekobling til grend uten polygon og vern mot erstatning av lagrede grenser.
+`tests/integration/map-hamlets.test.mjs` bruker isolert Postgres med syntetiske
+data og dekker gjentatt migrering, lagring/gjenlesing, samtidige endringer,
+navneendring/sletting fra gruppeadministrasjonen, bevarte medlemstilknytninger
+og tilbakeføring når brukerloggen feiler. Produksjonsdatabasen brukes ikke.
+
 Varige tester ligger i `tests/e2e/application.spec.js` for desktop og mobil.
 Kartdelen dekker tegning, redigering/sletting, teiglag og detaljer, kansellering,
-sene svar og CSV-nedlasting. WFS-testene dekker UTM-kontrollpunkter, hull,
+sene svar og CSV-nedlasting. Grendetesten dekker lagring/gjenåpning, lagvalg,
+redigering, utkaststatus, konflikt uten tap av data og fjerning av geometri.
+Bildeutkast testes også med hjørneredigering, avbrutt utkastbytte, eksplisitt
+lagring/gjenåpning og kobling til eksisterende grend uten polygon på desktop/mobil.
+WFS-testene dekker UTM-kontrollpunkter, hull,
 flere flater/referanser, ukjent CRS, XML-entiteter, avkorting og endret antall.
 Grenseadapteren er i tillegg kontrollert manuelt mot et lite åpent uttrekk.
 Den samlede kvalitetspakken og avgrensningene er beskrevet i `quality-review.md`.

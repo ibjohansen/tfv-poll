@@ -195,6 +195,135 @@ test('map draws, edits and deletes a polygon without external services', async (
   await expect(page.getByRole('button', { name: 'Fullfør polygon' })).toHaveCount(0);
 });
 
+test('hamlet polygons persist across reload, mark edited boundaries as drafts and preserve edits on conflicts', async ({ page, context }) => {
+  await authenticate(context);
+  let saved; let conflict = false;
+  const writes = [];
+  await page.route('**/api/admin/map/hamlets', (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: { hamlets: saved ? [saved] : [] } });
+    const input = route.request().postDataJSON(); writes.push(input);
+    if (conflict) return route.fulfill({ status: 409, json: { message: 'Grenden er endret av en annen administrator. Utkastet er beholdt.' } });
+    saved = { id: '13', name: input.action === 'clear' ? saved.name : input.name,
+      version: (saved?.version || 0) + 1, reviewed: input.action === 'clear' ? false : input.reviewed,
+      polygon: input.action === 'clear' ? null : input.polygon, areaM2: 10000, source: 'Turufjell vel · syntetisk grendegrense' };
+    return route.fulfill({ json: { hamlet: saved } });
+  });
+  await page.goto('/admin/map');
+  const editor = page.getByRole('region', { name: 'Grender og lagrede polygoner' });
+  await page.getByRole('button', { name: 'Tegn polygon', exact: true }).click();
+  const map = page.locator('.leaflet-container'); await expect(map).toBeVisible();
+  const box = await map.boundingBox();
+  for (const [x,y] of [[.35,.35],[.65,.35],[.5,.65]]) await map.click({ position: { x: box.width*x, y: box.height*y } });
+  await page.getByRole('button', { name: 'Fullfør polygon' }).click();
+  await editor.getByLabel('Navn på grend').fill('Slåtta Øst');
+  await editor.getByRole('checkbox').check();
+  await editor.getByRole('button', { name: 'Lagre polygon som ny grend' }).click();
+  await expect(editor.getByRole('status')).toContainText('lagret i databasen');
+  expect(writes[0].action).toBe('create'); expect(writes[0].reviewed).toBe(true);
+  expect(writes[0].polygon.geometry.type).toBe('Polygon');
+  await page.reload();
+  await editor.getByLabel('Lagret grend').selectOption('13');
+  await editor.getByRole('button', { name: 'Bruk grend i kartet' }).click();
+  await expect(editor.getByLabel('Navn på grend')).toHaveValue('Slåtta Øst');
+  await expect(editor.getByRole('checkbox')).toBeChecked();
+  await expect(page.getByRole('button', { name: 'Hent adresser', exact: true })).toBeEnabled();
+  await page.getByRole('checkbox', { name: 'Grendegrenser', exact: true }).uncheck();
+  await page.getByRole('checkbox', { name: 'Grendegrenser', exact: true }).check();
+  await page.getByRole('button', { name: 'Rediger polygon', exact: true }).click();
+  await page.getByText(/Koordinater og tilgjengelig polygonredigering/).click();
+  const longitude = page.getByRole('spinbutton', { name: 'Lengdegrad 1', exact: true });
+  await longitude.fill(String(Number(await longitude.inputValue()) + .0001));
+  await page.getByRole('button', { name: 'Fullfør polygon' }).click();
+  await expect(editor.getByRole('checkbox')).not.toBeChecked();
+  await editor.getByLabel('Navn på grend').fill('Slåtta Øst endret');
+  conflict = true;
+  await editor.getByRole('button', { name: 'Lagre grendeendringer' }).click();
+  await expect(editor.getByRole('alert')).toContainText('Utkastet er beholdt');
+  await expect(editor.getByLabel('Navn på grend')).toHaveValue('Slåtta Øst endret');
+  await editor.getByRole('button', { name: 'Last grendelisten på nytt' }).click();
+  await expect(editor.getByLabel('Navn på grend')).toHaveValue('Slåtta Øst endret');
+  await expect(editor.getByRole('button', { name: 'Lagre grendeendringer' })).toBeEnabled();
+  conflict = false;
+  await editor.getByRole('button', { name: 'Lagre grendeendringer' }).click();
+  await expect(editor.getByRole('status')).toContainText('lagret i databasen');
+  expect(writes.at(-1).reviewed).toBe(false); expect(writes.at(-1).version).toBe(1);
+  page.once('dialog', (dialog) => dialog.accept());
+  await editor.getByRole('button', { name: 'Fjern lagret polygon' }).click();
+  await expect(editor.getByRole('status')).toContainText('Grenden og medlemskoblingene er beholdt');
+  await expect(editor.getByRole('option', { name: 'Slåtta Øst endret · uten polygon' })).toHaveCount(1);
+  expect(writes.at(-1).action).toBe('clear');
+  const layout = await page.evaluate(() => ({ viewport: innerWidth, width: document.documentElement.scrollWidth }));
+  expect(layout.width).toBeLessThanOrEqual(layout.viewport);
+});
+
+test('image drafts are editable, require explicit save and cannot overwrite a saved border', async ({ page, context }) => {
+  await authenticate(context);
+  let saved; const writes = [];
+  await page.route('**/api/admin/map/hamlets', (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: { hamlets: saved ? [saved] : [] } });
+    const input = route.request().postDataJSON(); writes.push(input);
+    saved = { id: '44', name: input.name, version: 1, reviewed: input.reviewed,
+      polygon: input.polygon, areaM2: 10000, source: 'Turufjell vel' };
+    return route.fulfill({ json: { hamlet: saved } });
+  });
+  await page.goto('/admin/map');
+  const editor = page.getByRole('region', { name: 'Grender og lagrede polygoner' });
+  const picker = editor.getByLabel('Kartutkast fra bildet');
+  await expect(picker.locator('option')).toHaveCount(12);
+  await picker.selectOption('image-draft:slatta-ost');
+  await editor.getByRole('button', { name: 'Bruk kartutkast', exact: true }).click();
+  await expect(editor.getByLabel('Navn på grend')).toHaveValue('Slåtta Øst');
+  await expect(editor.getByRole('checkbox')).not.toBeChecked();
+  await expect(editor.getByRole('status')).toContainText('ikke lagret');
+  expect(writes).toHaveLength(0);
+  await page.getByRole('button', { name: 'Rediger polygon', exact: true }).click();
+  await page.getByText(/Koordinater og tilgjengelig polygonredigering/).click();
+  const longitude = page.getByRole('spinbutton', { name: 'Lengdegrad 1', exact: true });
+  const moved = Number(await longitude.inputValue()) + .0001;
+  await longitude.fill(String(moved));
+  await page.getByRole('button', { name: 'Fullfør polygon', exact: true }).click();
+  await picker.selectOption('image-draft:istjern');
+  page.once('dialog', (dialog) => dialog.dismiss());
+  await editor.getByRole('button', { name: 'Bruk kartutkast', exact: true }).click();
+  await expect(editor.getByLabel('Navn på grend')).toHaveValue('Slåtta Øst');
+  await editor.getByRole('button', { name: 'Lagre polygon som ny grend' }).click();
+  await expect(editor.getByRole('status')).toContainText('lagret i databasen');
+  expect(writes).toHaveLength(1); expect(writes[0].action).toBe('create');
+  expect(writes[0].reviewed).toBe(false);
+  expect(writes[0].polygon.geometry.coordinates[0][0][0]).toBeCloseTo(moved, 6);
+  await picker.selectOption('image-draft:slatta-ost');
+  await editor.getByRole('button', { name: 'Bruk kartutkast', exact: true }).click();
+  await expect(editor.getByRole('alert')).toContainText('allerede et lagret polygon');
+  expect(writes).toHaveLength(1);
+  await page.reload();
+  await editor.getByLabel('Lagret grend').selectOption('44');
+  await editor.getByRole('button', { name: 'Bruk grend i kartet' }).click();
+  await expect(editor.getByLabel('Navn på grend')).toHaveValue('Slåtta Øst');
+  await expect(editor.getByRole('checkbox')).not.toBeChecked();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('image draft attaches to an existing unmapped hamlet using its current version', async ({ page, context }) => {
+  await authenticate(context);
+  let saved = { id: '45', name: 'ISTJERN', version: 8, polygon: null, reviewed: false };
+  const writes = [];
+  await page.route('**/api/admin/map/hamlets', (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: { hamlets: [saved] } });
+    const input = route.request().postDataJSON(); writes.push(input);
+    saved = { ...saved, polygon: input.polygon, reviewed: input.reviewed, version: 9 };
+    return route.fulfill({ json: { hamlet: saved } });
+  });
+  await page.goto('/admin/map');
+  const editor = page.getByRole('region', { name: 'Grender og lagrede polygoner' });
+  await editor.getByLabel('Kartutkast fra bildet').selectOption('image-draft:istjern');
+  await editor.getByRole('button', { name: 'Bruk kartutkast', exact: true }).click();
+  await expect(editor.getByLabel('Navn på grend')).toHaveValue('ISTJERN');
+  await editor.getByRole('button', { name: 'Lagre grendeendringer', exact: true }).click();
+  await expect(editor.getByRole('status')).toContainText('lagret i databasen');
+  expect(writes).toHaveLength(1);
+  expect(writes[0]).toMatchObject({ action: 'save', id: '45', version: 8, name: 'ISTJERN', reviewed: false });
+});
+
 test('member entry validates input and displays rate-limit recovery without disclosing register matches', async ({ page }) => {
   await page.goto('/#medlemsopplysninger');
   const input = page.getByLabel('H-nummer, gateadresse eller e-postadresse');
@@ -274,7 +403,7 @@ test('map discards late results after edit/cancel and exports the accepted polyg
   const result = { complete: true, addresses: [{ id: 'test-point', addressName: 'Testvegen', houseNumber: 2, houseLetter: null, latitude: 60.442, longitude: 9.47, source: 'Kartverket', gnr: 10, bnr: 1 }], warnings: [] };
   for (const route of pending) await route.fulfill({ json: result }).catch(() => {});
   await expect(page.getByRole('button', { name: 'Adresse-CSV' })).toBeDisabled();
-  await page.getByRole('button', { name: /Fullfør polygon|Lagre polygon/ }).click();
+  await page.getByRole('button', { name: 'Fullfør polygon', exact: true }).click();
   await page.unroute('**/api/admin/map/search');
   await page.route('**/api/admin/map/search', (route) => route.fulfill({ json: result }));
   await page.getByRole('button', { name: 'Hent adresser' }).click();

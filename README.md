@@ -495,12 +495,23 @@ Dette bruker dagens skjema og krever ingen ny migrering eller miljøvariabel.
 ## Produksjonssetting: Netlify + Neon + Microsoft Entra ID
 
 Kartmodulen ligger på `/admin/map`, med beskyttede Node-ruter
-`POST /api/admin/map/search` og `POST /api/admin/map/export`. De bruker eksisterende
-`members`-rettighet og pooled databaseforbindelse; ingen nye miljøvariabler,
-Entra-roller, bakgrunnsfunksjoner eller skjemamigreringer trengs.
+`POST /api/admin/map/search`, `POST /api/admin/map/export` og
+`GET/POST /api/admin/map/hamlets`. De bruker eksisterende `members`-rettighet og
+pooled databaseforbindelse; ingen nye miljøvariabler, Entra-roller eller
+bakgrunnsfunksjoner trengs. Grendepolygoner krever en **ny additiv migrering**
+før publisering: `member_hamlets` får `polygon`, `polygon_reviewed`,
+`polygon_version`, `polygon_updated_at` og en versjoneringstrigger.
+Denne utvidelsen fra 16. september er ikke omfattet av den allerede utførte
+migreringen 15. september. Den er bare testet i isolert lokal Postgres og må
+følge godkjenningsprosedyren nedenfor før produksjonskjøring. Ingen grender
+eller kartgrenser opprettes automatisk av migreringen.
+Kartet har også en valgfri velger med 11 omtrentlige bildeutkast i en separat
+GeoJSON-katalog. Disse innfører ingen ytterligere migrering eller API-rute.
+Administrator må selv velge, kontrollere/redigere og lagre hvert område.
+Innlasting av et utkast overskriver aldri et eksisterende lagret polygon.
 Node må kunne nå `ws.geonorge.no` og `overpass-api.de` over HTTPS, og nettleseren
 må kunne hente kartbilder fra `cache.kartverket.no`. CSP er utvidet kun for
-denne bildekilden. Sørg for passende delt/WAF-rate-limit på de to rutene ved
+denne bildekilden. Sørg for passende delt/WAF-rate-limit på kartrutene ved
 produksjonsbruk; den lokale 20/minutt-grensen er bare per-instans.
 Se [kartmodulens datakilder, begrensninger og bruk](docs/map-explorer.md).
 
@@ -588,8 +599,12 @@ neon deploy
 3. Kontroller at `.env.local` inneholder både pooled `DATABASE_URL` og direkte
    `DATABASE_URL_UNPOOLED` for den samme produksjonsgrenen. Ikke skriv ut eller
    lim forbindelsesstrengene inn i logger eller dokumentasjon.
-4. Kjør databaseskjemaet med den direkte forbindelsen når `database/schema.sql`
-   er endret:
+4. Før produksjonsmigrering: verifiser endringen på en midlertidig schema-only-gren
+   med syntetiske data, opprett et gyldig gjenopprettingspunkt og innhent eksplisitt
+   godkjenning til å endre produksjonsdatabasen. Kontroller at ingen bakgrunnsjobber
+   kjører. Ikke endre `.env.local` til testgrenen som del av denne kontrollen.
+5. Kjør databaseskjemaet med den direkte forbindelsen når `database/schema.sql`
+   er endret og produksjonskjøringen er godkjent:
 
 ```bash
 APP_ENVIRONMENT=production npm run db:setup
@@ -598,6 +613,12 @@ APP_ENVIRONMENT=production npm run db:setup
 Kommandoen er idempotent. Den kjørende Netlify-applikasjonen skal bruke pooled
 `DATABASE_URL`; migrering og import skal bruke den direkte forbindelsen. Dette
 følger [Neons anbefaling for pooling og migrering](https://neon.com/docs/connect/connection-pooling).
+
+Kontroller etterpå at forventede kolonner, tabeller, indekser og triggere finnes,
+og at eksisterende data er beholdt. Bruk radantall og kontrollsummer uten å
+skrive medlemsopplysninger til logger eller eksportfiler. Se
+[migreringsstatus 15. september 2026](docs/database-migration-2026-09-15.md)
+for utført testing, bekreftet produksjonsmigrering og gjenopprettingspunkt.
 
 Skjemaet oppretter også `audit_log` og triggere på `members`, `member_requests`,
 `surveys`, `survey_responses`, `cms_pages` og `cms_attachments`. Loggen starter
@@ -835,7 +856,8 @@ Utfør kontrollene i denne rekkefølgen:
   adresse, alle matrikkelreferanser, nøyaktighetsklasse og kilde. Et avkortet
   eller endret uttrekk skal avvises. Teiggrenser er ikke grensepåvisning.
   Kontroller at redigering/sletting fjerner gamle resultater, også under lasting.
-- Kontroller at begge `/api/admin/map/*`-rutene svarer 401 uten sesjon og 403
+- Kontroller at alle `/api/admin/map/*`-rutene, inkludert både GET og POST for
+  `/api/admin/map/hamlets`, svarer 401 uten sesjon og 403
   med rolle uten `members`-rettighet. Test feil fra ekstern karttjeneste og
   retry i isolert miljø. Kontroller at ufullstendige adressedata ikke gir en
   sammenligningsrapport med falske «mangler»-tall.
@@ -910,6 +932,20 @@ Utfør kontrollene i denne rekkefølgen:
 - Kontroller grender/e-postgrupper med syntetiske tomter: tilordning, flytting,
   filtrering, antall medlemmer og unike adresser. Sletting av en gruppe skal
   beholde medlemsdata og logges med administratorens identitet.
+- I isolert testmiljø: lagre et navngitt polygon på `/admin/map`, last siden
+  på nytt og kontroller at grenden finnes både i kartet og gruppeadministrasjonen.
+  Test eksisterende grend uten polygon, navneendring, redigering, lagvalg og
+  utkast/kontrollstatus. Geometriendring skal kreve ny manuell kontroll.
+  To editorer skal ikke overskrive hverandre: siste lagring fra gammel versjon
+  skal gi konflikt uten å miste utkastet. Navneendring/sletting fra
+  gruppeadministrasjonen skal også avvise en gammel editor.
+  Fjerning av lagret polygon skal beholde grend og medlemstilknytninger.
+  Oppretting/endring/fjerning skal vises i brukerloggen uten koordinatlister
+  eller kontaktdata. Bare rødt avgrensede områder fra referansekartet skal
+  digitaliseres, og plasseringen må kontrolleres manuelt før bruk som grunnlag.
+  Test også **Kartutkast fra bildet**: innlasting uten databaseskriving,
+  hjørneredigering og eksplisitt lagring. Samme navn skal gjenbruke en grend uten
+  polygon; en eksisterende grense skal avvises som mål for et bildeutkast.
 - Test fler-tomtstilgang med to syntetiske tomter på samme hoved-e-post, én på en
   annen hovedadresse og én hvor adressen endres etter lenkeutstedelse. Bare det
   gyldige tilgangsutvalget skal vises, også ved manipulert `member`-parameter.

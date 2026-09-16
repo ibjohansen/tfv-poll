@@ -1,7 +1,8 @@
 'use client';
 
-export default function DrawingControls({ vertices, drawing, editing, onStart, onFinish, onEdit, onDelete, onChange }) {
-  return <section aria-label="Søkeområde" className="map-drawing-controls">
+export default function DrawingControls({ vertices, drawing, editing, onStart, onFinish, onEdit, onDelete, onChange, disabled = false }) {
+  return <fieldset aria-label="Søkeområde" className="map-drawing-controls" disabled={disabled}>
+    <legend>Søkepolygon</legend>
     <div className="map-actions">
       <button type="button" className="admin-button" onClick={onStart} disabled={vertices.length > 0 || drawing}>Tegn polygon</button>
       {(drawing || editing) && <button type="button" className="admin-button primary" onClick={onFinish} disabled={vertices.length < 3}>Fullfør polygon</button>}
@@ -25,5 +26,5 @@ export default function DrawingControls({ vertices, drawing, editing, onStart, o
         }}>Sett inn etter {index + 1}</button>
       </li>)}</ol>
     </details>}
-  </section>;
+  </fieldset>;
 }

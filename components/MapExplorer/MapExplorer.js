@@ -12,6 +12,7 @@ import { requestMap, downloadMapExport } from '@/lib/map/browser-client';
 import ResultsPanel from './ResultsPanel';
 import ObjectDetails from './ObjectDetails';
 import ExportButtons from './ExportButtons';
+import HamletControls from './HamletControls';
 
 const MapView = dynamic(() => import('./MapView'), { ssr: false, loading: () => <p role="status">Laster kart …</p> });
 
@@ -21,7 +22,9 @@ export default function MapExplorer() {
   const [editing, setEditing] = useState(false);
   const [area, setArea] = useState(null);
   const [error, setError] = useState('');
-  const [layers, setLayers] = useState({ addresses: true, roads: true, register: false, boundaries: false });
+  const [layers, setLayers] = useState({ addresses: true, roads: true, register: false, boundaries: false, hamlets: true });
+  const [hamlets, setHamlets] = useState([]);
+  const [hamletBusy, setHamletBusy] = useState(false);
   const [selected, setSelected] = useState(null);
   const selectObject = useCallback((item) => setSelected({ ...item }), []);
   const [data, setData] = useState({ addresses: null, roads: null, properties: null, comparison: null });
@@ -85,6 +88,14 @@ export default function MapExplorer() {
     } catch (failure) { setError(failure.message); }
   }
 
+  function useHamlet(hamlet) {
+    invalidate(); setDrawing(false); setEditing(false); setError('');
+    const next = hamlet?.polygon ? validatePolygon(hamlet.polygon) : null;
+    setVertices(next ? next.polygon.geometry.coordinates[0].slice(0, -1) : []);
+    setArea(next);
+    if (next) setSelected({ ...hamlet, id: `hamlet:${hamlet.id}`, kind: 'hamlet', feature: hamlet.polygon });
+  }
+
   return <div className="map-explorer">
     <p>Kontroller Turufjell vels register mot offisielle adresser. Hent bare data for området du tegner. Kartkildene mottar ikke medlemsopplysninger.</p>
     {data.comparison && <div className="map-summary" aria-label="Nøkkeltall">
@@ -93,7 +104,8 @@ export default function MapExplorer() {
       <div><strong>{data.comparison.unlocatedRows?.length || 0}</strong><span>Ukjent plassering · utenfor mangeltall</span></div>
       {Object.entries(data.comparison.counts).map(([status, count]) => <div key={status}><strong>{count}</strong><span>{STATUS_LABELS[status]}</span></div>)}
     </div>}
-    <DrawingControls vertices={vertices} drawing={drawing} editing={editing} onChange={changeVertices}
+    <HamletControls polygon={area?.polygon} drawing={drawing} editing={editing} onUse={useHamlet} onList={setHamlets} onBusy={setHamletBusy} />
+    <DrawingControls vertices={vertices} drawing={drawing} editing={editing} onChange={changeVertices} disabled={hamletBusy}
       onStart={() => setDrawing(true)} onFinish={finish} onEdit={() => { invalidate(); setEditing(true); }}
       onDelete={() => { changeVertices([]); setDrawing(false); setEditing(false); setSelected(null); }} />
     {error && <p className="error-message" role="alert">{error}</p>}
@@ -107,10 +119,10 @@ export default function MapExplorer() {
     </div>
     {notice && <p role="status">{notice}</p>}
     <p aria-live="polite">{area ? `Areal: ${Math.round(area.areaM2).toLocaleString('nb-NO')} m² (${area.areaKm2.toLocaleString('nb-NO', { maximumFractionDigits: 3 })} km²)` : 'Ingen ferdig søkepolygon.'}</p>
-    <fieldset className="map-layer-controls"><legend>Kartlag</legend>{[['addresses', 'Adresser'], ['roads', 'Veier'], ['register', 'Medlemsregister'], ['boundaries', 'Eiendomsgrenser']].map(([key, label]) =>
+    <fieldset className="map-layer-controls"><legend>Kartlag</legend>{[['addresses', 'Adresser'], ['roads', 'Veier'], ['register', 'Medlemsregister'], ['boundaries', 'Eiendomsgrenser'], ['hamlets', 'Grendegrenser']].map(([key, label]) =>
       <label key={key}><input type="checkbox" checked={layers[key]} onChange={(event) => setLayers({ ...layers, [key]: event.target.checked })} /> {label}</label>)}
     </fieldset>
-    <MapView vertices={vertices} drawing={drawing} editing={editing} onVerticesChange={changeVertices} layers={layers} selected={selected} onSelect={selectObject} onError={setError}
+    <MapView vertices={vertices} drawing={drawing} editing={editing} onVerticesChange={changeVertices} layers={layers} selected={selected} onSelect={selectObject} onError={setError} hamlets={hamlets}
       addresses={data.addresses?.addresses || []} roads={data.roads?.roads || []} boundaries={data.properties?.boundaries || []}
       registerPoints={(data.comparison?.rows || []).filter((r) => r.status === 'MATCH').map((r) => ({
         ...r.officialAddresses[0], name: r.register.hNumber, source: 'Turufjell vel · plassering fra Kartverket',
