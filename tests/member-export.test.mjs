@@ -33,6 +33,7 @@ test('member workbook includes member fields without personal survey secrets or 
   assert.equal(row.getCell(headers['H-nummer']).value, 25);
   assert.equal(row.getCell(headers['Andre e-postadresser']).value, 'kari@example.no');
   assert.equal(row.getCell(headers['Har svart']).value, 'Nei');
+  assert.equal(row.getCell(headers['Reservert mot deling med Turufjell AS']).value, 'Nei');
   for (const excludedHeader of [
     'Intern database-ID',
     'Kommentar',

@@ -6,7 +6,7 @@ import { isPublicPath } from './lib/route-access';
 function permissionForPath(pathname) {
   if (pathname.startsWith('/api/admin/member-groups') || pathname.startsWith('/api/admin/newsletters')) return 'members';
   if (pathname.startsWith('/admin/map') || pathname.startsWith('/api/admin/map')) return 'members';
-  if (pathname.startsWith('/admin/audit')) return 'audit';
+  if (pathname.startsWith('/admin/audit') || pathname.startsWith('/admin/usage')) return 'audit';
   if (pathname.startsWith('/admin/members/matrikkel') || pathname.startsWith('/api/admin/matrikkel')) return 'matrikkel';
   if (pathname.startsWith('/admin/members') || pathname.startsWith('/admin/inbox') || pathname.startsWith('/api/admin/members') || pathname.startsWith('/api/admin/member-requests')) return 'members';
   if (pathname.startsWith('/admin/surveys') || pathname.startsWith('/api/admin/surveys')) return 'surveys';

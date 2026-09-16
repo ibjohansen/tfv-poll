@@ -96,8 +96,9 @@ test('export activity stores only allowlisted metadata and a normalized actor', 
 
 test('member export is logged after workbook creation and is not returned if logging fails', async () => {
   const order = [];
+  const queries = [];
   let denied = false, logError = false;
-  const sql = async strings => strings.join('').includes('FROM surveys') ? [{ id: 'a'.repeat(32) }] : [{ h_number: '7' }];
+  const sql = async strings => { const query = strings.join(''); queries.push(query); return query.includes('FROM surveys') ? [{ id: 'a'.repeat(32) }] : [{ h_number: '7' }]; };
   const api = await loadModule('lib/member-export.js', {
     './admin-access.js': { requirePermission: async () => { order.push('auth'); if (denied) throw new Error('Forbidden'); return { email: 'admin@example.test' }; } },
     './db.js': { getSql: () => { order.push('database'); return sql; } },
@@ -107,6 +108,7 @@ test('member export is logged after workbook creation and is not returned if log
   });
   const input = { scope: 'all', surveyId: 'a'.repeat(32) };
   assert.equal((await api.createMemberExport(input)).buffer.toString(), 'export');
+  assert.match(queries.join('\n'), /turufjell_as_sharing_opt_out = FALSE/);
   assert.deepEqual(order, ['auth', 'database', 'workbook', 'audit']);
   logError = true;
   await assert.rejects(api.createMemberExport(input), /Audit unavailable/);

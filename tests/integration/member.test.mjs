@@ -42,12 +42,32 @@ test('member comment stays with its update, appears in inbox and can be acknowle
   const request = (await api.getAdminMemberRequests()).find((item) => item.id === update.id);
   assert.equal(request.request_type, 'profile_update');
   assert.equal(request.requested_comment, comment);
+  const taskCount = await api.getAdminTaskCount();
+  assert.ok(taskCount >= 1);
   await api.resolveAdminMemberRequest(update.id, 'acknowledge_comment');
   assert.equal((await api.getAdminMemberRequests()).some((item) => item.id === update.id), false);
+  assert.equal(await api.getAdminTaskCount(), taskCount - 1);
   const audit = await db.sql`SELECT changed_by, after_value FROM audit_log WHERE table_name = 'member_profile_updates' AND row_id = ${update.id} ORDER BY id`;
   assert.deepEqual(audit.map((row) => row.changed_by), [`member:${f.memberId}`, 'admin@example.test']);
   assert.ok(audit[1].after_value.comment_read_at);
   assert.equal(audit[1].after_value.comment, comment);
+});
+
+test('member can change sharing reservation and the timestamp and profile history are retained', async () => {
+  const f = await fixture();
+  const session = await api.verifyMemberAccess(f.secret);
+  const updated = await api.updateMemberSelfServiceProfile(session.secret, {
+    primary_contact_name: 'Syntetisk kontakt', primary_contact_email: 'member@example.test',
+    other_contact_emails: [], turufjell_as_sharing_opt_out: true,
+  });
+  assert.equal(updated.turufjell_as_sharing_opt_out, true);
+  assert.ok(updated.turufjell_as_sharing_opt_out_updated_at);
+  const profile = await api.getMemberSelfServiceProfile(session.secret);
+  assert.equal(profile.member.turufjell_as_sharing_opt_out, true);
+  assert.deepEqual(profile.updates[0].changed_fields, ['turufjell_as_sharing_opt_out']);
+  const [audit] = await db.sql`SELECT changed_by, after_value FROM audit_log WHERE table_name = 'members' AND row_id = ${f.memberId} AND operation = 'UPDATE' ORDER BY id DESC LIMIT 1`;
+  assert.equal(audit.changed_by, `member:${f.memberId}`);
+  assert.equal(audit.after_value.turufjell_as_sharing_opt_out, true);
 });
 
 test('expired sessions and invalid comments never mutate member data', async () => {

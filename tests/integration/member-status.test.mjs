@@ -11,15 +11,28 @@ import { memberTestEnvironment as env } from '../helpers/member-service.mjs';
 const db = createTestDatabase();
 let admin;
 let directory;
+let nextHamletAssignment = { hamlet: null, status: 'address_missing' };
 before(async () => {
   await db.migrate();
   const dependencies = { './db.js': { getSql: () => db.sql }, './mock-store.js': { isMockMode: () => false },
-    './admin-access.js': { requirePermission: async () => ({ email: 'admin@example.test' }) } };
+    './admin-access.js': { requirePermission: async () => ({ email: 'admin@example.test' }) },
+    './map/member-hamlet-assignment.js': { findHamletForNewMember: async () => nextHamletAssignment } };
   admin = await loadModule('lib/admin-member-updates.js', dependencies);
   directory = await loadModule('lib/admin-members.js', { ...dependencies,
     '../data/mock-members.js': { mockMembers: [] }, './member-contact-groups.js': contactGroups });
 });
 after(async () => { await db.close(); });
+
+test('new member persists an unambiguous automatic hamlet assignment', async () => {
+  const [hamlet] = await db.sql`INSERT INTO member_hamlets(name) VALUES (${`Auto-${randomUUID()}`}) RETURNING id,name`;
+  nextHamletAssignment = { hamlet, status: 'linked' };
+  try {
+    const member = await admin.createAdminMember({ h_number: `auto-${randomUUID()}`, street_address: 'Testvegen 1', other_contact_emails: [] });
+    assert.equal(String(member.hamlet_id), String(hamlet.id)); assert.equal(member.hamlet_name, hamlet.name);
+    const [stored] = await db.sql`SELECT hamlet_id FROM members WHERE id=${member.id}`;
+    assert.equal(String(stored.hamlet_id), String(hamlet.id));
+  } finally { nextHamletAssignment = { hamlet: null, status: 'address_missing' }; }
+});
 
 test('member status defaults safely, validates changes, filters/counts and preserves separate shared-email properties', async () => {
   const key = randomUUID();
@@ -38,6 +51,22 @@ test('member status defaults safely, validates changes, filters/counts and prese
   await assert.rejects(admin.updateAdminMember(String(first.id), { ...input, membership_status: 'invalid' }), /Invalid member/);
   const events = await db.sql`SELECT after_value FROM audit_log WHERE table_name = 'members' AND row_id = ${String(second.id)} ORDER BY id`;
   assert.equal(events[0].after_value.membership_status, 'exempt');
+});
+
+test('sharing reservation defaults off, records its change and can be filtered', async () => {
+  const key = randomUUID();
+  const input = { h_number: `sharing-${key}`, primary_contact_name: 'Test', primary_contact_email: `${key}@example.test`, other_contact_emails: [] };
+  const member = await admin.createAdminMember(input);
+  assert.equal(member.turufjell_as_sharing_opt_out, false);
+  const updated = await admin.updateAdminMember(String(member.id), { ...input, turufjell_as_sharing_opt_out: true });
+  assert.equal(updated.turufjell_as_sharing_opt_out, true);
+  assert.ok(updated.turufjell_as_sharing_opt_out_updated_at);
+  const reserved = await directory.getAdminMembers(key, 1, 'h_number', 'asc', false, false, { turufjellAsSharing: 'opted_out' });
+  assert.equal(reserved.total, 1);
+  const allowed = await directory.getAdminMembers(key, 1, 'h_number', 'asc', false, false, { turufjellAsSharing: 'allowed' });
+  assert.equal(allowed.total, 0);
+  const events = await db.sql`SELECT after_value FROM audit_log WHERE table_name = 'members' AND row_id = ${String(member.id)} ORDER BY id`;
+  assert.equal(events.at(-1).after_value.turufjell_as_sharing_opt_out, true);
 });
 
 async function surveyFixture() {

@@ -27,6 +27,8 @@ async function setup(options = {}) {
     if (query.includes('SELECT id, status FROM matrikkel_sync_runs') && query.includes('deleted_at IS NULL')) {
       return state.run && !state.run.deleted_at ? [{ ...state.run }] : [];
     }
+    if (query.includes('SELECT id::text AS id, h_number')) return state.members.map((item) => ({ id: item.member_id, h_number: item.h_number, street_address: item.street_address, cadastral_number: item.cadastral_number }));
+    if (query.includes('AS member_count')) return [{ member_count: state.memberExists ? 1 : 0 }];
     if (query.includes('WITH created AS')) return state.createConflict ? [] : [{ ...state.run, backup_count: state.members.length }];
     if (query.includes('SELECT id, status, requested_by')) return state.run ? [{ ...state.run }] : [];
     if (query.includes("started_at = COALESCE")) {
@@ -113,16 +115,41 @@ async function setup(options = {}) {
 
 test('new run snapshots selection, records actor and rejects invalid or concurrent starts', async () => {
   const { api, state } = await setup();
-  assert.equal((await api.createMatrikkelRun({ hNumber: ' H-7 ' })).backup_count, 1);
+  assert.equal((await api.createMatrikkelRun({ memberId: '7' })).backup_count, 1);
   assert.match(state.queries[0].query, /pg_advisory_xact_lock/);
   assert.ok(state.queries[1].values.includes('admin@example.test'));
-  assert.ok(state.queries[1].values.includes('H-7'));
+  assert.ok(state.queries[1].values.includes('["7"]'));
+  assert.match(state.queries[1].query, /jsonb_array_elements_text/);
   assert.match(state.queries[1].query, /INSERT INTO matrikkel_sync_backups/);
   const count = state.queries.length;
   await assert.rejects(api.createMatrikkelRun({ hNumber: "'; DROP TABLE members" }), /Invalid H-number/);
+  await assert.rejects(api.createMatrikkelRun({ memberId: '0' }), /Invalid member selection/);
+  await assert.rejects(api.createMatrikkelRun({ memberId: '7', hNumber: 'H-7' }), /Invalid member selection/);
   assert.equal(state.queries.length, count);
   state.createConflict = true;
   await assert.rejects(api.createMatrikkelRun(), /Sync already running/);
+});
+
+test('new run snapshots an explicit multi-member selection without a schema change', async () => {
+  const second = { ...member, member_id: '8', h_number: 'H-8', street_address: 'Testvegen 8' };
+  const { api, state } = await setup({ members: [{ ...member }, second], run: { id: runId, status: 'pending', requested_by: 'admin@example.test', total_count: 2 } });
+  assert.equal((await api.createMatrikkelRun({ memberIds: ['7', '8', '7'] })).backup_count, 2);
+  assert.ok(state.queries[1].values.includes('["7","8"]'));
+  await assert.rejects(api.createMatrikkelRun({ memberIds: ['7', '0'] }), /Invalid member selection/);
+  await assert.rejects(api.createMatrikkelRun({ memberIds: '7,8' }), /Invalid member selection/);
+  await assert.rejects(api.createMatrikkelRun({ memberIds: [] }), /Invalid member selection/);
+  await assert.rejects(api.createMatrikkelRun({ memberId: '7', memberIds: ['8'] }), /Invalid member selection/);
+});
+
+test('member choices expose only property identity needed by the sync picker', async () => {
+  const { api } = await setup();
+  assert.deepEqual(plain(await api.getMatrikkelMemberOptions()), [{ id: '7', h_number: 'H-7', street_address: 'Testvegen 7', cadastral_number: '10/20' }]);
+});
+
+test('a deleted or unknown selected member cannot create an empty run', async () => {
+  const { api, state } = await setup({ createConflict: true, memberExists: false });
+  await assert.rejects(api.createMatrikkelRun({ memberId: '999' }), /Member not found/);
+  assert.match(state.queries.at(-1).query, /deleted_at IS NULL/);
 });
 
 test('permission and mock checks happen before database access', async () => {

@@ -33,14 +33,22 @@ test('stored hamlets strip caller properties and do not claim official geographi
   assert.equal(hamlets.hamletRecord({ ...row, polygon: null }).polygon, null);
 });
 
-async function service({ denied, mock = false, failure, rows = [row] } = {}) {
-  const calls = [];
+async function service({ denied, mock = false, failure, rows = [row], syncSummary } = {}) {
+  const calls = []; const searches = [];
   const api = await loadModule('lib/map/hamlet-service.js', {
     '../admin-access.js': { requirePermission: async (p) => { assert.equal(p, 'members'); if (denied) throw new Error(denied); return { email: 'ADMIN@example.test' }; } },
-    '../db.js': { getSql: () => ({ query: async (text, args) => { calls.push({ text, args }); if (failure) throw failure; return rows; } }) },
+    '../db.js': { getSql: () => ({ query: async (text, args) => { calls.push({ text, args }); if (failure) throw failure;
+      return text.includes("'hamlet_members_sync'") ? [syncSummary || { target_count: 1, matched_count: 2, linked_count: 1, already_linked_count: 0, assigned_elsewhere_count: 1 }] : rows; } }) },
     '../mock-store.js': { isMockMode: () => mock }, './geo.js': { MapError }, './hamlets.js': hamlets,
+    './service.js': { searchMapData: async (searchInput, options) => { searches.push({ searchInput, options }); return { comparison: { rows: [
+      { status: 'MATCH', scope: 'address_in_polygon', register: { id: '41' } },
+      { status: 'MATCH', scope: 'address_in_polygon', register: { id: '42' } },
+      { status: 'POSSIBLE_MATCH', scope: 'address_in_polygon', register: { id: '43' } },
+      { status: 'MATCH', scope: 'parcel_intersects', register: { id: '44' } },
+      { status: 'MISSING_IN_REGISTER', scope: 'address_in_polygon', register: null },
+    ] } }; } },
   });
-  return { ...api, calls };
+  return { ...api, calls, searches };
 }
 
 test('hamlet service checks permissions, rejects mock writes and returns only active grends', async () => {
@@ -80,6 +88,32 @@ test('stale version, deletion, duplicate names and failed audit never report suc
   await assert.rejects(failure.saveMapHamlet(input), /audit failed/);
 });
 
+test('member sync recalculates geography and links only unambiguous address matches', async () => {
+  const s = await service({ rows: [{ ...row, polygon_reviewed: true }] });
+  const result = await s.syncMapHamletMembers({ action: 'sync_members', id: '1', version: 1 }, { signal: 'synthetic-signal' });
+  assert.deepEqual(plain(result), { hamletId: '1', matchedCount: 2, linkedCount: 1, alreadyLinkedCount: 0, assignedElsewhereCount: 1 });
+  assert.equal(s.searches.length, 1);
+  assert.equal(s.searches[0].searchInput.datatype, 'comparison');
+  assert.deepEqual(s.searches[0].searchInput.polygon, square);
+  assert.equal(s.searches[0].options.signal, 'synthetic-signal');
+  assert.deepEqual(JSON.parse(s.calls[1].args[2]), ['41', '42']);
+  assert.match(s.calls[1].text, /m\.hamlet_id IS NULL/);
+  assert.match(s.calls[1].text, /assigned_elsewhere_count/);
+  assert.doesNotMatch(s.calls[1].text, /hamlet_id\s*=\s*NULL/);
+});
+
+test('member sync rejects drafts, stale versions and mock mode before changing members', async () => {
+  const draft = await service();
+  await assert.rejects(draft.syncMapHamletMembers({ action: 'sync_members', id: '1', version: 1 }), (error) => error.status === 409 && /Kontroller/.test(error.message));
+  assert.equal(draft.searches.length, 0); assert.equal(draft.calls.length, 1);
+  const stale = await service({ rows: [] });
+  await assert.rejects(stale.syncMapHamletMembers({ action: 'sync_members', id: '1', version: 1 }), (error) => error.status === 409);
+  assert.equal(stale.searches.length, 0);
+  const mock = await service({ mock: true });
+  await assert.rejects(mock.syncMapHamletMembers({ action: 'sync_members', id: '1', version: 1 }), (error) => error.status === 409);
+  assert.equal(mock.calls.length, 0);
+});
+
 test('actual hamlet GET/POST routes enforce auth, CSRF, limits and private responses', async () => {
   for (const [denied, expected] of [[null, 200], ['Unauthorized', 401], ['Forbidden', 403]]) {
     let calls = 0;
@@ -90,6 +124,7 @@ test('actual hamlet GET/POST routes enforce auth, CSRF, limits and private respo
     const route = await loadModule('app/api/admin/map/hamlets/route.js', {
       '@/lib/map/api': { handleMapRequest }, '@/lib/map/hamlet-service': {
         getMapHamlets: async () => { calls++; return []; }, saveMapHamlet: async () => { calls++; return hamlets.hamletRecord(row); },
+        syncMapHamletMembers: async () => { calls++; return { linkedCount: 2 }; },
       },
     });
     for (const method of ['GET', 'POST']) {
@@ -98,11 +133,13 @@ test('actual hamlet GET/POST routes enforce auth, CSRF, limits and private respo
     }
     assert.equal(calls, denied ? 0 : 2);
     if (!denied) {
+      const sync = await route.POST(request('/api/admin/map/hamlets', { method: 'POST', body: { action: 'sync_members', id: '1', version: 1 } }));
+      assert.equal(sync.status, 200); assert.deepEqual(await sync.json(), { sync: { linkedCount: 2 } });
       for (const [options, status] of [[{ body: input, headers: { origin: 'https://evil.test' } }, 403],
         [{ body: { text: 'x'.repeat(33000) } }, 413], [{ rawBody: '{}' }, 415]]) {
         assert.equal((await route.POST(request('/api/admin/map/hamlets', { method: 'POST', ...options }))).status, status);
       }
-      assert.equal(calls, 2);
+      assert.equal(calls, 3);
     }
   }
 });

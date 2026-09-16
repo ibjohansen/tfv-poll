@@ -29,7 +29,7 @@ export async function PATCH(request) {
     }
     if (input.action !== 'update') return NextResponse.json({ ok: false, message: 'Ugyldig handling.' }, { status: 400 });
     const member = await updateMemberSelfServiceProfile(secret, input);
-    return NextResponse.json({ ok: true, member, message: 'Kontaktopplysningene er oppdatert.' }, { headers: { 'Cache-Control': 'no-store, private' } });
+    return NextResponse.json({ ok: true, member, message: 'Opplysningene er oppdatert.' }, { headers: { 'Cache-Control': 'no-store, private' } });
   } catch (error) {
     const status = apiErrorStatus(error);
     const message = status >= 500 ? 'Tjenesten er midlertidig utilgjengelig. Prøv igjen senere.' : status === 401 ? 'Tilgangen er ugyldig eller utløpt.'

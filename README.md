@@ -495,25 +495,30 @@ Dette bruker dagens skjema og krever ingen ny migrering eller miljøvariabel.
 ## Produksjonssetting: Netlify + Neon + Microsoft Entra ID
 
 Kartmodulen ligger på `/admin/map`, med beskyttede Node-ruter
-`POST /api/admin/map/search`, `POST /api/admin/map/export` og
-`GET/POST /api/admin/map/hamlets`. De bruker eksisterende `members`-rettighet og
+`POST /api/admin/map/search`, `GET/POST /api/admin/map/hamlets` og
+`GET /api/admin/members/[id]`. De bruker eksisterende `members`-rettighet og
 pooled databaseforbindelse; ingen nye miljøvariabler, Entra-roller eller
-bakgrunnsfunksjoner trengs. Grendepolygoner krever en **ny additiv migrering**
-før publisering: `member_hamlets` får `polygon`, `polygon_reviewed`,
-`polygon_version`, `polygon_updated_at` og en versjoneringstrigger.
-Denne utvidelsen fra 16. september er ikke omfattet av den allerede utførte
-migreringen 15. september. Den er bare testet i isolert lokal Postgres og må
-følge godkjenningsprosedyren nedenfor før produksjonskjøring. Ingen grender
-eller kartgrenser opprettes automatisk av migreringen.
-Kartet har også en valgfri velger med 11 omtrentlige bildeutkast i en separat
-GeoJSON-katalog. Disse innfører ingen ytterligere migrering eller API-rute.
-Administrator må selv velge, kontrollere/redigere og lagre hvert område.
-Innlasting av et utkast overskriver aldri et eksisterende lagret polygon.
+bakgrunnsfunksjoner trengs. Den additive produksjonsmigreringen 16. september
+la til `polygon`, `polygon_reviewed`, `polygon_version`, `polygon_updated_at` og
+versjoneringstriggeren på `member_hamlets`; se
+[migreringsstatus](docs/database-migration-2026-09-16.md). Ingen grender eller
+kartgrenser ble opprettet automatisk. Godkjent deploy og funksjonell
+produksjonsverifikasjon gjenstår.
+De 11 digitaliserte grendene er nå lagret som kontrollerte polygoner i databasen;
+applikasjonen har ikke lenger en separat utkastkatalog.
 Node må kunne nå `ws.geonorge.no` og `overpass-api.de` over HTTPS, og nettleseren
 må kunne hente kartbilder fra `cache.kartverket.no`. CSP er utvidet kun for
 denne bildekilden. Sørg for passende delt/WAF-rate-limit på kartrutene ved
 produksjonsbruk; den lokale 20/minutt-grensen er bare per-instans.
 Se [kartmodulens datakilder, begrensninger og bruk](docs/map-explorer.md).
+
+Forsiden viser kontrollerte grendepolygoner fra `member_hamlets`. Den offentlige
+GET-ruten `/api/map/hamlets/[id]/properties` laster eiendommer først når en grend
+velges og returnerer bare H-nummer, gårds-/bruksnummer, adresse og eventuell
+offisiell adressekoordinat fra Kartverket. Medlems-ID, navn, hjemmelshaver,
+e-post, telefon og interne notater inngår ikke i responsen. Ruten har en lokal
+rate-limit på 20 oppslag per minutt og trenger samme delte/WAF-beskyttelse som
+de øvrige offentlige rutene i produksjon. Ingen ny miljøvariabel er nødvendig.
 
 `netlify.toml` inneholder byggkommando, publiseringsmappe, Node-versjon og
 funksjonsmappe. Netlify håndterer Next.js App Router gjennom sin Next.js-adapter,
@@ -532,6 +537,14 @@ ingen unntak utledes fra navn. Kommentarer lagres separat fra interne adminnotat
 Samme migrering innfører grender/e-postgrupper, fler-tomtstilgang,
 `cms_pages.body_rich_text`, nyhetsbrev og den lesbare hendelsesvisningen
 `admin_activity_log`. Ingen medlemsdata flyttes til eksterne tjenester.
+
+Reservasjon mot manuell deling med Turufjell AS bruker de additive kolonnene
+`members.turufjell_as_sharing_opt_out` og
+`members.turufjell_as_sharing_opt_out_updated_at`. Kjør `npm run db:setup` med
+direkte `DATABASE_URL_UNPOOLED` før kode som leser feltene publiseres. Eksisterende
+poster får den avklarte standardverdien `FALSE`. Endringer logges av den
+eksisterende `members`-audittriggeren, og Excel-eksport utelater reserverte
+poster som standard.
 
 Nye beskyttede ruter er `/admin/members/groups`, `/api/admin/member-groups`,
 `/admin/members/newsletters` og `/api/admin/newsletters`, alle med eksisterende
@@ -617,13 +630,34 @@ følger [Neons anbefaling for pooling og migrering](https://neon.com/docs/connec
 Kontroller etterpå at forventede kolonner, tabeller, indekser og triggere finnes,
 og at eksisterende data er beholdt. Bruk radantall og kontrollsummer uten å
 skrive medlemsopplysninger til logger eller eksportfiler. Se
-[migreringsstatus 15. september 2026](docs/database-migration-2026-09-15.md)
-for utført testing, bekreftet produksjonsmigrering og gjenopprettingspunkt.
+[migreringsstatus 15. september 2026](docs/database-migration-2026-09-15.md) og
+[migreringsstatus 16. september 2026](docs/database-migration-2026-09-16.md)
+for utført testing, bekreftede produksjonsmigreringer og gjenopprettingspunkter.
 
 Skjemaet oppretter også `audit_log` og triggere på `members`, `member_requests`,
 `surveys`, `survey_responses`, `cms_pages` og `cms_attachments`. Loggen starter
 når migreringen kjøres; den rekonstruerer ikke historikk fra tidligere
 endringer. Tilgangstoken, verifiseringshash og interne lagringsnøkler utelates.
+
+Skjemaet oppretter i tillegg `usage_daily_stats` for egenhostet, anonym
+bruksstatistikk. Nettleseren sender bare en tillatt sidetype og én grov
+enhetskategori til `POST /api/usage/pageview`. API-et aksepterer bare
+same-origin-kall, og senderen bruker `credentials: omit`. Det lagres aldri rå
+URL eller query, IP-adresse, cookie, bruker-/besøks-ID, user-agent, referrer,
+navigasjonsforløp eller enkeltstående hendelsestidspunkt. `Do Not Track` blir
+respektert. Radene er dagsaggregater i norsk tid. Fordi de ikke inneholder
+besøksidentifikatorer eller rå hendelser, beholdes aggregatene som historisk
+statistikk uten automatisk sletting. En eventuell senere slettejobb skal være
+en eksplisitt, dokumentert driftsbeslutning.
+
+Administratorer med `audit`-rettighet kan se 7, 30, 90, 365 eller 730 dager,
+eller hele perioden, på `/admin/usage`. Visningen inneholder en responsiv
+Visx-graf med dag-, uke- eller månedsoppløsning, datatabell, tillatt sidetype og
+grov enhetskategori. Den viser ikke «unike besøk», sesjoner eller varighet,
+fordi slike tall ville krevd en varig identifikator og kunne blitt misvisende.
+Ingen ny miljøvariabel er nødvendig. Migreringen ble kjørt og verifisert i
+produksjon 16. september 2026. Den nye applikasjonsversjonen er ikke deployet
+som del av migreringen, så produksjonsinnsamlingen er ennå ikke aktivert.
 
 Før publisering av worker-gjenopptaking må den additive migreringen kjøres:
 den legger til manglende reservasjon-/forsøkskolonner på eksisterende
@@ -849,6 +883,12 @@ Utfør kontrollene i denne rekkefølgen:
   venstre, og at loginbildet viser et vesentlig bredere utsnitt uten å miste
   fokuspunktet.
 - Åpne `/admin` i et privat vindu og kontroller at du sendes til innlogging.
+- Åpne forsiden og en publisert artikkel uten `Do Not Track`, og kontroller at
+  `POST /api/usage/pageview` svarer `204` uten cookies eller rå URL i body.
+  Åpne `/admin/usage` med en konto som har `audit`-rettighet og kontroller
+  dags-, side- og enhetsfordeling. Kontroller at en konto uten rettigheten
+  avvises, at admin- og API-sider ikke telles, og at aktivert `Do Not Track`
+  hindrer kallet. Ikke bruk personlige medlems- eller surveylenker i testen.
 - Åpne `/admin/map` med medlemsadministrator. Tegn, rediger og slett et lite
   polygon ved Turufjell; kontroller areal, bakgrunnskart, adressepunkter, veier,
   lagvalg, tabellsøk og zoom fra tabellrad, også på mobil og med tastatur.
@@ -861,18 +901,21 @@ Utfør kontrollene i denne rekkefølgen:
   med rolle uten `members`-rettighet. Test feil fra ekstern karttjeneste og
   retry i isolert miljø. Kontroller at ufullstendige adressedata ikke gir en
   sammenligningsrapport med falske «mangler»-tall.
+- Åpne forsiden uten innlogging. Kontroller at alle kontrollerte grender har én
+  knapp, at valg zoomer til riktig polygon, og at **Vis eiendommer** bare laster
+  valgt grend. Nettverksresponsen skal bare inneholde H-nummer, gårds-/bruksnummer,
+  adresse, kartkoordinat og kilde – aldri medlems-ID, navn eller kontaktfelt.
 - Kontroller registersammenligningen med kjent testgrunnlag, inkludert ulike
   gnr/bnr på samme adresse, seksjonsnummer og flere kandidater. Ukjent plassering
   skal vises separat og ikke telle som manglende kartdata. Knyttede teiger kan
   berøre polygonet uten at adressepunktet er kjent; dette merkes uttrykkelig.
   Hent sammenligningen på nytt etter grensehenting. Registeret skal aldri endres.
-- Med godkjent testgrunnlag: kontroller adresse-CSV, sammenlignings-CSV og GeoJSON
-  samt kopiering. Bare sammenlignings-CSV skal ha interne kontaktopplysninger;
-  GeoJSON skal ikke ha medlemmer, e-post, telefon eller tilgangslenker.
-  Hentede teiger skal følge GeoJSON-eksporten med full geometri og kilde;
-  CSV skal skille ukjent plassering fra geografisk avgrensede mangler.
-  Kart-/registereksport skal vises i brukerloggen med aktør, format og antall,
-  uten eksportinnhold. Oppbevar eventuell kontaktfil sikkert og slett etter test.
+- Velg adresser og teiger med og uten registertreff. Et entydig treff skal åpne
+  samme medlemsdetaljer som medlemsregisteret; manglende hjemmelshaver skal
+  opplyses tydelig, og flere mulige registerposter skal ikke kobles automatisk.
+- Opprett en syntetisk tomt med en eksakt adresse innenfor én kontrollert grend.
+  Kontroller at grenden tilordnes automatisk. Utilgjengelig adressetjeneste,
+  fuzzy treff eller overlappende grender skal ikke føre til en gjettet kobling.
 - Logg inn med en godkjent administratorkonto og kontroller modulene Medlemsregister,
   Oppgaveliste, Undersøkelser, Web og Brukerendringer. Velg et medlem med gateadresse, og kontroller
   at eiendomskartet er lukket under adressefeltet i detaljpanelet og kan åpnes.
@@ -882,6 +925,10 @@ Utfør kontrollene i denne rekkefølgen:
   og kontroller at bare relevante medlemmer vises. Aktiver deretter filteret
   for registrert kommentar og kontroller at alle og bare kommenterte medlemmer
   vises, også i kombinasjon med søk.
+- Kryss av reservasjon mot deling med Turufjell AS i medlemmenes selvbetjening
+  og kontroller automatisk lagring, endringstid og audit-historikk. Kontroller
+  deretter adminfilteret og at Excel-eksporten utelater posten som standard.
+  Slå bare av eksportvalget i en kontrollert intern test og slett testfilen.
 - Gjør en kontrollert endring på et testmedlem. Åpne `/admin/audit`, kontroller
   riktig innlogget bruker, tidspunkt og før-/etterverdi, og bruk lenken tilbake
   til medlemsposten. Kontroller søk, filtrering på bruker, område, type og status,
@@ -935,17 +982,15 @@ Utfør kontrollene i denne rekkefølgen:
 - I isolert testmiljø: lagre et navngitt polygon på `/admin/map`, last siden
   på nytt og kontroller at grenden finnes både i kartet og gruppeadministrasjonen.
   Test eksisterende grend uten polygon, navneendring, redigering, lagvalg og
-  utkast/kontrollstatus. Geometriendring skal kreve ny manuell kontroll.
+  utkast/kontrollstatus. Valg i nedtrekkslisten skal laste og zoome til grenden
+  direkte, uten en ekstra knapp. Kartet skal stå til høyre for grendeeditoren på
+  større skjermer og under den på mobil. Geometriendring skal kreve ny manuell kontroll.
   To editorer skal ikke overskrive hverandre: siste lagring fra gammel versjon
   skal gi konflikt uten å miste utkastet. Navneendring/sletting fra
   gruppeadministrasjonen skal også avvise en gammel editor.
   Fjerning av lagret polygon skal beholde grend og medlemstilknytninger.
   Oppretting/endring/fjerning skal vises i brukerloggen uten koordinatlister
-  eller kontaktdata. Bare rødt avgrensede områder fra referansekartet skal
-  digitaliseres, og plasseringen må kontrolleres manuelt før bruk som grunnlag.
-  Test også **Kartutkast fra bildet**: innlasting uten databaseskriving,
-  hjørneredigering og eksplisitt lagring. Samme navn skal gjenbruke en grend uten
-  polygon; en eksisterende grense skal avvises som mål for et bildeutkast.
+  eller kontaktdata.
 - Test fler-tomtstilgang med to syntetiske tomter på samme hoved-e-post, én på en
   annen hovedadresse og én hvor adressen endres etter lenkeutstedelse. Bare det
   gyldige tilgangsutvalget skal vises, også ved manipulert `member`-parameter.
@@ -1126,6 +1171,8 @@ Databaseendringen er additiv og oppretter:
 - `survey_access_tokens` og `survey_sessions` for avgrenset surveytilgang
 - `security_rate_limits` og append-only `security_events` for misbruksvern og
   sikkerhetshendelser uten rå identifikatorer eller hemmeligheter
+- `usage_daily_stats` for varig, dagsaggregert bruksstatistikk uten
+  besøksidentifikatorer eller rå hendelser
 - `member_requests` for status på e-postbekreftelse og manuell behandling av
   innmelding/eierskifte, inkludert gårds-/bruksnummer, seksjonsnummer og status
   for matrikkelkontroll
@@ -1212,6 +1259,14 @@ MATRIKKEL_SYNC_EMAILS=<godkjent-driftskonto@turufjellvel.no>
 Variabelen må settes eksplisitt. Dersom den mangler eller er tom, har ingen
 brukere tilgang til matrikkelsynkronisering.
 
+På Matrikkel-siden kan administratoren søke på H-nummer, gateadresse eller
+gårds-/bruksnummer og velge ett konkret medlem. Utvalget låses til medlemmets
+interne ID før snapshotet opprettes; andre rader med samme midlertidige H-nummer
+blir derfor ikke berørt. Administratorer som både har medlems- og
+matrikkelrettighet får også en direkte handling fra medlemsdetaljene. Valget
+bruker samme backup, bakgrunnsjobb, avviksbehandling og brukerlogg som en full
+kjøring og krever ingen ny tabell eller miljøvariabel.
+
 Kartverkets produksjonslegitimasjon skal bare ligge i `.env.local` lokalt og i
 Netlifys server-side miljøvariabler i produksjon:
 
@@ -1260,10 +1315,11 @@ Oppslaget bruker `street_address` som eneste søkenøkkel og kan bare skrive:
 | Kartverket/verdi | Medlemsfelt |
 | --- | --- |
 | Gårds- og bruksnummer | `cadastral_number` |
+| Seksjonsnummer | `section_number` |
 | Aktive tinglyste eiere | `title_holder` |
 | Eierforholdets `datoFra` | `registration_date` |
 
-Før hver kjøring kopieres disse tre feltene for alle aktive medlemmer til
+Før hver kjøring kopieres disse fire feltene for alle valgte aktive medlemmer til
 `matrikkel_sync_backups` i samme transaksjon som jobbregistreringen. Dette er et
 komplett tilbakerullingsgrunnlag for synkroniseringens endringer, men ikke en
 ekstern katastrofesikker `pg_dump`. En full dump må lagres kryptert utenfor den
@@ -1275,9 +1331,10 @@ De vises som avvik og må eventuelt godkjennes manuelt. Ved nettverks- eller
 API-feil beholdes alle eksisterende medlemsverdier. Rå SOAP-responser,
 fødselsnummer og interne person-ID-er lagres ikke.
 
-Bruk **Test H-nummer 25** før første fullstendige kjøring. Testen bruker samme
-serverlogikk, sikkerhetskopi og avviksbehandling, men begrenser snapshot og
-oppslag til dette ene medlemmet.
+Bruk **Test H-nummer 25** før første fullstendige kjøring. For ordinær
+oppdatering av én rad brukes medlemsvelgeren. Begge bruker samme serverlogikk,
+sikkerhetskopi og avviksbehandling, men medlemsvelgeren avgrenser alltid på
+intern medlems-ID.
 
 `registration_date` inneholder Matrikkelens `datoFra` for det aktive tinglyste
 eierforholdet. Det er ikke nødvendigvis kontrakts-, overtakelses- eller faktisk

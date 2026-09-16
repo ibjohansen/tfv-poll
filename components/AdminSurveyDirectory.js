@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import SurveyEmailPanel from '@/components/SurveyEmailPanel';
@@ -12,10 +12,17 @@ const answerOptions = [
   { value: 'nei', label: 'Nei', color: '#b91c1c' },
   { value: 'usikker', label: 'Usikker', color: '#a16207' },
 ];
+const saveLabels = { saved: 'Alle endringer lagret', dirty: 'Venter på automatisk lagring …', saving: 'Lagrer automatisk …', error: 'Automatisk lagring feilet' };
 
 function normalizeQuestions(questions) {
   return questions.map((question, index) => ({ ...question, number: index + 1 }));
 }
+
+function surveyPayload(title, isOpen, endsOn, questions) {
+  return { title, isOpen, endsOn, questions: normalizeQuestions(questions) };
+}
+
+const surveyKey = (payload) => JSON.stringify(payload);
 
 function nextQuestion(questions) {
   const ids = new Set(questions.map(({ id }) => id));
@@ -109,6 +116,12 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
   const [questions, setQuestions] = useState([]);
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState('idle');
+  const [savedPayloadKey, setSavedPayloadKey] = useState('');
+  const draftPayload = useMemo(() => surveyPayload(title, isOpen, endsOn, questions), [endsOn, isOpen, questions, title]);
+  const draftKey = surveyKey(draftPayload);
+  const displayedSaveState = saveState === 'saved' && draftKey !== savedPayloadKey ? 'dirty' : saveState;
+  const latestDraftKey = useRef(draftKey);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [results, setResults] = useState(null);
@@ -141,6 +154,8 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
     setIsOpen(survey.is_open);
     setEndsOn(survey.ends_on || '');
     setQuestions(survey.questions || []);
+    setSavedPayloadKey(surveyKey(surveyPayload(survey.title, survey.is_open, survey.ends_on || '', survey.questions || [])));
+    setSaveState('saved');
     setMessage('');
   }
 
@@ -153,6 +168,8 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
     setIsOpen(true);
     setEndsOn('');
     setQuestions([blankQuestion(1)]);
+    setSavedPayloadKey('');
+    setSaveState('idle');
     setMessage('');
   }
 
@@ -167,35 +184,41 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
   const removeQuestion = (index) => setQuestions((current) => normalizeQuestions(current.filter((_, questionIndex) => questionIndex !== index)));
   const addQuestion = () => setQuestions((current) => [...current, nextQuestion(current)]);
 
+  const persistSurvey = useCallback(async (payload, wasNew, surveyId) => {
+    setSaving(true);
+    setSaveState('saving');
+    setMessage('');
+    const endpoint = wasNew ? '/api/admin/surveys' : `/api/admin/surveys/${surveyId}`;
+    try {
+      const response = await fetch(endpoint, { method: wasNew ? 'POST' : 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const body = await response.json();
+      if (!response.ok || !body.ok) throw new Error(body.message || 'Kunne ikke lagre undersøkelsen.');
+      const returnedPayload = surveyPayload(body.survey.title, body.survey.is_open, body.survey.ends_on || '', body.survey.questions || []);
+      setSavedPayloadKey(surveyKey(returnedPayload));
+      setSelected(body.survey);
+      if (latestDraftKey.current === surveyKey(payload)) {
+        setTitle(body.survey.title); setIsOpen(body.survey.is_open); setEndsOn(body.survey.ends_on); setQuestions(body.survey.questions);
+        setSaveState('saved');
+      } else setSaveState('dirty');
+      setMessage(wasNew ? 'Undersøkelsen er opprettet.' : '');
+      setResults(null); setResultsState('loading'); setResultsReload((value) => value + 1); router.refresh();
+    } catch (error) { setMessage(error.message || 'Kunne ikke lagre undersøkelsen.'); setSaveState('error'); }
+    finally { setSaving(false); }
+  }, [router]);
+
   async function save(event) {
     event.preventDefault();
-    setSaving(true);
-    setMessage('');
-    const wasNew = selected.isNew;
-    const payload = { title, isOpen, endsOn, questions: normalizeQuestions(questions) };
-    const endpoint = wasNew ? '/api/admin/surveys' : `/api/admin/surveys/${selected.id}`;
-    const response = await fetch(endpoint, {
-      method: wasNew ? 'POST' : 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const body = await response.json();
-    setSaving(false);
-    if (!response.ok || !body.ok) {
-      setMessage(body.message || 'Kunne ikke lagre undersøkelsen.');
-      return;
-    }
-    setSelected(body.survey);
-    setTitle(body.survey.title);
-    setIsOpen(body.survey.is_open);
-    setEndsOn(body.survey.ends_on);
-    setQuestions(body.survey.questions);
-    setMessage(wasNew ? 'Undersøkelsen er opprettet.' : 'Lagret.');
-    setResults(null);
-    setResultsState('loading');
-    setResultsReload((value) => value + 1);
-    router.refresh();
+    await persistSurvey(draftPayload, selected.isNew, selected.id);
   }
+
+  useEffect(() => { latestDraftKey.current = draftKey; }, [draftKey]);
+
+  useEffect(() => {
+    if (!selected || selected.isNew || selected.mock || saving || draftKey === savedPayloadKey) return undefined;
+    if (!title.trim() || !endsOn || !questions.length || questions.some((question) => !question.text.trim())) return undefined;
+    const timer = setTimeout(() => persistSurvey(draftPayload, false, selected.id), 900);
+    return () => clearTimeout(timer);
+  }, [draftKey, draftPayload, endsOn, isOpen, persistSurvey, questions, savedPayloadKey, saving, selected, title]);
 
   async function remove() {
     setDeleting(true);
@@ -256,8 +279,8 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
 
       <aside className={`admin-detail-panel survey-detail-panel${selected ? ' is-open' : ''}`} aria-hidden={!selected} aria-label="Administrer undersøkelse">
         <div className="admin-detail-header">
-          <div><p className="eyebrow">{selected?.isNew ? 'Ny undersøkelse' : 'Undersøkelse'}</p><h2>{selected?.isNew ? 'Opprett undersøkelse' : selected?.title}</h2></div>
-          <button className="admin-button" type="button" onClick={close}>Lukk</button>
+          <div><p className="eyebrow">{selected?.isNew ? 'Ny undersøkelse' : 'Undersøkelse'}</p><h2>{selected?.isNew ? 'Opprett undersøkelse' : selected?.title}</h2>{!selected?.isNew && <span className={`admin-save-status is-${displayedSaveState}`} role="status">{saveLabels[displayedSaveState]}</span>}</div>
+          <button className="admin-button" type="button" onClick={close} disabled={saving}>Lukk</button>
         </div>
         {selected && (
           <>

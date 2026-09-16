@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { clearRateLimits, isEmailRateLimited, isMemberAccessRateLimited, isMemberMutationRateLimited, isRateLimited } from '../lib/rate-limit.js';
+import { clearRateLimits, isEmailRateLimited, isMemberAccessRateLimited, isMemberMutationRateLimited, isPublicMapRateLimited, isRateLimited } from '../lib/rate-limit.js';
 
 test('the public response endpoint has a per-client request limit', () => {
   clearRateLimits();
@@ -25,5 +25,13 @@ test('public member access and authenticated mutations have separate limits', ()
   assert.equal(isMemberAccessRateLimited(request, 0), true);
   for (let count = 0; count < 10; count += 1) assert.equal(isMemberMutationRateLimited(request, 0), false);
   assert.equal(isMemberMutationRateLimited(request, 0), true);
+  clearRateLimits();
+});
+
+test('public map lookups have a separate twenty-per-minute backstop', () => {
+  clearRateLimits();
+  const request = new Request('https://example.test/api/map/hamlets/7/properties', { headers: { 'x-nf-client-connection-ip': '203.0.113.11' } });
+  for (let count = 0; count < 20; count += 1) assert.equal(isPublicMapRateLimited(request, 0), false);
+  assert.equal(isPublicMapRateLimited(request, 0), true);
   clearRateLimits();
 });

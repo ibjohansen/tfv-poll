@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
-import { adminPermissions, isAuthConfigured } from '@/lib/admin-policy';
+import { adminPermissions, isAllowedMatrikkelSync, isAuthConfigured } from '@/lib/admin-policy';
 import AdminModuleHeader from '@/components/AdminModuleHeader';
 import MapExplorer from '@/components/MapExplorer/MapExplorer';
 
@@ -12,5 +12,5 @@ export default async function MapExplorerPage() {
   const session = await auth();
   if (!adminPermissions(session?.user).has('members')) redirect('/admin');
   return <main className="admin-shell"><AdminModuleHeader active="map" title="Kart og registerkontroll" email={session.user.email} />
-    <section className="admin-content"><MapExplorer /></section></main>;
+    <section className="admin-content"><MapExplorer canMatrikkelSync={isAllowedMatrikkelSync(session.user)} /></section></main>;
 }

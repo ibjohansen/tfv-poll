@@ -1,12 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { loadModule, request, plain } from './helpers/load-module.mjs';
+import { loadModule, request } from './helpers/load-module.mjs';
 import { MapError, validatePolygon } from '../lib/map/geo.js';
 import { readLimitedJson } from '../lib/map/http.js';
 import { compareRegisterWithMapData } from '../lib/map/comparison.js';
 import { createMapCache } from '../lib/map/cache.js';
-import { addressesCsv, comparisonCsv, mapGeoJson } from '../lib/map/export.js';
 import { normalizeCadastral, cadastralInteger, nullableText } from '../lib/map/normalization.js';
 import { propertiesFromAddresses } from '../lib/map/kartverket-property-service.js';
 import { normalizeKartverketAddress } from '../lib/map/kartverket-address-service.js';
@@ -54,7 +53,7 @@ test('map rate limits return Retry-After and service failures never expose raw e
   assert.equal(failed.status, 500); assert.doesNotMatch(await failed.text(), /DATABASE_URL|secret|email@example/);
 });
 
-test('actual map routes delegate through authentication and return private JSON/download', async () => {
+test('actual map search route delegates through authentication and returns private JSON', async () => {
   const { handleMapRequest } = await api();
   const searchRoute = await loadModule('app/api/admin/map/search/route.js', {
     '@/lib/map/api': { handleMapRequest }, '@/lib/map/service': { searchMapData: async (input, options) => {
@@ -63,21 +62,12 @@ test('actual map routes delegate through authentication and return private JSON/
   });
   const result = await searchRoute.POST(request('/api/admin/map/search', { method: 'POST', body: { datatype: 'addresses', polygon: square } }));
   assert.equal(result.status, 200); assert.deepEqual(await result.json(), { addresses: [] }); assert.equal(result.headers.get('Vary'), 'Cookie');
-  const exportRoute = await loadModule('app/api/admin/map/export/route.js', {
-    '@/lib/map/api': { handleMapRequest }, '@/lib/map/service': { createMapExport: async (_input, user) => {
-      assert.equal(user.email, 'admin@example.invalid'); return { body: 'CSV', contentType: 'text/csv; charset=utf-8', filename: 'test.csv' };
-    } },
-  });
-  const download = await exportRoute.POST(request('/api/admin/map/export', { method: 'POST', body: {} }));
-  assert.match(download.headers.get('Content-Disposition'), /test.csv/); assert.match(download.headers.get('Cache-Control'), /private/);
 });
 
-async function service({ complete = true, failAudit = false } = {}) {
-  const calls = { addresses: 0, register: [], audit: [] };
+async function service({ complete = true } = {}) {
+  const calls = { addresses: 0, register: [] };
   const serviceModule = await loadModule('lib/map/service.js', {
-    'node:crypto': { randomUUID }, '../db.js': { getSql: () => async (strings, ...values) => {
-      if (failAudit) throw new Error('audit unavailable'); calls.audit.push({ query: strings.join('?'), values }); return [];
-    } }, '../mock-store.js': { isMockMode: () => false },
+    '../mock-store.js': { isMockMode: () => false },
     './cache.js': { createMapCache }, './geo.js': { MapError, validatePolygon },
     './kartverket-address-service.js': { findAddressesInPolygon: async () => {
       calls.addresses += 1; return { complete, addresses: [normalizeKartverketAddress(rawAddress)], fetchedAt: '2026-09-15' };
@@ -86,7 +76,7 @@ async function service({ complete = true, failAudit = false } = {}) {
     './kartverket-property-service.js': { propertiesFromAddresses },
     './kartverket-boundary-service.js': { findPropertiesInPolygon: async () => ({ boundaries: [], complete: true, fetchedAt: '2026-09-15' }) },
     './register-service.js': { getRegisterProperties: async (options) => { calls.register.push(options); return [{ ...register, owners: ['Internal owner'], emails: ['private@example.invalid'] }]; } },
-    './comparison.js': { compareRegisterWithMapData }, './export.js': { addressesCsv, comparisonCsv, mapGeoJson },
+    './comparison.js': { compareRegisterWithMapData },
   });
   return { ...serviceModule, calls };
 }
@@ -101,26 +91,9 @@ test('service reuses official data, never caches register comparison and validat
   await assert.rejects(s.searchMapData({ polygon: null, datatype: 'addresses' }));
 });
 
-test('incomplete official data disables comparison and exports, with no register query or audit event', async () => {
+test('incomplete official data disables comparison without querying the register', async () => {
   const s = await service({ complete: false });
   await assert.rejects(s.searchMapData({ polygon: square, datatype: 'comparison' }), (error) => error.status === 409);
-  await assert.rejects(s.createMapExport({ polygon: square, format: 'comparison-csv' }, { email: 'admin@example.invalid' }));
-  assert.equal(s.calls.register.length, 0); assert.equal(s.calls.audit.length, 0);
-});
-
-test('comparison export requests contacts explicitly and logs only minimal metadata', async () => {
-  const s = await service();
-  const result = await s.createMapExport({ polygon: square, format: 'comparison-csv' }, { email: 'Admin@example.invalid' });
-  assert.match(result.body, /private@example.invalid/);
-  assert.deepEqual(plain(s.calls.register[0]), { includeContacts: true });
-  const event = JSON.parse(s.calls.audit[0].values.at(-1));
-  assert.deepEqual(event, { action: 'map_export', format: 'comparison-csv', count: 1, scope: 'polygon' });
-  assert.doesNotMatch(JSON.stringify(s.calls.audit), /private@example|Internal owner|coordinates|Sprenåsen/);
-});
-
-test('map export fails closed on audit failure and never loads register for public-data formats', async () => {
-  const s = await service({ failAudit: true });
-  await assert.rejects(s.createMapExport({ polygon: square, format: 'addresses-csv' }, { email: 'admin@example.invalid' }), /audit unavailable/);
   assert.equal(s.calls.register.length, 0);
 });
 
@@ -150,7 +123,7 @@ test('actual proxy enforces member role for map page/API and narrowly permits Ka
   }, { crypto: { randomUUID } });
   for (const role of ['TFV.ReadOnly', 'TFV.MatrikkelAdmin']) {
     user.roles = [role];
-    for (const path of ['/api/admin/map/search', '/api/admin/map/export']) assert.equal((await proxy(request(path))).status, 403);
+    assert.equal((await proxy(request('/api/admin/map/search'))).status, 403);
     assert.match((await proxy(request('/admin/map'))).headers.get('location'), /\/admin$/);
   }
   user.roles = ['TFV.MemberAdmin'];

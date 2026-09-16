@@ -12,7 +12,7 @@ export default async function NewslettersPage() {
   try { user = await requirePermission('members'); } catch { redirect('/admin/login'); }
   let data, groups;
   try { [data, groups] = await Promise.all([getNewsletters(), getMemberGroups()]); } catch { data = null; }
-  return <main className="admin-shell"><AdminModuleHeader active="members" title="Nyhetsbrev" email={user.email} />
+  return <main className="admin-shell"><AdminModuleHeader active="newsletters" title="Nyhetsbrev" email={user.email} />
     <section className="admin-content">{data ? <AdminNewsletters initialData={JSON.parse(JSON.stringify(data))} groups={groups.filter((group) => group.kind === 'email')} /> : <p role="alert" className="form-error">Nyhetsbrevene er midlertidig utilgjengelige.</p>}</section>
   </main>;
 }

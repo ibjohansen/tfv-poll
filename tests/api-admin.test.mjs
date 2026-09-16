@@ -7,6 +7,7 @@ import { loadModule, plain, request, routeContext } from './helpers/load-module.
 const cases = [
   ['members', 'GET', 'admin-members', 'getAdminMembers', 200],
   ['members', 'POST', 'admin-member-updates', 'createAdminMember', 201],
+  ['members/[id]', 'GET', 'admin-members', 'getAdminMemberById', 200],
   ['members/[id]', 'PATCH', 'admin-member-updates', 'updateAdminMember', 200],
   ['members/[id]', 'DELETE', 'admin-member-updates', 'deleteAdminMember', 200],
   ['members/export', 'POST', 'member-export', 'createMemberExport', 200, { binary: true }],
@@ -41,7 +42,7 @@ const cases = [
   ['matrikkel/runs/[id]/items/[memberId]/approve', 'POST', 'matrikkel-sync', 'approveMatrikkelItem', 200, { unauthorized: 403 }],
 ];
 const exportsByModule = {
-  'admin-members': ['getAdminMembers'],
+  'admin-members': ['getAdminMembers', 'getAdminMemberById'],
   'admin-member-updates': ['createAdminMember', 'updateAdminMember', 'deleteAdminMember'],
   'member-export': ['createMemberExport'],
   'member-self-service': ['resolveAdminMemberRequest', 'updateAdminMemberRequestProperty'],
@@ -50,7 +51,7 @@ const exportsByModule = {
   'survey-email': ['getSurveyEmailOverview', 'sendSurveyTestEmail', 'createSurveyEmailCampaign', 'failPendingSurveyEmailCampaign'],
   'cms-pages': ['getAdminCmsPages', 'createAdminCmsPage', 'getAdminCmsPage', 'updateAdminCmsPage', 'deleteAdminCmsPage', 'setAdminCmsPageStatus'],
   'cms-files': ['uploadAdminCmsFile', 'deleteAdminCmsFile', 'reorderAdminCmsAttachments', 'updateAdminCmsAttachment'],
-  'matrikkel-sync': ['getMatrikkelRuns', 'getMatrikkelRun', 'createMatrikkelRun', 'failPendingMatrikkelRun', 'deleteMatrikkelRunLog', 'cancelMatrikkelRun', 'processMatrikkelRun', 'approveMatrikkelItem'],
+  'matrikkel-sync': ['getMatrikkelRuns', 'getMatrikkelRun', 'getMatrikkelMemberOptions', 'createMatrikkelRun', 'failPendingMatrikkelRun', 'deleteMatrikkelRunLog', 'cancelMatrikkelRun', 'processMatrikkelRun', 'approveMatrikkelItem'],
 };
 
 async function setup(path, overrides = {}) {
@@ -114,7 +115,19 @@ for (const [path, method, module, operation, status, options = {}] of cases) {
 test('member search normalizes pagination and preserves combined filters', async () => {
   const { route, calls } = await setup('members');
   await route.GET(request('/api/admin/members?q=%20Test%20&page=NaN&dir=desc&contact=incomplete&comment=present'));
-  assert.deepEqual(plain(calls[0].args), ['Test', 1, 'h_number', 'desc', true, true, { membershipStatus: '', hamletId: '', groupId: '' }]);
+  assert.deepEqual(plain(calls[0].args), ['Test', 1, 'h_number', 'desc', true, true, { membershipStatus: '', hamletId: '', groupId: '', turufjellAsSharing: '' }]);
+});
+
+test('matrikkel start forwards an exact member selection', async () => {
+  const { route, calls } = await setup('matrikkel/runs');
+  await route.POST(request('/api/admin/matrikkel/runs', { method: 'POST', body: { memberId: '427', hNumber: null } }));
+  assert.deepEqual(plain(calls.find((call) => call.name === 'createMatrikkelRun').args), [{ hNumber: null, memberId: '427' }]);
+});
+
+test('matrikkel start forwards a selected member batch', async () => {
+  const { route, calls } = await setup('matrikkel/runs');
+  await route.POST(request('/api/admin/matrikkel/runs', { method: 'POST', body: { memberIds: ['427', '428'] } }));
+  assert.deepEqual(plain(calls.find((call) => call.name === 'createMatrikkelRun').args), [{ memberIds: ['427', '428'] }]);
 });
 
 test('admin write handlers with origin protection reject cross-site requests before mutation', async () => {

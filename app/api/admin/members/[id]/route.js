@@ -1,8 +1,21 @@
 import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { deleteAdminMember, updateAdminMember } from '@/lib/admin-member-updates';
+import { getAdminMemberById } from '@/lib/admin-members';
 
 export const runtime = 'nodejs';
+
+export async function GET(_request, { params }) {
+  try {
+    const member = await getAdminMemberById((await params).id);
+    if (!member) throw new Error('Member not found');
+    return NextResponse.json({ ok: true, member }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch (error) {
+    const status = apiErrorStatus(error);
+    return NextResponse.json({ ok: false, message: status === 404 ? 'Medlemmet finnes ikke lenger.' : 'Kunne ikke hente medlemmet.' },
+      { status, headers: { 'Cache-Control': 'no-store' } });
+  }
+}
 
 export async function PATCH(request, { params }) {
   try {

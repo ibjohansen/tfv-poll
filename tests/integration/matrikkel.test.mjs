@@ -40,18 +40,18 @@ async function fixture({ attempts = null, stale = false, lookup } = {}) {
 
 test('concurrent starts create one run and one snapshot, with a fresh snapshot after the advisory lock', async () => {
   const f = await fixture();
-  const [member] = await db.sql`SELECT h_number FROM members WHERE id = ${f.memberId}`;
   // This dedicated loopback DB contains earlier synthetic fixtures. Temporarily
   // hide their active runs, then restore exactly those IDs in finally.
   const existing = await db.sql`UPDATE matrikkel_sync_runs SET deleted_at = NOW()
     WHERE status IN ('pending', 'running') AND deleted_at IS NULL RETURNING id`;
   let created;
   try {
-    const results = await Promise.allSettled([f.api.createMatrikkelRun({ hNumber: member.h_number }), f.api.createMatrikkelRun({ hNumber: member.h_number })]);
+    const results = await Promise.allSettled([f.api.createMatrikkelRun({ memberId: f.memberId }), f.api.createMatrikkelRun({ memberId: f.memberId })]);
     assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
     assert.equal(results.find((r) => r.status === 'rejected').reason.message, 'Sync already running');
     created = results.find((r) => r.status === 'fulfilled').value;
     assert.equal(created.backup_count, 1); assert.equal(created.total_count, 1);
+    assert.equal(created.selected_member_id, f.memberId);
   } finally {
     if (created) await db.sql`UPDATE matrikkel_sync_runs SET status = 'cancelled' WHERE id = ${created.id}`;
     await db.sql`UPDATE matrikkel_sync_runs SET deleted_at = NULL WHERE id = ANY(${existing.map((r) => r.id)}::text[])`;

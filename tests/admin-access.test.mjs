@@ -36,19 +36,25 @@ test('server permission guards enforce actual tenant, allowlist and role policy'
 test('member mutations validate input and never permit editing property identity or attribution', async () => {
   const queries = [];
   let denied = false;
+  let assignment = { hamlet: null, status: 'address_missing' };
   const api = await loadModule('lib/admin-member-updates.js', {
     './db.js': { getSql: () => async (strings, ...values) => { queries.push({ query: strings.join('?'), values }); return [{ id: '7' }]; } },
     './mock-store.js': { isMockMode: () => false },
     './admin-access.js': { requirePermission: async () => { if (denied) throw new Error('Forbidden'); return { email: 'admin@example.test' }; } },
+    './map/member-hamlet-assignment.js': { findHamletForNewMember: async () => assignment },
   });
   await assert.rejects(api.createAdminMember({}), /H-nummer is required/);
   await assert.rejects(api.updateAdminMember('7', { other_contact_emails: 'invalid' }), /Invalid member/);
+  await assert.rejects(api.updateAdminMember('7', { other_contact_emails: [], turufjell_as_sharing_opt_out: 'yes' }), /Invalid member/);
   await assert.rejects(api.updateAdminMember('bad-id', { other_contact_emails: [] }), /Invalid member/);
   assert.equal(queries.length, 0);
   await api.updateAdminMember('7', { primary_contact_name: 'Test', other_contact_emails: [], h_number: 'malicious-property', street_address: 'malicious-address', last_changed_by: 'forged-actor' });
   assert.ok(queries[0].values.includes('admin@example.test'));
   assert.doesNotMatch(JSON.stringify(queries[0].values), /malicious|forged/);
+  assignment = { hamlet: { id: '13', name: 'Slåtta Øst' }, status: 'linked' };
+  const created = await api.createAdminMember({ h_number: 'H13', street_address: 'Testvegen 13', other_contact_emails: [] });
+  assert.ok(queries[1].values.includes('13')); assert.equal(created.hamlet_name, 'Slåtta Øst');
   denied = true;
   await assert.rejects(api.updateAdminMember('7', { other_contact_emails: [] }), /Forbidden/);
-  assert.equal(queries.length, 1);
+  assert.equal(queries.length, 2);
 });

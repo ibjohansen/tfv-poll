@@ -35,11 +35,13 @@ test('production schema contains complete audit triggers without sensitive value
   assert.match(auditFunction, /old_data := old_data - 'storage_key'/);
   assert.ok(auditTriggers.every((statement) => statement.includes('AFTER INSERT OR UPDATE OR DELETE')));
   assert.ok(contextTriggers.every((statement) => statement.includes('BEFORE INSERT OR UPDATE OR DELETE')));
-  for (const table of ['member_sessions', 'member_email_changes', 'survey_access_tokens', 'survey_sessions', 'security_events', 'security_rate_limits', 'application_environment']) {
+  for (const table of ['member_sessions', 'member_email_changes', 'survey_access_tokens', 'survey_sessions', 'security_events', 'security_rate_limits', 'usage_daily_stats', 'application_environment']) {
     assert.match(schema, new RegExp(`CREATE TABLE IF NOT EXISTS ${table}`));
   }
   const cleanup = await readFile(new URL('../database/security-cleanup.sql', import.meta.url), 'utf8');
   assert.match(cleanup, /ALTER TABLE members DROP COLUMN IF EXISTS access_token/);
   assert.match(schema, /member_access_tokens[\s\S]*consumed_at/);
+  assert.match(schema, /turufjell_as_sharing_opt_out BOOLEAN NOT NULL DEFAULT FALSE/);
+  assert.match(schema, /turufjell_as_sharing_opt_out_updated_at TIMESTAMPTZ/);
   assert.match(schema, /security_events_append_only_trigger/);
 });

@@ -17,7 +17,7 @@ function statusLabel(status) {
 }
 
 function changedFieldLabel(field) {
-  return ({ primary_contact_name: 'kontaktperson', primary_contact_email: 'hoved-e-post', other_contact_emails: 'andre e-postadresser' })[field] || field;
+  return ({ primary_contact_name: 'kontaktperson', primary_contact_email: 'hoved-e-post', other_contact_emails: 'andre e-postadresser', turufjell_as_sharing_opt_out: 'reservasjon mot deling med Turufjell AS' })[field] || field;
 }
 
 export default function MemberSelfServiceProfile({ initialProfile }) {
@@ -27,6 +27,7 @@ export default function MemberSelfServiceProfile({ initialProfile }) {
     primary_contact_name: member.primary_contact_name || '',
     primary_contact_email: member.primary_contact_email || '',
     other_contact_emails: (member.other_contact_emails || []).join('\n'),
+    turufjell_as_sharing_opt_out: Boolean(member.turufjell_as_sharing_opt_out),
     comment: '',
   });
   const [transfer, setTransfer] = useState({ primary_contact_name: '', primary_contact_email: '', other_contact_emails: '', comment: '' });
@@ -82,15 +83,18 @@ export default function MemberSelfServiceProfile({ initialProfile }) {
     </section>
 
     <section className="member-profile-section" aria-labelledby="contact-data-title">
-      <p className="eyebrow">Retting</p><h2 id="contact-data-title">Kontaktopplysninger</h2>
+      <p className="eyebrow">Retting</p><h2 id="contact-data-title">Kontaktopplysninger og deling</h2>
       <form className="member-self-service-form" onSubmit={(event) => { event.preventDefault(); submit('update', form); }}>
         <label>Kontaktperson<input value={form.primary_contact_name} onChange={(event) => setForm({ ...form, primary_contact_name: event.target.value })} maxLength={500} required /></label>
         <label>Hoved-e-post<input type="email" value={form.primary_contact_email} readOnly aria-describedby="primary-email-note" /></label>
         <span id="primary-email-note" className="member-form-note">Hoved-e-post endres separat med kontroll av både gammel og ny adresse.</span>
         <label>Andre e-postadresser<textarea value={form.other_contact_emails} onChange={(event) => setForm({ ...form, other_contact_emails: event.target.value })} rows={3} placeholder="Én adresse per linje" /></label>
+        <label className="member-sharing-opt-out"><input type="checkbox" checked={form.turufjell_as_sharing_opt_out} onChange={(event) => setForm({ ...form, turufjell_as_sharing_opt_out: event.target.checked })} />
+          <span><strong>Reservasjon mot deling med Turufjell AS</strong><small>Når dette er krysset av, skal kontaktopplysningene for denne tomten ikke tas med i manuell utveksling med Turufjell AS.</small></span>
+        </label>
         <label>Kommentar til endringen (valgfritt)<textarea value={form.comment} onChange={(event) => setForm({ ...form, comment: event.target.value })} maxLength={MEMBER_COMMENT_MAX_LENGTH} rows={3} /></label>
         <p className="member-form-note">Kommentaren vises for administrator. Unngå sensitive personopplysninger. Maks {MEMBER_COMMENT_MAX_LENGTH} tegn.</p>
-        <button className="primary-button" type="submit" disabled={busy}>{busy === 'update' ? 'Lagrer …' : 'Lagre kontaktopplysninger'}</button>
+        <button className="primary-button" type="submit" disabled={busy}>{busy === 'update' ? 'Lagrer …' : 'Lagre opplysninger'}</button>
       </form>
     </section>
 

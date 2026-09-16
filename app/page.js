@@ -4,10 +4,12 @@ import landscape from '@/public/turufjell.jpeg';
 import SiteHeader from '@/components/SiteHeader';
 import PublicArticleDirectory from '@/components/PublicArticleDirectory';
 import MemberSelfServiceEntry from '@/components/MemberSelfServiceEntry';
+import PublicHamletMap from '@/components/PublicHamletMap';
 import { auth } from '@/auth';
 import { isAllowedAdmin } from '@/lib/admin-policy';
 import { getPublishedCmsPage, getPublishedCmsPageSummaries } from '@/lib/cms-pages';
 import { isValidCmsSlug } from '@/lib/cms-validation';
+import { getPublicMapHamlets } from '@/lib/map/public-map-service';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -16,11 +18,17 @@ export default async function HomePage({ searchParams }) {
   const isAdmin = isAllowedAdmin((await auth())?.user);
   const params = await searchParams;
   let pages = [];
+  let hamlets = [];
   let initialPage = null;
   try {
     pages = await getPublishedCmsPageSummaries(6);
   } catch {
     // Forsiden skal fortsatt fungere før CMS-tabellene er opprettet eller ved et kort databaseavbrudd.
+  }
+  try {
+    hamlets = await getPublicMapHamlets();
+  } catch {
+    // Forsiden og selvbetjeningen skal fungere selv om kartdata ikke kan hentes.
   }
   const requestedArticle = String(params?.article || '');
   if (isValidCmsSlug(requestedArticle)) {
@@ -52,6 +60,7 @@ export default async function HomePage({ searchParams }) {
           </div>
         </section>
 
+        <PublicHamletMap hamlets={JSON.parse(JSON.stringify(hamlets))} />
         <MemberSelfServiceEntry membershipStatus={String(params?.membership || '')} />
         {pages.length > 0 && <PublicArticleDirectory pages={pages} initialPage={initialPage} />}
       </main>

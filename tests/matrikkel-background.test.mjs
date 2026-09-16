@@ -75,13 +75,14 @@ test('missing configuration, invalid identity and unsafe origins fail before con
 
 async function setupStart(options = {}) {
   const dispatch = await setupDispatch(options);
-  const state = { created: 0, failed: 0, logs: [], run: { id: runId, status: 'pending', total_count: 426, ...options.run } };
+  const state = { created: 0, createArgs: [], failed: 0, logs: [], run: { id: runId, status: 'pending', total_count: 426, ...options.run } };
   const route = await loadModule('app/api/admin/matrikkel/runs/route.js', {
     '@/lib/matrikkel-background': dispatch.api,
     '@/lib/matrikkel-sync': {
-      createMatrikkelRun: async () => {
+      createMatrikkelRun: async (...args) => {
         if (options.denied) throw new Error('Unauthorized');
         state.created += 1;
+        state.createArgs.push(plain(args));
         return { ...state.run };
       },
       failPendingMatrikkelRun: async (id) => {
@@ -104,6 +105,13 @@ async function setupStart(options = {}) {
 function startRequest(headers) {
   return request('/api/admin/matrikkel/runs', { method: 'POST', body: { hNumber: null }, headers });
 }
+
+test('selected member identity reaches run creation without becoming a background payload', async () => {
+  const { route, state, dispatch } = await setupStart();
+  await route.POST(request('/api/admin/matrikkel/runs', { method: 'POST', body: { memberId: '427' } }));
+  assert.deepEqual(state.createArgs, [[{ memberId: '427' }]]);
+  assert.deepEqual(JSON.parse(dispatch.calls[0].init.body), { runId });
+});
 
 test('production start accepts 202 but retains pending until the worker actually starts', async () => {
   const { route, state, dispatch } = await setupStart();

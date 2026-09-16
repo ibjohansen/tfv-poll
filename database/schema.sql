@@ -71,6 +71,10 @@ ALTER TABLE members ADD COLUMN IF NOT EXISTS membership_status TEXT NOT NULL DEF
 ALTER TABLE members ADD COLUMN IF NOT EXISTS section_number TEXT;
 ALTER TABLE members ADD COLUMN IF NOT EXISTS import_key TEXT UNIQUE;
 ALTER TABLE members ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+-- Reservasjonen gjelder bare manuell deling/utveksling av kontaktinformasjon
+-- med Turufjell AS. Eksisterende poster beholdes som ikke reservert.
+ALTER TABLE members ADD COLUMN IF NOT EXISTS turufjell_as_sharing_opt_out BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS turufjell_as_sharing_opt_out_updated_at TIMESTAMPTZ;
 ALTER TABLE members ALTER COLUMN registration_date TYPE TEXT USING registration_date::text;
 ALTER TABLE members DROP CONSTRAINT IF EXISTS members_h_number_key;
 DROP INDEX IF EXISTS members_known_h_number_idx;
@@ -608,6 +612,17 @@ CREATE INDEX IF NOT EXISTS security_events_time_idx
   ON security_events (occurred_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS security_events_type_idx
   ON security_events (event_type, occurred_at DESC);
+
+-- Personvernvennlig besøksstatistikk. Bare lavoppløselige dagsaggregater
+-- lagres; tabellen har ingen rå URL, IP, brukeragent, referrer eller besøks-ID.
+CREATE TABLE IF NOT EXISTS usage_daily_stats (
+  day DATE NOT NULL,
+  page_type TEXT NOT NULL CHECK (page_type IN ('home', 'survey', 'self_service', 'article')),
+  device_category TEXT NOT NULL CHECK (device_category IN ('mobile', 'tablet', 'desktop', 'unknown')),
+  views BIGINT NOT NULL DEFAULT 0 CHECK (views >= 0),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (day, page_type, device_category)
+);
 
 CREATE OR REPLACE FUNCTION protect_security_events()
 RETURNS TRIGGER

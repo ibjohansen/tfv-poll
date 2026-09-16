@@ -1,20 +1,21 @@
 # ToDo
 
-Gjennomgått 14.–15. september 2026. Kvalitetsarbeidet nedenfor er implementert lokalt;
+Gjennomgått 14.–16. september 2026. Kvalitetsarbeidet nedenfor er implementert lokalt;
 ingen produksjonsdeploy, GitHub-push eller Entra-endring er kjørt.
-Databasemigreringen er testet på en isolert Neon-schema-only-gren og deretter
-kjørt i produksjon etter eksplisitt godkjenning 15. september kl. 21:50 UTC.
-Gjenopprettingspunkt er opprettet, og eksisterende data er verifisert bevart;
-se [migreringsstatus](docs/database-migration-2026-09-15.md).
+Databasemigreringene er testet på en isolert Neon-schema-only-gren og deretter
+kjørt i produksjon etter eksplisitt godkjenning. Gjenopprettingspunkter er
+opprettet, og eksisterende data er verifisert bevart; se migreringsstatus for
+[15. september](docs/database-migration-2026-09-15.md) og
+[16. september](docs/database-migration-2026-09-16.md).
 Se [kvalitetsgjennomgangen](docs/quality-review.md) for funn, testdekning,
 vurdering av brukerloggen og begrensninger. Uferdige produktoppgaver beholdes.
 
 **Avklaringer før de siste punktene kan fullføres:** Delingspraksis/standardverdi
-for Turufjell AS, datapunkter og lagringstid for statistikk, loggens lagringstid
-og databaseprivilegier, samt eksplisitt tillatelse til øvrige infrastruktur-/GitHub-
-endringer og funksjonell produksjonsverifikasjon. Skjemamigreringen er godkjent
-og utført for skjemaet fra 15. september; den nye grendepolygon-utvidelsen
-nedenfor trenger egen godkjenning. De øvrige valgene er ikke antatt eller aktivert.
+for Turufjell AS, brukerloggens lagringstid og databaseprivilegier, samt
+eksplisitt tillatelse til øvrige infrastruktur-/GitHub-endringer, deploy og
+funksjonell produksjonsverifikasjon. Statistikken er avgrenset til varige,
+anonyme dagsaggregater; ingen rå hendelser beholdes. De øvrige valgene er ikke
+antatt eller aktivert.
 
 ## Grendepolygoner – implementert lokalt 16. september 2026
 
@@ -28,15 +29,23 @@ nedenfor trenger egen godkjenning. De øvrige valgene er ikke antatt eller aktiv
 - [x] Teste validering, tilgang, samtidige lagringer, tilbakeføring ved loggfeil,
   gjentatt migrering og bevaring av grend/medlemmer med isolert Postgres.
   Nettlesertester dekker lagring, gjenåpning, redigering, konflikt og fjerning.
-- [x] Lage omtrentlige, redigerbare utkast for 11 navngitte områder med røde
-  grenser etter brukerens godkjenning. Separat GeoJSON-katalog og utkastvelger;
-  alltid ukontrollert ved innlasting, ingen automatisk databaseimport eller
-  overskriving av lagrede polygoner. Navnløse/ikke avgrensede områder utelates.
-- [ ] Kontrollere og justere utkastene manuelt i kartet, deretter lagre ønskede
-  grender. Bildeankrene er omtrentlige; utkastene er ikke offisielle grenser.
-- [ ] Godkjenne og utføre ny produksjonsmigrering for polygonkolonner og
-  versjoneringstrigger, deretter godkjent deploy og funksjonell verifikasjon.
-  Migreringen fra 15. september dekker ikke denne utvidelsen.
+- [x] De 11 digitaliserte grendene er justert og lagret som egne polygoner.
+  Lesekontroll mot databasen 16. september bekreftet at alle 11 er aktive, har
+  polygon og er markert manuelt kontrollert. Den midlertidige GeoJSON-katalogen
+  og utkastvelgeren er derfor fjernet.
+- [x] Vise kartet til høyre i **Grender og lagrede polygoner** på større skjermer
+  og under kontrollene på mobil. Valg av lagret grend i nedtrekkslisten laster
+  polygonet direkte; den separate knappen **Bruk grend i kartet** er fjernet.
+- [x] Justere alle «velg + utfør»-kontroller slik at nedtrekksmenyen og den
+  tilhørende knappen står horisontalt på samme linje, også i smale visninger.
+- [x] Koble sikre, entydige registertreff innenfor et kontrollert grendepolygon
+  til `members.hamlet_id` med en eksplisitt karthandling. Eksisterende kobling
+  til en annen grend overskrives ikke, og handlingen loggføres uten medlemsliste.
+- [x] Godkjenne og utføre produksjonsmigrering for polygonkolonner og
+  versjoneringstrigger. Utført og verifisert 16. september; se
+  [migreringsstatus](docs/database-migration-2026-09-16.md).
+- [ ] Godkjent deploy og funksjonell produksjonsverifikasjon av lagring,
+  versjonskonflikt og redigering av grendepolygon.
 
 Se [bruk og avgrensninger](docs/map-explorer.md#grender-og-lagrede-polygoner)
 og produksjonssjekklisten i README.
@@ -59,6 +68,10 @@ Kjøringen ble derfor stående før første oppslag, uten funksjonslogg.
 - [x] Regresjonstester for faktisk Next-matcher, `200`/redirect/timeout,
   feilkonfigurasjon, jobbhemmelighet, videresending og samtidige statusendringer.
   Eksterne kall og database er simulert; ingen nye npm-pakker eller migrering.
+- [x] Søk og velg ett konkret medlem for Matrikkel-oppdatering. Kjøringen
+  avgrenses på medlems-ID, tar samme atomiske snapshot som fullkjøringen og
+  kan åpnes direkte fra medlemsdetaljene når administrator har begge roller.
+  Ingen ny databasemigrering eller miljøvariabel.
 - [ ] Etter godkjent deploy: kjør bare **Test H-nummer 25** først, og verifiser
   både faktisk behandlingsstart i databasen og funksjonsloggen. `202` alene er
   ikke bevis på behandling. Se produksjonssjekklisten i README.
@@ -79,20 +92,26 @@ tilgang, testdekning og kjente begrensninger. Ingen automatisk registerretting.
 - [x] Steg 1: Leaflet-kart ved Turufjell, ett GeoJSON-polygon, tegning,
   redigering/sletting, koordinatkontroller for tastatur og areal med Turf.
 - [x] Steg 2: Åpent Kartverket-adressesøk via beskyttet Node-proxy,
-  paginering, eksakt polygonfiltrering, adressepunkter, sortering, søk og CSV.
+  paginering, eksakt polygonfiltrering, adressepunkter, sortering og søk.
 - [x] Steg 3: Matrikkelreferanser og adresseplasseringer fra åpne data.
   Ukjent seksjonsnummer beholdes som ukjent; ikke komplettert fra eierdata.
 - [x] Steg 4: Utskiftbar Overpass-adapter for supplerende veier/stier,
   klippet geometri, lengde i polygon og aggregering av kompatible segmenter.
 - [x] Steg 5: Separat registersammenligning med fem statuser, flere kandidater,
   konfliktverdier, manglende gnr/bnr, nøkkeltall og tydelig kildeansvar.
-- [x] Steg 6, eksportdel: CSV/GeoJSON, kopiering av adresser/veinavn,
-  formelinjeksjonsvern og eksportlogging uten filinnhold/personopplysninger.
+- [x] Fjernet kartmodulens CSV-/GeoJSON- og kopieringsknapper med tilhørende
+  klient-, API-, service- og testkode etter produktbeslutning 16. september.
 - [x] Enhets-/rutetester med mocket database og eksterne karttjenester.
 - [x] Steg 6, eiendomsgrenser: Åpen WFS/GML-adapter med UTM32-transformasjon,
   flere flater/hull, alle matrikkelreferanser og kontrollert fullstendighet.
   Separate tellekall før/etter; avkortede eller for store uttrekk avvises.
-  Kartlag, tabell, detaljer, GeoJSON og tester; liten reell kildekontroll bestod.
+  Kartlag, tabell, detaljer og tester; liten reell kildekontroll bestod.
+- [x] Flyttet **Søkepolygon** øverst. Valg av entydig adresse/eiendom/teig åpner
+  medlemsregisterets detaljpanel med automatisk lagring; ingen hjemmelshaver og
+  flere mulige registerposter vises uten at systemet gjetter.
+- [x] Nye tomter forsøkes automatisk koblet til én kontrollert grend via eksakt
+  Kartverket-adresse og punkt-i-polygon. Fuzzy treff, overlapp og tjenestefeil
+  gir ingen automatisk kobling og blokkerer ikke opprettelsen. Ingen migrering.
 - [x] Teiger uten offisiell adresse hentes nå uavhengig av adresse-API-et.
   Enheter uten registrert kartgeometri er ikke dekket; dette er dokumentert.
 - [x] NVDB v4 er vurdert. Behold utskiftbar Overpass-adapter for små
@@ -101,13 +120,13 @@ tilgang, testdekning og kjente begrensninger. Ingen automatisk registerretting.
   Overpass er supplerende og kan ha både tjenestefeil og manglende veigeometri.
 - [x] Ukjent plassering vises separat og teller ikke som manglende kartdata.
   Kjente punkter utenfor utelates; teigkobling merkes som berøring av området,
-  ikke bevist adresseplassering. Samme avgrensning gjelder CSV og nøkkeltall.
-- [ ] Verifiser reell Entra-rolle, delt rate-limit og eksportlogg etter
-  publisering med godkjent testgrunnlag; se README. Ingen produksjonsendring
-  eller produksjonseksport er utført som del av implementeringen.
+  ikke bevist adresseplassering. Samme avgrensning gjelder nøkkeltall.
+- [ ] Verifiser reell Entra-rolle, delt rate-limit og kart-/medlemskobling etter
+  publisering med godkjent testgrunnlag; se README. Ingen produksjonsendring er
+  utført som del av implementeringen.
 - [x] Varige Playwright-tester i isolert miljø med syntetisk register, desktop,
   mobil, tastatur, polygontegning/redigering/sletting, avbryt/redigering under
-  lasting og CSV-nedlasting. Karttjenester er mocket; ingen reelle kartkall.
+  lasting og medlemskobling. Karttjenester er mocket; ingen reelle kartkall.
 
 ## P1 – Prioritet / bør gjøres først
 
@@ -364,12 +383,13 @@ Dette er oppgaver som enten reduserer teknisk risiko, styrker kvaliteten eller l
 
 ---
 
-- [ ] **Reservasjon mot deling med Turufjell AS**
+- [x] **Reservasjon mot deling med Turufjell AS**
 
-  **Avventer avklaring:** Gjennomgangen fant kontaktfelter, eksport og
-  e-postutsending, men ingen særskilt Turufjell AS-integrasjon eller eksisterende
-  reservasjonsverdi. Koden kan ikke fastslå manuell delingspraksis.
-  Standardverdi og virkning på utvalg må avklares før implementering.
+  Reservasjonen er en avkrysning per tomt, synlig og redigerbar for medlem og
+  administrator. Eksisterende poster er som standard ikke reservert. Endringstid
+  lagres og endringen inngår i eksisterende audit-/profilhistorikk. Filteret kan
+  finne begge grupper, og Excel-eksport utelater reserverte poster som standard;
+  administrator må aktivt slå av dette bare for intern bruk i Turufjell Vel.
 
   **Prompt:**
 
@@ -714,12 +734,28 @@ Dette er nyttig funksjonalitet, men den er ikke nødvendig for neste versjon og 
 
 ### Applikasjon
 
-- [ ] **Intern bruksstatistikk**
+- [x] **Intern bruksstatistikk – personvernvennlig første nivå**
 
-  **Avventer produkt-/personvernavklaring:** Ingen ny besøksinstrumentering
-  eller identifikator er aktivert. Avklar formål, hvilke grove målinger som
-  faktisk trengs, eventuell sessionsammenkobling og lagringstid først.
-  Teknisk vurdering og foreslått dataminimering er beskrevet i kvalitetsrapporten.
+  Følgende avgrensning er implementert i kode. Databasemigreringen er utført;
+  innsamlingen aktiveres først etter godkjent deploy:
+
+  - [x] Dagsaggregater per tillatt sidetype i egen Neon-tabell
+  - [x] Grov enhetskategori (`mobile`, `tablet`, `desktop`, `unknown`)
+  - [x] Ingen IP, cookie, bruker-/besøks-ID, rå URL/query, referrer eller user-agent
+  - [x] Ingen rå hendelseslogg eller personlige medlems-/surveylenker
+  - [x] `Do Not Track` respekteres og forespørselen sender ikke cookies
+  - [x] Varig historikk i form av anonyme dagsaggregater; ingen rå events beholdes
+  - [x] Adminmodul med 7/30/90/365/730 dager og hele perioden
+  - [x] Responsiv Visx-graf med dag-, uke- og månedsoppløsning og tilgjengelig tabell
+  - [x] Enhets-, API- og databaseintegrasjonstester
+  - [x] Additiv produksjonsmigrering utført og verifisert 16. september 2026
+  - [ ] Godkjent deploy og funksjonell produksjonsverifikasjon av innsamling,
+    tilgangskontroll, periodevalg og graf
+
+  Besøk/sessioner, varighet, navigasjonsforløp, exit-side, nettleser,
+  operativsystem og referrer er bevisst ikke implementert. De krever mer
+  sammenkobling eller gir upålitelige tall, og skal bare vurderes gjennom en ny
+  produkt- og personvernbeslutning.
 
   Det er ikke ønskelig å bruke Google Analytics eller andre tredjepartstjenester.
 
@@ -818,7 +854,8 @@ Foreløpig ingen definerte utviklingsoppgaver.
 
 En separat sikkerhetsgjennomgang og penetrasjonstest basert på repository og kjørende løsning er igangsatt med ekstern part.
 
-**Status:** Ingen utviklingsoppgave nå.
+**Status:** Enkeltmedlemsvalg er implementert lokalt; funksjonell
+produksjonsverifikasjon inngår i den godkjenningspliktige deploykontrollen.
 
 Eventuelle funn fra sikkerhetsgjennomgangen legges inn som egne P1- eller P2-saker når rapporten foreligger.
 
@@ -848,10 +885,48 @@ Eventuelle funn fra sikkerhetsgjennomgangen legges inn som egne P1- eller P2-sak
 2. [x] Samlet tilgang for samme hoved-e-post på flere tomter
 3. [x] Medlemsstatus per tomt og visuell gruppering av felles e-post
 4. [x] Kommentar ved endringsforslag
-5. [ ] Avklar praksis/standardverdi for reservasjon mot deling med Turufjell AS
+5. [x] Reservasjon mot deling med Turufjell AS, med filter og trygg eksportstandard
 6. [ ] Brukerloggens integritet, lagringstid og gjenstående administrative hendelser
 7. [x] Nettlesertester og tester av bakgrunnsjobber
 8. [x] Ytelsestest av søk i store brukerlogger
 9. [x] Grender og e-postgrupper
 10. [x] CMS rikteksteditor og favicon
-11. [ ] Nyhetsbrev og repository-opprydding er implementert; bruksstatistikk venter på personvernavklaring
+11. [ ] Nyhetsbrev, repository-opprydding og bruksstatistikk er implementert;
+    godkjent deploy og funksjonell produksjonsverifikasjon gjenstår
+
+
+###16. sept todo:###
+###Oversikt###
+
+- [x] Alle fliser bruker samme ikon som menyen, til høyre for åpne-lenken.
+
+###Oppgaveliste###
+
+- [x] Oppgavelisten viser antall ubehandlede oppgaver i menyen og på flisen. Tallet inkluderer åpne medlemsforespørsler og uleste medlemskommentarer.
+
+###Medlemsregister###
+
+- [x] Filteret er synliggjort med egen bakgrunnsfarge.
+- [x] Knapper i adminområdet har tooltip som forklarer handlingen.
+- [x] «Mangelfull kontaktinfo» og «Medlemmer med kommentar» er del av filteret.
+- [x] Matrikkeloppdatering kan startes for avkryssede medlemmer, tilsvarende utvalget for Excel-eksport.
+- [x] Nyhetsbrev er et eget menyvalg til venstre.
+- [x] Detaljpanelene for medlemmer, undersøkelser og nettsider lagrer eksisterende poster automatisk og viser lagringsstatus i sticky topp. Opprettelse, publisering og sletting er fortsatt eksplisitt.
+- [x] H-nummer, gårds- og bruksnummer og seksjonsnummer ligger på én linje på større skjermer.
+- [x] Kartvisningen ligger under tinglysningsdato.
+- [x] Hjemmelshaver og tinglysningsdato ligger på samme linje på større skjermer.
+
+###kart og registerkontroll###
+
+- [x] Valg av grend i nedtrekkslisten og i kartet utfører samme handling.
+- [x] Feltene for ny grend skjules til «Ny grend» velges.
+- [x] Søkepolygon ligger i en egen, kollapset seksjon som kan ekspanderes.
+- [x] Når en lagret grend velges, hentes adresser og eiendommer innenfor polygonet automatisk. Eiendommer kan vises eller skjules som eget kartlag.
+- [x] Et kontrollert grendepolygon kan kobles til medlemsregisteret. Bare entydige offisielle treff får grend; eksisterende tilordning til en annen grend beholdes for manuell kontroll.
+
+###Forsidekart###
+
+- [x] Forsiden viser alle kontrollerte grendepolygoner med én knapp per grend.
+- [x] Eiendommer kan vises for valgt grend. Under kartet vises bare H-nummer,
+  gårds-/bruksnummer og adresse; navn, e-post, telefon og interne database-ID-er
+  sendes aldri til den offentlige klienten.

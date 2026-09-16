@@ -93,7 +93,7 @@ Kartets tjenester/kilder er dokumentert i [kartveiledningen](map-explorer.md).
 | `/api/webhooks/mailersend` | `api-public.test.mjs` | Faktisk HMAC-verifikasjon, endret payload, størrelsesgrense, ugyldig JSON og lagringsfeil |
 | `/api/auth/[...nextauth]` | `api-public.test.mjs` | Kun delegering av GET/POST til Auth.js; OAuth-forløpet må integrasjonstestes |
 | `/api/survey-access/verify`, `/survey/api/responses` | `api-survey.test.mjs` | Cookieutveksling, gyldige svar, øktavgrensning, ugyldige svar, origin, rategrense, honeypot og duplikater |
-| `/api/admin/map/search`, `/api/admin/map/export` | `map-api.test.mjs` | Tilgang, CSRF, body-/tidsgrenser, cache, delvise svar og eksportlogg |
+| `/api/admin/map/search`, `/api/admin/map/hamlets` | `map-api.test.mjs`, `map-hamlets.test.mjs` | Tilgang, CSRF, body-/tidsgrenser, cache, delvise svar og trygg grendekobling |
 | `/api/admin/member-groups` | `member-groups.test.mjs` | Input, rolle/origin, CRUD og sikre feil; SQL i integrasjonstestene |
 | `/api/admin/newsletters` | `newsletters.test.mjs` | Input, rettighet/origin, oppstartsfeil; kø og levering i integrasjonstestene |
 
@@ -108,13 +108,13 @@ kopiere deres omfattende datainnsamling.
 | --- | --- |
 | Medlems-/henvendelses-/CMS-/surveyendringer | Eksisterende audit-triggere, utvidet med profilkommentarer. Hemmeligheter redigeres bort. |
 | Grender og e-postgrupper | Aktør, gruppe-ID/type og antall. Ingen kopiert medlemsliste i hendelsen. |
-| Medlems-/resultat-/kart-eksport | Aktør, type, antall og utvalg. Ingen eksportinnhold. Loggfeil stopper levering. |
+| Medlems-/resultateksport | Aktør, type, antall og utvalg. Ingen eksportinnhold. Loggfeil stopper levering. Kartmodulens eksport er fjernet. |
 | Medlemmets egeneksport | Én security_events-hendelse for valgt tomt; ingen kopi av profilen. |
 | Matrikkel-stopp, godkjenning og skjuling | Varig aktørhendelse i audit_log; overlever skjuling av kjøringen. |
 | Kampanje/testmail | admin_activity_log viser metadata fra kampanjer/leveranser og bestillende aktør. Ingen e-postadresser eller innhold kopieres til visningen. |
 | Admin-innlogging og rolle-/tilgangsendringer i identitetsplattformen | Entra-logger beholdes som kilde; ingen lokal kopi av OAuth-payload eller identitetshistorikk. |
 | Avvist apptilgang | Eksisterende proxy-hendelse med område, resultat og tidspunkt. Ingen rå IP, token eller medlemsfelt. |
-| Vanlig lesing/sidevisning | Ikke del av brukerloggen; bruksstatistikk er et separat uavklart produktvalg. |
+| Vanlig lesing/sidevisning | Ikke del av brukerloggen; anonym, aggregert bruksstatistikk lagres i et separat statistikksystem. |
 
 Entra dokumenterer [innloggingshendelser](https://learn.microsoft.com/en-us/entra/identity/monitoring-health/concept-sign-ins)
 og [audit av blant annet brukere, grupper og apper](https://learn.microsoft.com/en-us/entra/identity/monitoring-health/concept-audit-logs).
@@ -151,31 +151,34 @@ i større volum bør trigramindeks og nøkkelbasert navigasjon vurderes på nytt
 
 ## Uavklarte produktvalg
 
-Reservasjon mot Turufjell AS: gjennomgangen fant kontaktfelter, admin-/kart-
+Reservasjon mot Turufjell AS: gjennomgangen fant kontaktfelter, administrativ
 eksport og e-postutsending, men ingen egen integrasjon eller eksisterende
 reservasjonsverdi. Koden viser ikke dagens manuelle delingspraksis. ToDo krever
 at denne og standardverdien avklares først. Ingen antatt ja/nei-verdi er innført.
 
-Intern bruksstatistikk: implementering er utsatt til formål, datagrunnlag og
-lagringstid er valgt. Et minimert forslag er dagsaggregater per tillatt
-sidetype, uten rå URL/query, personlige lenker, medlems-ID eller rå referrer.
-Nettleser/OS bør eventuelt være grove kategorier og viewport faste intervaller,
-ikke eksakte dimensjoner. Sammenkobling av disse dimensjonene kan øke
-identifiserbarhet og bør ikke innføres som standard.
+Intern bruksstatistikk: det minimerte første nivået er implementert som
+dagsaggregater per tillatt sidetype og grov enhetskategori. Aggregatene beholdes
+som historisk statistikk uten automatisk sletting; de har fast, lav kardinalitet
+og inneholder ingen besøksidentifikator eller rå hendelse. Løsningen lagrer ikke rå URL/query, personlige lenker,
+IP, cookies, medlems-/besøks-ID, user-agent eller referrer. `Do Not Track`
+respekteres. Nettleser og operativsystem samles ikke inn; eventuell senere
+utvidelse krever en ny produkt- og personvernvurdering.
 
 Enkeltvisninger kan telles uten varig besøks-ID. Pålitelige besøkstall,
 navigasjonsforløp og besøkstid krever mer sammenkobling; sideavslutning og
 varighet kan ikke måles fullstendig når fanen/appen termineres eller nettverket
 forsvinner. Ikke presenter estimater som presise tall. Rå referrer og URL-query
-kan røpe personlige lenker. Ingen instrumentering, cookies eller ny innsamling
-er aktivert, og ingen foreslått lagringstid er behandlet som vedtatt.
+kan røpe personlige lenker. Derfor viser første nivå bare sidevisninger og
+presenterer ikke besøk, sesjoner eller varighet som om de var presise.
+Den additive `usage_daily_stats`-migreringen ble kjørt og verifisert 16. september
+2026. Produksjonsinnsamling starter først når den nye applikasjonsversjonen er
+eksplisitt godkjent og publisert.
 
 ## Ekstern verifikasjon som fortsatt krever godkjenning
 
-- Isolert Neon schema-only-test før produksjonsmigrering.
 - GitHub-påkrevd quality-status og PR-krav; workflow-filen setter ikke dette.
 - Netlify-pakking, faktisk workerstart/watchdog og test av H-nummer 25.
-- Reell Entra-rolle, delt ratebegrensning og eksportlogg med godkjent testgrunnlag.
+- Reell Entra-rolle, delt ratebegrensning og kart-/medlemskobling med godkjent testgrunnlag.
 - Lagringstid/privilegier og eventuell større driftsavtale for veidata.
 
 Produksjonsprosedyren i README er oppdatert med nye ruter, funksjoner og

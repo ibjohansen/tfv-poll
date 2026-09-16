@@ -26,7 +26,7 @@ export async function POST(request) {
   if (!sameOrigin(request)) return NextResponse.json({ ok: false, message: 'Ugyldig forespørsel.' }, { status: 403 });
   try {
     const input = await readJsonObject(request);
-    let run = await createMatrikkelRun({ hNumber: input.hNumber });
+    let run = await createMatrikkelRun({ hNumber: input.hNumber, memberId: input.memberId, memberIds: input.memberIds });
     let backgroundStarted = false;
     if (process.env.NODE_ENV === 'production' && run.status === 'pending') {
       try {
@@ -48,10 +48,15 @@ export async function POST(request) {
     return NextResponse.json({ ok: true, run, backgroundStarted }, { status: 201, headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     const status = apiErrorStatus(error, 403);
-    const message = error.message === 'Matrikkel API not configured' ? 'Matrikkel-API er ikke konfigurert.'
-      : error.message === 'Sync already running' ? 'En synkronisering pågår allerede.'
-        : error.message === 'Invalid H-number' ? 'H-nummeret har ugyldig format.'
-        : status === 403 ? 'Du har ikke tilgang til matrikkelsynkronisering.' : 'Kunne ikke starte synkroniseringen.';
+    const knownMessages = {
+      'Matrikkel API not configured': 'Matrikkel-API er ikke konfigurert.',
+      'Sync already running': 'En synkronisering pågår allerede.',
+      'Invalid H-number': 'H-nummeret har ugyldig format.',
+      'Invalid member selection': 'Medlemsvalget er ugyldig.',
+      'Member not found': 'Medlemmet finnes ikke lenger.',
+    };
+    const message = knownMessages[error.message]
+      || (status === 403 ? 'Du har ikke tilgang til matrikkelsynkronisering.' : 'Kunne ikke starte synkroniseringen.');
     console.error('Matrikkel sync start failed', { message: error.message, code: error.code || error.cause?.code });
     return NextResponse.json({ ok: false, message }, { status, headers: { 'Cache-Control': 'no-store' } });
   }

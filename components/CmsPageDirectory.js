@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import RichTextEditor from '@/components/RichTextEditor';
 import { cmsCategories, createSlug, isValidCmsSlug, normalizeSlugInput } from '@/lib/cms-validation';
@@ -21,6 +21,7 @@ const emptyPage = {
   image: null,
   attachments: [],
 };
+const saveLabels = { saved: 'Alle endringer lagret', dirty: 'Venter på automatisk lagring …', saving: 'Lagrer automatisk …', error: 'Automatisk lagring feilet' };
 
 function formatDate(value) {
   return value ? new Date(value).toLocaleString('nb-NO', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
@@ -44,12 +45,17 @@ function pagePayload(page, status) {
   };
 }
 
+const pageKey = (page, status = page?.status) => page ? JSON.stringify(pagePayload(page, status)) : '';
+
 export default function CmsPageDirectory({ pages, search, storageConfigured }) {
   const router = useRouter();
   const [selected, setSelected] = useState(null);
   const [slugEdited, setSlugEdited] = useState(false);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [saveState, setSaveState] = useState('idle');
+  const [savedPageKey, setSavedPageKey] = useState('');
+  const latestPageKey = useRef('');
   const [message, setMessage] = useState('');
   const [listMessage, setListMessage] = useState('');
   const [deleteCandidate, setDeleteCandidate] = useState(null);
@@ -62,6 +68,8 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
     setSelected({ ...emptyPage, isNew: true });
     setSlugEdited(false);
     setMessage('');
+    setSavedPageKey('');
+    setSaveState('idle');
   }
 
   async function editPage(summary) {
@@ -73,6 +81,8 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
       const body = await response.json();
       if (!response.ok || !body.ok) throw new Error(body.message || 'Kunne ikke hente siden.');
       setSelected(body.page);
+      setSavedPageKey(pageKey(body.page));
+      setSaveState('saved');
       setSlugEdited(true);
     } catch (error) {
       setListMessage(error.message);
@@ -81,29 +91,48 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
     }
   }
 
-  async function save(event) {
-    event.preventDefault();
-    const requestedStatus = event.nativeEvent.submitter?.value === 'published' ? 'published' : 'draft';
+  const persistPage = useCallback(async (page, requestedStatus, wasNew) => {
     setBusy(true);
+    setSaveState('saving');
     setMessage('');
     try {
-      const response = await fetch(selected.isNew ? '/api/admin/cms/pages' : `/api/admin/cms/pages/${selected.id}`, {
-        method: selected.isNew ? 'POST' : 'PATCH',
+      const response = await fetch(wasNew ? '/api/admin/cms/pages' : `/api/admin/cms/pages/${page.id}`, {
+        method: wasNew ? 'POST' : 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(pagePayload(selected, requestedStatus)),
+        body: JSON.stringify(pagePayload(page, requestedStatus)),
       });
       const body = await response.json();
       if (!response.ok || !body.ok) throw new Error(body.message || 'Kunne ikke lagre siden.');
-      setSelected(body.page);
+      setSavedPageKey(pageKey(body.page));
+      setSelected((current) => latestPageKey.current === pageKey(page, requestedStatus) ? body.page : current);
       setSlugEdited(true);
-      setMessage(requestedStatus === 'published' ? 'Siden er lagret og publisert.' : 'Utkastet er lagret.');
+      setSaveState(latestPageKey.current === pageKey(page, requestedStatus) ? 'saved' : 'dirty');
+      setMessage(wasNew ? (requestedStatus === 'published' ? 'Siden er lagret og publisert.' : 'Utkastet er opprettet.') : '');
       router.refresh();
     } catch (error) {
       setMessage(error.message);
+      setSaveState('error');
     } finally {
       setBusy(false);
     }
+  }, [router]);
+
+  async function save(event) {
+    event.preventDefault();
+    const requestedStatus = event.nativeEvent.submitter?.value === 'published' ? 'published' : 'draft';
+    await persistPage(selected, requestedStatus, selected.isNew);
   }
+
+  const selectedPageKey = pageKey(selected);
+  const displayedSaveState = saveState === 'saved' && selectedPageKey !== savedPageKey ? 'dirty' : saveState;
+  useEffect(() => { latestPageKey.current = selectedPageKey; }, [selectedPageKey]);
+  useEffect(() => {
+    if (!selected?.id || selected.isNew || busy || selectedPageKey === savedPageKey) return undefined;
+    if (!selected.title.trim() || !isValidCmsSlug(selected.slug)) return undefined;
+    const snapshot = selected;
+    const timer = setTimeout(() => persistPage(snapshot, snapshot.status, false), 900);
+    return () => clearTimeout(timer);
+  }, [busy, persistPage, savedPageKey, selected, selectedPageKey]);
 
   async function ensureDraftForUpload() {
     if (selected?.id) return { page: selected, created: false };
@@ -118,6 +147,8 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
     const body = await response.json();
     if (!response.ok || !body.ok) throw new Error(body.message || 'Kunne ikke opprette utkastet før filopplasting.');
     setSelected(body.page);
+    setSavedPageKey(pageKey(body.page));
+    setSaveState('saved');
     setSlugEdited(true);
     router.refresh();
     return { page: body.page, created: true };
@@ -320,7 +351,7 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
       </div>
 
       <aside className={`admin-detail-panel cms-editor${selected ? ' is-open' : ''}`} aria-hidden={!selected} aria-label="Rediger nettside">
-        <div className="admin-detail-header"><div><p className="eyebrow">{selected?.isNew ? 'Ny side' : 'Nettside'}</p><h2>{selected?.isNew ? 'Opprett side' : selected?.title}</h2></div><button className="admin-button" type="button" onClick={() => setSelected(null)}>Lukk</button></div>
+        <div className="admin-detail-header"><div><p className="eyebrow">{selected?.isNew ? 'Ny side' : 'Nettside'}</p><h2>{selected?.isNew ? 'Opprett side' : selected?.title}</h2>{!selected?.isNew && <span className={`admin-save-status is-${displayedSaveState}`} role="status">{saveLabels[displayedSaveState]}</span>}</div><button className="admin-button" type="button" onClick={() => setSelected(null)} disabled={busy}>Lukk</button></div>
         {selected && <CmsEditorForm page={selected} busy={busy} message={message} storageConfigured={storageConfigured} onUpdate={update} onTitleChange={(title) => setSelected((current) => ({ ...current, title, slug: slugEdited ? current.slug : createSlug(title) }))} onSlugChange={(value) => { setSlugEdited(true); update('slug', normalizeSlugInput(value)); }} onSave={save} onUploadImage={uploadImage} onUploadAttachments={uploadAttachments} onRenameAttachment={renameAttachment} onMoveAttachment={moveAttachment} onDelete={setDeleteCandidate} />}
       </aside>
 
