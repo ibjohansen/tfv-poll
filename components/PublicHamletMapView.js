@@ -15,7 +15,30 @@ function syncBuildingLayer(map, layer) {
   if (!shouldShow && map.hasLayer(layer)) map.removeLayer(layer);
 }
 
-export default function PublicHamletMapView({ hamlets, activeHamlet, properties, selectedProperty, onSelectHamlet, onSelectProperty, onError }) {
+function hamletStyle(active, hovered = false) {
+  return {
+    color: active ? '#5a2636' : hovered ? '#7d3147' : '#955e6e',
+    weight: active ? 4 : hovered ? 3.5 : 2,
+    fillColor: hovered ? '#ffad93' : '#f79c80',
+    fillOpacity: active ? 0.22 : hovered ? 0.2 : 0.08,
+  };
+}
+
+function propertyStyle(active, hovered = false) {
+  return {
+    color: active ? '#5a2636' : hovered ? '#7d3147' : '#33626d',
+    fillColor: active || hovered ? '#f79c80' : '#7cabb3',
+    fillOpacity: active ? 0.38 : hovered ? 0.42 : 0.2,
+    weight: active ? 3 : hovered ? 3.5 : 2,
+  };
+}
+
+function stylePropertyLayer(layer, style, radius) {
+  layer.setStyle(style);
+  layer.eachLayer((child) => child.setRadius?.(radius));
+}
+
+export default function PublicHamletMapView({ hamlets, activeHamlet, properties, selectedProperty, onSelectHamlet, onSelectProperty, onHoverHamlet, onError }) {
   const { t } = useI18n('map.public');
   const frame = useRef(null);
   const container = useRef(null);
@@ -90,22 +113,47 @@ export default function PublicHamletMapView({ hamlets, activeHamlet, properties,
     group.clearLayers();
     for (const hamlet of hamlets) {
       const active = hamlet.id === activeHamlet?.id;
-      const layer = L.geoJSON(hamlet.polygon, { style: { color: active ? '#5a2636' : '#955e6e', weight: active ? 4 : 2, fillColor: '#f79c80', fillOpacity: active ? 0.22 : 0.08 } }).addTo(group);
-      layer.bindTooltip(hamlet.name);
-      layer.on('click', () => onSelectHamlet(hamlet));
+      const baseStyle = hamletStyle(active);
+      const layer = L.geoJSON(hamlet.polygon, { style: baseStyle }).addTo(group);
+      layer.bindTooltip(hamlet.name, { sticky: true, direction: 'right', offset: L.point(18, 0) });
+      layer.on('mouseover', () => {
+        layer.setStyle(hamletStyle(active, true));
+        layer.bringToFront();
+        onHoverHamlet(hamlet.id);
+      });
+      layer.on('mouseout', () => {
+        layer.setStyle(baseStyle);
+        onHoverHamlet('');
+      });
+      // Grendeknappen er en toggle. Klikk inne i et allerede valgt polygon
+      // skal derimot beholde utsnittet, ikke nullstille valget og zoome ut.
+      if (!active) layer.on('click', () => onSelectHamlet(hamlet));
     }
     for (const property of properties) {
       if (!property.geometry && (!Number.isFinite(property.latitude) || !Number.isFinite(property.longitude))) continue;
       const active = property.id === selectedProperty?.id;
       const feature = property.geometry ? { type: 'Feature', properties: {}, geometry: property.geometry }
         : { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [property.longitude, property.latitude] } };
-      const layer = L.geoJSON(feature, { pointToLayer: (_feature, point) => L.circleMarker(point, {
-        radius: active ? 9 : 6, color: active ? '#5a2636' : '#33626d', fillColor: active ? '#f79c80' : '#7cabb3', fillOpacity: 0.95, weight: 2,
-      }) }).addTo(group);
-      layer.bindTooltip([property.hNumber, property.address, property.cadastralNumber].filter(Boolean).join(' · '));
+      const point = feature.geometry.type === 'Point';
+      const baseStyle = { ...propertyStyle(active), ...(point ? { fillOpacity: 0.95 } : {}) };
+      const hoverStyle = { ...propertyStyle(active, true), ...(point ? { fillOpacity: 0.95 } : {}) };
+      const baseRadius = active ? 9 : 6;
+      const layer = L.geoJSON(feature, {
+        style: baseStyle,
+        pointToLayer: (_feature, point) => L.circleMarker(point, {
+          ...baseStyle, radius: baseRadius, fillOpacity: 0.95,
+        }),
+      }).addTo(group);
+      layer.bindTooltip([property.hNumber, property.address, property.cadastralNumber].filter(Boolean).join(' · '),
+        { sticky: true, direction: 'right', offset: L.point(18, 0) });
+      layer.on('mouseover', () => {
+        stylePropertyLayer(layer, hoverStyle, active ? 10 : 8);
+        layer.bringToFront();
+      });
+      layer.on('mouseout', () => stylePropertyLayer(layer, baseStyle, baseRadius));
       layer.on('click', () => onSelectProperty(property));
     }
-  }, [activeHamlet, hamlets, onSelectHamlet, onSelectProperty, properties, selectedProperty]);
+  }, [activeHamlet, hamlets, onHoverHamlet, onSelectHamlet, onSelectProperty, properties, selectedProperty]);
 
   useEffect(() => {
     const selectedGeometry = selectedProperty?.geometry || (selectedProperty

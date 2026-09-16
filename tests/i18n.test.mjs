@@ -29,7 +29,7 @@ test('Accept-Language honours quality and request cookies take precedence', () =
 });
 
 test('translation supports scopes, interpolation and explicit fallback values', () => {
-  assert.equal(translate(dictionaries.en, 'map.public.summary', { count: 2, name: 'Turusvingen' }), '2 official properties with an address in Turusvingen.');
+  assert.equal(translate(dictionaries.en, 'map.public.summary', { count: 2, name: 'Turusvingen' }), '2 registered properties in Turusvingen.');
   const t = scopedTranslator(dictionaries.en, 'general.navigation');
   assert.equal(t('login'), 'Sign in');
   assert.equal(t('missing', {}, 'Fallback'), 'Fallback');

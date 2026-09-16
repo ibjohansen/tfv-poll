@@ -1,15 +1,15 @@
 const map = {
   public: {
     eyebrow: 'Utforsk området', title: 'Grender og eiendommer', unavailable: 'Kartet er midlertidig utilgjengelig.',
-    introduction: 'Velg en grend for å se området – klikk på vis eiendommer for å se detaljer om tomtene. Eiendomsvisningen viser bare H-nummer, gårds- og bruksnummer og adresse – aldri navn eller kontaktopplysninger.',
+    introduction: 'Velg en grend for å se området og laste registrerte eiendommer. Eiendomsvisningen viser bare H-nummer, gårds- og bruksnummer og adresse – aldri navn eller kontaktopplysninger.',
     chooseHamlet: 'Velg grend', showHamlet: 'Vis {name} i kartet', hideHamlet: 'Skjul {name} i kartet',
     propertyToggleHelp: 'Vis eller skjul registrerte eiendommer i valgt grend', fetchProperties: 'Henter eiendommer …', showProperties: 'Vis eiendommer', hideProperties: 'Skjul eiendommer',
-    buildingToggleHelp: 'Vis eller skjul detaljerte bygningsflater fra Kartverket', showBuildings: 'Vis bygninger', hideBuildings: 'Skjul bygninger', buildingsDefault: 'Bygningslaget er slått på.', buildingZoomHelp: 'Detaljerte bygninger vises automatisk når du zoomer inn tilstrekkelig.', buildingTileError: 'Bygningslaget kunne ikke lastes. Last siden på nytt for å prøve igjen.',
+    buildingToggleHelp: 'Vis eller skjul detaljerte bygningsflater fra Kartverket', showBuildings: 'Vis bygninger', hideBuildings: 'Skjul bygninger', buildingsDefault: 'Bygningslaget er slått på.', buildingZoomHelp: 'Eiendomsgrenser vises fra Kartverket/Geonorge når gårds- og bruksnummeret gir et sikkert treff. Ellers vises det offisielle adressepunktet. Detaljerte bygninger vises automatisk når du zoomer inn tilstrekkelig.', buildingTileError: 'Bygningslaget kunne ikke lastes. Last siden på nytt for å prøve igjen.',
     enterFullscreen: 'Vis kartet i fullskjerm', exitFullscreen: 'Avslutt fullskjerm', fullscreenError: 'Kartet kunne ikke åpnes i fullskjerm.',
     loadError: 'Kunne ikke hente eiendommene.', timeout: 'Kartoppslaget tok for lang tid. Prøv igjen.', retryTitle: 'Prøv eiendomsoppslaget på nytt',
-    summary: '{count} offisielle eiendommer med adresse i {name}.', selected: 'Valgt: {value}.', noGeometry: 'Eiendommer uten kartgeometri vises bare i listen.',
+    summary: '{count} registrerte eiendommer i {name}.', selected: 'Valgt: {value}.', noGeometry: 'Eiendommer uten kartgeometri vises bare i listen.',
     region: 'Eiendommer i {name}', caption: 'Registrerte eiendommer i {name}', hNumber: 'H-nummer', cadastral: 'Gårds- og bruksnummer', address: 'Adresse', showInMap: 'Vis eiendommen i kartet', notRegistered: 'Ikke registrert', retry: 'Prøv igjen',
-    source: 'Grendegrenser: Turufjell Vel. Adressekoordinater og bakgrunnskart: Kartverket.', loading: 'Laster kart …', turufjell: 'Turufjell', tileError: 'Bakgrunnskartet kunne ikke lastes. Prøv igjen senere.', canvasLabel: 'Kart over grender og registrerte eiendommer på Turufjell',
+    source: 'Grendegrenser: Turufjell Vel. Eiendomsgrenser: Kartverket/Geonorge. Adressekoordinater og bakgrunnskart: Kartverket.', loading: 'Laster kart …', turufjell: 'Turufjell', tileError: 'Bakgrunnskartet kunne ikke lastes. Prøv igjen senere.', canvasLabel: 'Kart over grender og registrerte eiendommer på Turufjell',
   },
   admin: {
     tileError: 'Bakgrunnskartet kunne ikke lastes. Last siden på nytt for å prøve igjen.', vertexTitle: 'Polygonpunkt {number}. Kan også endres i koordinatlisten.', canvasLabel: 'Kart over Turufjell. Polygonet kan også redigeres med koordinatfeltene.', addCenterPoint: 'Legg til punkt i kartsenter (kartet flyttes med piltastene)', unnamed: 'Uten navn', draftLabel: 'utkast',

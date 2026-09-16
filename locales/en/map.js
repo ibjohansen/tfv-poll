@@ -1,15 +1,15 @@
 const map = {
   public: {
     eyebrow: 'Explore the area', title: 'Hamlets and properties', unavailable: 'The map is temporarily unavailable.',
-    introduction: 'Select a hamlet to view the area, then choose show properties for plot details. The property view only shows the H-number, cadastral number and address – never names or contact details.',
+    introduction: 'Select a hamlet to view the area and load its registered properties. The property view only shows the H-number, cadastral number and address – never names or contact details.',
     chooseHamlet: 'Select hamlet', showHamlet: 'Show {name} on the map', hideHamlet: 'Hide {name} on the map',
     propertyToggleHelp: 'Show or hide registered properties in the selected hamlet', fetchProperties: 'Loading properties …', showProperties: 'Show properties', hideProperties: 'Hide properties',
-    buildingToggleHelp: 'Show or hide detailed building footprints from Kartverket', showBuildings: 'Show buildings', hideBuildings: 'Hide buildings', buildingsDefault: 'The building layer is enabled.', buildingZoomHelp: 'Detailed buildings appear automatically when you zoom in sufficiently.', buildingTileError: 'The building layer could not be loaded. Reload the page to try again.',
+    buildingToggleHelp: 'Show or hide detailed building footprints from Kartverket', showBuildings: 'Show buildings', hideBuildings: 'Hide buildings', buildingsDefault: 'The building layer is enabled.', buildingZoomHelp: 'Property boundaries from Kartverket/Geonorge are shown when the cadastral reference gives a certain match. Otherwise, the official address point is shown. Detailed buildings appear automatically when you zoom in sufficiently.', buildingTileError: 'The building layer could not be loaded. Reload the page to try again.',
     enterFullscreen: 'Show the map in full screen', exitFullscreen: 'Exit full screen', fullscreenError: 'The map could not enter full-screen mode.',
     loadError: 'Could not load the properties.', timeout: 'The map lookup took too long. Please try again.', retryTitle: 'Retry the property lookup',
-    summary: '{count} official properties with an address in {name}.', selected: 'Selected: {value}.', noGeometry: 'Properties without map geometry are only shown in the list.',
+    summary: '{count} registered properties in {name}.', selected: 'Selected: {value}.', noGeometry: 'Properties without map geometry are only shown in the list.',
     region: 'Properties in {name}', caption: 'Registered properties in {name}', hNumber: 'H-number', cadastral: 'Cadastral number', address: 'Address', showInMap: 'Show the property on the map', notRegistered: 'Not registered', retry: 'Try again',
-    source: 'Hamlet boundaries: Turufjell Vel. Address coordinates and background map: Kartverket.', loading: 'Loading map …', turufjell: 'Turufjell', tileError: 'The background map could not be loaded. Please try again later.', canvasLabel: 'Map of hamlets and registered properties at Turufjell',
+    source: 'Hamlet boundaries: Turufjell Vel. Property boundaries: Kartverket/Geonorge. Address coordinates and background map: Kartverket.', loading: 'Loading map …', turufjell: 'Turufjell', tileError: 'The background map could not be loaded. Please try again later.', canvasLabel: 'Map of hamlets and registered properties at Turufjell',
   },
   admin: {
     tileError: 'The background map could not be loaded. Reload the page to try again.', vertexTitle: 'Polygon vertex {number}. It can also be changed in the coordinate list.', canvasLabel: 'Map of Turufjell. The polygon can also be edited using the coordinate fields.', addCenterPoint: 'Add a point at the map centre (move the map with the arrow keys)', unnamed: 'Unnamed', draftLabel: 'draft',

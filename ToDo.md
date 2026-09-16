@@ -943,6 +943,12 @@ Eventuelle funn fra sikkerhetsgjennomgangen legges inn som egne P1- eller P2-sak
   sendes aldri til den offentlige klienten. Eiendomslisten avgrenses med lagret
   `members.hamlet_id`; Kartverket brukes bare til kartplassering.
 - [x] Klikk på eiendomsmarkør eller tabellrad velger objektet og zoomer kartet.
+- [x] Klikk inne i en aktiv grend beholder valget og kartutsnittet. Registrerte
+  eiendommer vises som offisielle teigpolygoner ved sikkert matrikkeltreff, med
+  entydig adressepunkt som reserve.
+- [x] Valg av grend aktiverer og laster eiendomslaget automatisk. Hover på
+  grend/eiendom fremhever objektet, grendehover fremhever tilhørende knapp, og
+  karttooltipene er større og forskjøvet fra pekeren.
 - [x] Grendeknappene vises i to rader, eiendomsknappen ligger under kartet, og
   kartet har fullskjermsknapp. Bygningslaget er aktivt som standard.
 - [x] Leaflet og Kartverket-fliser lastes først når kartseksjonen nærmer seg

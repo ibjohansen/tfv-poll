@@ -142,15 +142,23 @@ Forsiden viser bare grender med lagret og manuelt kontrollert polygon. Ingen
 grend er valgt ved innlasting. Grendeknappene ligger i to rader; én knapp per
 grend velger og zoomer området, og samme knapp slår valget av igjen. Kartkode og
 Kartverket-fliser lastes først når kartseksjonen nærmer seg synsfeltet.
-**Vis eiendommer** ligger under kartet og gjør et behovsstyrt kall
-til `GET /api/map/hamlets/[id]/properties`; alle grender og Kartverket-adresser
-forhåndshentes derfor ikke ved vanlig sidevisning.
+Klikk inne i polygonet til den valgte grenden beholder valget og kartutsnittet;
+det er bare grendeknappen som slår en aktiv grend av.
+Valg av grend gjør et behovsstyrt kall til
+`GET /api/map/hamlets/[id]/properties`. **Vis eiendommer** ligger under kartet
+og skjuler eller viser det allerede lastede laget; alle grender og
+Kartverket-adresser forhåndshentes derfor ikke ved vanlig sidevisning. Hover på
+en grend eller eiendom fremhever kartobjektet. Grendehover fremhever også riktig
+knapp, mens tooltipen er større og forskjøvet til høyre for pekeren.
 
 `lib/map/public-map-service.js` bruker den lagrede `members.hamlet_id`-koblingen
 som autoritativ avgrensning og leser bare `h_number`, `cadastral_number` og
-`street_address` for aktive poster i valgt grend. Kartverket-oppslaget brukes
-deretter bare til å plassere de valgte registerpostene i kartet. Flere tvetydige
-adressetreff gir ingen gjettet markør; posten står fortsatt i listen. Responsen
+`street_address` for aktive poster i valgt grend. Kartverket-oppslagene brukes
+deretter bare til å plassere de valgte registerpostene i kartet. En sikker
+matrikkelreferanse vises med åpen teiggeometri fra Kartverket/Geonorge; hvis en
+slik kobling ikke kan gjøres sikkert, brukes det entydige offisielle
+adressepunktet. Flere tvetydige treff gir ingen gjettet geometri; posten står
+fortsatt i listen. Responsen
 inneholder ikke medlems-ID, navn, hjemmelshaver, e-post, telefon, reservasjoner
 eller interne notater. Kartverket mottar polygonet server-side, ikke registerdata.
 

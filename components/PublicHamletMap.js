@@ -18,6 +18,7 @@ export default function PublicHamletMap({hamlets}) {
   const {t} = useI18n('map.public');
   const [activeId, setActiveId] = useState('');
   const [showProperties, setShowProperties] = useState(false);
+  const [hoveredHamletId, setHoveredHamletId] = useState('');
   const [mapReady, setMapReady] = useState(false);
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
@@ -68,11 +69,12 @@ export default function PublicHamletMap({hamlets}) {
     return () => observer.disconnect();
   }, [mapReady]);
 
-  function selectHamlet(hamlet) {
+  const selectHamlet = useCallback((hamlet) => {
     if (hamlet.id === activeId) {
       controllerRef.current?.abort();
       setActiveId('');
       setShowProperties(false);
+      setHoveredHamletId('');
       setLoading(false);
       setProperties([]);
       setSelectedProperty(null);
@@ -83,8 +85,9 @@ export default function PublicHamletMap({hamlets}) {
     setProperties([]);
     setSelectedProperty(null);
     setError('');
-    if (showProperties) loadProperties(hamlet.id);
-  }
+    setShowProperties(true);
+    loadProperties(hamlet.id);
+  }, [activeId, loadProperties]);
 
   function toggleProperties() {
     const next = !showProperties;
@@ -108,13 +111,15 @@ export default function PublicHamletMap({hamlets}) {
       <p>{t('introduction')}</p></div>
     <div className="public-hamlet-controls" aria-label={t('chooseHamlet')}>
       {hamlets.map((hamlet) => <button key={hamlet.id} type="button" aria-pressed={hamlet.id === activeId}
+                                       className={hamlet.id === hoveredHamletId ? 'is-map-hovered' : undefined}
                                        title={hamlet.id === activeId ? t('hideHamlet', {name: hamlet.name}) : t('showHamlet', {name: hamlet.name})}
                                        onClick={() => selectHamlet(hamlet)}>{hamlet.name}</button>)}
     </div>
     <div ref={mapMount} className="public-hamlet-map-mount">
       {mapReady ? <PublicHamletMapView hamlets={hamlets} activeHamlet={activeHamlet} properties={showProperties ? properties : []}
                          selectedProperty={selectedProperty} onSelectHamlet={selectHamlet}
-                         onSelectProperty={setSelectedProperty} onError={setError}/> : <MapLoading />}
+                         onSelectProperty={setSelectedProperty} onHoverHamlet={setHoveredHamletId}
+                         onError={setError}/> : <MapLoading />}
     </div>
     <div className="public-hamlet-actions">
       <button className="public-property-toggle" type="button" aria-pressed={showProperties}

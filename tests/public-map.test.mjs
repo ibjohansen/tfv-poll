@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadModule, request, routeContext } from './helpers/load-module.mjs';
+import { loadModule, plain, request, routeContext } from './helpers/load-module.mjs';
 import { MapError } from '../lib/map/geo.js';
 import { normalizeAddress, normalizeCadastral, propertyLabel } from '../lib/map/normalization.js';
 
@@ -11,6 +11,7 @@ async function publicService() {
     './cache.js': { createMapCache: () => async (_key, loader) => loader() },
     './geo.js': { MapError }, './hamlets.js': { hamletRecord: (row) => row },
     './kartverket-address-service.js': { findAddressesInPolygon: async () => ({ addresses: [] }) },
+    './kartverket-boundary-service.js': { findPropertiesInPolygon: async () => ({ boundaries: [], complete: true }) },
     './normalization.js': { normalizeAddress, normalizeCadastral, propertyLabel },
   }, { Intl });
 }
@@ -29,6 +30,18 @@ test('public property projection exposes only requested property fields and uses
   });
   assert.deepEqual(Object.keys(property).sort(), ['address', 'cadastralNumber', 'geometry', 'hNumber', 'id', 'latitude', 'locationSource', 'longitude', 'source'].sort());
   assert.doesNotMatch(JSON.stringify(property), /private@example|Skal ikke ut|"91"/);
+});
+
+test('public property projection prefers a certain cadastral boundary over the address point', async () => {
+  const { normalizePublicProperties, propertyBoundaryGeometry } = await publicService();
+  const member = { h_number: 'H242', cadastral_number: '10/524', street_address: 'Øvre Sprenåsen 37' };
+  const geometry = { type: 'Polygon', coordinates: [[[9.5, 60.4], [9.501, 60.4], [9.501, 60.401], [9.5, 60.4]]] };
+  const boundaries = [{ references: [{ gnr: 10, bnr: 524, fnr: null, snr: null }], feature: { geometry } },
+    { references: [{ gnr: 10, bnr: 524, fnr: 1, snr: null }], feature: { geometry: { type: 'Polygon', coordinates: [] } } }];
+  assert.deepEqual(plain(propertyBoundaryGeometry(member, boundaries)), geometry);
+  const [property] = normalizePublicProperties([member], [{ address: 'Øvre Sprenåsen 37', latitude: 60.4, longitude: 9.5 }], boundaries);
+  assert.deepEqual(plain(property.geometry), geometry);
+  assert.equal(property.locationSource, 'Kartverket / Geonorge');
 });
 
 test('public property projection never guesses between ambiguous address coordinates', async () => {
@@ -57,6 +70,7 @@ test('public hamlet lookup uses the stored member relationship as its source of 
     './cache.js': { createMapCache: () => async (_key, loader) => loader() },
     './geo.js': { MapError }, './hamlets.js': { hamletRecord: (row) => ({ ...row, polygon: { type: 'Feature', properties: {}, geometry: row.polygon } }) },
     './kartverket-address-service.js': { findAddressesInPolygon: async () => ({ addresses: [], fetchedAt: '2026-09-16' }) },
+    './kartverket-boundary-service.js': { findPropertiesInPolygon: async () => ({ boundaries: [], complete: true }) },
     './normalization.js': { normalizeAddress, normalizeCadastral, propertyLabel },
   }, { Intl });
   const result = await service.getPublicHamletProperties('7');

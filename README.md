@@ -190,7 +190,7 @@ gang til.
 | `app/admin/audit`, `lib/admin-audit.js` og databasetriggere | Viser et skrivebeskyttet revisjonsspor for medlemmer, henvendelser, undersøkelser, svar, nettsider og vedlegg. |
 | `app/admin/usage`, `app/api/usage/pageview` og `lib/usage-statistics.js` | Lagrer og viser kun tillatte dagsaggregater for sidetype og grov enhetskategori, adskilt fra brukerloggen. |
 | `app/admin/map`, `components/MapExplorer/*` og `lib/map/*` | Holder kildeintegrasjon, GeoJSON-analyse, grender og registerkobling adskilt fra kartgrensesnittet. |
-| `components/PublicHamletMap*` og `lib/map/public-map-service.js` | Viser kontrollerte grender offentlig og utleverer bare H-nummer, matrikkelnummer, adresse og sikre kartkoordinater. |
+| `components/PublicHamletMap*` og `lib/map/public-map-service.js` | Viser kontrollerte grender offentlig og utleverer bare H-nummer, matrikkelnummer, adresse og sikker adresse-/teiggeometri. |
 | `app/admin/members/groups` og `lib/member-groups.js` | Administrerer grender/e-postgrupper og medlemstilknytning med eksplisitte massevalg. |
 | `app/admin/members/newsletters`, `lib/newsletters.js` og bakgrunnsfunksjonen | Oppretter dedupliserte mottakerutvalg og kontrollerte nyhetsbrevjobber uten å blande leveringsdata inn i medlemsgrupper. |
 | `app/[slug]/page.js` og `components/CmsPageView.js` | Viser kun publiserte sider med systemstyrt typografi og avsnitt. |
@@ -579,8 +579,8 @@ eller flere mulige registerposter opplyses eksplisitt; løsningen velger aldri e
 eier eller tomt på grunnlag av fuzzy treff. Nye tomter forsøkes koblet til én
 kontrollert grend server-side, men uklar geometri blokkerer ikke opprettelsen.
 
-Forsidens kart bruker bare kontrollerte grendepolygoner. Eiendommer lastes først
-når brukeren ber om det, og tabellen under kartet viser H-nummer,
+Forsidens kart bruker bare kontrollerte grendepolygoner. Eiendommer lastes når
+brukeren velger en grend, og tabellen under kartet viser H-nummer,
 gårds-/bruksnummer og adresse. Offentlig kartvisning er bevisst adskilt fra
 medlemsdata og viser aldri navn, e-post, telefon, hjemmelshaver eller notater.
 Forsiden viser Kartverkets åpne Topografisk Norgeskart WMS automatisk fra
@@ -630,11 +630,17 @@ GET-ruten `/api/map/hamlets/[id]/properties` laster eiendommer først når en gr
 velges. Ingen grend er valgt ved innlasting, og samme grendeknapp slår valget av
 og på. Leaflet og Kartverket-fliser lastes først når kartseksjonen nærmer seg
 synsfeltet. Bygningslaget er aktivert som standard og vises fra zoomnivå 16;
-**Vis eiendommer** ligger under kartet, og kartet har fullskjermsknapp. Ruten
+**Vis eiendommer** ligger under kartet og kan skjule/vise det automatisk lastede
+laget. Kartet har fullskjermsknapp. Ved hover fremheves grend eller eiendom;
+grendehover fremhever også riktig knapp, og tooltipen ligger forskjøvet til
+siden. Ruten
 bruker `members.hamlet_id` som autoritativ avgrensning. Kartverket
 brukes bare til kartplassering av disse registerpostene, ikke til et nytt
 grendeoppslag ved hver visning. Responsen inneholder bare H-nummer,
-gårds-/bruksnummer, adresse og offisiell adressegeometri. Medlems-ID, navn,
+gårds-/bruksnummer, adresse og sikker offisiell adresse-/teiggeometri. Teigen
+vises når matrikkelreferansen gir et entydig treff; ellers brukes adressepunktet.
+Klikk i det aktive grendepolygonet beholder valgt grend og kartutsnitt.
+Medlems-ID, navn,
 hjemmelshaver, e-post, telefon og interne notater inngår ikke i responsen. Ruten har en lokal
 rate-limit på 20 oppslag per minutt og trenger samme delte/WAF-beskyttelse som
 de øvrige offentlige rutene i produksjon. Ingen ny miljøvariabel er nødvendig.
@@ -1065,9 +1071,12 @@ Utfør kontrollene i denne rekkefølgen:
   retry i isolert miljø. Kontroller at ufullstendige adressedata ikke gir en
   sammenligningsrapport med falske «mangler»-tall.
 - Åpne forsiden uten innlogging. Kontroller at alle kontrollerte grender har én
-  knapp, at valg zoomer til riktig polygon, og at **Vis eiendommer** bare laster
-  valgt grend. Nettverksresponsen skal bare inneholde H-nummer, gårds-/bruksnummer,
-  adresse, kartkoordinat og kilde – aldri medlems-ID, navn eller kontaktfelt.
+  knapp, at valg zoomer til riktig polygon og automatisk laster bare valgt grend.
+  Kontroller at hover fremhever kartobjekt og riktig grendeknapp, og at
+  **Vis eiendommer** skjuler/viser laget. Nettverksresponsen skal bare inneholde H-nummer, gårds-/bruksnummer,
+  adresse, sikker adresse-/teiggeometri og kilde – aldri medlems-ID, navn eller
+  kontaktfelt. Klikk i valgt grend skal ikke velge den bort. Kontroller at sikre
+  matrikkeltreff tegnes som teigpolygon, med adressepunkt som reserve.
 - Kontroller registersammenligningen med kjent testgrunnlag, inkludert ulike
   gnr/bnr på samme adresse, seksjonsnummer og flere kandidater. Ukjent plassering
   skal vises separat og ikke telle som manglende kartdata. Knyttede teiger kan
