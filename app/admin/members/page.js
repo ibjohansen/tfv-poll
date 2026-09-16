@@ -21,7 +21,7 @@ export default async function AdminMembersPage({ searchParams }) {
   const incompleteContact = params.contact === 'incomplete';
   const hasComment = params.comment === 'present';
   const membershipStatus = ['member', 'exempt'].includes(params.membership) ? params.membership : '';
-  const hamletId = /^[1-9][0-9]{0,15}$/.test(params.hamlet || '') ? params.hamlet : '';
+  const hamletId = params.hamlet === 'unassigned' || /^[1-9][0-9]{0,15}$/.test(params.hamlet || '') ? params.hamlet : '';
   const groupId = /^[1-9][0-9]{0,15}$/.test(params.group || '') ? params.group : '';
   const turufjellAsSharing = ['allowed', 'opted_out'].includes(params.sharing) ? params.sharing : '';
   const selectedId = /^\d+$/.test(params.member || '') ? params.member : '';

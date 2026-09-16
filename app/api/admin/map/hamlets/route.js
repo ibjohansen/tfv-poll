@@ -1,5 +1,5 @@
 import { handleMapRequest } from '@/lib/map/api';
-import { getMapHamlets, saveMapHamlet, syncMapHamletMembers } from '@/lib/map/hamlet-service';
+import { getMapHamlets, saveMapHamlet } from '@/lib/map/hamlet-service';
 
 export const runtime = 'nodejs';
 
@@ -8,7 +8,5 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  return handleMapRequest(request, async (input, _user, options) => input.action === 'sync_members'
-    ? Response.json({ sync: await syncMapHamletMembers(input, options) })
-    : Response.json({ hamlet: await saveMapHamlet(input) }));
+  return handleMapRequest(request, async (input) => Response.json({ hamlet: await saveMapHamlet(input) }));
 }

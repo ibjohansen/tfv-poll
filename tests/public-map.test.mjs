@@ -2,8 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModule, request, routeContext } from './helpers/load-module.mjs';
 import { MapError } from '../lib/map/geo.js';
-import { normalizeAddress, normalizeCadastral } from '../lib/map/normalization.js';
-import { propertiesFromAddresses } from '../lib/map/kartverket-property-service.js';
+import { normalizeAddress, normalizeCadastral, propertyLabel } from '../lib/map/normalization.js';
 
 async function publicService() {
   return loadModule('lib/map/public-map-service.js', {
@@ -12,8 +11,7 @@ async function publicService() {
     './cache.js': { createMapCache: () => async (_key, loader) => loader() },
     './geo.js': { MapError }, './hamlets.js': { hamletRecord: (row) => row },
     './kartverket-address-service.js': { findAddressesInPolygon: async () => ({ addresses: [] }) },
-    './kartverket-property-service.js': { propertiesFromAddresses },
-    './normalization.js': { normalizeAddress, normalizeCadastral },
+    './normalization.js': { normalizeAddress, normalizeCadastral, propertyLabel },
   }, { Intl });
 }
 
@@ -27,24 +25,44 @@ test('public property projection exposes only requested property fields and uses
   const [property] = normalizePublicProperties(rows, addresses);
   assert.deepEqual({ hNumber: property.hNumber, cadastralNumber: property.cadastralNumber, address: property.address,
     latitude: property.latitude, longitude: property.longitude }, {
-    hNumber: 'H242', cadastralNumber: '10/524', address: 'øvre sprenåsen 37', latitude: 60.401, longitude: 9.501,
+    hNumber: 'H242', cadastralNumber: '10/524', address: 'Øvre Sprenåsen 37', latitude: 60.401, longitude: 9.501,
   });
   assert.deepEqual(Object.keys(property).sort(), ['address', 'cadastralNumber', 'geometry', 'hNumber', 'id', 'latitude', 'locationSource', 'longitude', 'source'].sort());
   assert.doesNotMatch(JSON.stringify(property), /private@example|Skal ikke ut|"91"/);
 });
 
-test('public property projection includes official properties without a hamlet assignment and never guesses their H-number', async () => {
+test('public property projection never guesses between ambiguous address coordinates', async () => {
   const { normalizePublicProperties } = await publicService();
-  const properties = normalizePublicProperties(
+  const [property] = normalizePublicProperties(
     [{ h_number: 'H1', cadastral_number: null, street_address: 'Testvegen 1' }],
     [{ id: 'one', address: 'Testvegen 1', municipalityNumber: '3320', gnr: 10, bnr: 1, fnr: null, snr: null,
       latitude: 60.1, longitude: 9.1, feature: { type: 'Feature', geometry: { type: 'Point', coordinates: [9.1, 60.1] } } },
     { id: 'two', address: 'Testvegen 1', municipalityNumber: '3320', gnr: 10, bnr: 2, fnr: null, snr: null,
       latitude: 60.2, longitude: 9.2, feature: { type: 'Feature', geometry: { type: 'Point', coordinates: [9.2, 60.2] } } }],
   );
-  assert.equal(properties.length, 2);
-  assert.deepEqual(properties.map((property) => property.hNumber), [null, null]);
-  assert.deepEqual(properties.map((property) => property.cadastralNumber).sort(), ['10/1', '10/2']);
+  assert.equal(property.latitude, null);
+  assert.equal(property.longitude, null);
+  assert.equal(property.geometry, null);
+});
+
+test('public hamlet lookup uses the stored member relationship as its source of truth', async () => {
+  const calls = [];
+  const sql = async (strings, ...values) => {
+    calls.push({ text: strings.join('?'), values });
+    return [{ id: '12', h_number: 'H12', cadastral_number: '10/12', street_address: 'Testvegen 12' }];
+  };
+  sql.query = async () => [{ id: '7', name: 'Testgrend', polygon: { type: 'Polygon', coordinates: [[[9, 60], [9.01, 60], [9.01, 60.01], [9, 60.01], [9, 60]]] }, polygon_reviewed: true, polygon_version: 1 }];
+  const service = await loadModule('lib/map/public-map-service.js', {
+    '../db.js': { getSql: () => sql }, '../mock-store.js': { isMockMode: () => false },
+    './cache.js': { createMapCache: () => async (_key, loader) => loader() },
+    './geo.js': { MapError }, './hamlets.js': { hamletRecord: (row) => ({ ...row, polygon: { type: 'Feature', properties: {}, geometry: row.polygon } }) },
+    './kartverket-address-service.js': { findAddressesInPolygon: async () => ({ addresses: [], fetchedAt: '2026-09-16' }) },
+    './normalization.js': { normalizeAddress, normalizeCadastral, propertyLabel },
+  }, { Intl });
+  const result = await service.getPublicHamletProperties('7');
+  assert.equal(result.properties.length, 1);
+  assert.match(calls[0].text, /hamlet_id\s*=\s*\?/);
+  assert.deepEqual(calls[0].values, ['7']);
 });
 
 test('public hamlet property route rate-limits, caches publicly and hides internal failures', async () => {

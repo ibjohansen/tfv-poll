@@ -600,14 +600,31 @@ Se [kartmodulens datakilder, begrensninger og bruk](docs/map-explorer.md).
 Forsiden viser kontrollerte grendepolygoner fra `member_hamlets`. Den offentlige
 GET-ruten `/api/map/hamlets/[id]/properties` laster eiendommer først når en grend
 velges. Ingen grend er valgt ved innlasting, og samme grendeknapp slår valget av
-og på. Ruten henter offisielle adresser i polygonet, grupperer dem etter
-matrikkelreferanse og supplerer bare med H-nummer ved sikkert registertreff.
-Visningen er dermed ikke avhengig av en forhåndsutfylt `members.hamlet_id`.
-Responsen inneholder bare H-nummer, gårds-/bruksnummer, adresse og offisiell
-adressegeometri fra Kartverket. Medlems-ID, navn, hjemmelshaver,
+og på. Ruten bruker `members.hamlet_id` som autoritativ avgrensning. Kartverket
+brukes bare til kartplassering av disse registerpostene, ikke til et nytt
+grendeoppslag ved hver visning. Responsen inneholder bare H-nummer,
+gårds-/bruksnummer, adresse og offisiell adressegeometri. Medlems-ID, navn, hjemmelshaver,
 e-post, telefon og interne notater inngår ikke i responsen. Ruten har en lokal
 rate-limit på 20 oppslag per minutt og trenger samme delte/WAF-beskyttelse som
 de øvrige offentlige rutene i produksjon. Ingen ny miljøvariabel er nødvendig.
+
+Eksisterende tomter kobles samlet etter kontrollert tørrkjøring:
+
+```bash
+APP_ENVIRONMENT=production npm run hamlets:assign
+APP_ENVIRONMENT=production HAMLET_ASSIGNMENT_CONFIRMED=true npm run hamlets:assign -- --apply
+```
+
+Andre kommando er en produksjonsendring og skal bare kjøres etter eksplisitt
+godkjenning. Den bruker direkte `DATABASE_URL_UNPOOLED`, avviser miljømismatch,
+kontrollerer at polygonversjonene er uendret, lagrer bare entydige MATCH-treff i
+én SQL-operasjon og skriver audit-hendelser. Tvetydige, overlappende eller
+ukoblede tomter må avklares manuelt. Nye tomter forsøkes koblet én gang ved
+opprettelse; medlemsfilter, grupper, detaljer og offentlig kart leser deretter
+den lagrede `hamlet_id`-koblingen. Når en lagret grend velges i adminkartet,
+avgrenses også registerlaget med denne koblingen; den tidligere manuelle
+«Koble register til valgt grend»-handlingen er fjernet. Filteret **Uten grend**
+i medlemsregisteret viser poster som må gjennomgås manuelt.
 
 `netlify.toml` inneholder byggkommando, publiseringsmappe, Node-versjon og
 funksjonsmappe. Netlify håndterer Next.js App Router gjennom sin Next.js-adapter,

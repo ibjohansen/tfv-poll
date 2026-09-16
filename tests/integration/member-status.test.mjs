@@ -46,6 +46,9 @@ test('member status defaults safely, validates changes, filters/counts and prese
   const exempt = await directory.getAdminMembers(key, 1, 'h_number', 'asc', false, false, { membershipStatus: 'exempt' });
   assert.equal(exempt.total, 1);
   assert.equal(exempt.members[0].id, second.id);
+  const unassigned = await directory.getAdminMembers(key, 1, 'h_number', 'asc', false, false, { hamletId: 'unassigned' });
+  assert.equal(unassigned.total, 2);
+  assert.ok(unassigned.members.every((member) => member.hamlet_id === null));
   await admin.updateAdminMember(String(second.id), { ...input, primary_contact_name: 'Oppdatert' });
   assert.equal((await directory.getAdminMemberById(String(second.id))).membership_status, 'exempt', 'omitted status preserves current value');
   await assert.rejects(admin.updateAdminMember(String(first.id), { ...input, membership_status: 'invalid' }), /Invalid member/);

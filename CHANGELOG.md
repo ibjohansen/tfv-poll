@@ -3,8 +3,15 @@
 ## Ikke publisert
 
 - Offentlig grendekart uten forhåndsvalg, med av/på-knapper og behovsstyrte
-  Kartverket-eiendommer som kan velges fra kart eller tabell; H-nummer suppleres
-  ved sikkert registertreff uten å eksponere kontaktopplysninger.
+  registereiendommer som kan velges fra kart eller tabell, uten å eksponere
+  kontaktopplysninger. Lagret grendekobling er felles kilde for alle visninger.
+- Kontrollert engangskommando for å beregne og lagre `members.hamlet_id` fra alle
+  godkjente grendepolygoner, med tørrkjøring, konfliktvern og audit.
+- Produksjonsregisteret er kontrollert og oppdatert med 424 entydige
+  grendekoblinger; 4 tomter uten sikkert treff er beholdt ukoblet.
+- Grendefilter, gruppetelling, offentlig kart og registerlaget for en valgt
+  grend i adminkartet bruker nå samme lagrede kobling; gjentatt manuell
+  polygonkobling fra adminkartet er fjernet.
 - Reservasjon mot manuell deling med Turufjell AS i selvbetjening og admin, med endringstidspunkt, audit, filter og trygg eksportstandard.
 - Kartet ligger i grendepanelet, og valg av lagret grend laster polygonet direkte; den midlertidige utkastkatalogen er fjernet etter databasekontroll.
 - Søkepolygonet ligger øverst; kartobjekter åpner medlemsdetaljer, og nye tomter får trygg automatisk grendetilknytning ved ett eksakt geografisk treff.

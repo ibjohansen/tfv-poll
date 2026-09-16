@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { loadModule, request } from './helpers/load-module.mjs';
+import { loadModule, plain, request } from './helpers/load-module.mjs';
 import { MapError, validatePolygon } from '../lib/map/geo.js';
 import { readLimitedJson } from '../lib/map/http.js';
 import { compareRegisterWithMapData } from '../lib/map/comparison.js';
@@ -84,10 +84,14 @@ async function service({ complete = true } = {}) {
 test('service reuses official data, never caches register comparison and validates datatype/polygon', async () => {
   const s = await service();
   await s.searchMapData({ polygon: square, datatype: 'addresses' });
-  await s.searchMapData({ polygon: square, datatype: 'comparison' });
+  const scoped = await s.searchMapData({ polygon: square, datatype: 'comparison', hamletId: '7' });
   await s.searchMapData({ polygon: square, datatype: 'comparison' });
   assert.equal(s.calls.addresses, 1); assert.equal(s.calls.register.length, 2);
+  assert.deepEqual(plain(s.calls.register), [{ hamletId: '7' }, { hamletId: null }]);
+  assert.equal(scoped.comparison.registerScope, 'hamlet');
   await assert.rejects(s.searchMapData({ polygon: square, datatype: 'https://evil.test' }));
+  await assert.rejects(s.searchMapData({ polygon: square, datatype: 'addresses', hamletId: '7' }));
+  await assert.rejects(s.searchMapData({ polygon: square, datatype: 'comparison', hamletId: '7 OR 1=1' }));
   await assert.rejects(s.searchMapData({ polygon: null, datatype: 'addresses' }));
 });
 
@@ -100,14 +104,17 @@ test('incomplete official data disables comparison without querying the register
 test('register adapter projects only needed fields and excludes deleted rows, tokens and contacts by default', async () => {
   const queries = [];
   const registerModule = await loadModule('lib/map/register-service.js', {
-    '../db.js': { getSql: () => async (strings) => { queries.push(strings.join('?')); return [{ id: 7, cadastral_number: '10/524', section_number: '2', street_address: 'Testvegen 1', primary_contact_email: 'secret@example.invalid', access_token: 'secret' }]; } },
+    '../db.js': { getSql: () => async (strings, ...values) => { queries.push({ text: strings.join('?'), values }); return [{ id: 7, cadastral_number: '10/524', section_number: '2', street_address: 'Testvegen 1', primary_contact_email: 'secret@example.invalid', access_token: 'secret' }]; } },
     '../admin-access.js': { requirePermission: async (p) => assert.equal(p, 'members') },
     '../mock-store.js': { isMockMode: () => false }, '../../data/mock-members.js': { mockMembers: [] },
     './geo.js': { MapError }, './normalization.js': { cadastralInteger, normalizeCadastral, nullableText },
   });
-  const [row] = await registerModule.getRegisterProperties();
+  const [row] = await registerModule.getRegisterProperties({ hamletId: '7' });
   assert.equal(row.snr, 2); assert.equal(row.emails, undefined); assert.equal(row.access_token, undefined);
-  assert.match(queries[0], /deleted_at IS NULL/); assert.match(queries[0], /LIMIT 5001/); assert.doesNotMatch(queries[0], /primary_contact_email|access_token|SELECT \*/);
+  assert.match(queries[0].text, /deleted_at IS NULL/); assert.match(queries[0].text, /hamlet_id = \?/); assert.match(queries[0].text, /LIMIT 5001/);
+  assert.deepEqual(queries[0].values, ['7', '7']);
+  assert.doesNotMatch(queries[0].text, /primary_contact_email|access_token|SELECT \*/);
+  await assert.rejects(registerModule.getRegisterProperties({ hamletId: 'invalid' }), /gyldig grend/);
 });
 
 test('actual proxy enforces member role for map page/API and narrowly permits Kartverket image tiles', async () => {

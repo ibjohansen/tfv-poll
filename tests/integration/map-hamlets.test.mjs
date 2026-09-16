@@ -9,14 +9,12 @@ import { square } from '../fixtures/map.mjs';
 
 const db = createTestDatabase();
 let maps, groups;
-let syncRows = [];
 before(async () => {
   await db.migrate(); await db.migrate();
   maps = await loadModule('lib/map/hamlet-service.js', {
     '../admin-access.js': { requirePermission: async () => ({ email: 'map-admin@example.test' }) },
     '../db.js': { getSql: () => db.sql }, '../mock-store.js': { isMockMode: () => false },
     './geo.js': { MapError }, './hamlets.js': hamlets,
-    './service.js': { searchMapData: async () => ({ comparison: { rows: syncRows } }) },
   });
   groups = await loadModule('lib/member-groups.js', {
     './admin-access.js': { requirePermission: async () => ({ email: 'group-admin@example.test' }) },
@@ -101,23 +99,4 @@ test('failed audit insert rolls back geometry, name and version together', async
     await db.sql.query('DROP TRIGGER hamlet_test_audit ON audit_log');
     await db.sql.query('DROP FUNCTION reject_hamlet_test_audit()');
   }
-});
-
-test('reviewed polygon links secure matches without moving existing hamlet assignments', async () => {
-  const selected = await maps.saveMapHamlet({ action: 'create', name: `Synk ${randomUUID()}`, polygon: square, reviewed: true });
-  const other = await maps.saveMapHamlet({ action: 'create', name: `Annen ${randomUUID()}`, polygon: square, reviewed: true });
-  const members = await db.sql`INSERT INTO members(h_number,hamlet_id) VALUES
-    (${`SYNC-A-${randomUUID()}`},NULL), (${`SYNC-B-${randomUUID()}`},${selected.id}), (${`SYNC-C-${randomUUID()}`},${other.id})
-    RETURNING id`;
-  syncRows = members.map((member) => ({ status: 'MATCH', scope: 'address_in_polygon', register: { id: String(member.id) } }));
-  const result = await maps.syncMapHamletMembers({ action: 'sync_members', id: selected.id, version: selected.version });
-  assert.deepEqual(result, { hamletId: selected.id, matchedCount: 3, linkedCount: 1, alreadyLinkedCount: 1, assignedElsewhereCount: 1 });
-  const assignments = await db.sql`SELECT id::text,hamlet_id::text FROM members WHERE id = ANY(${members.map((member) => member.id)}::bigint[]) ORDER BY id`;
-  assert.equal(assignments[0].hamlet_id, selected.id);
-  assert.equal(assignments[1].hamlet_id, selected.id);
-  assert.equal(assignments[2].hamlet_id, other.id);
-  const [audit] = await db.sql`SELECT after_value FROM audit_log WHERE table_name='admin_actions' AND row_id=${selected.id}
-    AND after_value->>'action'='hamlet_members_sync' ORDER BY id DESC LIMIT 1`;
-  assert.equal(audit.after_value.linked_count, 1);
-  assert.equal(audit.after_value.assigned_elsewhere_count, 1);
 });

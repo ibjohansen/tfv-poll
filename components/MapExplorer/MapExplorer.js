@@ -7,7 +7,7 @@ import { MAX_VERTICES, validatePolygon } from '@/lib/map/geo';
 import { propertiesFromAddresses } from '@/lib/map/kartverket-property-service';
 import { STATUS_LABELS } from '@/lib/map/comparison';
 import { memberIdsForSelection } from '@/lib/map/selection';
-import { requestMap, syncMapHamletMembers } from '@/lib/map/browser-client';
+import { requestMap } from '@/lib/map/browser-client';
 import ResultsPanel from './ResultsPanel';
 import ObjectDetails from './ObjectDetails';
 import HamletControls from './HamletControls';
@@ -82,7 +82,7 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
     } catch (failure) { setError(failure.message); }
   }
 
-  const loadHamletData = useCallback(async (polygon) => {
+  const loadHamletData = useCallback(async (polygon, hamletId) => {
     requestRef.current?.abort();
     const controller = new AbortController(); requestRef.current = controller;
     setBusy('hamlet'); setError(''); setNotice('Henter adresser og eiendommer i grenden …'); setRetry(null);
@@ -90,7 +90,7 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
     const body = { polygon, includeBoundaries: true };
     try {
       const [addressResult, propertyResult] = await Promise.allSettled([
-        requestMap('search', { ...body, datatype: 'comparison' }, signal).then((response) => response.json()),
+        requestMap('search', { ...body, datatype: 'comparison', hamletId }, signal).then((response) => response.json()),
         requestMap('search', { ...body, datatype: 'properties' }, signal).then((response) => response.json()),
       ]);
       if (requestRef.current !== controller) return;
@@ -115,32 +115,9 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
     setArea(next);
     if (next) {
       setSelected({ ...hamlet, id: `hamlet:${hamlet.id}`, kind: 'hamlet', feature: hamlet.polygon });
-      loadHamletData(next.polygon);
+      loadHamletData(next.polygon, hamlet.id);
     }
   }, [invalidate, loadHamletData]);
-
-  async function syncMembersToHamlet() {
-    const savedGeometry = activeHamlet?.polygon?.geometry;
-    const currentGeometry = area?.polygon?.geometry;
-    if (!savedGeometry || JSON.stringify(savedGeometry) !== JSON.stringify(currentGeometry) || busy || drawing || editing) return;
-    if (!window.confirm(`Koble sikre registertreff til «${activeHamlet.name}»? Tomter som allerede tilhører en annen grend, flyttes ikke.`)) return;
-    const controller = new AbortController(); requestRef.current?.abort(); requestRef.current = controller;
-    setBusy('hamlet-members'); setError(''); setNotice('Kontrollerer adresser og kobler sikre registertreff …'); setRetry(null);
-    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(35_000)]);
-    try {
-      const result = await syncMapHamletMembers({ id: activeHamlet.id, version: activeHamlet.version }, signal);
-      if (requestRef.current !== controller) return;
-      const parts = [`${result.linkedCount} tomter ble koblet`, `${result.alreadyLinkedCount} var allerede koblet`];
-      if (result.assignedElsewhereCount) parts.push(`${result.assignedElsewhereCount} tilhører en annen grend og ble ikke flyttet`);
-      setNotice(`${parts.join('. ')}. Medlemsregisterets grendefilter er oppdatert.`);
-    } catch (failure) {
-      if (requestRef.current !== controller || controller.signal.aborted) return;
-      setError(signal.aborted ? 'Koblingen tok for lang tid. Prøv igjen.' : failure.message);
-    } finally { if (requestRef.current === controller) { setBusy(''); requestRef.current = null; } }
-  }
-
-  const activeHamletIsCurrent = Boolean(activeHamlet?.polygon && area?.polygon
-    && JSON.stringify(activeHamlet.polygon.geometry) === JSON.stringify(area.polygon.geometry));
 
   return <div className="map-explorer">
     <p>Kontroller Turufjell vels register mot offisielle adresser. Hent bare data for området du tegner. Kartkildene mottar ikke medlemsopplysninger.</p>
@@ -152,7 +129,7 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
     </div></details>
     {data.comparison && <div className="map-summary" aria-label="Nøkkeltall">
       <div><strong>{data.comparison.officialCount}</strong><span>Offisielle adresser i polygon</span></div>
-      <div><strong>{data.comparison.registerCount}</strong><span>Aktive poster i hele registeret</span></div>
+      <div><strong>{data.comparison.registerCount}</strong><span>{data.comparison.registerScope === 'hamlet' ? 'Registrerte tomter i valgt grend' : 'Aktive poster i hele registeret'}</span></div>
       <div><strong>{data.comparison.unlocatedRows?.length || 0}</strong><span>Ukjent plassering · utenfor mangeltall</span></div>
       {Object.entries(data.comparison.counts).map(([status, count]) => <div key={status}><strong>{count}</strong><span>{STATUS_LABELS[status]}</span></div>)}
     </div>}
@@ -171,8 +148,6 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
       <button type="button" className="admin-button" disabled={!area || drawing || editing || Boolean(busy)} onClick={() => run('roads')}>Hent veier og stier</button>
       <button type="button" className="admin-button" disabled={!area || drawing || editing || Boolean(busy)} onClick={() => run('properties')}>Hent eiendomsgrenser</button>
       <button type="button" className="admin-button" disabled={!area || drawing || editing || Boolean(busy) || data.addresses?.complete === false} onClick={() => run('comparison')}>Sammenlign register</button>
-      {activeHamlet?.polygon && <button type="button" className="admin-button" title={!activeHamletIsCurrent ? 'Lagre grendeendringene før medlemsregisteret kobles.' : activeHamlet.reviewed ? 'Koble entydige adresse- og matrikkeltreff til den valgte grenden.' : 'Kontroller og lagre polygonet før medlemsregisteret kobles.'}
-        disabled={!activeHamletIsCurrent || !activeHamlet.reviewed || drawing || editing || Boolean(busy)} onClick={syncMembersToHamlet}>Koble register til valgt grend</button>}
       {busy && <><span role="status">Henter og behandler data …</span><button type="button" className="admin-button" onClick={() => { requestRef.current?.abort(); requestRef.current = null; setBusy(''); setNotice('Forespørselen er avbrutt.'); }}>Avbryt</button></>}
     </div>
     {notice && <p role="status">{notice}</p>}

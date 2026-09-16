@@ -18,6 +18,7 @@
     "db:setup": "node --use-system-ca --env-file=.env.local scripts/setup-database.mjs",
     "db:security-cleanup": "node --use-system-ca --env-file=.env.local scripts/security-cleanup.mjs",
     "members:import": "node --use-system-ca --env-file=.env.local scripts/import-members.mjs",
+    "hamlets:assign": "node --use-system-ca --env-file=.env.local scripts/assign-member-hamlets.mjs",
     "test": "node --experimental-vm-modules --test tests/*.test.mjs",
     "test:integration": "node --experimental-vm-modules --test --test-concurrency=1 tests/integration/*.test.mjs",
     "test:e2e": "playwright test"

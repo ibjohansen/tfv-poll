@@ -264,7 +264,6 @@ test('hamlet polygons persist across reload, mark edited boundaries as drafts an
   await page.route('**/api/admin/map/hamlets', (route) => {
     if (route.request().method() === 'GET') return route.fulfill({ json: { hamlets: saved ? [saved] : [] } });
     const input = route.request().postDataJSON(); writes.push(input);
-    if (input.action === 'sync_members') return route.fulfill({ json: { sync: { matchedCount: 3, linkedCount: 2, alreadyLinkedCount: 1, assignedElsewhereCount: 0 } } });
     if (conflict) return route.fulfill({ status: 409, json: { message: 'Grenden er endret av en annen administrator. Utkastet er beholdt.' } });
     saved = { id: '13', name: input.action === 'clear' ? saved.name : input.name,
       version: (saved?.version || 0) + 1, reviewed: input.action === 'clear' ? false : input.reviewed,
@@ -277,7 +276,7 @@ test('hamlet polygons persist across reload, mark edited boundaries as drafts an
     const address = { id: 'synthetic-address', kind: 'address', address: 'Testvegen 1', addressName: 'Testvegen', houseNumber: 1,
       gnr: 10, bnr: 7001, fnr: null, snr: null, postalCode: '3539', postalPlace: 'FLÅ', latitude: 60.465, longitude: 9.495, source: 'Kartverket',
       feature: { type: 'Feature', id: 'synthetic-address', properties: {}, geometry: { type: 'Point', coordinates: [9.495, 60.465] } } };
-    const comparison = datatype === 'comparison' ? { officialCount: 1, registerCount: 1, counts: { MATCH: 1, MISSING_IN_REGISTER: 0, MISSING_IN_MAP_DATA: 0, POSSIBLE_MATCH: 0, CONFLICT: 0 }, unlocatedRows: [], rows: [{
+    const comparison = datatype === 'comparison' ? { officialCount: 1, registerCount: 1, registerScope: 'hamlet', counts: { MATCH: 1, MISSING_IN_REGISTER: 0, MISSING_IN_MAP_DATA: 0, POSSIBLE_MATCH: 0, CONFLICT: 0 }, unlocatedRows: [], rows: [{
       id: 'register:7001', status: 'MATCH', scope: 'address_in_polygon', notes: [], officialAddresses: [address],
       register: { id: '7001', hNumber: 'H-SYNTHETIC-1', address: 'Testvegen 1', gnr: 10, bnr: 7001, owners: [] },
     }] } : undefined;
@@ -335,10 +334,8 @@ test('hamlet polygons persist across reload, mark edited boundaries as drafts an
   await expect(editor.getByLabel('Navn på grend')).toHaveValue('Slåtta Øst');
   await expect(editor.getByRole('checkbox')).toBeChecked();
   await expect(page.getByRole('button', { name: 'Hent adresser', exact: true })).toBeEnabled();
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: 'Koble register til valgt grend' }).click();
-  await expect(page.getByRole('status').filter({ hasText: '2 tomter ble koblet' })).toBeVisible();
-  expect(writes.at(-1).action).toBe('sync_members');
+  await expect(page.getByText('Registrerte tomter i valgt grend')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Koble register til valgt grend' })).toHaveCount(0);
   await page.getByRole('checkbox', { name: 'Grendegrenser', exact: true }).uncheck();
   await page.getByRole('checkbox', { name: 'Grendegrenser', exact: true }).check();
   await page.getByRole('button', { name: 'Rediger polygon', exact: true }).click();
@@ -346,7 +343,6 @@ test('hamlet polygons persist across reload, mark edited boundaries as drafts an
   const longitude = page.getByRole('spinbutton', { name: 'Lengdegrad 1', exact: true });
   await longitude.fill(String(Number(await longitude.inputValue()) + .0001));
   await page.getByRole('button', { name: 'Fullfør polygon' }).click();
-  await expect(page.getByRole('button', { name: 'Koble register til valgt grend' })).toBeDisabled();
   await expect(editor.getByRole('checkbox')).not.toBeChecked();
   await editor.getByLabel('Navn på grend').fill('Slåtta Øst endret');
   conflict = true;

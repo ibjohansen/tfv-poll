@@ -931,6 +931,16 @@ Eventuelle funn fra sikkerhetsgjennomgangen legges inn som egne P1- eller P2-sak
   valget.
 - [x] Eiendommer kan vises for valgt grend. Under kartet vises bare H-nummer,
   gårds-/bruksnummer og adresse; navn, e-post, telefon og interne database-ID-er
-  sendes aldri til den offentlige klienten. Eiendomslisten bygges fra offisielle
-  Kartverket-adresser i polygonet og krever ikke en forhåndsutfylt grendekobling.
+  sendes aldri til den offentlige klienten. Eiendomslisten avgrenses med lagret
+  `members.hamlet_id`; Kartverket brukes bare til kartplassering.
 - [x] Klikk på eiendomsmarkør eller tabellrad velger objektet og zoomer kartet.
+- [x] Engangsverktøy for å beregne alle grender samlet, avvise overlapp og lagre
+  sikre koblinger med miljølås, polygonversjonskontroll og audit.
+- [x] Produksjonskjøring 16.09.2026: 424 av 428 aktive tomter ble koblet entydig
+  til 11 kontrollerte grender. Ingen overlapp eller konflikter ble funnet; 4
+  tomter står ukoblet for manuell kontroll.
+- [x] Alle ordinære grendefiltre og -visninger bruker lagret `members.hamlet_id`.
+  Gjentatt polygonkobling er fjernet fra adminkartet; fri polygonkontroll er
+  fortsatt tilgjengelig som et separat datakvalitetsverktøy.
+- [x] Medlemsfilteret har valget **Uten grend** for manuell gjennomgang av de
+  fire tomtene som ikke fikk et entydig sikkert treff.

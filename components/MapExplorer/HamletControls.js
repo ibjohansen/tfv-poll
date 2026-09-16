@@ -75,7 +75,7 @@ const HamletControls = forwardRef(function HamletControls({ polygon, editing, dr
 
   return <section className="map-hamlet-controls" aria-labelledby="map-hamlets-heading">
     <h2 id="map-hamlets-heading">Grender og lagrede polygoner</h2>
-    <p>Grendegrenser er interne søkeområder, ikke offisielle eiendomsgrenser. Etter kontroll kan sikre registertreff kobles til valgt grend fra kartverktøyene nedenfor.</p>
+    <p>Grendegrenser er interne søkeområder, ikke offisielle eiendomsgrenser. Registerlaget bruker tomtenes lagrede grendekobling.</p>
     <div className="map-hamlet-workspace">
       <div className="map-hamlet-editor">
         <fieldset disabled={saving}>

@@ -29,6 +29,8 @@ const fieldLabels = {
   reviewed: 'Kontrollert i kartet', vertices: 'Polygonhjørner', area_m2: 'Areal (m²)', version: 'Versjon',
   matched_count: 'Sikre treff', linked_count: 'Nye grendekoblinger',
   already_linked_count: 'Allerede koblet', assigned_elsewhere_count: 'Tilhører annen grend',
+  changed_count: 'Lagrede grendekoblinger', hamlet_count: 'Kontrollerte grender',
+  unassigned_count: 'Tomter uten entydig grend',
 };
 
 function formatDate(value) {
@@ -54,6 +56,7 @@ function entityLabel(entry) {
   const value = entry.after_value || entry.before_value || {};
   if (value.action?.startsWith('hamlet_polygon_')) return `Grend · ${value.name} · ${value.action === 'hamlet_polygon_clear' ? 'polygon fjernet' : 'polygon lagret'}`;
   if (value.action === 'hamlet_members_sync') return `Grend · ${value.linked_count || 0} tomter koblet fra kartkontroll`;
+  if (value.action === 'hamlet_members_bulk_assignment') return `Grender · ${value.changed_count || 0} tomter koblet i engangskjøring`;
   if (value.action === 'newsletter_saved') return 'Nyhetsbrevutkast lagret';
   if (value.action === 'newsletter_queued') return 'Nyhetsbrev bestilt';
   if (entry.table_name === 'newsletter_campaigns') return value.action === 'campaign_started' ? 'Nyhetsbrev startet' : 'Nyhetsbrev avsluttet';
@@ -70,7 +73,8 @@ function entityLabel(entry) {
 }
 
 function entityHref(entry) {
-  if (entry.after_value?.action?.startsWith('hamlet_polygon_') || entry.after_value?.action === 'hamlet_members_sync') return '/admin/map';
+  if (entry.after_value?.action?.startsWith('hamlet_polygon_')
+    || ['hamlet_members_sync', 'hamlet_members_bulk_assignment'].includes(entry.after_value?.action)) return '/admin/map';
   if (entry.after_value?.newsletter_id) return '/admin/members/newsletters';
   if (['email_campaigns', 'email_deliveries'].includes(entry.table_name)) return '/admin/surveys';
   if (entry.table_name === 'admin_actions' && entry.after_value?.action?.startsWith('group_')) return '/admin/members/groups';
