@@ -390,6 +390,8 @@ Dette er oppgaver som enten reduserer teknisk risiko, styrker kvaliteten eller l
   lagres og endringen inngår i eksisterende audit-/profilhistorikk. Filteret kan
   finne begge grupper, og Excel-eksport utelater reserverte poster som standard;
   administrator må aktivt slå av dette bare for intern bruk i Turufjell Vel.
+  De to additive reservasjonskolonnene ble migrert og verifisert i produksjon
+  16. september 2026.
 
   **Prompt:**
 
@@ -926,6 +928,9 @@ Eventuelle funn fra sikkerhetsgjennomgangen legges inn som egne P1- eller P2-sak
 
 ### Forsidekart
 
+- [x] Forsiden har bildekarusell fra `public/carousel`, fotografkreditering,
+  automatisk fremdrift med pause ved hover/fokus og tilgjengelig manuell
+  navigasjon.
 - [x] Forsiden viser alle kontrollerte grendepolygoner med én knapp per grend.
 - [x] Ingen grend er valgt ved innlasting; samme knapp velger eller opphever
   valget.

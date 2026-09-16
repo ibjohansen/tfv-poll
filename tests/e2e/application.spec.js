@@ -22,6 +22,15 @@ test('public pageviews send only coarse anonymous dimensions and usage dashboard
     return route.fulfill({ status: 204, body: '' });
   });
   await page.goto('/');
+  const carousel = page.getByRole('region', { name: 'Bilder fra Turufjell' });
+  await expect(carousel).toBeVisible();
+  await expect(carousel.getByText('Foto: Ib Johansen')).toBeVisible();
+  await carousel.getByRole('button', { name: 'Pause automatisk bildebytte' }).click();
+  await carousel.getByRole('button', { name: 'Vis bilde 1 av 4' }).click();
+  await expect(carousel.getByRole('button', { name: 'Vis bilde 1 av 4' })).toHaveAttribute('aria-current', 'true');
+  await carousel.focus();
+  await carousel.press('ArrowRight');
+  await expect(carousel.getByRole('button', { name: 'Vis bilde 2 av 4' })).toHaveAttribute('aria-current', 'true');
   const expectedDevice = page.viewportSize().width < 768 ? 'mobile' : page.viewportSize().width < 1100 ? 'tablet' : 'desktop';
   await expect.poll(() => payload).toEqual({ pageType: 'home', deviceCategory: expectedDevice });
   expect(Object.keys(payload).sort()).toEqual(['deviceCategory', 'pageType']);

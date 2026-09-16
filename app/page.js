@@ -1,7 +1,8 @@
-import Image from 'next/image';
+import { readdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import Link from 'next/link';
-import landscape from '@/public/turufjell.jpeg';
 import SiteHeader from '@/components/SiteHeader';
+import HomeHeroCarousel from '@/components/HomeHeroCarousel';
 import PublicArticleDirectory from '@/components/PublicArticleDirectory';
 import MemberSelfServiceEntry from '@/components/MemberSelfServiceEntry';
 import PublicHamletMap from '@/components/PublicHamletMap';
@@ -10,13 +11,24 @@ import { isAllowedAdmin } from '@/lib/admin-policy';
 import { getPublishedCmsPage, getPublishedCmsPageSummaries } from '@/lib/cms-pages';
 import { isValidCmsSlug } from '@/lib/cms-validation';
 import { getPublicMapHamlets } from '@/lib/map/public-map-service';
+import { carouselImagesFromFilenames } from '@/lib/public-carousel';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+async function getCarouselImages() {
+  try {
+    const filenames = await readdir(join(process.cwd(), 'public', 'carousel'));
+    return carouselImagesFromFilenames(filenames);
+  } catch {
+    return [];
+  }
+}
+
 export default async function HomePage({ searchParams }) {
   const isAdmin = isAllowedAdmin((await auth())?.user);
   const params = await searchParams;
+  const carouselImages = await getCarouselImages();
   let pages = [];
   let hamlets = [];
   let initialPage = null;
@@ -43,15 +55,12 @@ export default async function HomePage({ searchParams }) {
       <a className="fixed top-3 left-3 z-50 -translate-y-24 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-foreground shadow-lg transition-transform focus:translate-y-0 focus:outline-2 focus:outline-offset-2 focus:outline-primary" href="#main-content">Hopp til innhold</a>
       <SiteHeader />
       <main id="main-content">
-        <section className="relative flex min-h-[clamp(26rem,60vh,46rem)] w-full items-end overflow-hidden bg-primary" aria-labelledby="home-title">
-          <Image src={landscape} alt="Utsikt over fjellandskapet på Turufjell" fill sizes="100vw" priority className="object-cover object-[35%_center]" />
-          <div className="absolute inset-0 bg-linear-to-t from-[#493F39]/85 via-[#493F39]/15 to-transparent" />
-          <div className="relative mx-auto w-full max-w-7xl px-5 py-12 text-white sm:px-8 sm:py-16 lg:px-12 lg:py-20">
-            <p className="text-xs font-semibold tracking-[0.2em] text-white/70 uppercase">Turufjell Vel</p>
-            <h1 id="home-title" className="mt-4 max-w-3xl text-4xl leading-[1.04] font-light tracking-[-0.035em] sm:text-6xl lg:text-7xl">Fellesskap på fjellet</h1>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-white/80 sm:text-lg">Vi samordner og ivaretar medlemmenes interesser i og omkring Turufjell hytteområde.</p>
-          </div>
-        </section>
+        <HomeHeroCarousel images={carouselImages.length ? carouselImages : [{
+          id: 'fallback',
+          src: '/turufjell.jpeg',
+          photographer: null,
+          number: 0,
+        }]} />
 
         <section className="relative flex min-h-[32rem] items-center justify-center overflow-hidden px-5 py-20 text-center sm:px-8" aria-labelledby="about-title">
           <div className="mx-auto max-w-3xl">

@@ -2,6 +2,9 @@
 
 ## Ikke publisert
 
+- Tilgjengelig bildekarusell på forsiden med automatisk mappeoppdagelse,
+  fotografkreditering, pause ved hover/fokus og navigasjon med piler, tastatur og
+  bildeindikatorer.
 - Offentlig grendekart uten forhåndsvalg, med av/på-knapper og behovsstyrte
   registereiendommer som kan velges fra kart eller tabell, uten å eksponere
   kontaktopplysninger. Lagret grendekobling er felles kilde for alle visninger.

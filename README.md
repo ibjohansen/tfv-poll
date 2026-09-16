@@ -50,8 +50,15 @@ Sertifikatkontrollen skal ikke deaktiveres.
 
 ## Sider og tilgang
 
-- `/` er en offentlig forside med logo, hovedinnhold, kontrollert grendekart,
-  medlemsselvbetjening, publiserte artikler og bunnfelt.
+- `/` er en offentlig forside med logo, bildekarusell, hovedinnhold, kontrollert
+  grendekart, medlemsselvbetjening, publiserte artikler og bunnfelt.
+- Forsidekarusellen leser bildefiler fra `public/carousel`. Filnavn skal følge
+  `[FOTOGRAF]_tf[NUMMER].jpg` (også JPEG, PNG, WebP og AVIF støttes), for eksempel
+  `Ib Johansen_tf1.jpg`. Fotografnavnet vises som kreditering på bildet. Bildene
+  sorteres på nummeret, byttes automatisk og kan styres med piler, tastaturets
+  piltaster, indikatorene eller pauseknappen. Automatisk bildebytte stopper når
+  pekeren er over karusellen, når den har tastaturfokus eller redusert bevegelse
+  er valgt i operativsystemet.
 - **Mine medlemsopplysninger** ligger alltid på forsiden før publiserte artikler.
   Et medlem kan be om en 15-minutters engangslenke med H-nummer, gateadresse eller
   registrert e-postadresse, eller sende inn en ny tomt til behandling.
@@ -646,11 +653,11 @@ Samme migrering innfører grender/e-postgrupper, fler-tomtstilgang,
 
 Reservasjon mot manuell deling med Turufjell AS bruker de additive kolonnene
 `members.turufjell_as_sharing_opt_out` og
-`members.turufjell_as_sharing_opt_out_updated_at`. Kjør `npm run db:setup` med
-direkte `DATABASE_URL_UNPOOLED` før kode som leser feltene publiseres. Eksisterende
-poster får den avklarte standardverdien `FALSE`. Endringer logges av den
-eksisterende `members`-audittriggeren, og Excel-eksport utelater reserverte
-poster som standard.
+`members.turufjell_as_sharing_opt_out_updated_at`. Den avgrensede additive
+produksjonsmigreringen ble utført og verifisert 16. september 2026; se
+[migreringsstatus](docs/database-migration-2026-09-16.md). Eksisterende poster
+har standardverdien `FALSE`. Endringer logges av den eksisterende
+`members`-audittriggeren, og Excel-eksport utelater reserverte poster som standard.
 
 Nye beskyttede ruter er `/admin/members/groups`, `/api/admin/member-groups`,
 `/admin/members/newsletters` og `/api/admin/newsletters`, alle med eksisterende

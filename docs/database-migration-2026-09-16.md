@@ -54,14 +54,21 @@ ikke kjørt; den kan erstatte nyere data og krever en egen vurdering og godkjenn
 Produksjonsdatabasen er klar for den nye koden, men innsamling og grafvisning er
 ikke funksjonelt verifisert i produksjon før en separat godkjent Netlify-deploy.
 
-## Etterfølgende lokal skjemaendring
+## Etterfølgende produksjonsmigrering – reservasjon mot Turufjell AS
 
-Kodebasen inneholder nå en ny, additiv migrering for reservasjon mot manuell
-deling med Turufjell AS:
+Etter ny eksplisitt godkjenning fra prosjekteier ble følgende additive kolonner
+opprettet i produksjon 16. september 2026 kl. 18:53 UTC:
 
 - `members.turufjell_as_sharing_opt_out BOOLEAN NOT NULL DEFAULT FALSE`
 - `members.turufjell_as_sharing_opt_out_updated_at TIMESTAMPTZ`
 
-Denne etterfølgende endringen inngår ikke i den fullførte produksjonskjøringen
-eller SHA-256-verdien over. Den må testes og kjøres separat med eksplisitt
-godkjenning før den tilhørende applikasjonskoden deployes.
+Endringen ble kjørt som en avgrenset transaksjon gjennom direkte, upolet
+databaseforbindelse. Miljømarkøren `production`, samsvar mellom pooled og direkte
+endepunkt og at begge kolonnene manglet ble kontrollert før kjøring. Ingen andre
+skjemaoperasjoner eller deployer ble utført.
+
+Etterkontrollen via applikasjonens pooled runtime-forbindelse bekreftet riktige
+datatyper, `NOT NULL DEFAULT FALSE` på reservasjonsflagget og nullable tidsstempel.
+Alle 428 aktive medlemsposter er bevart; ingen poster er reservert, ingen flagg er
+`NULL`, og ingen endringstidspunkter ble satt av migreringen. Endringen inngår
+ikke i SHA-256-verdien eller det tidligere gjenopprettingspunktet beskrevet over.
