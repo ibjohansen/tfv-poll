@@ -4,11 +4,13 @@ import { isAllowedAdmin, isAuthConfigured } from '@/lib/admin-policy';
 import { getAdminSurveys } from '@/lib/admin-surveys';
 import AdminSurveyDirectory from '@/components/AdminSurveyDirectory';
 import AdminModuleHeader from '@/components/AdminModuleHeader';
+import { getServerI18n } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export default async function AdminSurveysPage({ searchParams }) {
+  const { t } = await getServerI18n();
   if (!isAuthConfigured()) redirect('/admin/login');
   const session = await auth();
   if (!isAllowedAdmin(session?.user)) redirect('/admin/login');
@@ -17,5 +19,5 @@ export default async function AdminSurveysPage({ searchParams }) {
   const direction = params.dir === 'desc' ? 'desc' : 'asc';
   let surveys;
   try { surveys = await getAdminSurveys(sort, direction); } catch { surveys = null; }
-  return <main className="admin-shell"><AdminModuleHeader active="surveys" title="Undersøkelser" email={session.user.email} /><section className="admin-content">{surveys ? <AdminSurveyDirectory key={`${sort}-${direction}`} surveys={surveys} sort={sort} direction={direction} adminEmail={session.user.email} /> : <p className="form-error" role="alert">Undersøkelsene er midlertidig utilgjengelige. Prøv igjen senere.</p>}</section></main>;
+  return <main className="admin-shell"><AdminModuleHeader active="surveys" title={t('admin.common.surveys')} email={session.user.email} /><section className="admin-content">{surveys ? <AdminSurveyDirectory key={`${sort}-${direction}`} surveys={surveys} sort={sort} direction={direction} adminEmail={session.user.email} /> : <p className="form-error" role="alert">{t('admin.pages.surveysUnavailable')}</p>}</section></main>;
 }

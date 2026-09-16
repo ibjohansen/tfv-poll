@@ -50,7 +50,7 @@ test('conflicting address is not hidden by a parcel match at another address', (
 test('missing cadastral references still match by exact address and produce quality notes', () => {
   const row = compareRegisterWithMapData([{ ...register, gnr: null, bnr: null }], [official]).rows[0];
   assert.equal(row.status, 'MATCH');
-  assert.match(row.notes.join(' '), /Gnr\/bnr mangler/);
+  assert.ok(row.notes.includes('comparison.missingRegisterCadastral'));
 });
 
 test('shared parcels retain all possible addresses; unique address disambiguates', () => {
@@ -81,7 +81,7 @@ test('never match owner names alone or same parcel numbers across known municipa
   assert.equal(report.unlocatedRows.length, 2);
   assert.ok(report.unlocatedRows.every((row) => row.status === null));
   assert.equal(report.counts.MISSING_IN_REGISTER, 1);
-  assert.match(report.unlocatedRows[0].notes.join(' '), /utenfor polygonet/);
+  assert.ok(report.unlocatedRows[0].notes.includes('comparison.noMapLink'));
 });
 
 test('unmatched plots are geographically scoped without guessing locations or omitting unknowns', () => {

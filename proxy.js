@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { auth } from './auth';
 import { adminPermissions, isAllowedAdmin, isAuthConfigured } from './lib/admin-policy';
 import { isPublicPath } from './lib/route-access';
+import { getRequestI18n } from './lib/i18n/request';
+import { LOCALE_COOKIE, normalizeLocale } from './lib/i18n/config';
 
 function permissionForPath(pathname) {
   if (pathname.startsWith('/api/admin/member-groups') || pathname.startsWith('/api/admin/newsletters')) return 'members';
@@ -17,15 +19,20 @@ function permissionForPath(pathname) {
 function contentSecurityPolicy(nonce) {
   const development = process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : '';
   const upgrade = process.env.NODE_ENV === 'production' ? '; upgrade-insecure-requests' : '';
-  return `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src https://norgeskart.no https://www.norgeskart.no; form-action 'self'; img-src 'self' data: blob: https://cache.kartverket.no; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development}; connect-src 'self' https://ws.geonorge.no${upgrade}`;
+  return `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src https://norgeskart.no https://www.norgeskart.no; form-action 'self'; img-src 'self' data: blob: https://cache.kartverket.no https://wms.geonorge.no; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development}; connect-src 'self' https://ws.geonorge.no${upgrade}`;
 }
 
-function nextWithCsp(request, nonce, csp) {
+function nextWithCsp(request, nonce, csp, requestedLocale) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
   requestHeaders.set('Content-Security-Policy', csp);
+  requestHeaders.delete('x-tfv-locale');
+  if (requestedLocale) requestHeaders.set('x-tfv-locale', requestedLocale);
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set('Content-Security-Policy', csp);
+  if (requestedLocale) response.cookies.set(LOCALE_COOKIE, requestedLocale, {
+    httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: 31_536_000,
+  });
   return response;
 }
 
@@ -35,22 +42,24 @@ function responseWithCsp(response, csp) {
 }
 
 export async function proxy(request) {
+  const { t } = getRequestI18n(request, 'backend.api');
+  const requestedLocale = normalizeLocale(request.nextUrl.searchParams.get('lang'));
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const csp = contentSecurityPolicy(nonce);
-  if (isPublicPath(request.nextUrl.pathname)) return nextWithCsp(request, nonce, csp);
+  if (isPublicPath(request.nextUrl.pathname)) return nextWithCsp(request, nonce, csp, requestedLocale);
   const session = isAuthConfigured() ? await auth() : null;
   if (isAllowedAdmin(session?.user)) {
     const permission = permissionForPath(request.nextUrl.pathname);
-    if (adminPermissions(session.user).has(permission)) return nextWithCsp(request, nonce, csp);
+    if (adminPermissions(session.user).has(permission)) return nextWithCsp(request, nonce, csp, requestedLocale);
     if (request.nextUrl.pathname.startsWith('/api/')) {
       console.warn('Security event', { event: 'admin_access_denied', result: 'forbidden', area: permission, occurredAt: new Date().toISOString() });
-      return responseWithCsp(NextResponse.json({ message: 'Du har ikke tilgang.' }, { status: 403, headers: { 'Cache-Control': 'no-store' } }), csp);
+      return responseWithCsp(NextResponse.json({ message: t('forbidden') }, { status: 403, headers: { 'Cache-Control': 'no-store' } }), csp);
     }
     return responseWithCsp(NextResponse.redirect(new URL('/admin', request.url)), csp);
   }
   if (request.nextUrl.pathname.startsWith('/api/')) {
     console.warn('Security event', { event: 'admin_access_denied', result: 'unauthorized', area: permissionForPath(request.nextUrl.pathname), occurredAt: new Date().toISOString() });
-    return responseWithCsp(NextResponse.json({ message: 'Innlogging kreves.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } }), csp);
+    return responseWithCsp(NextResponse.json({ message: t('unauthorized') }, { status: 401, headers: { 'Cache-Control': 'no-store' } }), csp);
   }
   return responseWithCsp(NextResponse.redirect(new URL('/admin/login', request.url)), csp);
 }

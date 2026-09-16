@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import { useI18n } from '@/components/LocaleProvider';
 
-const statusLabels = { pending: 'Venter', running: 'Pågår', completed: 'Fullført', failed: 'Feilet', cancelled: 'Stoppet' };
-
-function memberLabel(member) {
-  return `${member.h_number} · ${member.street_address || 'Adresse ikke registrert'}`;
+function memberLabel(member, t) {
+  return `${member.h_number} · ${member.street_address || t('addressMissing')}`;
 }
 
 export default function MatrikkelSyncPanel({ initialRuns, members = [], initialMemberId = '', initialMemberIds = [], configured, databaseReady }) {
+  const { t, formatLocale } = useI18n('members.matrikkel');
   const [runs, setRuns] = useState(initialRuns);
   const [activeId, setActiveId] = useState(initialRuns.find((run) => ['pending', 'running'].includes(run.status))?.id || null);
   const [active, setActive] = useState(null);
@@ -42,12 +42,12 @@ export default function MatrikkelSyncPanel({ initialRuns, members = [], initialM
         setActive(body.data);
         setRuns((current) => [body.data, ...current.filter((run) => run.id !== body.data.id)].slice(0, 10));
         if (['completed', 'failed', 'cancelled'].includes(body.data.status)) setActiveId(null);
-      } catch (error) { if (!stopped) setMessage(error.message || 'Kunne ikke hente status.'); }
+      } catch (error) { if (!stopped) setMessage(error.message || t('statusError')); }
     };
     refresh();
     const timer = setInterval(refresh, 3000);
     return () => { stopped = true; clearInterval(timer); };
-  }, [activeId]);
+  }, [activeId, t]);
 
   async function processNext(runId) {
     setProcessingLocally(true);
@@ -60,7 +60,7 @@ export default function MatrikkelSyncPanel({ initialRuns, members = [], initialM
         status = body.run.status;
         setActive(body.run);
       }
-    } catch (error) { setMessage(error.message || 'Synkroniseringen stoppet.'); }
+    } catch (error) { setMessage(error.message || t('stopped')); }
     finally { setProcessingLocally(false); }
   }
 
@@ -78,7 +78,7 @@ export default function MatrikkelSyncPanel({ initialRuns, members = [], initialM
       }
       if (!response.ok || !body.ok) throw new Error(body.message);
       if (!body.backgroundStarted && !isFinished) processNext(body.run.id);
-    } catch (error) { setConfirm(false); setMessage(error.message || 'Kunne ikke starte synkroniseringen.'); }
+    } catch (error) { setConfirm(false); setMessage(error.message || t('startError')); }
     finally { setStarting(false); }
   }
 
@@ -93,7 +93,7 @@ export default function MatrikkelSyncPanel({ initialRuns, members = [], initialM
       if (!detailResponse.ok || !detail.ok) throw new Error(detail.message);
       setActive(detail.data);
       setRuns((current) => [detail.data, ...current.filter((run) => run.id !== detail.data.id)].slice(0, 10));
-    } catch (error) { setMessage(error.message || 'Kunne ikke godkjenne oppslaget.'); }
+    } catch (error) { setMessage(error.message || t('approveError')); }
   }
 
   async function stop() {
@@ -106,7 +106,7 @@ export default function MatrikkelSyncPanel({ initialRuns, members = [], initialM
       setActive(body.run);
       setRuns((current) => [body.run, ...current.filter((run) => run.id !== body.run.id)].slice(0, 10));
       setActiveId(null); setConfirmStop(false);
-    } catch (error) { setConfirmStop(false); setMessage(error.message || 'Kunne ikke stoppe synkroniseringen.'); }
+    } catch (error) { setConfirmStop(false); setMessage(error.message || t('stopError')); }
     finally { setStarting(false); }
   }
 
@@ -120,26 +120,26 @@ export default function MatrikkelSyncPanel({ initialRuns, members = [], initialM
       setRuns((current) => current.filter((run) => run.id !== deleteCandidate.id));
       if (active?.id === deleteCandidate.id) setActive(null);
       setDeleteCandidate(null);
-    } catch (error) { setDeleteCandidate(null); setMessage(error.message || 'Kunne ikke fjerne kjøringen.'); }
+    } catch (error) { setDeleteCandidate(null); setMessage(error.message || t('removeError')); }
     finally { setStarting(false); }
   }
 
   const current = active || runs[0];
   const currentMember = members.find((member) => member.id === current?.selected_member_id);
-  const currentScope = currentMember ? memberLabel(currentMember) : current?.h_number_filter ? `H-nummer ${current.h_number_filter}`
-    : current?.total_count < members.length ? `Utvalg på ${current.total_count} medlemmer` : 'Alle medlemmer';
+  const currentScope = currentMember ? memberLabel(currentMember, t) : current?.h_number_filter ? t('hNumber', {number: current.h_number_filter})
+    : current?.total_count < members.length ? t('selectedScope', {count: current.total_count}) : t('allMembers');
   return <>
-    <section className="matrikkel-intro"><div><p>Oppslaget bruker medlemmenes gateadresse og oppdaterer bare gårds- og bruksnummer, hjemmelshavere og Matrikkelens <code>datoFra</code>. Eksisterende verdier beholdes ved feil eller usikre treff.</p><p>Før jobben starter lagres et øyeblikksbilde av alle feltene jobben kan endre.</p></div><div className="matrikkel-actions"><button className="admin-button" type="button" onClick={() => { setScope('test'); setConfirm(true); }} disabled={!configured || !databaseReady || starting || processingLocally || Boolean(activeId)}>Test H-nummer 25</button><button className="primary-button" type="button" onClick={() => { setScope('all'); setConfirm(true); }} disabled={!configured || !databaseReady || starting || processingLocally || Boolean(activeId)}>{activeId || processingLocally ? 'Synkronisering pågår …' : 'Synkroniser alle'}</button>{activeId && <button className="admin-button" type="button" onClick={() => setConfirmStop(true)} disabled={starting}>Stopp kjøring</button>}</div></section>
-    {selectedMemberIds.length > 0 && <section className="matrikkel-selection" aria-label="Valgt utvalg fra medlemsregisteret"><div><p className="eyebrow">Utvalg fra medlemsregisteret</p><h2>{selectedMemberIds.length} medlemmer er valgt</h2><p>Utvalget låses til disse medlems-ID-ene når kjøringen opprettes.</p></div><div className="map-actions"><button className="primary-button" type="button" onClick={() => { setScope('selection'); setConfirm(true); }} disabled={!configured || !databaseReady || starting || processingLocally || Boolean(activeId)}>Oppdater valgte medlemmer</button><button className="admin-button" type="button" onClick={() => setSelectedMemberIds([])} disabled={starting}>Fjern utvalget</button></div></section>}
-    <section className="matrikkel-member-picker" aria-labelledby="matrikkel-member-title"><div><p className="eyebrow">Enkeltmedlem</p><h2 id="matrikkel-member-title">Velg medlem som skal oppdateres</h2><p>Utvalget låses til medlems-ID-en når kjøringen opprettes. Andre medlemmer med samme eller midlertidig H-nummer blir ikke berørt.</p></div><div className="matrikkel-member-fields"><label>Søk etter medlem<input type="search" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} placeholder="H-nummer, adresse eller gnr/bnr" maxLength={100} /></label><div className="select-action-row"><label>Medlem<select value={selectedMemberId} onChange={(event) => { setSelectedMemberId(event.target.value); setSelectedMemberIds([]); }}><option value="">Velg medlem</option>{visibleMembers.map((member) => <option key={member.id} value={member.id}>{memberLabel(member)}{member.cadastral_number ? ` · ${member.cadastral_number}` : ''}</option>)}</select></label><button className="primary-button" type="button" onClick={() => { setScope('member'); setConfirm(true); }} disabled={!selectedMember || !configured || !databaseReady || starting || processingLocally || Boolean(activeId)}>Oppdater valgt medlem</button></div>{memberSearch && !visibleMembers.length && <p className="form-error" role="status">Ingen medlemmer samsvarer med søket.</p>}</div></section>
-    {!configured && <p className="form-error" role="alert">Matrikkel-API er ikke konfigurert. Legg API_MATRIKKEL_BASE_URL, API_MATRIKKEL_USR og API_MATRIKKEL_PWD i serverens miljøvariabler.</p>}
-    {!databaseReady && <p className="form-error" role="alert">Databaseskjemaet mangler synkroniseringstabellene. Kjør npm run db:setup.</p>}
+    <section className="matrikkel-intro"><div><p>{t('intro')}</p><p>{t('backupIntro')}</p></div><div className="matrikkel-actions"><button className="admin-button" type="button" onClick={() => { setScope('test'); setConfirm(true); }} disabled={!configured || !databaseReady || starting || processingLocally || Boolean(activeId)}>{t('test')}</button><button className="primary-button" type="button" onClick={() => { setScope('all'); setConfirm(true); }} disabled={!configured || !databaseReady || starting || processingLocally || Boolean(activeId)}>{activeId || processingLocally ? t('syncing') : t('syncAll')}</button>{activeId && <button className="admin-button" type="button" onClick={() => setConfirmStop(true)} disabled={starting}>{t('stop')}</button>}</div></section>
+    {selectedMemberIds.length > 0 && <section className="matrikkel-selection" aria-label={t('selectedRegion')}><div><p className="eyebrow">{t('selectedEyebrow')}</p><h2>{t('selectedTitle', {count: selectedMemberIds.length})}</h2><p>{t('selectedHelp')}</p></div><div className="map-actions"><button className="primary-button" type="button" onClick={() => { setScope('selection'); setConfirm(true); }} disabled={!configured || !databaseReady || starting || processingLocally || Boolean(activeId)}>{t('updateSelected')}</button><button className="admin-button" type="button" onClick={() => setSelectedMemberIds([])} disabled={starting}>{t('clearSelection')}</button></div></section>}
+    <section className="matrikkel-member-picker" aria-labelledby="matrikkel-member-title"><div><p className="eyebrow">{t('single')}</p><h2 id="matrikkel-member-title">{t('chooseTitle')}</h2><p>{t('chooseHelp')}</p></div><div className="matrikkel-member-fields"><label>{t('search')}<input type="search" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} placeholder={t('searchPlaceholder')} maxLength={100} /></label><div className="select-action-row"><label>{t('member')}<select value={selectedMemberId} onChange={(event) => { setSelectedMemberId(event.target.value); setSelectedMemberIds([]); }}><option value="">{t('choose')}</option>{visibleMembers.map((member) => <option key={member.id} value={member.id}>{memberLabel(member, t)}{member.cadastral_number ? ` · ${member.cadastral_number}` : ''}</option>)}</select></label><button className="primary-button" type="button" onClick={() => { setScope('member'); setConfirm(true); }} disabled={!selectedMember || !configured || !databaseReady || starting || processingLocally || Boolean(activeId)}>{t('updateMember')}</button></div>{memberSearch && !visibleMembers.length && <p className="form-error" role="status">{t('noResults')}</p>}</div></section>
+    {!configured && <p className="form-error" role="alert">{t('apiMissing')}</p>}
+    {!databaseReady && <p className="form-error" role="alert">{t('databaseMissing')}</p>}
     {message && <p className="form-error" role="alert">{message}</p>}
-    {current && <section className="matrikkel-status" aria-live="polite"><div><p className="eyebrow">Siste kjøring · {currentScope}</p><h2>{statusLabels[current.status] || current.status}</h2><p>Startet av {current.requested_by}</p></div><dl><div><dt>Behandlet</dt><dd>{current.processed_count || 0} / {current.total_count || 0}</dd></div><div><dt>Oppdatert</dt><dd>{current.updated_count || 0}</dd></div><div><dt>Uendret</dt><dd>{current.unchanged_count || 0}</dd></div><div><dt>Til kontroll</dt><dd>{current.review_count || 0}</dd></div><div><dt>Feil/hoppet over</dt><dd>{current.error_count || 0}</dd></div><div><dt>Sikkerhetskopiert</dt><dd>{current.backup_count ?? current.total_count ?? 0}</dd></div></dl>{current.error_message && <p className="form-error">{current.error_message}</p>}</section>}
-    {active?.items?.length > 0 && <div className="admin-table-scroll" role="region" aria-label="Avvik fra matrikkelsynkronisering" tabIndex={0}><table className="admin-table"><caption>Oppslag som ikke endret medlemsregisteret automatisk.</caption><thead><tr><th>H-nummer</th><th>Status</th><th>Adresse</th><th>Forslag</th><th>Melding</th><th>Handling</th></tr></thead><tbody>{active.items.map((item) => <tr key={item.member_id}><th scope="row">{item.h_number}</th><td>{item.status}</td><td>{item.source_address || 'Mangler'}</td><td>{item.proposed_values ? `${item.proposed_values.cadastral_number || ''} · ${item.proposed_values.title_holder || 'Ingen eier'}` : 'Ingen'}</td><td>{item.message}</td><td>{item.status === 'review' && item.proposed_values && <button className="admin-button" type="button" onClick={() => approve(item)}>Godkjenn</button>}</td></tr>)}</tbody></table></div>}
-    {runs.length > 0 && <section className="matrikkel-history"><h2>Tidligere kjøringer</h2><ul>{runs.map((run) => <li key={run.id}><button className="matrikkel-history-open" type="button" onClick={() => { setActiveId(run.id); setActive(run); }}>{new Date(run.created_at).toLocaleString('nb-NO')} · {statusLabels[run.status] || run.status} · {run.processed_count || 0}/{run.total_count}</button>{!['pending', 'running'].includes(run.status) && <button className="matrikkel-history-delete" type="button" onClick={() => setDeleteCandidate(run)} aria-label={`Fjern kjøringen fra ${new Date(run.created_at).toLocaleString('nb-NO')} fra loggen`}>Slett</button>}</li>)}</ul></section>}
-    <ConfirmDialog open={confirm} title={scope === 'test' ? 'Teste med H-nummer 25?' : scope === 'member' ? `Oppdatere ${selectedMember ? memberLabel(selectedMember) : 'valgt medlem'}?` : scope === 'selection' ? `Oppdatere ${selectedMemberIds.length} valgte medlemmer?` : 'Synkronisere alle medlemmer?'} description={scope === 'member' ? 'Bare dette medlemmet tas med. Det tas først en sikkerhetskopi av feltene som kan endres; usikre treff legges til kontroll.' : scope === 'selection' ? 'Bare det valgte utvalget tas med. Utvalget låses før kjøringen, og feltene sikkerhetskopieres først.' : 'Det tas først en sikkerhetskopi av feltene som kan endres. Sikre treff oppdateres automatisk; usikre treff legges til kontroll.'} confirmLabel={scope === 'test' ? 'Start test' : scope === 'member' ? 'Oppdater medlem' : scope === 'selection' ? 'Oppdater utvalg' : 'Synkroniser alle'} busy={starting} onCancel={() => setConfirm(false)} onConfirm={start} />
-    <ConfirmDialog open={confirmStop} title="Stoppe matrikkelkjøringen?" description="Ingen flere medlemmer blir behandlet. Endringer som allerede er fullført beholdes, og sikkerhetskopien og historikken slettes ikke." confirmLabel="Stopp kjøring" busy={starting} onCancel={() => setConfirmStop(false)} onConfirm={stop} />
-    <ConfirmDialog open={Boolean(deleteCandidate)} title="Fjerne kjøringen fra loggen?" description="Kjøringen skjules fra oversikten. Backup og revisjonsdata beholdes i databasen." confirmLabel="Slett fra loggen" busy={starting} onCancel={() => setDeleteCandidate(null)} onConfirm={removeRun} />
+    {current && <section className="matrikkel-status" aria-live="polite"><div><p className="eyebrow">{t('latest', {scope: currentScope})}</p><h2>{t(`statuses.${current.status}`, {}, current.status)}</h2><p>{t('startedBy', {user: current.requested_by})}</p></div><dl><div><dt>{t('processed')}</dt><dd>{current.processed_count || 0} / {current.total_count || 0}</dd></div><div><dt>{t('updated')}</dt><dd>{current.updated_count || 0}</dd></div><div><dt>{t('unchanged')}</dt><dd>{current.unchanged_count || 0}</dd></div><div><dt>{t('review')}</dt><dd>{current.review_count || 0}</dd></div><div><dt>{t('errors')}</dt><dd>{current.error_count || 0}</dd></div><div><dt>{t('backedUp')}</dt><dd>{current.backup_count ?? current.total_count ?? 0}</dd></div></dl>{current.error_message && <p className="form-error">{current.error_message}</p>}</section>}
+    {active?.items?.length > 0 && <div className="admin-table-scroll" role="region" aria-label={t('deviations')} tabIndex={0}><table className="admin-table"><caption>{t('deviationsCaption')}</caption><thead><tr><th>{t('hNumberLabel')}</th><th>{t('status')}</th><th>{t('address')}</th><th>{t('proposal')}</th><th>{t('message')}</th><th>{t('action')}</th></tr></thead><tbody>{active.items.map((item) => <tr key={item.member_id}><th scope="row">{item.h_number}</th><td>{item.status}</td><td>{item.source_address || t('missing')}</td><td>{item.proposed_values ? `${item.proposed_values.cadastral_number || ''} · ${item.proposed_values.title_holder || t('noOwner')}` : t('none')}</td><td>{item.message}</td><td>{item.status === 'review' && item.proposed_values && <button className="admin-button" type="button" onClick={() => approve(item)}>{t('approve')}</button>}</td></tr>)}</tbody></table></div>}
+    {runs.length > 0 && <section className="matrikkel-history"><h2>{t('history')}</h2><ul>{runs.map((run) => { const date = new Date(run.created_at).toLocaleString(formatLocale); return <li key={run.id}><button className="matrikkel-history-open" type="button" onClick={() => { setActiveId(run.id); setActive(run); }}>{date} · {t(`statuses.${run.status}`, {}, run.status)} · {run.processed_count || 0}/{run.total_count}</button>{!['pending', 'running'].includes(run.status) && <button className="matrikkel-history-delete" type="button" onClick={() => setDeleteCandidate(run)} aria-label={t('removeRun', {date})}>{t('delete')}</button>}</li>; })}</ul></section>}
+    <ConfirmDialog open={confirm} title={scope === 'test' ? t('confirmTest') : scope === 'member' ? t('confirmMember', {member: selectedMember ? memberLabel(selectedMember, t) : t('selectedMemberFallback')}) : scope === 'selection' ? t('confirmSelection', {count: selectedMemberIds.length}) : t('confirmAll')} description={scope === 'member' ? t('memberDescription') : scope === 'selection' ? t('selectionDescription') : t('allDescription')} confirmLabel={scope === 'test' ? t('startTest') : scope === 'member' ? t('updateOne') : scope === 'selection' ? t('updateSelection') : t('syncAll')} busy={starting} onCancel={() => setConfirm(false)} onConfirm={start} />
+    <ConfirmDialog open={confirmStop} title={t('confirmStop')} description={t('stopDescription')} confirmLabel={t('stop')} busy={starting} onCancel={() => setConfirmStop(false)} onConfirm={stop} />
+    <ConfirmDialog open={Boolean(deleteCandidate)} title={t('confirmRemove')} description={t('removeDescription')} confirmLabel={t('removeConfirm')} busy={starting} onCancel={() => setDeleteCandidate(null)} onConfirm={removeRun} />
   </>;
 }

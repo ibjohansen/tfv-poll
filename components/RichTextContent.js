@@ -1,10 +1,12 @@
 import { createElement } from 'react';
 import { sanitizeRichText } from '@/lib/rich-text';
+import { useI18n } from '@/components/LocaleProvider';
 
 const tags = { paragraph: 'p', blockquote: 'blockquote', bulletList: 'ul', orderedList: 'ol', listItem: 'li', hardBreak: 'br' };
 export default function RichTextContent({ value }) {
+  const { t } = useI18n('cms.common');
   let document;
-  try { document = sanitizeRichText(value); } catch { return <p>Artikkelteksten kunne ikke vises.</p>; }
+  try { document = sanitizeRichText(value); } catch { return <p>{t('richTextError')}</p>; }
   function render(node, key) {
     if (node.type === 'text') {
       return (node.marks || []).reduce((text, mark, index) => mark.type === 'link'

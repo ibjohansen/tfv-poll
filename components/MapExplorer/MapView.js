@@ -4,13 +4,23 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { TURUFJELL_CENTER } from '@/lib/map/geo';
-import { BACKGROUND_MAP } from '@/lib/map/sources';
+import { BACKGROUND_MAP, BUILDING_MAP } from '@/lib/map/sources';
+import { useI18n } from '@/components/LocaleProvider';
 
 const latLng = ([lon, lat]) => [lat, lon];
 
+function syncBuildingLayer(map, layer, visible) {
+  const shouldShow = visible && map.getZoom() >= BUILDING_MAP.minZoom;
+  if (shouldShow && !map.hasLayer(layer)) layer.addTo(map);
+  if (!shouldShow && map.hasLayer(layer)) map.removeLayer(layer);
+}
+
 export default function MapView({ vertices, drawing, editing, onVerticesChange, addresses = [], roads = [], registerPoints = [], boundaries = [], hamlets = [], layers, selected, onSelect, onError }) {
+  const { t } = useI18n('map.admin');
   const container = useRef(null);
   const mapRef = useRef(null);
+  const buildingLayer = useRef(null);
+  const buildingsVisible = useRef(Boolean(layers.buildings));
   const overlay = useRef(null);
   const latest = useRef(null);
 
@@ -24,9 +34,32 @@ export default function MapView({ vertices, drawing, editing, onVerticesChange, 
     }).addTo(map);
     let warned = false;
     tiles.on('tileerror', () => {
-      if (!warned) latest.current.onError('Bakgrunnskartet kunne ikke lastes. Last siden på nytt for å prøve igjen.');
+      if (!warned) latest.current.onError(t('tileError'));
       warned = true;
     });
+    map.createPane('buildingPane');
+    map.getPane('buildingPane').style.zIndex = '250';
+    map.getPane('buildingPane').style.pointerEvents = 'none';
+    const buildings = L.tileLayer.wms(BUILDING_MAP.url, {
+      attribution: BUILDING_MAP.attribution,
+      layers: BUILDING_MAP.layers,
+      version: BUILDING_MAP.version,
+      format: BUILDING_MAP.format,
+      transparent: true,
+      maxZoom: BUILDING_MAP.maxZoom,
+      opacity: BUILDING_MAP.opacity,
+      pane: 'buildingPane',
+      updateWhenIdle: true,
+      keepBuffer: 1,
+    });
+    let buildingWarned = false;
+    buildings.on('tileerror', () => {
+      if (!buildingWarned) latest.current.onError(t('buildingTileError'));
+      buildingWarned = true;
+    });
+    buildingLayer.current = buildings;
+    const syncBuildings = () => syncBuildingLayer(map, buildings, buildingsVisible.current);
+    map.on('zoomend', syncBuildings);
     overlay.current = L.featureGroup().addTo(map);
     map.on('click', (event) => {
       const current = latest.current;
@@ -34,8 +67,16 @@ export default function MapView({ vertices, drawing, editing, onVerticesChange, 
     });
     const resize = new ResizeObserver(() => map.invalidateSize());
     resize.observe(container.current);
-    return () => { resize.disconnect(); map.remove(); mapRef.current = null; };
-  }, []);
+    return () => { resize.disconnect(); map.off('zoomend', syncBuildings); map.remove(); mapRef.current = null; buildingLayer.current = null; };
+  }, [t]);
+
+  useEffect(() => {
+    buildingsVisible.current = Boolean(layers.buildings);
+    const map = mapRef.current;
+    const buildings = buildingLayer.current;
+    if (!map || !buildings) return;
+    syncBuildingLayer(map, buildings, buildingsVisible.current);
+  }, [layers.buildings]);
 
   useEffect(() => {
     const group = overlay.current;
@@ -47,7 +88,7 @@ export default function MapView({ vertices, drawing, editing, onVerticesChange, 
     if (drawing || editing) vertices.forEach((p, index) => {
       const marker = L.marker(latLng(p), {
         draggable: editing,
-        title: `Polygonpunkt ${index + 1}. Kan også endres i koordinatlisten.`,
+        title: t('vertexTitle', {number: index + 1}),
         icon: L.divIcon({ className: 'map-vertex', html: String(index + 1), iconSize: [26, 26], iconAnchor: [13, 13] }),
       }).addTo(group);
       marker.on('dragend', () => {
@@ -64,7 +105,7 @@ export default function MapView({ vertices, drawing, editing, onVerticesChange, 
         pointToLayer: (_, coordinates) => L.circleMarker(coordinates, { radius: active ? 9 : 6, color: active ? '#b33b24' : color, fillOpacity: 0.9, weight: 2 }),
       }).addTo(group);
       const label = document.createElement('span');
-      label.textContent = `${item.address || item.name || 'Uten navn'} · ${item.source}${item.kind === 'hamlet' && !item.reviewed ? ' · utkast' : ''}`;
+      label.textContent = `${item.address || item.name || t('unnamed')} · ${item.source}${item.kind === 'hamlet' && !item.reviewed ? ` · ${t('draftLabel')}` : ''}`;
       layer.bindTooltip(label);
       layer.on('click', () => { if (!drawing && !editing) onSelect(item); });
     }
@@ -74,7 +115,7 @@ export default function MapView({ vertices, drawing, editing, onVerticesChange, 
     if (layers.roads) roads.forEach((item) => addObject({ type: 'Feature', properties: {}, geometry: item.geometry }, item, '#826736'));
     if (layers.register) registerPoints.forEach((item) => addObject(item.feature, item, '#665493'));
     if (layers.boundaries) boundaries.forEach((item) => addObject(item.feature, item, '#38724b'));
-  }, [vertices, drawing, editing, addresses, roads, registerPoints, boundaries, hamlets, layers, selected, onVerticesChange, onSelect]);
+  }, [vertices, drawing, editing, addresses, roads, registerPoints, boundaries, hamlets, layers, selected, onVerticesChange, onSelect, t]);
 
   useEffect(() => {
     const geometry = selected?.feature?.geometry || selected?.geometry;
@@ -84,10 +125,10 @@ export default function MapView({ vertices, drawing, editing, onVerticesChange, 
   }, [selected]);
 
   return <div>
-    <div ref={container} className="map-explorer-canvas" aria-label="Kart over Turufjell. Polygonet kan også redigeres med koordinatfeltene." />
+    <div ref={container} className="map-explorer-canvas" aria-label={t('canvasLabel')} />
     {drawing && <button type="button" className="admin-button" onClick={() => {
       const center = mapRef.current.getCenter();
       onVerticesChange([...vertices, [center.lng, center.lat]]);
-    }}>Legg til punkt i kartsenter (kartet flyttes med piltastene)</button>}
+    }}>{t('addCenterPoint')}</button>}
   </div>;
 }

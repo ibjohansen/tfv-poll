@@ -15,6 +15,9 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  images: {
+    minimumCacheTTL: 3600,
+  },
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },

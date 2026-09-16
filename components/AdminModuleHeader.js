@@ -2,18 +2,19 @@ import Link from 'next/link';
 import { signOut } from '@/auth';
 import BrandLogo from '@/components/BrandLogo';
 import { getAdminTaskCount } from '@/lib/member-self-service';
+import { getServerI18n } from '@/lib/i18n/server';
 
 export const adminModules = [
-  { href: '/admin', label: 'Oversikt', key: 'overview', icon: 'home' },
-  { href: '/admin/inbox', label: 'Oppgaveliste', key: 'inbox', icon: 'inbox' },
-  { href: '/admin/members', label: 'Medlemsregister', key: 'members', icon: 'members' },
-  { href: '/admin/map', label: 'Kart og registerkontroll', key: 'map', icon: 'web' },
-  { href: '/admin/members/matrikkel', label: 'Matrikkel', key: 'matrikkel', icon: 'members' },
-  { href: '/admin/members/newsletters', label: 'Nyhetsbrev', key: 'newsletters', icon: 'newsletter' },
-  { href: '/admin/surveys', label: 'Undersøkelser', key: 'surveys', icon: 'surveys' },
-  { href: '/admin/web', label: 'Web', key: 'web', icon: 'web' },
-  { href: '/admin/usage', label: 'Bruksstatistikk', key: 'usage', icon: 'usage' },
-  { href: '/admin/audit', label: 'Brukerendringer', key: 'audit', icon: 'audit' },
+  { href: '/admin', key: 'overview', icon: 'home' },
+  { href: '/admin/inbox', key: 'inbox', icon: 'inbox' },
+  { href: '/admin/members', key: 'members', icon: 'members' },
+  { href: '/admin/map', key: 'map', icon: 'web' },
+  { href: '/admin/members/matrikkel', key: 'matrikkel', icon: 'members' },
+  { href: '/admin/members/newsletters', key: 'newsletters', icon: 'newsletter' },
+  { href: '/admin/surveys', key: 'surveys', icon: 'surveys' },
+  { href: '/admin/web', key: 'web', icon: 'web' },
+  { href: '/admin/usage', key: 'usage', icon: 'usage' },
+  { href: '/admin/audit', key: 'audit', icon: 'audit' },
 ];
 
 export function ModuleIcon({ name }) {
@@ -27,15 +28,16 @@ export function ModuleIcon({ name }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3V10Zm6 10v-6h6v6" /></svg>;
 }
 
-function Navigation({ active, taskCount }) {
-  return <nav className="admin-tabs" aria-label="Moduler i Medlemsservice">{adminModules.map((module) => <Link key={module.key} href={module.href} aria-current={active === module.key ? 'page' : undefined}><ModuleIcon name={module.icon} /><span>{module.label}</span>{module.key === 'inbox' && taskCount > 0 && <span className="admin-nav-count" aria-label={`${taskCount} ubehandlede oppgaver`}>{taskCount}</span>}</Link>)}</nav>;
+function Navigation({ active, taskCount, t }) {
+  return <nav className="admin-tabs" aria-label={t('navigation')}>{adminModules.map((module) => <Link key={module.key} href={module.href} aria-current={active === module.key ? 'page' : undefined}><ModuleIcon name={module.icon} /><span>{t(module.key)}</span>{module.key === 'inbox' && taskCount > 0 && <span className="admin-nav-count" aria-label={t('pendingTasks', {count: taskCount})}>{taskCount}</span>}</Link>)}</nav>;
 }
 
-function LogoutButton() {
-  return <form action={async () => { 'use server'; await signOut({ redirectTo: '/admin/login' }); }}><button type="submit" className="admin-button">Logg ut</button></form>;
+function LogoutButton({ label }) {
+  return <form action={async () => { 'use server'; await signOut({ redirectTo: '/admin/login' }); }}><button type="submit" className="admin-button">{label}</button></form>;
 }
 
 export default async function AdminModuleHeader({ active, title, email, pendingTaskCount }) {
+  const { t } = await getServerI18n('admin.common');
   const initial = email?.trim().charAt(0).toUpperCase() || 'T';
   let taskCount = pendingTaskCount;
   if (!Number.isInteger(taskCount)) {
@@ -43,14 +45,14 @@ export default async function AdminModuleHeader({ active, title, email, pendingT
   }
   return <>
     <aside className="admin-sidebar">
-      <Link className="admin-sidebar-brand" href="/admin"><BrandLogo variant="stacked" decorative className="admin-sidebar-logo" /><strong>Medlemsservice</strong></Link>
-      <Navigation active={active} taskCount={taskCount} />
-      <div className="admin-account"><span className="admin-avatar" aria-hidden="true">{initial}</span><span className="admin-account-email">{email}</span><LogoutButton /></div>
+      <Link className="admin-sidebar-brand" href="/admin"><BrandLogo variant="stacked" decorative className="admin-sidebar-logo" /><strong>{t('memberService')}</strong></Link>
+      <Navigation active={active} taskCount={taskCount} t={t} />
+      <div className="admin-account"><span className="admin-avatar" aria-hidden="true">{initial}</span><span className="admin-account-email">{email}</span><LogoutButton label={t('logout')} /></div>
     </aside>
     <header className="admin-header">
       <details className="admin-mobile-menu">
-        <summary><span className="visually-hidden">Åpne administrasjonsmenyen</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg><strong>Medlemsservice</strong></summary>
-        <div><Navigation active={active} taskCount={taskCount} /><div className="admin-mobile-account"><span>{email}</span><LogoutButton /></div></div>
+        <summary><span className="visually-hidden">{t('openMenu')}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg><strong>{t('memberService')}</strong></summary>
+        <div><Navigation active={active} taskCount={taskCount} t={t} /><div className="admin-mobile-account"><span>{email}</span><LogoutButton label={t('logout')} /></div></div>
       </details>
       <p className="eyebrow">Turufjell Vel</p>
       <h1>{title}</h1>

@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
+import { useI18n } from '@/components/LocaleProvider';
 
 const AUTOPLAY_DELAY_MS = 4000;
 
@@ -22,6 +23,7 @@ function PauseIcon({ paused }) {
 }
 
 export default function HomeHeroCarousel({ images }) {
+  const { t } = useI18n('public.carousel');
   const [activeIndex, setActiveIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [hasFocusWithin, setHasFocusWithin] = useState(false);
@@ -72,8 +74,8 @@ export default function HomeHeroCarousel({ images }) {
   return (
     <section
       className="home-hero-carousel relative flex min-h-[clamp(26rem,60vh,46rem)] w-full items-end overflow-hidden bg-primary focus-visible:outline-3 focus-visible:outline-offset-[-3px] focus-visible:outline-white"
-      aria-roledescription="karusell"
-      aria-label="Bilder fra Turufjell"
+      aria-roledescription={t('role')}
+      aria-label={t('label')}
       tabIndex={0}
       onKeyDown={handleKeyDown}
       onMouseEnter={() => setIsHovered(true)}
@@ -82,44 +84,35 @@ export default function HomeHeroCarousel({ images }) {
       onBlurCapture={handleBlur}
     >
       <div className="absolute inset-0" aria-live="off">
-        {images.map((image, index) => {
-          const isActive = index === activeIndex;
-          return (
-            <div
-              key={image.id}
-              className={`absolute inset-0 transition-opacity duration-700 ease-out ${isActive ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-              aria-hidden={!isActive}
-            >
-              <Image
-                src={image.src}
-                alt={isActive ? (image.photographer ? `Turufjell. Foto: ${image.photographer}` : 'Utsikt over fjellandskapet på Turufjell') : ''}
-                fill
-                sizes="100vw"
-                preload={index === 0}
-                className="object-cover object-center"
-              />
-            </div>
-          );
-        })}
+        <div key={activeImage.id} className="absolute inset-0">
+          <Image
+            src={activeImage.src}
+            alt={activeImage.photographer ? t('imageAlt', {name: activeImage.photographer}) : t('landscapeAlt')}
+            fill
+            sizes="100vw"
+            preload={activeIndex === 0}
+            className="object-cover object-center"
+          />
+        </div>
       </div>
 
       <div className="absolute inset-0 bg-linear-to-t from-[#493F39]/85 via-[#493F39]/15 to-transparent" aria-hidden="true" />
 
       {imageCount > 1 && (
         <>
-          <button className="home-carousel-arrow home-carousel-arrow-left" type="button" onClick={showPrevious} aria-label="Forrige bilde" title="Forrige bilde">
+          <button className="home-carousel-arrow home-carousel-arrow-left" type="button" onClick={showPrevious} aria-label={t('previous')} title={t('previous')}>
             <Chevron direction="left" />
           </button>
-          <button className="home-carousel-arrow home-carousel-arrow-right" type="button" onClick={showNext} aria-label="Neste bilde" title="Neste bilde">
+          <button className="home-carousel-arrow home-carousel-arrow-right" type="button" onClick={showNext} aria-label={t('next')} title={t('next')}>
             <Chevron direction="right" />
           </button>
-          <div className="home-carousel-controls" role="group" aria-label="Velg bilde">
+          <div className="home-carousel-controls" role="group" aria-label={t('choose')}>
             <button
               className="home-carousel-pause"
               type="button"
               onClick={() => setIsPaused((current) => !current)}
-              aria-label={isPaused ? 'Start automatisk bildebytte' : 'Pause automatisk bildebytte'}
-              title={isPaused ? 'Start automatisk bildebytte' : 'Pause automatisk bildebytte'}
+              aria-label={isPaused ? t('play') : t('pause')}
+              title={isPaused ? t('play') : t('pause')}
             >
               <PauseIcon paused={isPaused} />
             </button>
@@ -130,9 +123,9 @@ export default function HomeHeroCarousel({ images }) {
                   className="home-carousel-dot"
                   type="button"
                   onClick={() => setActiveIndex(index)}
-                  aria-label={`Vis bilde ${index + 1} av ${imageCount}`}
+                  aria-label={t('image', {current: index + 1, total: imageCount})}
                   aria-current={index === activeIndex ? 'true' : undefined}
-                  title={`Bilde ${index + 1}`}
+                  title={t('imageTitle', {current: index + 1})}
                 />
               ))}
             </span>
@@ -141,13 +134,13 @@ export default function HomeHeroCarousel({ images }) {
       )}
 
       <div className="relative mx-auto w-full max-w-7xl px-5 pt-12 pb-20 text-white sm:px-8 sm:pt-16 sm:pb-20 lg:px-12 lg:pt-20 lg:pb-24">
-        <p className="text-xs font-semibold tracking-[0.2em] text-white/70 uppercase">Turufjell Vel</p>
-        <h1 id="home-title" className="mt-4 max-w-3xl text-4xl leading-[1.04] font-light tracking-[-0.035em] sm:text-6xl lg:text-7xl">Fellesskap på fjellet</h1>
-        <p className="mt-5 max-w-2xl text-base leading-7 text-white/80 sm:text-lg">Vi samordner og ivaretar medlemmenes interesser i og omkring Turufjell hytteområde.</p>
+        <p className="text-xs font-semibold tracking-[0.2em] text-white/70 uppercase">{t('eyebrow')}</p>
+        <h1 id="home-title" className="mt-4 max-w-3xl text-4xl leading-[1.04] font-light tracking-[-0.035em] sm:text-6xl lg:text-7xl">{t('title')}</h1>
+        <p className="mt-5 max-w-2xl text-base leading-7 text-white/80 sm:text-lg">{t('introduction')}</p>
       </div>
 
-      {activeImage.photographer && <p className="home-carousel-credit">Foto: {activeImage.photographer}</p>}
-      <p className="visually-hidden">Bilde {activeIndex + 1} av {imageCount}</p>
+      {activeImage.photographer && <p className="home-carousel-credit">{t('photographer', {name: activeImage.photographer})}</p>}
+      <p className="visually-hidden">{t('image', {current: activeIndex + 1, total: imageCount})}</p>
     </section>
   );
 }

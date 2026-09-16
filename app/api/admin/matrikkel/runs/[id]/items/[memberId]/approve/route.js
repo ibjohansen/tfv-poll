@@ -1,12 +1,14 @@
 import { apiErrorStatus } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { approveMatrikkelItem } from '@/lib/matrikkel-sync';
+import { getRequestI18n } from '@/lib/i18n/request';
 
 export const runtime = 'nodejs';
 
 export async function POST(request, { params }) {
+  const { t } = getRequestI18n(request, 'backend');
   if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) {
-    return NextResponse.json({ ok: false, message: 'Ugyldig forespørsel.' }, { status: 403 });
+    return NextResponse.json({ ok: false, message: t('api.invalidRequest') }, { status: 403 });
   }
   try {
     const values = await params;
@@ -15,6 +17,6 @@ export async function POST(request, { params }) {
   } catch (error) {
     const status = apiErrorStatus(error, 403);
     console.error('Matrikkel review approval failed', { message: error.message, code: error.code || error.cause?.code });
-    return NextResponse.json({ ok: false, message: status === 403 ? 'Du har ikke tilgang.' : 'Kunne ikke godkjenne oppslaget.' }, { status });
+    return NextResponse.json({ ok: false, message: t(status === 403 ? 'api.forbidden' : 'adminMatrikkel.approve') }, { status });
   }
 }

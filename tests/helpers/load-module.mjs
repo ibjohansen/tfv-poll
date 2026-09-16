@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { createContext, SourceTextModule, SyntheticModule } from 'node:vm';
 import { NextRequest, NextResponse } from 'next/server.js';
 import { apiErrorStatus, readJsonObject } from '../../lib/api-errors.js';
+import { getRequestI18n } from '../../lib/i18n/request.js';
+import { LOCALE_COOKIE, normalizeLocale } from '../../lib/i18n/config.js';
 
 // Execute the actual source with explicit dependencies. Never fall back to a
 // real database, mail provider, auth provider or network from a route test.
@@ -15,7 +17,11 @@ export async function loadModule(path, dependencies = {}, globals = {}) {
     fetch: () => { throw new Error('Unexpected network access in test'); },
     ...globals,
   });
-  const imports = { 'server-only': {}, 'next/server': { NextResponse }, '@/lib/api-errors': { apiErrorStatus, readJsonObject }, ...dependencies };
+  const imports = {
+    'server-only': {}, 'next/server': { NextResponse }, '@/lib/api-errors': { apiErrorStatus, readJsonObject },
+    '@/lib/i18n/request': { getRequestI18n }, './lib/i18n/request': { getRequestI18n },
+    './lib/i18n/config': { LOCALE_COOKIE, normalizeLocale }, ...dependencies,
+  };
   const mocks = new Map();
   function dependency(specifier) {
     if (mocks.has(specifier)) return mocks.get(specifier);

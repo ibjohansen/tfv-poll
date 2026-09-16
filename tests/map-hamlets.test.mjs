@@ -40,6 +40,7 @@ async function service({ denied, mock = false, failure, rows = [row] } = {}) {
     '../db.js': { getSql: () => ({ query: async (text, args) => { calls.push({ text, args }); if (failure) throw failure;
       return rows; } }) },
     '../mock-store.js': { isMockMode: () => mock }, './geo.js': { MapError }, './hamlets.js': hamlets,
+    '../public-content-cache.js': { revalidatePublicHamlets: () => {} },
   });
   return { ...api, calls };
 }
@@ -76,7 +77,7 @@ test('stale version, deletion, duplicate names and failed audit never report suc
   const missing = await service({ rows: [] });
   await assert.rejects(missing.saveMapHamlet({ ...input, action: 'save', id: '1', version: 1 }), (e) => e.status === 409);
   const duplicate = await service({ failure: Object.assign(new Error('duplicate'), { code: '23505' }) });
-  await assert.rejects(duplicate.saveMapHamlet(input), (e) => e.status === 409 && /allerede/.test(e.message));
+  await assert.rejects(duplicate.saveMapHamlet(input), (e) => e.status === 409 && e.code === 'errors.hamletDuplicate');
   const failure = await service({ failure: new Error('audit failed') });
   await assert.rejects(failure.saveMapHamlet(input), /audit failed/);
 });
@@ -86,7 +87,8 @@ test('actual hamlet GET/POST routes enforce auth, CSRF, limits and private respo
     let calls = 0;
     const { handleMapRequest } = await loadModule('lib/map/api.js', {
       '../admin-access.js': { requirePermission: async () => { if (denied) throw new Error(denied); return { email: 'test@example.test' }; } },
-      '../rate-limit.js': { isRateLimited: () => false }, './geo.js': { MapError }, './http.js': { readLimitedJson },
+      '../rate-limit.js': { isRateLimited: () => false }, '../i18n/request.js': { getRequestI18n: () => ({ locale: 'nb', t: (key, values, fallback) => fallback || key }) },
+      './geo.js': { MapError }, './http.js': { readLimitedJson },
     });
     const route = await loadModule('app/api/admin/map/hamlets/route.js', {
       'next/server': { after: () => {} },

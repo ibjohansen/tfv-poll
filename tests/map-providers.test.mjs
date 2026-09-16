@@ -86,7 +86,7 @@ test('external failures are retried once, rate limits are not retried, and raw e
   } });
   assert.equal(result.ok, true); assert.equal(attempts, 2);
   attempts = 0;
-  await assert.rejects(fetchMapJson('https://example.test', { source: 'Kartverket', fetchImpl: async () => { attempts += 1; return new Response('private', { status: 429 }); } }), /opptatt/);
+  await assert.rejects(fetchMapJson('https://example.test', { source: 'Kartverket', fetchImpl: async () => { attempts += 1; return new Response('private', { status: 429 }); } }), (error) => error.code === 'errors.sourceBusy');
   assert.equal(attempts, 1);
   await assert.rejects(fetchMapJson('https://example.test', { source: 'Kartverket', fetchImpl: async () => { throw new Error('SECRET'); } }), (e) => !e.message.includes('SECRET'));
 });

@@ -1,12 +1,14 @@
 import { apiErrorStatus } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { cancelMatrikkelRun, deleteMatrikkelRunLog } from '@/lib/matrikkel-sync';
+import { getRequestI18n } from '@/lib/i18n/request';
 
 export const runtime = 'nodejs';
 
 export async function DELETE(request, { params }) {
+  const { t } = getRequestI18n(request, 'backend');
   if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) {
-    return NextResponse.json({ ok: false, message: 'Ugyldig forespørsel.' }, { status: 403 });
+    return NextResponse.json({ ok: false, message: t('api.invalidRequest') }, { status: 403 });
   }
   try {
     const action = request.nextUrl.searchParams.get('action');
@@ -21,10 +23,10 @@ export async function DELETE(request, { params }) {
       message: error.message,
       code: error.code || error.cause?.code,
     });
-    const message = status === 403 ? 'Du har ikke tilgang til matrikkelsynkronisering.'
-      : status === 404 ? 'Kjøringen finnes ikke.'
-        : error.message === 'Run still active' ? 'En aktiv kjøring må stoppes før den kan fjernes fra loggen.'
-          : status === 409 ? 'Kjøringen er allerede avsluttet.' : 'Kunne ikke endre kjøringen.';
+    const message = t(status === 403 ? 'adminMatrikkel.forbidden'
+      : status === 404 ? 'adminMatrikkel.missing'
+        : error.message === 'Run still active' ? 'adminMatrikkel.active'
+          : status === 409 ? 'adminMatrikkel.finished' : 'adminMatrikkel.change');
     return NextResponse.json({ ok: false, message }, { status, headers: { 'Cache-Control': 'no-store' } });
   }
 }

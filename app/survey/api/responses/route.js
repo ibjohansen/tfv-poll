@@ -6,6 +6,7 @@ import {
   submitSurveyResponse, surveySessionCookieName,
 } from '@/lib/membership';
 import { isRateLimited } from '@/lib/rate-limit';
+import { getRequestI18n } from '@/lib/i18n/request';
 
 export const runtime = 'nodejs';
 
@@ -33,10 +34,11 @@ function accessErrorStatus(status) {
 }
 
 export async function POST(request) {
-  if (!hasValidOrigin(request)) return reply({ ok: false, message: 'Ugyldig forespørsel.' }, 403);
-  if (isRateLimited(request)) return reply({ ok: false, message: 'For mange forespørsler. Prøv igjen om litt.' }, 429);
+  const { t } = getRequestI18n(request, 'backend');
+  if (!hasValidOrigin(request)) return reply({ ok: false, message: t('api.invalidRequest') }, 403);
+  if (isRateLimited(request)) return reply({ ok: false, message: t('api.tooManyRequests') }, 429);
   const body = await request.json().catch(() => null);
-  if (!body || typeof body !== 'object' || Array.isArray(body)) return reply({ ok: false, message: 'Ugyldig forespørsel.' }, 400);
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return reply({ ok: false, message: t('api.invalidRequest') }, 400);
 
   try {
     const secret = (await cookies()).get(surveySessionCookieName())?.value;
@@ -48,24 +50,24 @@ export async function POST(request) {
     }
     if (body.website) return reply({ ok: true }, 200);
     if (!Number.isSafeInteger(body.questionVersion) || body.questionVersion < 1 || body.questionVersion > 2147483647) {
-      return reply({ ok: false, message: 'Last inn undersøkelsen på nytt før du sender inn svaret.' }, 400);
+      return reply({ ok: false, message: t('survey.reload') }, 400);
     }
     if (body.questionVersion !== access.survey.question_version) {
-      return reply({ ok: false, code: 'SURVEY_CHANGED', message: 'Spørsmålene er endret siden du åpnet skjemaet. Last inn undersøkelsen på nytt og svar på de oppdaterte spørsmålene.' }, 409);
+      return reply({ ok: false, code: 'SURVEY_CHANGED', message: t('survey.changed') }, 409);
     }
     if (!hasValidAnswers(body.answers, access.survey.questions)) {
-      return reply({ ok: false, message: 'Alle spørsmål må besvares.' }, 400);
+      return reply({ ok: false, message: t('survey.allRequired') }, 400);
     }
     const result = isMockMode()
       ? await submitMockSurveyResponse(body.mockToken, body.mockSurveyId, body.answers)
       : await submitSurveyResponse(secret, body.answers, { questionVersion: body.questionVersion });
-    if (!result.saved) return reply({ ok: false, code: 'SURVEY_CONFLICT', message: 'Svaret ble ikke lagret. Undersøkelsen eller tilgangen kan ha endret seg, eller tomten har allerede svart. Last inn undersøkelsen på nytt.' }, 409);
+    if (!result.saved) return reply({ ok: false, code: 'SURVEY_CONFLICT', message: t('survey.conflict') }, 409);
     const response = reply({ ok: true }, 201);
     if (!isMockMode()) response.cookies.set(surveySessionCookieName(), '', {
       maxAge: 0, path: '/', httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production',
     });
     return response;
   } catch {
-    return reply({ ok: false, message: 'Vi klarte ikke å lagre svaret ditt. Prøv igjen om litt.' }, 500);
+    return reply({ ok: false, message: t('survey.saveFailed') }, 500);
   }
 }

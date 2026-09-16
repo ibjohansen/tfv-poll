@@ -1,16 +1,20 @@
+'use client';
+
 import Image from 'next/image';
 import RichTextContent from '@/components/RichTextContent';
 import { fileTypeLabel, formatFileSize } from '@/lib/file-format';
+import { useI18n } from '@/components/LocaleProvider';
 
 function paragraphs(text) {
   return String(text || '').split(/\n+/).map((paragraph) => paragraph.trim()).filter(Boolean);
 }
 
 export default function CmsPageView({ page, preview = false }) {
+  const { t, formatLocale } = useI18n('cms');
   return (
     <article className="cms-article">
       <header className="cms-article-header">
-        <p className="eyebrow">{page.category}</p>
+        <p className="eyebrow">{t(`categories.${page.category}`, {}, page.category)}</p>
         <h1>{page.title}</h1>
         {page.intro && <div className="cms-article-intro">{paragraphs(page.intro).map((text, index) => <p key={index}>{text}</p>)}</div>}
       </header>
@@ -28,13 +32,13 @@ export default function CmsPageView({ page, preview = false }) {
 
       {page.attachments?.length > 0 && (
         <section className="cms-documents" aria-labelledby="cms-documents-title">
-          <h2 id="cms-documents-title">Dokumenter</h2>
+          <h2 id="cms-documents-title">{t('common.documents')}</h2>
           <ul>
             {page.attachments.map((file) => (
               <li key={file.id}>
                 <a href={`${file.url}?download=1`}>
                   <span className="cms-document-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7V3Zm7 0v5h5M9.5 13h6M9.5 17h6" /></svg></span>
-                  <span><strong>{file.title}</strong><small>{fileTypeLabel(file.mime_type, file.original_filename)} · {formatFileSize(file.size_bytes)}</small></span>
+                  <span><strong>{file.title}</strong><small>{fileTypeLabel(file.mime_type, file.original_filename, t('common.file'))} · {formatFileSize(file.size_bytes, formatLocale)}</small></span>
                   <svg className="cms-download-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 20h14" /></svg>
                 </a>
               </li>

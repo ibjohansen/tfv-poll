@@ -6,11 +6,13 @@ import AdminModuleHeader from '@/components/AdminModuleHeader';
 import { getAdminAuditLog, getAuditedTables } from '@/lib/admin-audit';
 import { isAllowedAdmin, isAuthConfigured } from '@/lib/admin-policy';
 import { normalizeAuditFilters } from '@/lib/audit-filters';
+import { getServerI18n } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export default async function AdminAuditPage({ searchParams }) {
+  const { t } = await getServerI18n();
   if (!isAuthConfigured()) redirect('/admin/login');
   const session = await auth();
   if (!isAllowedAdmin(session?.user)) redirect('/admin/login');
@@ -32,5 +34,5 @@ export default async function AdminAuditPage({ searchParams }) {
     filterError = error.message.startsWith('Invalid audit date');
     data = null;
   }
-  return <main className="admin-shell"><AdminModuleHeader active="audit" title="Brukerendringer" email={session.user.email} /><section className="admin-content">{data ? <AdminAuditLog data={data} filters={filters} tables={tables} /> : <p className="form-error" role="alert">{filterError ? <>Datointervallet er ugyldig. <Link href="/admin/audit">Nullstill filtrene</Link>.</> : 'Endringsloggen er midlertidig utilgjengelig. Kontroller at databaseskjemaet er oppdatert.'}</p>}</section></main>;
+  return <main className="admin-shell"><AdminModuleHeader active="audit" title={t('admin.common.audit')} email={session.user.email} /><section className="admin-content">{data ? <AdminAuditLog data={data} filters={filters} tables={tables} /> : <p className="form-error" role="alert">{filterError ? <>{t('admin.pages.invalidDates')} <Link href="/admin/audit">{t('admin.pages.resetFilters')}</Link>.</> : t('admin.pages.auditUnavailable')}</p>}</section></main>;
 }

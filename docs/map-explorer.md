@@ -139,8 +139,10 @@ konteksten; den må ikke ha `NEXT_PUBLIC_`-prefiks.
 ### Offentlig kart på forsiden
 
 Forsiden viser bare grender med lagret og manuelt kontrollert polygon. Ingen
-grend er valgt ved innlasting. Én knapp per grend velger og zoomer området;
-samme knapp slår valget av igjen. **Vis eiendommer** gjør et behovsstyrt kall
+grend er valgt ved innlasting. Grendeknappene ligger i to rader; én knapp per
+grend velger og zoomer området, og samme knapp slår valget av igjen. Kartkode og
+Kartverket-fliser lastes først når kartseksjonen nærmer seg synsfeltet.
+**Vis eiendommer** ligger under kartet og gjør et behovsstyrt kall
 til `GET /api/map/hamlets/[id]/properties`; alle grender og Kartverket-adresser
 forhåndshentes derfor ikke ved vanlig sidevisning.
 
@@ -223,6 +225,74 @@ Ingen fliser forhåndslastes eller eksporteres. CSP tillater bare den konkrete
 kartvertens bilder i tillegg til eksisterende bildekilder. Global
 `Referrer-Policy: no-referrer` er uendret. Kartverket ser vanlige flisforespørsler
 fra nettleseren, ikke registerfelt.
+
+### Detaljert bygningslag
+
+Kartvisningene har et **Bygninger**-lag fra den åpne
+[Topografisk Norgeskart WMS](https://data.norge.no/nb/data-services/68959b9b-1e1e-3ec3-b532-d2dbab6c1ced/topografisk-norgeskart-wms).
+Leaflet ber om det transparente laget `bygning` fra
+`https://wms.geonorge.no/skwms1/wms.topo` med WMS 1.1.1 og EPSG:3857. Laget
+inneholder detaljerte FKB-bygningsflater, men ingen eier- eller
+kontaktopplysninger. Kartverkets presentasjonsregel viser laget rundt målestokk
+1:12 000 og nærmere, derfor aktiverer klienten det først fra zoomnivå 16.
+
+GetCapabilities, CORS og et faktisk GetMap-kall over Turufjell ble kontrollert
+17. september 2026. Tjenesten svarte uten nøkkel med `Access-Control-Allow-Origin:
+*`; testbildet var en transparent PNG med bygningsflater. Katalogoppføringen
+angir CC BY 4.0. Laget er slått på i den offentlige kartvisningen, men blir ikke
+forespurt før kartet er lastet og zoomnivå 16 er nådd. I administratorkartet kan
+laget fortsatt slås av og på. `updateWhenIdle` og en liten Leaflet-buffer
+begrenser antall kall. Synlig Kartverket-attribusjon legges til kartet mens
+laget er aktivt.
+
+Den separate Matrikkelen WMS ble også kontrollert, men avviste anonyme kall og
+krever avtale/autentisering. `Bakgrunnskart for Matrikkelen WMS` er primært en
+intern klienttjeneste der endringer kan skje uten ordinært varsel. Ingen av
+disse brukes til bygningslaget.
+
+### Tilgjengelige Kartverket-lag og mulige kartverktøy
+
+Kartverkets WMTS-capabilities og Topografisk Norgeskart WMS-capabilities ble
+kontrollert 17. september 2026. WMTS-tjenesten annonserer fire ferdig tegnede
+bakgrunnskart: `topo` (farge), `topograatone` (gråtone), `toporaster` (turkart)
+og `sjokartraster` (sjøkart). Dagens løsning bruker `topo`.
+
+Topografisk Norgeskart WMS annonserer 227 navngitte lag på tvers av
+målestokker. Følgende grupper er relevante for Turufjell-løsningen:
+
+- bygninger og anlegg: `bygning`, `bygningspunkt`, `bygningsavgrensning`,
+  `tiltak` og bygningsmessige anlegg
+- samferdsel: `veg`, `vegavgrensning`, `traktorveg_sti`, bru, tunnel og bane
+- terreng: 1- og 5-meters høydekurver, høydepunkt og fjellskygge
+- areal og natur: AR5, arealbruk, vannflater/-konturer og verneområder
+- orientering: adresser, vegnavn, stedsnavn og administrative grenser
+
+Et WMS-lag er et presentasjonsbilde, ikke nødvendigvis et søkbart eller komplett
+analysegrunnlag. Lisens, CORS, aktualitet, målestokkområde og eventuell tilgang
+må derfor kontrolleres per tjeneste før et nytt lag aktiveres. Ortofoto fra
+Norge i bilder krever nå GeoID/token og er ikke egnet som anonymt standardlag
+uten en egen tilgangs- og proxybeslutning. Beskyttet Matrikkel-API eller
+eieropplysninger skal ikke kobles inn i den offentlige klienten.
+
+Dagens offentlige kart har panorering/zoom, valg av grend, behovsstyrt visning
+og valg av eiendom, automatisk bygningslag og fullskjerm. Følgende verktøy kan
+bygges videre uten å bytte Leaflet eller den interne GeoJSON-modellen:
+
+1. bakgrunnsvelger mellom fargekart, gråtone og turkart
+2. lagvelger med synlighet og gjennomsiktighet for høydekurver, stier, vann,
+   verneområder og administrative grenser
+3. adresse- og stedsnavnsøk med zoom til resultat
+4. «min posisjon», koordinatvisning og kopiering av kartkoordinat
+5. måling av avstand og areal
+6. objektinformasjon via WMS `GetFeatureInfo` der tjenesten støtter dette
+7. høydeprofil for tegnet eller valgt rute
+8. delbar URL som lagrer senter, zoom, valgt grend og aktive lag
+9. utskrift/PDF og eksport av valgte, ikke-personlige GeoJSON-objekter
+10. tegnede ruter/markeringer med angre, redigering og eksplisitt lagring
+
+Lagvelger, stedsnavnsøk, måleverktøy og delbar URL er de mest nærliggende
+tiltakene. Høydeprofil, utskrift og ortofoto krever mer kilde- og
+driftsavklaring.
 
 ### OpenStreetMap / Overpass: supplerende veier og stier
 

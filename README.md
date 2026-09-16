@@ -104,6 +104,14 @@ Skissene følger nivåene i [C4-modellen](https://c4model.com/): først systemet
 kontekst, deretter containere (kjørbare eller lagrende deler). Mermaid-diagrammene
 renderes direkte i GitHub og de fleste Markdown-visere.
 
+### Språk og locales
+
+Webgrensesnittet og brukerrettede API-svar støtter norsk bokmål og engelsk.
+Norsk er standard, mens språkvelgeren lagrer valget i en sikker HTTP-only
+cookie. Ordlistene er gruppert etter funksjonsområde under `locales/`; se
+[språkdokumentasjonen](docs/internationalization.md) for struktur, avgrensning
+og fremgangsmåte for nye språk. Ingen ekstra i18n-avhengighet er nødvendig.
+
 ### Systemkontekst
 
 ```mermaid
@@ -575,6 +583,9 @@ Forsidens kart bruker bare kontrollerte grendepolygoner. Eiendommer lastes førs
 når brukeren ber om det, og tabellen under kartet viser H-nummer,
 gårds-/bruksnummer og adresse. Offentlig kartvisning er bevisst adskilt fra
 medlemsdata og viser aldri navn, e-post, telefon, hjemmelshaver eller notater.
+Forsiden viser Kartverkets åpne Topografisk Norgeskart WMS automatisk fra
+zoomnivå 16. Administratorkartet har en valgfri **Bygninger**-bryter. Laget
+endrer ikke kartets klikk-, polygon- eller registerfunksjoner.
 Detaljert kildebruk, koordinatsystemer, avgrensninger og lisenskrav står i
 [kartveiledningen](docs/map-explorer.md).
 
@@ -608,21 +619,30 @@ produksjonsverifikasjon gjenstår.
 De 11 digitaliserte grendene er nå lagret som kontrollerte polygoner i databasen;
 applikasjonen har ikke lenger en separat utkastkatalog.
 Node må kunne nå `ws.geonorge.no` og `overpass-api.de` over HTTPS, og nettleseren
-må kunne hente kartbilder fra `cache.kartverket.no`. CSP er utvidet kun for
-denne bildekilden. Sørg for passende delt/WAF-rate-limit på kartrutene ved
+må kunne hente kartbilder fra `cache.kartverket.no` og det valgfrie, detaljerte
+bygningslaget fra `wms.geonorge.no`. CSP tillater kun disse to eksterne
+bildekildene. Sørg for passende delt/WAF-rate-limit på kartrutene ved
 produksjonsbruk; den lokale 20/minutt-grensen er bare per-instans.
 Se [kartmodulens datakilder, begrensninger og bruk](docs/map-explorer.md).
 
 Forsiden viser kontrollerte grendepolygoner fra `member_hamlets`. Den offentlige
 GET-ruten `/api/map/hamlets/[id]/properties` laster eiendommer først når en grend
 velges. Ingen grend er valgt ved innlasting, og samme grendeknapp slår valget av
-og på. Ruten bruker `members.hamlet_id` som autoritativ avgrensning. Kartverket
+og på. Leaflet og Kartverket-fliser lastes først når kartseksjonen nærmer seg
+synsfeltet. Bygningslaget er aktivert som standard og vises fra zoomnivå 16;
+**Vis eiendommer** ligger under kartet, og kartet har fullskjermsknapp. Ruten
+bruker `members.hamlet_id` som autoritativ avgrensning. Kartverket
 brukes bare til kartplassering av disse registerpostene, ikke til et nytt
 grendeoppslag ved hver visning. Responsen inneholder bare H-nummer,
-gårds-/bruksnummer, adresse og offisiell adressegeometri. Medlems-ID, navn, hjemmelshaver,
-e-post, telefon og interne notater inngår ikke i responsen. Ruten har en lokal
+gårds-/bruksnummer, adresse og offisiell adressegeometri. Medlems-ID, navn,
+hjemmelshaver, e-post, telefon og interne notater inngår ikke i responsen. Ruten har en lokal
 rate-limit på 20 oppslag per minutt og trenger samme delte/WAF-beskyttelse som
 de øvrige offentlige rutene i produksjon. Ingen ny miljøvariabel er nødvendig.
+
+Forsidens CMS-oppslag og grendeliste mellomlagres i fem minutter og invalideres
+ved redigering. Next.js-optimaliserte bilder mellomlagres i minst én time;
+offentlige CMS-filer bruker ETag slik at uendrede filer ikke lastes på nytt fra
+objektlageret ved revalidering.
 
 Eksisterende tomter kan fortsatt kontrolleres manuelt med en tørrkjøring:
 
@@ -983,15 +1003,19 @@ URI i Entra oppdateres. Utløs en ny deploy etter endringen.
 
 ### 6. Utløs produksjonsdeploy
 
-1. Gå til **Deploys** i Netlify.
-2. Velg **Trigger deploy → Deploy site**. Bruk **Clear cache and deploy site**
+1. Gå til **Project configuration → General → Powered by Netlify badge** og slå
+   av merket. Netlify injiserer ellers `/.netlify/scripts/hud` etter at Next.js
+   har generert HTML. Den strenge nonce-baserte CSP-en blokkerer med hensikt
+   dette plattformtillegget; ikke løs det ved å tillate `unsafe-inline`.
+2. Gå til **Deploys** i Netlify.
+3. Velg **Trigger deploy → Deploy site**. Bruk **Clear cache and deploy site**
    hvis forrige bygg ble kjørt før miljøvariablene ble lagt inn.
-3. Kontroller at byggeloggen avsluttes uten feil.
-4. Kontroller at Next.js-funksjonene og
+4. Kontroller at byggeloggen avsluttes uten feil.
+5. Kontroller at Next.js-funksjonene og
    `matrikkel-sync-background`, `hamlet-member-sync-background`, `survey-email-background`, `newsletter-background` og `background-watchdog` finnes i Netlifys
    funksjonsoversikt. Kontroller også at edge-funksjonen
    `public-member-rate-limit` er oppdaget og aktivert i deployloggen.
-5. Kontroller at den publiserte deployen bruker committen som var godkjent i
+6. Kontroller at den publiserte deployen bruker committen som var godkjent i
    GitHub Actions.
 
 Etter at GitHub-repositoriet er koblet til Netlify, utløser senere pushes til

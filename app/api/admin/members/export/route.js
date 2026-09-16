@@ -1,5 +1,6 @@
 import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { createMemberExport } from '@/lib/member-export';
+import { getRequestI18n } from '@/lib/i18n/request';
 
 export const runtime = 'nodejs';
 
@@ -15,7 +16,8 @@ function exportBaseUrl(request) {
 }
 
 export async function POST(request) {
-  if (!sameOrigin(request)) return Response.json({ ok: false, message: 'Ugyldig forespørsel.' }, { status: 403 });
+  const { t } = getRequestI18n(request, 'backend');
+  if (!sameOrigin(request)) return Response.json({ ok: false, message: t('api.invalidRequest') }, { status: 403 });
   try {
     const input = await readJsonObject(request);
     const result = await createMemberExport({ ...input, baseUrl: exportBaseUrl(request) });
@@ -31,9 +33,9 @@ export async function POST(request) {
   } catch (error) {
     const status = apiErrorStatus(error);
     console.error('Admin member export failed', { code: error.code || error.cause?.code, message: error.message });
-    const message = error.message === 'No members selected' ? 'Ingen medlemmer er valgt.'
-      : error.message === 'Survey not found' ? 'Undersøkelsen finnes ikke.'
-        : status === 400 ? 'Kontroller eksportvalgene.' : 'Kunne ikke generere Excel-filen.';
+    const message = error.message === 'No members selected' ? t('adminMembers.noSelection')
+      : error.message === 'Survey not found' ? t('adminMembers.surveyMissing')
+        : status === 400 ? t('adminMembers.exportCheck') : t('adminMembers.export');
     return Response.json({ ok: false, message }, { status, headers: { 'Cache-Control': 'no-store' } });
   }
 }

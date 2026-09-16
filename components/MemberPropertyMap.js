@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useI18n } from '@/components/LocaleProvider';
 
 const PLACE_NAME = 'Flå';
 
@@ -18,8 +19,8 @@ function mapUrl(streetAddress, coordinates) {
   return `https://norgeskart.no/#!?${parameters}`;
 }
 
-function MapFrame({ coordinates, streetAddress, title }) {
-  if (coordinates === undefined) return <div className="member-map-loading" role="status">Finner eiendommen …</div>;
+function MapFrame({ coordinates, streetAddress, title, loadingLabel }) {
+  if (coordinates === undefined) return <div className="member-map-loading" role="status">{loadingLabel}</div>;
   return (
     <iframe
       className="member-map-frame"
@@ -33,6 +34,7 @@ function MapFrame({ coordinates, streetAddress, title }) {
 }
 
 export default function MemberPropertyMap({ streetAddress }) {
+  const { t } = useI18n('members.propertyMap');
   const [coordinates, setCoordinates] = useState();
 
   useEffect(() => {
@@ -64,13 +66,13 @@ export default function MemberPropertyMap({ streetAddress }) {
     <details className="member-map">
       <summary className="member-map-heading">
         <div>
-          <strong>Eiendomskart</strong>
+          <strong>{t('title')}</strong>
           <span>{streetAddress}, {PLACE_NAME}</span>
         </div>
-        <span className="member-map-toggle" aria-hidden="true">Vis kart</span>
+        <span className="member-map-toggle" aria-hidden="true">{t('show')}</span>
       </summary>
-      <div className="member-map-content"><MapFrame coordinates={coordinates} streetAddress={streetAddress} title={`Eiendomskart for ${streetAddress}, ${PLACE_NAME}`} />
-        <a className="member-map-source" href={mapUrl(streetAddress, coordinates)} target="_blank" rel="noreferrer">Åpne i Norgeskart</a></div>
+      <div className="member-map-content"><MapFrame coordinates={coordinates} streetAddress={streetAddress} title={t('frameTitle', {address: streetAddress})} loadingLabel={t('loading')} />
+        <a className="member-map-source" href={mapUrl(streetAddress, coordinates)} target="_blank" rel="noreferrer">{t('open')}</a></div>
     </details>
   );
 }

@@ -4,11 +4,13 @@ import { isAllowedMatrikkelSync, isAuthConfigured } from '@/lib/admin-policy';
 import { getMatrikkelMemberOptions, getMatrikkelRuns, isMatrikkelConfigured } from '@/lib/matrikkel-sync';
 import AdminModuleHeader from '@/components/AdminModuleHeader';
 import MatrikkelSyncPanel from '@/components/MatrikkelSyncPanel';
+import { getServerI18n } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export default async function MatrikkelSyncPage({ searchParams }) {
+  const { t } = await getServerI18n('admin.pages');
   if (!isAuthConfigured()) redirect('/admin/login');
   const session = await auth();
   if (!isAllowedMatrikkelSync(session?.user)) redirect('/admin');
@@ -22,5 +24,5 @@ export default async function MatrikkelSyncPage({ searchParams }) {
   try { [runs, members] = await Promise.all([getMatrikkelRuns(), getMatrikkelMemberOptions()]); } catch { databaseReady = false; }
   const initialMemberId = members.some((member) => member.id === requestedMemberId) ? requestedMemberId : '';
   const initialMemberIds = [...new Set(requestedMemberIds)].filter((id) => members.some((member) => member.id === id));
-  return <main className="admin-shell"><AdminModuleHeader active="matrikkel" title="Oppdater matrikkeldata" email={session.user.email} /><section className="admin-content"><MatrikkelSyncPanel initialRuns={runs} members={members} initialMemberId={initialMemberId} initialMemberIds={initialMemberIds} configured={isMatrikkelConfigured()} databaseReady={databaseReady} /></section></main>;
+  return <main className="admin-shell"><AdminModuleHeader active="matrikkel" title={t('updateCadastral')} email={session.user.email} /><section className="admin-content"><MatrikkelSyncPanel initialRuns={runs} members={members} initialMemberId={initialMemberId} initialMemberIds={initialMemberIds} configured={isMatrikkelConfigured()} databaseReady={databaseReady} /></section></main>;
 }

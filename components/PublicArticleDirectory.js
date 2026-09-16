@@ -2,12 +2,9 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import CmsPageView from '@/components/CmsPageView';
-
-function formatDate(value) {
-  return value ? new Date(value).toLocaleDateString('nb-NO', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
-}
+import { useI18n } from '@/components/LocaleProvider';
 
 function dateTimeValue(value) {
   if (!value) return undefined;
@@ -16,20 +13,25 @@ function dateTimeValue(value) {
 }
 
 export default function PublicArticleDirectory({ pages, initialPage = null }) {
+  const { t, formatLocale } = useI18n('public.articles');
+  const { t: categoryLabel } = useI18n('cms.categories');
+  const formatDate = (value) => value ? new Intl.DateTimeFormat(formatLocale, {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Oslo',
+  }).format(new Date(value)) : '';
   const [selected, setSelected] = useState(initialPage);
   const [loadingSlug, setLoadingSlug] = useState('');
   const [error, setError] = useState('');
   const closeButton = useRef(null);
   const requestNumber = useRef(0);
 
-  async function openArticle(slug, updateHistory = true) {
+  const openArticle = useCallback(async (slug, updateHistory = true) => {
     const request = ++requestNumber.current;
     setLoadingSlug(slug);
     setError('');
     try {
       const response = await fetch(`/api/cms/pages/${encodeURIComponent(slug)}`, { headers: { Accept: 'application/json' } });
       const body = await response.json();
-      if (!response.ok || !body.ok) throw new Error(body.message || 'Kunne ikke hente artikkelen.');
+      if (!response.ok || !body.ok) throw new Error(body.message || t('unavailable'));
       if (request !== requestNumber.current) return;
       setSelected(body.page);
       if (updateHistory) window.history.pushState({}, '', `/?article=${encodeURIComponent(slug)}`);
@@ -38,15 +40,15 @@ export default function PublicArticleDirectory({ pages, initialPage = null }) {
     } finally {
       if (request === requestNumber.current) setLoadingSlug('');
     }
-  }
+  }, [t]);
 
-  function closeArticle() {
+  const closeArticle = useCallback(() => {
     requestNumber.current += 1;
     setSelected(null);
     setLoadingSlug('');
     setError('');
     if (new URL(window.location.href).searchParams.has('article')) window.history.replaceState({}, '', '/');
-  }
+  }, []);
 
   useEffect(() => {
     function onPopState() {
@@ -56,7 +58,7 @@ export default function PublicArticleDirectory({ pages, initialPage = null }) {
     }
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, []);
+  }, [openArticle]);
 
   useEffect(() => {
     if (!selected) return undefined;
@@ -71,16 +73,16 @@ export default function PublicArticleDirectory({ pages, initialPage = null }) {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [selected]);
+  }, [closeArticle, selected]);
 
   return (
     <>
       <section className="border-t border-foreground/15 bg-white px-5 py-20 sm:px-8 lg:py-24" aria-labelledby="pages-title">
         <div className="mx-auto w-full max-w-7xl">
-          <p className="text-xs font-semibold tracking-[0.16em] text-primary uppercase">Fra Turufjell Vel</p>
+          <p className="text-xs font-semibold tracking-[0.16em] text-primary uppercase">{t('eyebrow')}</p>
           <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <h2 id="pages-title" className="text-3xl font-light tracking-[-0.025em] text-foreground sm:text-4xl">Aktuelt</h2>
-            <p className="max-w-lg text-sm leading-6 text-[#6F645E]">Publiserte saker, nyttig informasjon og dokumenter fra velforeningen.</p>
+            <h2 id="pages-title" className="text-3xl font-light tracking-[-0.025em] text-foreground sm:text-4xl">{t('title')}</h2>
+            <p className="max-w-lg text-sm leading-6 text-[#6F645E]">{t('introduction')}</p>
           </div>
           {error && <p className="mt-8 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{error}</p>}
           <div className="mt-10 grid gap-x-7 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
@@ -89,19 +91,19 @@ export default function PublicArticleDirectory({ pages, initialPage = null }) {
                 {page.image ? <Image src={page.image.url} alt={page.image_alt || ''} fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.025]" /> : <div className="flex size-full items-center justify-center bg-primary/8 text-primary/45" aria-hidden="true"><svg viewBox="0 0 24 24" className="size-10 fill-none stroke-current stroke-[1.25]"><path d="M4 18 9 12l3 3 2-2 6 5M4 5h16v14H4V5Zm11 4h.01" /></svg></div>}
               </div>
               <div className="flex flex-1 flex-col pt-5">
-                <div className="flex items-center gap-3 text-xs"><p className="font-semibold tracking-[0.1em] text-primary uppercase">{page.category}</p><span className="size-1 rounded-full bg-primary/30" aria-hidden="true" /><time className="text-[#6F645E]" dateTime={dateTimeValue(page.published_at)}>{formatDate(page.published_at)}</time></div>
+                <div className="flex items-center gap-3 text-xs"><p className="font-semibold tracking-[0.1em] text-primary uppercase">{categoryLabel(page.category, {}, page.category)}</p><span className="size-1 rounded-full bg-primary/30" aria-hidden="true" /><time className="text-[#6F645E]" dateTime={dateTimeValue(page.published_at)}>{formatDate(page.published_at)}</time></div>
                 <h3 className="mt-3 text-xl leading-7 font-light tracking-[-0.015em] text-foreground"><Link className="outline-none after:absolute after:inset-0 focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary" href={`/?article=${encodeURIComponent(page.slug)}`} onClick={(event) => { event.preventDefault(); openArticle(page.slug); }}>{page.title}</Link></h3>
                 {page.intro && <p className="mt-3 line-clamp-3 text-sm leading-6 text-[#6F645E]">{page.intro}</p>}
-                <span className="relative mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary">{loadingSlug === page.slug ? 'Åpner …' : 'Les saken'} <span className="transition-transform group-hover:translate-x-1" aria-hidden="true">→</span></span>
+                <span className="relative mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary">{loadingSlug === page.slug ? t('opening') : t('open')} <span className="transition-transform group-hover:translate-x-1" aria-hidden="true">→</span></span>
               </div>
             </article>)}
           </div>
         </div>
       </section>
 
-      <button className={`public-article-backdrop${selected ? ' is-visible' : ''}`} type="button" aria-label="Lukk artikkelen" tabIndex={selected ? 0 : -1} onClick={closeArticle} />
+      <button className={`public-article-backdrop${selected ? ' is-visible' : ''}`} type="button" aria-label={t('close')} tabIndex={selected ? 0 : -1} onClick={closeArticle} />
       <aside className={`public-article-panel${selected ? ' is-open' : ''}`} aria-hidden={!selected} role="dialog" aria-modal="true" aria-labelledby={selected ? 'public-article-panel-title' : undefined}>
-        {selected && <><header className="public-article-panel-header"><div><p>Artikkel</p><strong id="public-article-panel-title">{selected.title}</strong></div><button ref={closeButton} type="button" onClick={closeArticle}>Lukk <span aria-hidden="true">×</span></button></header><div className="public-article-panel-content"><CmsPageView page={selected} /></div></>}
+        {selected && <><header className="public-article-panel-header"><div><p>{t('label')}</p><strong id="public-article-panel-title">{selected.title}</strong></div><button ref={closeButton} type="button" onClick={closeArticle}>{t('closeShort')} <span aria-hidden="true">×</span></button></header><div className="public-article-panel-content"><CmsPageView page={selected} /></div></>}
       </aside>
     </>
   );

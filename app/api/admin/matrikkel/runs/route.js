@@ -2,6 +2,7 @@ import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { createMatrikkelRun, failPendingMatrikkelRun, getMatrikkelRun, getMatrikkelRuns } from '@/lib/matrikkel-sync';
 import { dispatchMatrikkelRun } from '@/lib/matrikkel-background';
+import { getRequestI18n } from '@/lib/i18n/request';
 
 export const runtime = 'nodejs';
 
@@ -11,6 +12,7 @@ function sameOrigin(request) {
 }
 
 export async function GET(request) {
+  const { t } = getRequestI18n(request, 'backend.adminMatrikkel');
   try {
     const id = request.nextUrl.searchParams.get('id');
     const data = id ? await getMatrikkelRun(id) : await getMatrikkelRuns();
@@ -18,12 +20,13 @@ export async function GET(request) {
   } catch (error) {
     const status = apiErrorStatus(error, 403);
     console.error('Matrikkel sync read failed', { message: error.message, code: error.code || error.cause?.code });
-    return NextResponse.json({ ok: false, message: status === 403 ? 'Du har ikke tilgang til matrikkelsynkronisering.' : 'Kunne ikke hente synkroniseringsstatus.' }, { status });
+    return NextResponse.json({ ok: false, message: t(status === 403 ? 'forbidden' : 'status') }, { status });
   }
 }
 
 export async function POST(request) {
-  if (!sameOrigin(request)) return NextResponse.json({ ok: false, message: 'Ugyldig forespørsel.' }, { status: 403 });
+  const { t } = getRequestI18n(request, 'backend');
+  if (!sameOrigin(request)) return NextResponse.json({ ok: false, message: t('api.invalidRequest') }, { status: 403 });
   try {
     const input = await readJsonObject(request);
     let run = await createMatrikkelRun({ hNumber: input.hNumber, memberId: input.memberId, memberIds: input.memberIds });
@@ -37,7 +40,7 @@ export async function POST(request) {
         run = { ...run, ...await failPendingMatrikkelRun(run.id) };
         if (run.status === 'failed' || run.status === 'pending') {
           return NextResponse.json({ ok: false, run, backgroundStarted: false,
-            message: run.error_message || 'Kunne ikke bekrefte oppstart. Kontroller kjørestatus før du prøver igjen.',
+            message: run.error_message || t('adminMatrikkel.startUnconfirmed'),
           }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
         }
         // Worker kan ha startet selv om kvitteringen gikk tapt. Ikke start
@@ -49,14 +52,14 @@ export async function POST(request) {
   } catch (error) {
     const status = apiErrorStatus(error, 403);
     const knownMessages = {
-      'Matrikkel API not configured': 'Matrikkel-API er ikke konfigurert.',
-      'Sync already running': 'En synkronisering pågår allerede.',
-      'Invalid H-number': 'H-nummeret har ugyldig format.',
-      'Invalid member selection': 'Medlemsvalget er ugyldig.',
-      'Member not found': 'Medlemmet finnes ikke lenger.',
+      'Matrikkel API not configured': t('adminMatrikkel.apiMissing'),
+      'Sync already running': t('adminMatrikkel.alreadyRunning'),
+      'Invalid H-number': t('adminMatrikkel.invalidHNumber'),
+      'Invalid member selection': t('adminMatrikkel.invalidSelection'),
+      'Member not found': t('adminMatrikkel.memberMissing'),
     };
     const message = knownMessages[error.message]
-      || (status === 403 ? 'Du har ikke tilgang til matrikkelsynkronisering.' : 'Kunne ikke starte synkroniseringen.');
+      || (status === 403 ? t('adminMatrikkel.forbidden') : t('adminMatrikkel.start'));
     console.error('Matrikkel sync start failed', { message: error.message, code: error.code || error.cause?.code });
     return NextResponse.json({ ok: false, message }, { status, headers: { 'Cache-Control': 'no-store' } });
   }

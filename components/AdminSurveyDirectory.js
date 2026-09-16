@@ -5,14 +5,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import SurveyEmailPanel from '@/components/SurveyEmailPanel';
+import { useI18n } from '@/components/LocaleProvider';
 
 const blankQuestion = (number) => ({ id: `q${number}`, number, text: '' });
 const answerOptions = [
-  { value: 'ja', label: 'Ja', color: '#15803d' },
-  { value: 'nei', label: 'Nei', color: '#b91c1c' },
-  { value: 'usikker', label: 'Usikker', color: '#a16207' },
+  { value: 'ja', color: '#15803d' },
+  { value: 'nei', color: '#b91c1c' },
+  { value: 'usikker', color: '#a16207' },
 ];
-const saveLabels = { saved: 'Alle endringer lagret', dirty: 'Venter på automatisk lagring …', saving: 'Lagrer automatisk …', error: 'Automatisk lagring feilet' };
 
 function normalizeQuestions(questions) {
   return questions.map((question, index) => ({ ...question, number: index + 1 }));
@@ -31,50 +31,49 @@ function nextQuestion(questions) {
   return blankQuestion(number);
 }
 
-function formatEndDate(value) {
+function formatEndDate(value, locale) {
   if (typeof value !== 'string') return '—';
-  const [year, month, day] = value.split('-');
-  return year && month && day ? `${day}.${month}.${year}` : '—';
+  return new Intl.DateTimeFormat(locale, {dateStyle: 'short', timeZone: 'Europe/Oslo'}).format(new Date(`${value}T12:00:00Z`));
 }
 
-function SurveyResults({ data, state, surveyId }) {
-  if (state === 'loading') return <p className="survey-results-status" role="status">Henter resultater …</p>;
-  if (state === 'error') return <p className="form-error" role="alert">Kunne ikke hente resultatene.</p>;
+function SurveyResults({ data, state, surveyId, t, formatLocale }) {
+  if (state === 'loading') return <p className="survey-results-status" role="status">{t('loadingResults')}</p>;
+  if (state === 'error') return <p className="form-error" role="alert">{t('resultsError')}</p>;
   if (!data) return null;
 
   return (
     <section className="survey-results" aria-labelledby="survey-results-heading">
       <div className="survey-results-summary">
         <div>
-          <p className="eyebrow">Resultater</p>
-          <h3 id="survey-results-heading">{data.response_count} {data.response_count === 1 ? 'besvarelse' : 'besvarelser'}</h3>
-          <p>Resultatene kan vises og eksporteres både før og etter sluttdato.</p>
+          <p className="eyebrow">{t('results')}</p>
+          <h3 id="survey-results-heading">{t(data.response_count === 1 ? 'responseOne' : 'responseMany', {count: data.response_count})}</h3>
+          <p>{t('resultsHelp')}</p>
         </div>
-        <a className="admin-button survey-results-export" href={`/api/admin/surveys/${surveyId}/results/export`}>Eksporter Excel</a>
+        <a className="admin-button survey-results-export" href={`/api/admin/surveys/${surveyId}/results/export`}>{t('export')}</a>
       </div>
 
       {data.response_count === 0 ? (
         <div className="survey-results-empty">
-          <strong>Ingen svar ennå</strong>
-          <p>Diagrammene fylles automatisk når den første besvarelsen er registrert.</p>
+          <strong>{t('noAnswers')}</strong>
+          <p>{t('chartsHelp')}</p>
         </div>
       ) : data.versions.map((version) => (
         <section className="survey-result-version" key={version.version} aria-labelledby={`result-version-${version.version}`}>
           <div className="survey-result-version-heading">
-            <h4 id={`result-version-${version.version}`}>Spørsmålsversjon {version.version}</h4>
-            <span>{version.response_count} svar</span>
+            <h4 id={`result-version-${version.version}`}>{t('questionVersion', {version: version.version})}</h4>
+            <span>{t('answerCount', {count: version.response_count})}</span>
           </div>
           <div className="survey-result-grid">
             {version.questions.map((question) => {
               const jaEnd = question.percentages.ja;
               const neiEnd = jaEnd + question.percentages.nei;
               const chartLabel = answerOptions
-                .map(({ value, label }) => `${label}: ${question.counts[value]} (${question.percentages[value].toLocaleString('nb-NO')} prosent)`)
+                .map(({ value }) => t('percent', {label: t(`answers.${value}`), count: question.counts[value], percent: question.percentages[value].toLocaleString(formatLocale)}))
                 .join(', ');
               return (
                 <article className="survey-result-card" key={question.id}>
                   <div className="survey-result-question">
-                    <span>Spørsmål {question.number}</span>
+                    <span>{t('question', {number: question.number})}</span>
                     <h5>{question.text}</h5>
                   </div>
                   <div className="survey-result-visual">
@@ -84,14 +83,14 @@ function SurveyResults({ data, state, surveyId }) {
                       role="img"
                       aria-label={chartLabel}
                     >
-                      <span><strong>{question.answered_count}</strong><small>besvart</small></span>
+                      <span><strong>{question.answered_count}</strong><small>{t('answered')}</small></span>
                     </div>
-                    <ul className="survey-result-legend" aria-label={`Svarfordeling for spørsmål ${question.number}`}>
-                      {answerOptions.map(({ value, label, color }) => (
+                    <ul className="survey-result-legend" aria-label={t('distribution', {number: question.number})}>
+                      {answerOptions.map(({ value, color }) => (
                         <li key={value}>
-                          <span className="survey-result-key"><i style={{ backgroundColor: color }} aria-hidden="true" />{label}</span>
+                          <span className="survey-result-key"><i style={{ backgroundColor: color }} aria-hidden="true" />{t(`answers.${value}`)}</span>
                           <strong>{question.counts[value]}</strong>
-                          <small>{question.percentages[value].toLocaleString('nb-NO')} %</small>
+                          <small>{question.percentages[value].toLocaleString(formatLocale)} %</small>
                         </li>
                       ))}
                     </ul>
@@ -107,6 +106,7 @@ function SurveyResults({ data, state, surveyId }) {
 }
 
 export default function AdminSurveyDirectory({ surveys, sort, direction, adminEmail }) {
+  const { t, formatLocale } = useI18n('surveys.admin');
   const router = useRouter();
   const [selected, setSelected] = useState(null);
   const [activeTab, setActiveTab] = useState('settings');
@@ -135,7 +135,7 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
     fetch(`/api/admin/surveys/${selectedId}/results`, { signal: controller.signal })
       .then(async (response) => {
         const body = await response.json();
-        if (!response.ok || !body.ok) throw new Error(body.message || 'Results unavailable');
+        if (!response.ok || !body.ok) throw new Error(body.message || t('resultsError'));
         setResults(body.results);
         setResultsState('ready');
       })
@@ -143,7 +143,7 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
         if (error.name !== 'AbortError') setResultsState('error');
       });
     return () => controller.abort();
-  }, [selectedId, resultsReload]);
+  }, [selectedId, resultsReload, t]);
 
   function select(survey) {
     setSelected(survey);
@@ -192,7 +192,7 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
     try {
       const response = await fetch(endpoint, { method: wasNew ? 'POST' : 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const body = await response.json();
-      if (!response.ok || !body.ok) throw new Error(body.message || 'Kunne ikke lagre undersøkelsen.');
+      if (!response.ok || !body.ok) throw new Error(body.message || t('saveError'));
       const returnedPayload = surveyPayload(body.survey.title, body.survey.is_open, body.survey.ends_on || '', body.survey.questions || []);
       setSavedPayloadKey(surveyKey(returnedPayload));
       setSelected(body.survey);
@@ -200,11 +200,11 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
         setTitle(body.survey.title); setIsOpen(body.survey.is_open); setEndsOn(body.survey.ends_on); setQuestions(body.survey.questions);
         setSaveState('saved');
       } else setSaveState('dirty');
-      setMessage(wasNew ? 'Undersøkelsen er opprettet.' : '');
+      setMessage(wasNew ? t('created') : '');
       setResults(null); setResultsState('loading'); setResultsReload((value) => value + 1); router.refresh();
-    } catch (error) { setMessage(error.message || 'Kunne ikke lagre undersøkelsen.'); setSaveState('error'); }
+    } catch (error) { setMessage(error.message || t('saveError')); setSaveState('error'); }
     finally { setSaving(false); }
-  }, [router]);
+  }, [router, t]);
 
   async function save(event) {
     event.preventDefault();
@@ -227,7 +227,7 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
       const body = await response.json().catch(() => ({}));
       if (!response.ok || !body.ok) {
         setConfirmDelete(false);
-        setMessage(body.message || 'Kunne ikke slette undersøkelsen.');
+        setMessage(body.message || t('deleteError'));
         return;
       }
       setConfirmDelete(false);
@@ -235,7 +235,7 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
       router.refresh();
     } catch {
       setConfirmDelete(false);
-      setMessage('Kunne ikke kontakte serveren for å slette undersøkelsen.');
+      setMessage(t('deleteServerError'));
     } finally {
       setDeleting(false);
     }
@@ -243,16 +243,16 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
 
   return (
     <>
-      <div className="admin-toolbar"><button className="primary-button" type="button" onClick={create}>Ny undersøkelse</button></div>
-      <div className="admin-table-scroll" role="region" aria-label="Undersøkelser" tabIndex={0}>
+      <div className="admin-toolbar"><button className="primary-button" type="button" onClick={create}>{t('new')}</button></div>
+      <div className="admin-table-scroll" role="region" aria-label={t('surveys')} tabIndex={0}>
         <table className="admin-table">
-          <caption>Velg en undersøkelse for detaljer, resultater og innstillinger. Klikk på en kolonneoverskrift for å sortere.</caption>
+          <caption>{t('tableCaption')}</caption>
           <thead><tr>
-            <th scope="col"><Link className="admin-sort" href={sortHref('title')}>{sortLabel('title', 'Undersøkelse')}</Link></th>
-            <th scope="col"><Link className="admin-sort" href={sortHref('is_open')}>{sortLabel('is_open', 'Status')}</Link></th>
-            <th scope="col"><Link className="admin-sort" href={sortHref('ends_on')}>{sortLabel('ends_on', 'Sluttdato')}</Link></th>
-            <th scope="col"><Link className="admin-sort" href={sortHref('response_count')}>{sortLabel('response_count', 'Svar')}</Link></th>
-            <th scope="col"><Link className="admin-sort" href={sortHref('question_version')}>{sortLabel('question_version', 'Versjon')}</Link></th>
+            <th scope="col"><Link className="admin-sort" href={sortHref('title')}>{sortLabel('title', t('survey'))}</Link></th>
+            <th scope="col"><Link className="admin-sort" href={sortHref('is_open')}>{sortLabel('is_open', t('status'))}</Link></th>
+            <th scope="col"><Link className="admin-sort" href={sortHref('ends_on')}>{sortLabel('ends_on', t('endDate'))}</Link></th>
+            <th scope="col"><Link className="admin-sort" href={sortHref('response_count')}>{sortLabel('response_count', t('responses'))}</Link></th>
+            <th scope="col"><Link className="admin-sort" href={sortHref('question_version')}>{sortLabel('question_version', t('version'))}</Link></th>
           </tr></thead>
           <tbody>{surveys.map((survey) => (
             <tr
@@ -268,8 +268,8 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
               }}
             >
               <th scope="row">{survey.title}</th>
-              <td><span className={`status-pill ${survey.is_open && !survey.has_ended ? 'is-open' : 'is-closed'}`}>{survey.has_ended ? 'Avsluttet' : survey.is_open ? 'Åpen' : 'Lukket'}</span></td>
-              <td>{formatEndDate(survey.ends_on)}</td>
+              <td><span className={`status-pill ${survey.is_open && !survey.has_ended ? 'is-open' : 'is-closed'}`}>{survey.has_ended ? t('ended') : survey.is_open ? t('open') : t('closed')}</span></td>
+              <td>{formatEndDate(survey.ends_on, formatLocale)}</td>
               <td>{survey.response_count}</td>
               <td>{survey.question_version}</td>
             </tr>
@@ -277,43 +277,43 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
         </table>
       </div>
 
-      <aside className={`admin-detail-panel survey-detail-panel${selected ? ' is-open' : ''}`} aria-hidden={!selected} aria-label="Administrer undersøkelse">
+      <aside className={`admin-detail-panel survey-detail-panel${selected ? ' is-open' : ''}`} aria-hidden={!selected} aria-label={t('manage')}>
         <div className="admin-detail-header">
-          <div><p className="eyebrow">{selected?.isNew ? 'Ny undersøkelse' : 'Undersøkelse'}</p><h2>{selected?.isNew ? 'Opprett undersøkelse' : selected?.title}</h2>{!selected?.isNew && <span className={`admin-save-status is-${displayedSaveState}`} role="status">{saveLabels[displayedSaveState]}</span>}</div>
-          <button className="admin-button" type="button" onClick={close} disabled={saving}>Lukk</button>
+          <div><p className="eyebrow">{selected?.isNew ? t('new') : t('survey')}</p><h2>{selected?.isNew ? t('create') : selected?.title}</h2>{!selected?.isNew && <span className={`admin-save-status is-${displayedSaveState}`} role="status">{t(`saveStates.${displayedSaveState}`)}</span>}</div>
+          <button className="admin-button" type="button" onClick={close} disabled={saving}>{t('close')}</button>
         </div>
         {selected && (
           <>
             {!selected.isNew && (
-              <div className="survey-panel-tabs" role="tablist" aria-label="Undersøkelsesdetaljer">
-                <button type="button" role="tab" aria-selected={activeTab === 'settings'} onClick={() => setActiveTab('settings')}>Innstillinger</button>
-                <button type="button" role="tab" aria-selected={activeTab === 'results'} onClick={() => setActiveTab('results')}>Resultater <span>{selected.response_count}</span></button>
-                <button type="button" role="tab" aria-selected={activeTab === 'email'} onClick={() => setActiveTab('email')}>Utsendelse</button>
+              <div className="survey-panel-tabs" role="tablist" aria-label={t('details')}>
+                <button type="button" role="tab" aria-selected={activeTab === 'settings'} onClick={() => setActiveTab('settings')}>{t('settings')}</button>
+                <button type="button" role="tab" aria-selected={activeTab === 'results'} onClick={() => setActiveTab('results')}>{t('results')} <span>{selected.response_count}</span></button>
+                <button type="button" role="tab" aria-selected={activeTab === 'email'} onClick={() => setActiveTab('email')}>{t('mailing')}</button>
               </div>
             )}
             {activeTab === 'email' && !selected.isNew ? (
               <SurveyEmailPanel surveyId={selected.id} adminEmail={adminEmail} />
             ) : activeTab === 'results' && !selected.isNew ? (
-              <SurveyResults data={results} state={resultsState} surveyId={selected.id} />
+              <SurveyResults data={results} state={resultsState} surveyId={selected.id} t={t} formatLocale={formatLocale} />
             ) : (
               <form className="admin-detail-form" onSubmit={save}>
-                <label>Navn<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={200} required /></label>
-                <label>Sluttdato<input type="date" value={endsOn} onChange={(event) => setEndsOn(event.target.value)} required /><span className="admin-field-note">Undersøkelsen er tilgjengelig ut denne datoen.</span></label>
-                <label className="admin-checkbox"><input type="checkbox" checked={isOpen} onChange={(event) => setIsOpen(event.target.checked)} /> Åpen for besvarelser</label>
+                <label>{t('name')}<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={200} required /></label>
+                <label>{t('endDate')}<input type="date" value={endsOn} onChange={(event) => setEndsOn(event.target.value)} required /><span className="admin-field-note">{t('availableThrough')}</span></label>
+                <label className="admin-checkbox"><input type="checkbox" checked={isOpen} onChange={(event) => setIsOpen(event.target.checked)} /> {t('openForResponses')}</label>
                 <section className="admin-questions" aria-labelledby="admin-questions-heading">
-                  <div className="admin-section-header"><h3 id="admin-questions-heading">Spørsmål</h3><button className="admin-button" type="button" onClick={addQuestion}>Legg til spørsmål</button></div>
+                  <div className="admin-section-header"><h3 id="admin-questions-heading">{t('questions')}</h3><button className="admin-button" type="button" onClick={addQuestion}>{t('addQuestion')}</button></div>
                   {questions.map((question, index) => (
                     <div className="admin-question-editor" key={question.id}>
-                      <label>Spørsmål {index + 1}<textarea value={question.text} onChange={(event) => updateQuestion(index, event.target.value)} rows={4} required /></label>
-                      {questions.length > 1 && <button className="admin-remove" type="button" onClick={() => removeQuestion(index)}>Fjern</button>}
+                      <label>{t('question', {number: index + 1})}<textarea value={question.text} onChange={(event) => updateQuestion(index, event.target.value)} rows={4} required /></label>
+                      {questions.length > 1 && <button className="admin-remove" type="button" onClick={() => removeQuestion(index)}>{t('remove')}</button>}
                     </div>
                   ))}
                 </section>
-                {!selected.isNew && <dl className="admin-meta"><div><dt>Undersøkelses-ID</dt><dd>{selected.id}</dd></div><div><dt>Besvarelser</dt><dd>{selected.response_count}</dd></div><div><dt>Spørsmålsversjon</dt><dd>{selected.question_version}</dd></div></dl>}
-                {message && <p className={message.includes('Lagret') || message.includes('opprettet') ? 'admin-success' : 'form-error'} role="status">{message}</p>}
-                <button className="primary-button" type="submit" disabled={saving || selected.mock}>{saving ? 'Lagrer …' : selected.isNew ? 'Opprett undersøkelse' : 'Lagre endringer'}</button>
-                {!selected.isNew && <button className="admin-delete" type="button" onClick={() => setConfirmDelete(true)} disabled={selected.mock}>Slett undersøkelse</button>}
-                {selected.mock && <p className="privacy-subnote">Mock-data kan ikke endres.</p>}
+                {!selected.isNew && <dl className="admin-meta"><div><dt>{t('surveyId')}</dt><dd>{selected.id}</dd></div><div><dt>{t('responses')}</dt><dd>{selected.response_count}</dd></div><div><dt>{t('questionVersionLabel')}</dt><dd>{selected.question_version}</dd></div></dl>}
+                {message && <p className={saveState === 'error' ? 'form-error' : 'admin-success'} role="status">{message}</p>}
+                <button className="primary-button" type="submit" disabled={saving || selected.mock}>{saving ? t('saving') : selected.isNew ? t('create') : t('saveChanges')}</button>
+                {!selected.isNew && <button className="admin-delete" type="button" onClick={() => setConfirmDelete(true)} disabled={selected.mock}>{t('delete')}</button>}
+                {selected.mock && <p className="privacy-subnote">{t('mockReadonly')}</p>}
               </form>
             )}
           </>
@@ -321,9 +321,9 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
       </aside>
       <ConfirmDialog
         open={confirmDelete}
-        title={`Slette undersøkelsen «${selected?.title || ''}»?`}
-        description="Undersøkelsen, spørsmålene og eventuelle svar beholdes, men skjules og slutter å ta imot besvarelser."
-        confirmLabel="Slett undersøkelse"
+        title={t('deleteTitle', {title: selected?.title || ''})}
+        description={t('deleteDescription')}
+        confirmLabel={t('delete')}
         busy={deleting}
         onCancel={() => setConfirmDelete(false)}
         onConfirm={remove}

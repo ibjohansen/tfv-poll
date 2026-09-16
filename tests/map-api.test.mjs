@@ -16,7 +16,8 @@ import { isPublicPath } from '../lib/route-access.js';
 async function api({ denied, limited = false } = {}) {
   return loadModule('lib/map/api.js', {
     '../admin-access.js': { requirePermission: async (permission) => { assert.equal(permission, 'members'); if (denied) throw new Error(denied); return { email: 'admin@example.invalid' }; } },
-    '../rate-limit.js': { isRateLimited: () => limited }, './geo.js': { MapError }, './http.js': { readLimitedJson },
+    '../rate-limit.js': { isRateLimited: () => limited }, '../i18n/request.js': { getRequestI18n: () => ({ locale: 'nb', t: (key, values, fallback) => fallback || key }) },
+    './geo.js': { MapError }, './http.js': { readLimitedJson },
   }, { AbortSignal, SyntaxError });
 }
 
@@ -114,7 +115,7 @@ test('register adapter projects only needed fields and excludes deleted rows, to
   assert.match(queries[0].text, /deleted_at IS NULL/); assert.match(queries[0].text, /hamlet_id = \?/); assert.match(queries[0].text, /LIMIT 5001/);
   assert.deepEqual(queries[0].values, ['7', '7']);
   assert.doesNotMatch(queries[0].text, /primary_contact_email|access_token|SELECT \*/);
-  await assert.rejects(registerModule.getRegisterProperties({ hamletId: 'invalid' }), /gyldig grend/);
+  await assert.rejects(registerModule.getRegisterProperties({ hamletId: 'invalid' }), (error) => error.code === 'errors.invalidHamlet');
 });
 
 test('actual proxy enforces member role for map page/API and narrowly permits Kartverket image tiles', async () => {
@@ -136,7 +137,10 @@ test('actual proxy enforces member role for map page/API and narrowly permits Ka
   user.roles = ['TFV.MemberAdmin'];
   const allowed = await proxy(request('/admin/map'));
   assert.equal(allowed.status, 200);
-  assert.match(allowed.headers.get('Content-Security-Policy'), /img-src 'self' data: blob: https:\/\/cache.kartverket.no;/);
+  assert.match(allowed.headers.get('Content-Security-Policy'), /img-src 'self' data: blob: https:\/\/cache.kartverket.no https:\/\/wms.geonorge.no;/);
+  const localized = await proxy(request('/?lang=en'));
+  assert.match(localized.headers.get('set-cookie'), /tfv_locale=en/);
+  assert.doesNotMatch((await proxy(request('/?lang=de'))).headers.get('set-cookie') || '', /tfv_locale=/);
   user = null;
   assert.equal((await proxy(request('/api/admin/map/search'))).status, 401);
 });

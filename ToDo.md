@@ -102,6 +102,10 @@ tilgang, testdekning og kjente begrensninger. Ingen automatisk registerretting.
 - [x] Fjernet kartmodulens CSV-/GeoJSON- og kopieringsknapper med tilhørende
   klient-, API-, service- og testkode etter produktbeslutning 16. september.
 - [x] Enhets-/rutetester med mocket database og eksterne karttjenester.
+- [x] Detaljert bygningslag i offentlig kart og administratorkart. Bruker åpen
+  Topografisk Norgeskart WMS med Kartverket-attribusjon. Offentlig kart har
+  laget på som standard fra zoomnivå 16; administrator kan slå det av/på.
+  Verifisert 17. september 2026.
 - [x] Steg 6, eiendomsgrenser: Åpen WFS/GML-adapter med UTM32-transformasjon,
   flere flater/hull, alle matrikkelreferanser og kontrollert fullstendighet.
   Separate tellekall før/etter; avkortede eller for store uttrekk avvises.
@@ -939,6 +943,13 @@ Eventuelle funn fra sikkerhetsgjennomgangen legges inn som egne P1- eller P2-sak
   sendes aldri til den offentlige klienten. Eiendomslisten avgrenses med lagret
   `members.hamlet_id`; Kartverket brukes bare til kartplassering.
 - [x] Klikk på eiendomsmarkør eller tabellrad velger objektet og zoomer kartet.
+- [x] Grendeknappene vises i to rader, eiendomsknappen ligger under kartet, og
+  kartet har fullskjermsknapp. Bygningslaget er aktivt som standard.
+- [x] Leaflet og Kartverket-fliser lastes først når kartseksjonen nærmer seg
+  synsfeltet. Bare aktivt karusellbilde rendres, og uavhengige serveroppslag på
+  forsiden kjøres parallelt med fem minutters, eksplisitt invaliderbar cache.
+- [x] Kartverkets tilgjengelige WMTS-/WMS-lag og aktuelle videre kartverktøy er
+  kartlagt og prioritert i `docs/map-explorer.md`.
 - [x] Engangsverktøy for å beregne alle grender samlet, avvise overlapp og lagre
   sikre koblinger med miljølås, polygonversjonskontroll og audit.
 - [x] Produksjonskjøring 16.09.2026: 424 av 428 aktive tomter ble koblet entydig
@@ -949,3 +960,18 @@ Eventuelle funn fra sikkerhetsgjennomgangen legges inn som egne P1- eller P2-sak
   fortsatt tilgjengelig som et separat datakvalitetsverktøy.
 - [x] Medlemsfilteret har valget **Uten grend** for manuell gjennomgang av de
   fire tomtene som ikke fikk et entydig sikkert treff.
+
+### Flerspråklig grensesnitt
+
+- [x] Norsk bokmål og engelsk ordliste er gruppert etter generelt, offentlig
+  innhold, medlemmer, kart, undersøkelser, CMS, e-postadmin og backend.
+- [x] Språkvelgeren er tilgjengelig i offentlig og administrativ navigasjon,
+  med globeikon, språkenes egne navn, delbare `?lang=nb|en`-URL-er, norsk som
+  standard og sikker cookie for brukerens valg. Bytte tilbake til norsk virker.
+- [x] Fast tekst i webgrensesnittet samt brukerrettede API-, kart- og
+  valideringsmeldinger bruker locale-laget.
+- [x] Datoer, tall og grafetiketter bruker valgt locale, og kartcache er skilt
+  per språk.
+- [x] Ordlistetest kontrollerer identiske, ikke-tomme nøkler for norsk og
+  engelsk. Avgrensning for databaseinnhold, maskinkoder, e-post og eksport er
+  dokumentert i `docs/internationalization.md`.

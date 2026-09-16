@@ -2,38 +2,42 @@ import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { deleteAdminMember, updateAdminMember } from '@/lib/admin-member-updates';
 import { getAdminMemberById } from '@/lib/admin-members';
+import { getRequestI18n } from '@/lib/i18n/request';
 
 export const runtime = 'nodejs';
 
-export async function GET(_request, { params }) {
+export async function GET(request, { params }) {
+  const { t } = getRequestI18n(request, 'backend.adminMembers');
   try {
     const member = await getAdminMemberById((await params).id);
     if (!member) throw new Error('Member not found');
     return NextResponse.json({ ok: true, member }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     const status = apiErrorStatus(error);
-    return NextResponse.json({ ok: false, message: status === 404 ? 'Medlemmet finnes ikke lenger.' : 'Kunne ikke hente medlemmet.' },
+    return NextResponse.json({ ok: false, message: t(status === 404 ? 'missing' : 'fetch') },
       { status, headers: { 'Cache-Control': 'no-store' } });
   }
 }
 
 export async function PATCH(request, { params }) {
+  const { t } = getRequestI18n(request, 'backend.adminMembers');
   try {
     const member = await updateAdminMember((await params).id, await readJsonObject(request));
     return NextResponse.json({ ok: true, member }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     const status = apiErrorStatus(error);
     console.error('Admin member update failed', { id: (await params).id, code: error.code || error.cause?.code, message: error.message });
-    const message = status === 409 ? 'H-nummeret er allerede i bruk.'
-      : error.message === 'Mock data cannot be changed' ? 'Mock-data kan ikke endres.'
-        : error.message === 'H-nummer is required' ? 'H-nummer må fylles ut.'
-          : error.message === 'Invalid member' ? 'Kontroller at feltene har gyldige verdier.'
-            : 'Kunne ikke lagre medlemmet.';
+    const message = status === 409 ? t('duplicate')
+      : error.message === 'Mock data cannot be changed' ? t('mock')
+        : error.message === 'H-nummer is required' ? t('hRequired')
+          : error.message === 'Invalid member' ? t('invalid')
+            : t('save');
     return NextResponse.json({ ok: false, message }, { status, headers: { 'Cache-Control': 'no-store' } });
   }
 }
 
-export async function DELETE(_request, { params }) {
+export async function DELETE(request, { params }) {
+  const { t } = getRequestI18n(request, 'backend.adminMembers');
   try { await deleteAdminMember((await params).id); return NextResponse.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } }); }
   catch (error) {
     const id = (await params).id;
@@ -41,10 +45,10 @@ export async function DELETE(_request, { params }) {
     console.error('Admin member delete failed', { id, code, message: error.message });
     const status = apiErrorStatus(error);
     const message = code === '42703'
-      ? 'Databasen mangler oppdatert skjema. Kjør npm run db:setup og prøv igjen.'
+      ? t('schema')
       : error.message === 'Member not found'
-        ? 'Medlemmet finnes ikke lenger.'
-        : 'Kunne ikke slette medlemmet.';
+        ? t('missing')
+        : t('delete');
     return NextResponse.json({ ok: false, message }, { status, headers: { 'Cache-Control': 'no-store' } });
   }
 }

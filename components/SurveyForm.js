@@ -3,8 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { answerOptions } from "@/data/survey";
+import { useI18n } from '@/components/LocaleProvider';
 
 export default function SurveyForm({ mockToken, mockSurveyId, questions, questionVersion }) {
+  const { t } = useI18n('surveys.form');
   const router = useRouter();
   const [answers, setAnswers] = useState(() => Object.fromEntries(questions.map(({ id }) => [id, ""])));
   const [website, setWebsite] = useState("");
@@ -28,7 +30,7 @@ export default function SurveyForm({ mockToken, mockSurveyId, questions, questio
     event.preventDefault();
 
     if (!isComplete) {
-      setErrorMessage(`Svar på alle ${questions.length} spørsmål før du sender inn.`);
+      setErrorMessage(t('incomplete', {count: questions.length}));
       return;
     }
 
@@ -57,7 +59,7 @@ export default function SurveyForm({ mockToken, mockSurveyId, questions, questio
       }
 
       if (!response.ok || !data.ok) {
-        throw new Error(data.message || "Kunne ikke sende inn svaret.");
+        throw new Error(data.message || t('submitError'));
       }
 
       setStatus("success");
@@ -73,7 +75,7 @@ export default function SurveyForm({ mockToken, mockSurveyId, questions, questio
       setErrorMessage('');
       setStatus('idle');
       router.refresh();
-    }}>Last inn undersøkelsen på nytt</button></section>;
+    }}>{t('reload')}</button></section>;
   }
 
   if (status === "success") {
@@ -82,22 +84,19 @@ export default function SurveyForm({ mockToken, mockSurveyId, questions, questio
         <div className="success-icon" aria-hidden="true">
           ✓
         </div>
-        <p className="eyebrow">Svar mottatt</p>
-        <h2>Takk for at du svarte.</h2>
-        <p>
-          Besvarelsen er lagret. Turufjell Vel kan bruke de samlede svarene som
-          grunnlag for det videre arbeidet.
-        </p>
+        <p className="eyebrow">{t('received')}</p>
+        <h2>{t('thanks')}</h2>
+        <p>{t('success')}</p>
       </section>
     );
   }
 
   return (
     <form className="survey-form" onSubmit={handleSubmit} noValidate>
-        <div className="form-progress" aria-label={`${answeredCount} av ${questions.length} spørsmål besvart`}>
+        <div className="form-progress" aria-label={t('progress', {answered: answeredCount, total: questions.length})}>
         <div className="progress-copy">
-          <span>Din besvarelse</span>
-          <span>{answeredCount} av {questions.length} besvart</span>
+          <span>{t('yourResponse')}</span>
+          <span>{t('answered', {answered: answeredCount, total: questions.length})}</span>
         </div>
         <div className="progress-track" aria-hidden="true">
           <div className="progress-value" style={{ width: `${progress}%` }} />
@@ -105,7 +104,7 @@ export default function SurveyForm({ mockToken, mockSurveyId, questions, questio
       </div>
 
       <div className="honeypot" aria-hidden="true">
-        <label htmlFor="website">Nettside</label>
+        <label htmlFor="website">{t('website')}</label>
         <input
           id="website"
           name="website"
@@ -147,7 +146,7 @@ export default function SurveyForm({ mockToken, mockSurveyId, questions, questio
                       }
                     />
                     <span className="radio-mark" aria-hidden="true" />
-                    <span>{option.label}</span>
+                    <span>{t(`answers.${option.value}`, {}, option.label)}</span>
                   </label>
                 );
               })}
@@ -164,17 +163,15 @@ export default function SurveyForm({ mockToken, mockSurveyId, questions, questio
 
       <div className="submit-row">
         <div>
-          <p className="privacy-note">Én besvarelse per tomt i denne undersøkelsen.</p>
-          <p className="privacy-subnote">
-            Svarene kobles til tomten i medlemsregisteret og lagres med tidspunkt for innsending.
-          </p>
+          <p className="privacy-note">{t('onePerProperty')}</p>
+          <p className="privacy-subnote">{t('privacy')}</p>
         </div>
         <button
           className="primary-button"
           type="submit"
           disabled={status === "submitting"}
         >
-          {status === "submitting" ? "Sender inn …" : "Send inn svar"}
+          {status === "submitting" ? t('submitting') : t('submit')}
         </button>
       </div>
     </form>

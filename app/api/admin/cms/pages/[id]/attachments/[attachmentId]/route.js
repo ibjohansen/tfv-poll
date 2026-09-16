@@ -1,6 +1,7 @@
 import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { deleteAdminCmsFile, updateAdminCmsAttachment } from '@/lib/cms-files';
+import { getRequestI18n } from '@/lib/i18n/request';
 
 export const runtime = 'nodejs';
 
@@ -8,25 +9,27 @@ function response(body, status = 200) {
   return NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 export async function PATCH(request, { params }) {
-  if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return response({ ok: false, message: 'Ugyldig forespørsel.' }, 403);
+  const { t } = getRequestI18n(request, 'backend');
+  if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return response({ ok: false, message: t('api.invalidRequest') }, 403);
   try {
     const route = await params;
     const { title } = await readJsonObject(request);
     return response({ ok: true, attachment: await updateAdminCmsAttachment(route.id, route.attachmentId, title) });
   } catch (error) {
     const status = apiErrorStatus(error);
-    return response({ ok: false, message: status === 404 ? 'Vedlegget finnes ikke lenger.' : 'Skriv inn et visningsnavn på maksimalt 200 tegn.' }, status);
+    return response({ ok: false, message: t(status === 404 ? 'adminCms.attachmentMissing' : 'adminCms.attachmentName') }, status);
   }
 }
 
 export async function DELETE(request, { params }) {
-  if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return response({ ok: false, message: 'Ugyldig forespørsel.' }, 403);
+  const { t } = getRequestI18n(request, 'backend');
+  if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return response({ ok: false, message: t('api.invalidRequest') }, 403);
   try {
     const route = await params;
     await deleteAdminCmsFile(route.id, route.attachmentId);
     return response({ ok: true });
   } catch (error) {
     const status = apiErrorStatus(error);
-    return response({ ok: false, message: status === 404 ? 'Vedlegget finnes ikke lenger.' : 'Kunne ikke fjerne vedlegget.' }, status);
+    return response({ ok: false, message: t(status === 404 ? 'adminCms.attachmentMissing' : 'adminCms.removeAttachment') }, status);
   }
 }

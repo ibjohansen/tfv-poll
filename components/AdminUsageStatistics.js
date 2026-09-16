@@ -1,36 +1,42 @@
 import Link from 'next/link';
-import { USAGE_PERIODS, usageDeviceLabels, usagePageLabels } from '@/lib/usage-metrics';
+import { USAGE_PERIODS } from '@/lib/usage-metrics';
 import UsageTrendChart from '@/components/UsageTrendChart';
+import { getServerI18n } from '@/lib/i18n/server';
 
-function formatDate(value) {
+function formatDate(value, locale) {
   if (!value) return '—';
-  return new Intl.DateTimeFormat('nb-NO', { dateStyle: 'medium', timeZone: 'Europe/Oslo' }).format(new Date(`${value}T12:00:00Z`));
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'Europe/Oslo' }).format(new Date(`${value}T12:00:00Z`));
 }
 
-function formatBucket(value, granularity) {
+function formatBucket(value, granularity, locale, t) {
   if (granularity === 'month') {
-    return new Intl.DateTimeFormat('nb-NO', { month: 'long', year: 'numeric', timeZone: 'Europe/Oslo' }).format(new Date(`${value}T12:00:00Z`));
+    return new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric', timeZone: 'Europe/Oslo' }).format(new Date(`${value}T12:00:00Z`));
   }
-  const date = formatDate(value);
-  return granularity === 'week' ? `Uke fra ${date}` : date;
+  const date = formatDate(value, locale);
+  return granularity === 'week' ? t('weekFrom', {date}) : date;
 }
 
-function Distribution({ title, rows, labelFor, total }) {
+function Distribution({ title, rows, labelFor, total, locale, empty }) {
   return <section className="usage-panel"><h2>{title}</h2>{rows.length ? <ul className="usage-bars">{rows.map((row) => {
     const key = row.pageType || row.deviceCategory;
     const percent = total ? Math.round((row.views / total) * 100) : 0;
-    return <li key={key}><div><strong>{labelFor[key] || key}</strong><span>{row.views.toLocaleString('nb-NO')} · {percent} %</span></div><span className="usage-bar" aria-hidden="true"><span style={{ width: `${percent}%` }} /></span></li>;
-  })}</ul> : <p className="usage-empty">Ingen sidevisninger i perioden.</p>}</section>;
+    return <li key={key}><div><strong>{labelFor[key] || key}</strong><span>{row.views.toLocaleString(locale)} · {percent} %</span></div><span className="usage-bar" aria-hidden="true"><span style={{ width: `${percent}%` }} /></span></li>;
+  })}</ul> : <p className="usage-empty">{empty}</p>}</section>;
 }
 
-export default function AdminUsageStatistics({ data }) {
-  const periodLabel = (period) => period === 'all' ? 'Hele perioden' : period === 365 ? '1 år' : period === 730 ? '2 år' : `${period} dager`;
-  const bucketLabel = data.granularity === 'month' ? 'måned' : data.granularity === 'week' ? 'uke' : 'dag';
+export default async function AdminUsageStatistics({ data }) {
+  const { t, locale } = await getServerI18n('admin.usageDashboard');
+  const numberLocale = locale === 'en' ? 'en-GB' : 'nb-NO';
+  const periodLabel = (period) => period === 'all' ? t('all') : period === 365 ? t('year') : period === 730 ? t('twoYears') : t('days', {count: period});
+  const bucketLabel = t(data.granularity === 'month' ? 'month' : data.granularity === 'week' ? 'week' : 'day');
+  const pageLabels = { home: t('pages.home'), survey: t('pages.survey'), self_service: t('pages.self_service'), article: t('pages.article') };
+  const deviceLabels = { mobile: t('devicesMap.mobile'), tablet: t('devicesMap.tablet'), desktop: t('devicesMap.desktop'), unknown: t('devicesMap.unknown') };
+  const chartLabels = { empty: t('empty'), title: t('overTime'), explore: t('chartExplore'), point: t('chartPoint'), value: t('chartValue') };
   return <div className="usage-dashboard">
-    <section className="usage-intro"><div><p className="eyebrow">Personvernvennlig statistikk</p><h2>{data.total.toLocaleString('nb-NO')} sidevisninger</h2><p>{formatDate(data.from)}–{formatDate(data.to)}. Statistikken er dagsaggregert og inneholder ikke IP-adresser, cookies, bruker-ID-er, rå URL-er eller personlige lenker.</p></div><nav aria-label="Velg periode">{USAGE_PERIODS.map((period) => <Link key={period} href={`/admin/usage?days=${period}`} aria-current={data.period === period ? 'page' : undefined}>{periodLabel(period)}</Link>)}</nav></section>
-    <section className="usage-panel usage-trend"><div className="usage-panel-heading"><div><p className="eyebrow">Utvikling</p><h2>Sidevisninger over tid</h2></div><span>Per {bucketLabel}</span></div><UsageTrendChart rows={data.trend} granularity={data.granularity} /></section>
-    <div className="usage-grid"><Distribution title="Mest besøkte sidetyper" rows={data.pages} labelFor={usagePageLabels} total={data.total} /><Distribution title="Enhetskategorier" rows={data.devices} labelFor={usageDeviceLabels} total={data.total} /></div>
-    <section className="usage-panel"><h2>Datagrunnlag per {bucketLabel}</h2>{data.trend.length ? <div className="admin-table-scroll"><table className="admin-table"><caption>Aggregerte sidevisninger per {bucketLabel} i valgt periode</caption><thead><tr><th scope="col">Periode</th><th scope="col">Sidevisninger</th></tr></thead><tbody>{[...data.trend].reverse().map((row) => <tr key={row.date}><th scope="row">{formatBucket(row.date, data.granularity)}</th><td>{row.views.toLocaleString('nb-NO')}</td></tr>)}</tbody></table></div> : <p className="usage-empty">Ingen sidevisninger i perioden.</p>}</section>
-    <p className="privacy-subnote">De anonyme dagsaggregatene beholdes som historisk statistikk uten automatisk sletting. Besøk, varighet, navigasjonsforløp, nettleser, operativsystem og referrer samles ikke inn.</p>
+    <section className="usage-intro"><div><p className="eyebrow">{t('eyebrow')}</p><h2>{t('views', {count: data.total.toLocaleString(numberLocale)})}</h2><p>{t('privacySummary', {from: formatDate(data.from, numberLocale), to: formatDate(data.to, numberLocale)})}</p></div><nav aria-label={t('choosePeriod')}>{USAGE_PERIODS.map((period) => <Link key={period} href={`/admin/usage?days=${period}`} aria-current={data.period === period ? 'page' : undefined}>{periodLabel(period)}</Link>)}</nav></section>
+    <section className="usage-panel usage-trend"><div className="usage-panel-heading"><div><p className="eyebrow">{t('development')}</p><h2>{t('overTime')}</h2></div><span>{t('per', {bucket: bucketLabel})}</span></div><UsageTrendChart rows={data.trend} granularity={data.granularity} locale={numberLocale} labels={chartLabels} /></section>
+    <div className="usage-grid"><Distribution title={t('popularPages')} rows={data.pages} labelFor={pageLabels} total={data.total} locale={numberLocale} empty={t('empty')} /><Distribution title={t('devices')} rows={data.devices} labelFor={deviceLabels} total={data.total} locale={numberLocale} empty={t('empty')} /></div>
+    <section className="usage-panel"><h2>{t('basis', {bucket: bucketLabel})}</h2>{data.trend.length ? <div className="admin-table-scroll"><table className="admin-table"><caption>{t('caption', {bucket: bucketLabel})}</caption><thead><tr><th scope="col">{t('period')}</th><th scope="col">{t('pageViews')}</th></tr></thead><tbody>{[...data.trend].reverse().map((row) => <tr key={row.date}><th scope="row">{formatBucket(row.date, data.granularity, numberLocale, t)}</th><td>{row.views.toLocaleString(numberLocale)}</td></tr>)}</tbody></table></div> : <p className="usage-empty">{t('empty')}</p>}</section>
+    <p className="privacy-subnote">{t('retention')}</p>
   </div>;
 }

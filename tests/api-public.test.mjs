@@ -211,7 +211,15 @@ test('private CMS files require admin access and downloads have safe headers', a
   assert.equal(privateResponse.headers.get('x-injected'), null);
   assert.equal(privateResponse.headers.get('x-content-type-options'), 'nosniff');
   publicFile = { ...adminFile, is_public: true };
-  assert.match((await get()).headers.get('cache-control'), /public/);
+  const publicResponse = await get();
+  assert.match(publicResponse.headers.get('cache-control'), /public/);
+  assert.ok(publicResponse.headers.get('etag'));
+  const callsBeforeRevalidation = storageCalls;
+  const notModified = await route.GET(request('/api/cms/files/id', {
+    headers: { 'if-none-match': publicResponse.headers.get('etag') },
+  }), routeContext());
+  assert.equal(notModified.status, 304);
+  assert.equal(storageCalls, callsBeforeRevalidation);
   fail = true;
   const failed = await get();
   assert.equal(failed.status, 503);

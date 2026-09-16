@@ -6,6 +6,7 @@ import BrandLogo from '@/components/BrandLogo';
 import SurveyForm from "@/components/SurveyForm";
 import { surveyDocuments, surveyLinkParameters } from "@/data/survey";
 import { isMockMode } from '@/lib/mock-store';
+import { getServerI18n } from '@/lib/i18n/server';
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,6 +22,7 @@ function DocumentIcon() {
 }
 
 export default async function HomePage({ searchParams }) {
+  const { t } = await getServerI18n('surveys.page');
   const params = await searchParams;
   const memberToken = params[surveyLinkParameters.member];
   const requestedSurveyId = params[surveyLinkParameters.survey];
@@ -31,7 +33,7 @@ export default async function HomePage({ searchParams }) {
       ? await getMockSurveyAccess(memberToken, requestedSurveyId)
       : await getSurveyAccess(sessionSecret);
   } catch {
-    access = { status: "unavailable", message: "Medlemsregisteret er midlertidig utilgjengelig. Prøv igjen senere." };
+    access = { status: "unavailable", message: t('unavailable') };
   }
   return (
     <main>
@@ -42,12 +44,8 @@ export default async function HomePage({ searchParams }) {
           </div>
           <div className="hero-copy">
             <p className="eyebrow">Turufjell Vel</p>
-            <h1>Turufjell Vel - medlemsundersøkelse.</h1>
-            <p className="hero-intro">
-              Vi ønsker medlemmenes vurdering av informasjon og forventninger
-              knyttet til et mulig alpinanlegg på Kristnatten, og hvordan
-              vel-foreningen bør arbeide videre med saken.
-            </p>
+            <h1>{t('title')}</h1>
+            <p className="hero-intro">{t('introduction')}</p>
           </div>
         </header>
 
@@ -56,13 +54,10 @@ export default async function HomePage({ searchParams }) {
         <section className="info-section" aria-labelledby="before-you-answer">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Før du svarer</p>
-              <h2 id="before-you-answer">Informasjon og dokumenter</h2>
+              <p className="eyebrow">{t('before')}</p>
+              <h2 id="before-you-answer">{t('information')}</h2>
             </div>
-            <p>
-              Les gjerne relevant bakgrunnsmateriale før du sender inn
-              besvarelsen. Dokumentene åpnes i en ny fane.
-            </p>
+            <p>{t('documentHelp')}</p>
           </div>
 
           {surveyDocuments.length > 0 ? (
@@ -92,11 +87,8 @@ export default async function HomePage({ searchParams }) {
                 <DocumentIcon />
               </span>
               <div>
-                <strong>Dokumenter publiseres her</strong>
-                <p>
-                  Relevante vedlegg kan legges inn før undersøkelsen sendes ut
-                  til medlemmene.
-                </p>
+                <strong>{t('documentsComing')}</strong>
+                <p>{t('documentsComingHelp')}</p>
               </div>
             </div>
           )}
@@ -105,10 +97,10 @@ export default async function HomePage({ searchParams }) {
         {access.status === "ready" && <section className="survey-section" aria-labelledby="survey-heading">
           <div className="section-heading survey-heading">
             <div>
-              <p className="eyebrow">{access.survey.questions.length} spørsmål</p>
-              <h2 id="survey-heading">Din vurdering</h2>
+              <p className="eyebrow">{t('questionCount', {count: access.survey.questions.length})}</p>
+              <h2 id="survey-heading">{t('assessment')}</h2>
             </div>
-            <p>Velg det alternativet som passer best for hvert spørsmål.</p>
+            <p>{t('answerHelp')}</p>
           </div>
 
           <SurveyForm key={`${access.survey.id}:${access.survey.question_version}`} questionVersion={access.survey.question_version} mockToken={isMockMode() ? memberToken : undefined} mockSurveyId={isMockMode() ? requestedSurveyId : undefined} questions={access.survey.questions} />
@@ -116,7 +108,7 @@ export default async function HomePage({ searchParams }) {
 
         <footer className="page-footer">
           <span>Turufjell Vel</span>
-          <Link href="/admin">Administrasjon</Link>
+          <Link href="/admin">{t('administration')}</Link>
         </footer>
       </div>
     </main>

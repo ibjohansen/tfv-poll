@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { safeRichTextLink, textToRichText } from '@/lib/rich-text';
+import { useI18n } from '@/components/LocaleProvider';
 
 export default function RichTextEditor({ value, plainText = '', onChange, disabled = false }) {
+  const { t } = useI18n('cms.richEditor');
   const [link, setLink] = useState('');
   const [message, setMessage] = useState('');
   const editor = useEditor({
@@ -16,7 +18,7 @@ export default function RichTextEditor({ value, plainText = '', onChange, disabl
         isAllowedUri: (url) => Boolean(safeRichTextLink(url)) },
     })],
     content: value || textToRichText(plainText), editable: !disabled,
-    editorProps: { attributes: { role: 'textbox', 'aria-label': 'Hovedtekst', 'aria-multiline': 'true', class: 'cms-rich-text' } },
+    editorProps: { attributes: { role: 'textbox', 'aria-label': t('mainText'), 'aria-multiline': 'true', class: 'cms-rich-text' } },
     onUpdate: ({ editor: current }) => onChange(current.getJSON()),
   });
   const state = useEditorState({ editor, selector: ({ editor: current }) => current ? {
@@ -28,30 +30,30 @@ export default function RichTextEditor({ value, plainText = '', onChange, disabl
   // update and marks a successfully saved newsletter dirty again.
   useEffect(() => { editor?.setEditable(!disabled, false); }, [editor, disabled]);
   const buttons = [
-    ['Avsnitt', 'paragraph', () => editor.chain().focus().setParagraph().run()],
-    ['Overskrift 2', 'heading2', () => editor.chain().focus().toggleHeading({ level: 2 }).run()],
-    ['Overskrift 3', 'heading3', () => editor.chain().focus().toggleHeading({ level: 3 }).run()],
-    ['Fet', 'bold', () => editor.chain().focus().toggleBold().run()],
-    ['Kursiv', 'italic', () => editor.chain().focus().toggleItalic().run()],
-    ['Punktliste', 'bulletList', () => editor.chain().focus().toggleBulletList().run()],
-    ['Nummerert liste', 'orderedList', () => editor.chain().focus().toggleOrderedList().run()],
-    ['Sitat', 'blockquote', () => editor.chain().focus().toggleBlockquote().run()],
+    [t('paragraph'), 'paragraph', () => editor.chain().focus().setParagraph().run()],
+    [t('heading2'), 'heading2', () => editor.chain().focus().toggleHeading({ level: 2 }).run()],
+    [t('heading3'), 'heading3', () => editor.chain().focus().toggleHeading({ level: 3 }).run()],
+    [t('bold'), 'bold', () => editor.chain().focus().toggleBold().run()],
+    [t('italic'), 'italic', () => editor.chain().focus().toggleItalic().run()],
+    [t('bulletList'), 'bulletList', () => editor.chain().focus().toggleBulletList().run()],
+    [t('orderedList'), 'orderedList', () => editor.chain().focus().toggleOrderedList().run()],
+    [t('quote'), 'blockquote', () => editor.chain().focus().toggleBlockquote().run()],
   ];
   return <div className="cms-rich-editor">
-    <span>Hovedtekst</span><div className="cms-rich-toolbar" role="group" aria-label="Formatering">
+    <span>{t('mainText')}</span><div className="cms-rich-toolbar" role="group" aria-label={t('formatting')}>
       {buttons.map(([label, key, action]) => <button className="admin-button" key={key} type="button" aria-pressed={Boolean(state?.[key])} disabled={disabled || !editor} onClick={action}>{label}</button>)}
-      <button type="button" className="admin-button" disabled={disabled || !editor} onClick={() => editor.chain().focus().undo().run()}>Angre</button>
-      <button type="button" className="admin-button" disabled={disabled || !editor} onClick={() => editor.chain().focus().redo().run()}>Gjør om</button>
+      <button type="button" className="admin-button" disabled={disabled || !editor} onClick={() => editor.chain().focus().undo().run()}>{t('undo')}</button>
+      <button type="button" className="admin-button" disabled={disabled || !editor} onClick={() => editor.chain().focus().redo().run()}>{t('redo')}</button>
     </div><EditorContent editor={editor} />
-    <div className="cms-rich-toolbar"><label>Lenkeadresse<input value={link} onChange={(event) => setLink(event.target.value)} placeholder="https://…" maxLength={2000} disabled={disabled} /></label>
+    <div className="cms-rich-toolbar"><label>{t('linkAddress')}<input value={link} onChange={(event) => setLink(event.target.value)} placeholder="https://…" maxLength={2000} disabled={disabled} /></label>
       <button className="admin-button" type="button" disabled={disabled || !editor} onClick={() => {
         const href = safeRichTextLink(link.trim());
-        if (!href) { setMessage('Bruk en gyldig https-, http-, mailto- eller intern lenke.'); return; }
-        if (editor.state.selection.empty) { setMessage('Marker teksten som skal bli en lenke først.'); return; }
-        editor.chain().focus().setLink({ href }).run(); setMessage('Lenken er lagt til.'); setLink('');
-      }}>Legg til lenke</button>
-      <button className="admin-button" type="button" disabled={disabled || !editor} onClick={() => editor.chain().focus().extendMarkRange('link').unsetLink().run()}>Fjern lenke</button>
-    </div><small>Enkel formatering, uten egendefinerte skrifter, farger eller HTML. Maks 100 000 teksttegn.</small>
+        if (!href) { setMessage(t('invalidLink')); return; }
+        if (editor.state.selection.empty) { setMessage(t('selectText')); return; }
+        editor.chain().focus().setLink({ href }).run(); setMessage(t('linkAdded')); setLink('');
+      }}>{t('addLink')}</button>
+      <button className="admin-button" type="button" disabled={disabled || !editor} onClick={() => editor.chain().focus().extendMarkRange('link').unsetLink().run()}>{t('removeLink')}</button>
+    </div><small>{t('help')}</small>
     {message && <p role="status">{message}</p>}
   </div>;
 }

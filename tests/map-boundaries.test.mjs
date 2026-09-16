@@ -83,7 +83,7 @@ test('WFS retry, rate limit, cancellation and body budget do not expose raw erro
   const transport = mock(collection(feature()));
   const result = await findPropertiesInPolygon(square, { fetchImpl: (...args) => ++calls === 1 ? new Response('', { status: 503 }) : transport.fetchImpl(...args) });
   assert.equal(result.boundaries.length, 1); assert.equal(calls, 4);
-  await assert.rejects(findPropertiesInPolygon(square, { fetchImpl: async () => new Response('secret', { status: 429 }) }), /opptatt/);
+  await assert.rejects(findPropertiesInPolygon(square, { fetchImpl: async () => new Response('secret', { status: 429 }) }), (error) => error.code === 'errors.boundaryServiceBusy');
   const controller = new AbortController(); controller.abort();
   await assert.rejects(findPropertiesInPolygon(square, { signal: controller.signal, fetchImpl: async (_, { signal }) => { signal.throwIfAborted(); } }), (e) => e.status === 504);
   await assert.rejects(findPropertiesInPolygon(square, { fetchImpl: async () => new Response('x'.repeat(100001)) }), (e) => e.status === 413);
