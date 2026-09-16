@@ -1,8 +1,30 @@
 # Medlemsservice · Turufjell Vel
 
 En modulbasert medlemsservice bygget med Next.js, React, Node, Neon Postgres og
-Neon Object Storage. Den har medlemsregister, undersøkelser og et strukturert
+Neon Object Storage. Den samler medlemsregister, selvbetjening, kartbasert
+registerkontroll, kommunikasjon, undersøkelser, bruksstatistikk og et strukturert
 CMS for informasjonssider.
+
+## Funksjonsoversikt
+
+- Medlemsregister med søk, serverbaserte filtre, automatisk lagring,
+  endringshistorikk, Excel-eksport og matrikkelopplysninger på tomtenivå.
+- Sikker medlemsselvbetjening med tidsbegrenset engangslenke, fler-tomtstilgang,
+  retting av kontaktopplysninger, eierskifte, innmelding og maskinlesbar egeneksport.
+- Reservasjon mot manuell deling med Turufjell AS. Reservasjonen vises i admin og
+  selvbetjening, kan filtreres og utelates som standard fra administrativ eksport.
+- Oppgaveliste for innmeldinger, eierskifter, kommentarer og
+  matrikkelavklaringer, med antall ubehandlede saker på adminforsiden og i menyen.
+- Kart- og registerkontroll med lagrede grendepolygoner, Kartverket-adresser,
+  eiendomsgrenser, matrikkelreferanser og supplerende vei-/stidata fra Overpass.
+- Offentlig grendekart med ett valg per kontrollert grend og behovsstyrt visning
+  av H-nummer, gårds-/bruksnummer og adresse, uten medlemmenes kontaktopplysninger.
+- Grender og e-postgrupper, nyhetsbrev med forhåndsvisning/testutsending og
+  undersøkelser med personlige invitasjoner, resultater og Excel-eksport.
+- Strukturert CMS med sanert riktekst, hovedbilder og vedlegg i privat Object
+  Storage, samt personvernvennlig, egenhostet statistikk med Visx-grafer.
+- Rollebasert administrasjon gjennom Microsoft Entra ID, revisjonsspor og
+  kontrollerte Netlify-bakgrunnsjobber for e-post og matrikkelsynkronisering.
 
 ## Krav
 
@@ -28,7 +50,8 @@ Sertifikatkontrollen skal ikke deaktiveres.
 
 ## Sider og tilgang
 
-- `/` er en offentlig forside med logo, hovedinnhold og bunnfelt.
+- `/` er en offentlig forside med logo, hovedinnhold, kontrollert grendekart,
+  medlemsselvbetjening, publiserte artikler og bunnfelt.
 - **Mine medlemsopplysninger** ligger alltid på forsiden før publiserte artikler.
   Et medlem kan be om en 15-minutters engangslenke med H-nummer, gateadresse eller
   registrert e-postadresse, eller sende inn en ny tomt til behandling.
@@ -41,8 +64,18 @@ Sertifikatkontrollen skal ikke deaktiveres.
 - `/admin/inbox` er oppgavelisten for innmeldinger, eierskifter og
   matrikkelavklaringer, også når innsenderen ennå ikke har bekreftet e-postadressen.
 - `/admin/members` er modulen Medlemsregister.
+- `/admin/members/groups` administrerer grender, e-postgrupper og
+  medlemstilknytninger.
+- `/admin/members/newsletters` oppretter, tester og sender nyhetsbrev til valgte
+  e-postgrupper.
+- `/admin/members/matrikkel` starter og følger matrikkeloppdatering for ett,
+  flere eller alle valgte medlemmer. Tilgang krever matrikkelrettighet.
+- `/admin/map` viser kart- og registerkontroll, lagrede grendepolygoner,
+  adresser, eiendommer, veier og kobling til medlemsregisteret.
 - `/admin/surveys` er modulen Undersøkelser.
 - `/admin/web` er CMS-et for nettsider, hovedbilder og nedlastbare vedlegg.
+- `/admin/usage` viser anonym, aggregert bruksstatistikk og krever
+  revisjonsrettighet.
 - `/admin/audit` er den administratorbeskyttede oversikten Brukerendringer med
   før- og etterverdier for endringer i sentrale tabeller.
 - `/<slug>` viser en publisert informasjonsside. Utkast kan bare forhåndsvises
@@ -75,6 +108,7 @@ flowchart LR
   neon[("Neon Postgres\nmedlemmer, undersøkelser, svar og CMS-metadata")]
   storage[("Neon Object Storage\nbilder og vedlegg")]
   mailer["MailerSend Email API\ntransaksjonell levering"]
+  mapdata["Kartverket / Geonorge / OSM\noffisielle og supplerende kartdata"]
 
   member -->|"Ser data, retter kontaktfelt eller svarer"| app
   admin -->|"Administrerer medlemmer, undersøkelser og nettsider"| app
@@ -82,6 +116,7 @@ flowchart LR
   app -->|"Leser og skriver data"| neon
   app -->|"Lagrer og henter CMS-filer"| storage
   app -->|"Sender e-post server-side"| mailer
+  app -->|"Henter og normaliserer geografiske data"| mapdata
 ```
 
 ### Containere
@@ -96,6 +131,7 @@ flowchart TB
   files["Statiske dokumenter\npublic/survey/dokumenter"]
   matrikkel["Kartverket\nAdresse-API, A5 og Matrikkel SOAP-API"]
   norgeskart["Kartverket Norgeskart\ninnbygd eiendomskart"]
+  geodata["Kartverket / Geonorge / Overpass\nadresser, teiger, veier og stier"]
   worker["Netlify Background Function\nmatrikkelsynkronisering"]
   emailworker["Netlify Background Function\nsurvey-utsendelse"]
   mailer["MailerSend Email API\nlevering og suppression"]
@@ -112,6 +148,7 @@ flowchart TB
   mailer -->|"Signerte delivery/bounce-webhooks"| next
   worker -->|"Server-side API-kall"| matrikkel
   browser -->|"Adresseoppslag og kartvisning"| norgeskart
+  next -->|"Avgrensede server-side oppslag"| geodata
   worker -->|"Snapshot, status og oppdateringer"| db
 ```
 
@@ -132,6 +169,11 @@ gang til.
 | `app/api/admin/member-requests/*` | Krever Entra-basert administratortilgang og godkjenner eller avviser verifiserte eierskifter og innmeldinger. |
 | `app/admin/web/*` og `app/api/admin/cms/*` | Administrerer strukturert sideinnhold og filmetadata. Alle endringer krever adminøkt. |
 | `app/admin/audit`, `lib/admin-audit.js` og databasetriggere | Viser et skrivebeskyttet revisjonsspor for medlemmer, henvendelser, undersøkelser, svar, nettsider og vedlegg. |
+| `app/admin/usage`, `app/api/usage/pageview` og `lib/usage-statistics.js` | Lagrer og viser kun tillatte dagsaggregater for sidetype og grov enhetskategori, adskilt fra brukerloggen. |
+| `app/admin/map`, `components/MapExplorer/*` og `lib/map/*` | Holder kildeintegrasjon, GeoJSON-analyse, grender og registerkobling adskilt fra kartgrensesnittet. |
+| `components/PublicHamletMap*` og `lib/map/public-map-service.js` | Viser kontrollerte grender offentlig og utleverer bare H-nummer, matrikkelnummer, adresse og sikre kartkoordinater. |
+| `app/admin/members/groups` og `lib/member-groups.js` | Administrerer grender/e-postgrupper og medlemstilknytning med eksplisitte massevalg. |
+| `app/admin/members/newsletters`, `lib/newsletters.js` og bakgrunnsfunksjonen | Oppretter dedupliserte mottakerutvalg og kontrollerte nyhetsbrevjobber uten å blande leveringsdata inn i medlemsgrupper. |
 | `app/[slug]/page.js` og `components/CmsPageView.js` | Viser kun publiserte sider med systemstyrt typografi og avsnitt. |
 | `app/api/cms/files/*` og `lib/cms-storage.js` | Leverer filer fra en privat bøtte etter kontroll av publiseringsstatus eller adminøkt. |
 | `lib/admin-*.js` | Felles serverlogikk for sortering, opprettelse, oppdatering og myk sletting. |
@@ -492,6 +534,49 @@ har mottatt den. Kan hendelsen ikke lagres, returneres ikke eksportfilen.
 Mock-eksport av undersøkelsesresultater oppretter ingen databasehendelse.
 Dette bruker dagens skjema og krever ingen ny migrering eller miljøvariabel.
 
+## Kart, grender og registerkontroll
+
+Administratorkartet på `/admin/map` bruker Leaflet og GeoJSON. **Søkepolygon**
+ligger øverst og kan tegnes, redigeres eller slettes; Turf beregner areal,
+bounding box og eksakt geografisk avgrensning. Kartet kan vise adresser,
+eiendommer/teiger, veier og lagrede grender som separate lag. Ekstern API-logikk
+ligger i `lib/map`, slik at datakilder kan byttes uten å bygge om UI-et.
+
+Grendene er navngitte polygoner i `member_hamlets`, ikke hardkodede kartutkast.
+Valg i kart eller nedtrekksliste utfører samme handling og zoomer til polygonet.
+Administrator kan opprette, redigere, kontrollere og fjerne polygonet med
+versjonskontroll; fjerning av geometri sletter ikke grenden eller eksisterende
+medlemstilknytninger. Kartet ligger til høyre for grendeeditoren på brede skjermer
+og tilpasser seg mobilvisning.
+
+Adresse- og eiendomsobjekter kobles til medlemsregisteret med matrikkelreferanse
+eller eksakt normalisert adresse. Et entydig kartobjekt åpner det samme
+detaljpanelet med automatisk lagring som medlemsregisteret. Manglende hjemmelshaver
+eller flere mulige registerposter opplyses eksplisitt; løsningen velger aldri en
+eier eller tomt på grunnlag av fuzzy treff. Nye tomter forsøkes koblet til én
+kontrollert grend server-side, men uklar geometri blokkerer ikke opprettelsen.
+
+Forsidens kart bruker bare kontrollerte grendepolygoner. Eiendommer lastes først
+når brukeren ber om det, og tabellen under kartet viser H-nummer,
+gårds-/bruksnummer og adresse. Offentlig kartvisning er bevisst adskilt fra
+medlemsdata og viser aldri navn, e-post, telefon, hjemmelshaver eller notater.
+Detaljert kildebruk, koordinatsystemer, avgrensninger og lisenskrav står i
+[kartveiledningen](docs/map-explorer.md).
+
+## Grupper og nyhetsbrev
+
+`/admin/members/groups` administrerer både geografiske grender og e-postgrupper.
+Administrator kan søke og velge enkeltposter eller hele det serverfiltrerte
+utvalget. En gruppe inneholder medlemstilknytninger; den er ikke en kopiert
+kontaktliste. Sletting av en gruppe må bekreftes og sletter ikke medlemmer.
+
+Nyhetsbrev ligger som en egen modul på `/admin/members/newsletters`. Et utkast
+har emne, sanert riktekst og ett eller flere gruppeutvalg. Forhåndsvisning teller
+dedupliserte hovedadresser, testmail sendes separat, og masseutsending krever
+`MAILERSEND_BULK_ENABLED=true` og eksplisitt bekreftelse. Medlemsstatus,
+suppression og gyldig mottaker kontrolleres igjen rett før sending. Jobben kan
+gjenopptas idempotent uten å sende ferdigbehandlede leveringer på nytt.
+
 ## Produksjonssetting: Netlify + Neon + Microsoft Entra ID
 
 Kartmodulen ligger på `/admin/map`, med beskyttede Node-ruter
@@ -514,8 +599,12 @@ Se [kartmodulens datakilder, begrensninger og bruk](docs/map-explorer.md).
 
 Forsiden viser kontrollerte grendepolygoner fra `member_hamlets`. Den offentlige
 GET-ruten `/api/map/hamlets/[id]/properties` laster eiendommer først når en grend
-velges og returnerer bare H-nummer, gårds-/bruksnummer, adresse og eventuell
-offisiell adressekoordinat fra Kartverket. Medlems-ID, navn, hjemmelshaver,
+velges. Ingen grend er valgt ved innlasting, og samme grendeknapp slår valget av
+og på. Ruten henter offisielle adresser i polygonet, grupperer dem etter
+matrikkelreferanse og supplerer bare med H-nummer ved sikkert registertreff.
+Visningen er dermed ikke avhengig av en forhåndsutfylt `members.hamlet_id`.
+Responsen inneholder bare H-nummer, gårds-/bruksnummer, adresse og offisiell
+adressegeometri fra Kartverket. Medlems-ID, navn, hjemmelshaver,
 e-post, telefon og interne notater inngår ikke i responsen. Ruten har en lokal
 rate-limit på 20 oppslag per minutt og trenger samme delte/WAF-beskyttelse som
 de øvrige offentlige rutene i produksjon. Ingen ny miljøvariabel er nødvendig.
@@ -524,7 +613,7 @@ de øvrige offentlige rutene i produksjon. Ingen ny miljøvariabel er nødvendig
 funksjonsmappe. Netlify håndterer Next.js App Router gjennom sin Next.js-adapter,
 mens den lange matrikkelsynkroniseringen kjøres som en Netlify Background
 Function. Survey-utsendelser kjøres på samme måte i en egen bakgrunnsfunksjon.
-Den planlagte funksjonen `background-watchdog` kontrollerer matrikkeljobber
+Den planlagte Netlify-kjøringen av `background-watchdog` kontrollerer matrikkeljobber
 hvert femte minutt, bare når Netlify `CONTEXT` og `APP_ENVIRONMENT` er
 `production`. Den prøver høyst tre gjenopptakinger før synlig feilstatus.
 Den bruker eksisterende `DATABASE_URL`, `MATRIKKEL_JOB_SECRET` og Netlifys `URL`.
@@ -1135,11 +1224,21 @@ Medlemmet kan se registrerte eiendoms- og kontaktopplysninger,
 undersøkelsessvar med spørsmålssnapshot, registrert e-postleveringshistorikk og
 egne medlemsforespørsler. Interne administratornotater returneres ikke og er
 ikke med i JSON-eksporten. `primary_contact_name` og `other_contact_emails` kan
-endres direkte. Endring av hoved-e-post krever en separat engangsbekreftelse
+endres direkte. Medlemmet kan også reservere tomten mot manuell deling med
+Turufjell AS. Dette er en eksplisitt reservasjon, ikke en automatisk vurdering
+basert på eiernavn eller medlemsstatus. Endring av hoved-e-post krever en separat engangsbekreftelse
 først via gammel og deretter ny adresse; fullføring tilbakekaller alle tidligere
 medlem- og surveyøkter. H-nummer, gårds-/bruksnummer, gateadresse, hjemmelshaver og
 tinglysningsdato er skrivebeskyttet. De samme eiendomsfeltene er også
 skrivebeskyttet etter opprettelse i adminpanelets medlemsdetaljer.
+
+Administrator kan se og filtrere på delingsreservasjonen i medlemsregisteret.
+Excel-eksport utelater reserverte poster som standard; administrator må velge
+eksplisitt dersom de skal være med i et annet legitimt arbeidsutvalg. Feltet er
+`FALSE` for eksisterende poster etter migrering, og endringstidspunktet oppdateres
+bare når reservasjonsverdien faktisk endres. Reservasjonen påvirker ikke
+medlemskap, innlogging, undersøkelser eller nyhetsbrev uten en egen senere
+produktbeslutning.
 
 **Meld eierskifte** oppretter en merket, ventende forespørsel med ny
 kontaktperson, hoved-e-post og alternative adresser. Feltverdiene erstattes
@@ -1150,7 +1249,10 @@ H-nummer eller gateadresse ikke finnes. Skjemaet tar også imot gårds-/bruksnum
 og valgfritt seksjonsnummer. Saken vises umiddelbart i oppgavelisten som
 ubekreftet. Oppgitt e-post kan bekreftes med en egen 15-minutters lenke, og saken
 merkes da som bekreftet. Godkjenning oppretter medlemmet så lenge H-nummer/adresse
-fremdeles ikke kolliderer med et aktivt medlem.
+fremdeles ikke kolliderer med et aktivt medlem. Ved opprettelse forsøker serveren
+å knytte tomten til én kontrollert grend når Kartverket gir ett eksakt
+adressepunkt innenfor ett polygon. Uklare treff, overlapp eller tjenestefeil gir
+ingen gjettet grendetilknytning og blokkerer ikke opprettelsen.
 
 Ventende saker vises i den separate oppgavelisten på `/admin/inbox`. Saker med
 status `pending_verification` merkes tydelig som ubekreftet, men administrator
@@ -1308,7 +1410,11 @@ autentiseringsavvisning og videreføring uten medlemsdata eller hemmeligheter.
 Netlify kan returnere `202` før worker avviser et kall; kontroller derfor alltid
 lagret fremdrift og funksjonsloggen. Hvis en akseptert jobb aldri starter eller
 worker blir avbrutt, bruk **Stopp kjøring** og undersøk årsaken før nytt forsøk.
-Automatisk overvåking/gjenopptakelse gjenstår; se ToDo.
+`background-watchdog` kontrollerer i produksjonskontekst jobber som ikke har
+startet og utløpte worker-reservasjoner hvert femte minutt. Den forsøker høyst
+tre kontrollerte gjenopptakinger før kjøringen får synlig feilstatus. Dette må
+likevel funksjonstestes etter deploy; en `202` bekrefter bare at Netlify tok imot
+oppdraget, ikke at behandlingen faktisk startet.
 
 Oppslaget bruker `street_address` som eneste søkenøkkel og kan bare skrive:
 
@@ -1485,10 +1591,12 @@ Før en produksjonsutsendelse:
 ## Medlemsservice og Microsoft 365
 
 Åpne `/admin` for startsiden i Medlemsservice, `/admin/inbox` for oppgaver,
-`/admin/members` for medlemmer, `/admin/surveys` for undersøkelser eller
-`/admin/web` for nettsider. `/admin/audit` viser hvem som har gjort endringer i
-sentrale tabeller, med før- og etterverdier og lenker tilbake til relevante
-poster. Publiserte
+`/admin/members` for medlemmer, `/admin/members/groups` for grupper,
+`/admin/members/newsletters` for nyhetsbrev, `/admin/map` for kartkontroll,
+`/admin/members/matrikkel` for matrikkeloppdatering, `/admin/surveys` for
+undersøkelser eller `/admin/web` for nettsider. `/admin/usage` viser anonym
+bruksstatistikk, og `/admin/audit` viser hvem som har gjort endringer i sentrale
+tabeller, med før- og etterverdier og lenker tilbake til relevante poster. Publiserte
 CMS-sider vises automatisk på den offentlige forsiden og på sin egen slug.
 Oversiktene kan sorteres på kolonneoverskriftene. Medlemslisten har søk,
 filter for registrert administratorkommentar og uendelig rulling; klikk på en

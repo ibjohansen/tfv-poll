@@ -2328,6 +2328,8 @@ input, textarea, select { caret-color: var(--accent); }
 .public-hamlet-status { min-height: 46px; padding: 12px 0; color: var(--text-soft); font-size: 12px; }
 .public-hamlet-status p { margin: 0; }
 .public-hamlet-status .form-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.public-property-table tbody tr { cursor: pointer; }
+.public-property-table tbody tr:focus-visible { outline: 2px solid var(--brand-light-burgundy); outline-offset: -2px; }
 .public-property-table { max-height: 430px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; }
 .public-property-table table { width: 100%; border-collapse: collapse; color: var(--brand-brown); font-size: 13px; text-align: left; }
 .public-property-table caption { padding: 14px 16px; color: var(--text-soft); text-align: left; }

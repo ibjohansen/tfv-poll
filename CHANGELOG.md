@@ -2,7 +2,9 @@
 
 ## Ikke publisert
 
-- Offentlig grendekart på forsiden med behovsstyrt visning av H-nummer, gårds-/bruksnummer og adresse uten kontaktopplysninger.
+- Offentlig grendekart uten forhåndsvalg, med av/på-knapper og behovsstyrte
+  Kartverket-eiendommer som kan velges fra kart eller tabell; H-nummer suppleres
+  ved sikkert registertreff uten å eksponere kontaktopplysninger.
 - Reservasjon mot manuell deling med Turufjell AS i selvbetjening og admin, med endringstidspunkt, audit, filter og trygg eksportstandard.
 - Kartet ligger i grendepanelet, og valg av lagret grend laster polygonet direkte; den midlertidige utkastkatalogen er fjernet etter databasekontroll.
 - Søkepolygonet ligger øverst; kartobjekter åpner medlemsdetaljer, og nye tomter får trygg automatisk grendetilknytning ved ett eksakt geografisk treff.

@@ -9,7 +9,7 @@ const PublicHamletMapView = dynamic(() => import('./PublicHamletMapView'), {
 });
 
 export default function PublicHamletMap({ hamlets }) {
-  const [activeId, setActiveId] = useState(hamlets[0]?.id || '');
+  const [activeId, setActiveId] = useState('');
   const [showProperties, setShowProperties] = useState(false);
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
@@ -40,6 +40,11 @@ export default function PublicHamletMap({ hamlets }) {
   useEffect(() => () => controllerRef.current?.abort(), []);
 
   function selectHamlet(hamlet) {
+    if (hamlet.id === activeId) {
+      controllerRef.current?.abort(); setActiveId(''); setShowProperties(false); setLoading(false);
+      setProperties([]); setSelectedProperty(null); setError('');
+      return;
+    }
     setActiveId(hamlet.id); setProperties([]); setSelectedProperty(null); setError('');
     if (showProperties) loadProperties(hamlet.id);
   }
@@ -60,7 +65,8 @@ export default function PublicHamletMap({ hamlets }) {
       <p>Velg en grend for å se området. Eiendomsvisningen viser bare H-nummer, gårds- og bruksnummer og adresse – aldri navn eller kontaktopplysninger.</p></div>
     <div className="public-hamlet-controls" aria-label="Velg grend">
       {hamlets.map((hamlet) => <button key={hamlet.id} type="button" aria-pressed={hamlet.id === activeId}
-        title={`Vis ${hamlet.name} i kartet`} onClick={() => selectHamlet(hamlet)}>{hamlet.name}</button>)}
+        title={hamlet.id === activeId ? `Skjul ${hamlet.name} i kartet` : `Vis ${hamlet.name} i kartet`}
+        onClick={() => selectHamlet(hamlet)}>{hamlet.name}</button>)}
       <button className="public-property-toggle" type="button" aria-pressed={showProperties} disabled={!activeHamlet || loading}
         title="Vis eller skjul registrerte eiendommer i valgt grend" onClick={toggleProperties}>
         {loading ? 'Henter eiendommer …' : showProperties ? 'Skjul eiendommer' : 'Vis eiendommer'}
@@ -70,11 +76,13 @@ export default function PublicHamletMap({ hamlets }) {
       selectedProperty={selectedProperty} onSelectHamlet={selectHamlet} onSelectProperty={setSelectedProperty} onError={setError} />
     <div className="public-hamlet-status" aria-live="polite">
       {error ? <p className="form-error">{error} {showProperties && <button type="button" onClick={() => loadProperties(activeId)} title="Prøv eiendomsoppslaget på nytt">Prøv igjen</button>}</p>
-        : showProperties && !loading && <p>{properties.length} registrerte eiendommer i {activeHamlet?.name}. {properties.filter((property) => property.latitude === null).length > 0 && 'Eiendommer uten entydig adressekoordinat vises bare i listen.'}</p>}
+        : showProperties && !loading && <p>{properties.length} offisielle eiendommer med adresse i {activeHamlet?.name}. {selectedProperty && `Valgt: ${selectedProperty.address || selectedProperty.cadastralNumber}. `}{properties.filter((property) => !property.geometry).length > 0 && 'Eiendommer uten kartgeometri vises bare i listen.'}</p>}
     </div>
     {showProperties && properties.length > 0 && <div className="public-property-table" role="region" aria-label={`Eiendommer i ${activeHamlet?.name}`} tabIndex={0}>
       <table><caption>Registrerte eiendommer i {activeHamlet?.name}</caption><thead><tr><th scope="col">H-nummer</th><th scope="col">Gårds- og bruksnummer</th><th scope="col">Adresse</th></tr></thead>
-        <tbody>{properties.map((property) => <tr key={property.id} className={selectedProperty?.id === property.id ? 'is-selected' : undefined}>
+        <tbody>{properties.map((property) => <tr key={property.id} className={selectedProperty?.id === property.id ? 'is-selected' : undefined}
+          tabIndex={0} aria-selected={selectedProperty?.id === property.id} title="Vis eiendommen i kartet"
+          onClick={() => setSelectedProperty(property)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedProperty(property); } }}>
           <th scope="row"><button type="button" onClick={() => setSelectedProperty(property)} title="Vis eiendommen i kartet">{property.hNumber || '–'}</button></th>
           <td>{property.cadastralNumber || '–'}</td><td>{property.address || 'Ikke registrert'}</td>
         </tr>)}</tbody></table>

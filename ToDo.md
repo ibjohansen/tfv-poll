@@ -924,9 +924,13 @@ Eventuelle funn fra sikkerhetsgjennomgangen legges inn som egne P1- eller P2-sak
 - [x] Når en lagret grend velges, hentes adresser og eiendommer innenfor polygonet automatisk. Eiendommer kan vises eller skjules som eget kartlag.
 - [x] Et kontrollert grendepolygon kan kobles til medlemsregisteret. Bare entydige offisielle treff får grend; eksisterende tilordning til en annen grend beholdes for manuell kontroll.
 
-###Forsidekart###
+### Forsidekart
 
 - [x] Forsiden viser alle kontrollerte grendepolygoner med én knapp per grend.
+- [x] Ingen grend er valgt ved innlasting; samme knapp velger eller opphever
+  valget.
 - [x] Eiendommer kan vises for valgt grend. Under kartet vises bare H-nummer,
   gårds-/bruksnummer og adresse; navn, e-post, telefon og interne database-ID-er
-  sendes aldri til den offentlige klienten.
+  sendes aldri til den offentlige klienten. Eiendomslisten bygges fra offisielle
+  Kartverket-adresser i polygonet og krever ikke en forhåndsutfylt grendekobling.
+- [x] Klikk på eiendomsmarkør eller tabellrad velger objektet og zoomer kartet.

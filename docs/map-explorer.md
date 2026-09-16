@@ -131,15 +131,19 @@ rollekrav beholdes. Ingen ny Entra-rolle eller miljøvariabel behøves.
 
 ### Offentlig kart på forsiden
 
-Forsiden viser bare grender med lagret og manuelt kontrollert polygon. Én knapp
-per grend velger og zoomer området. **Vis eiendommer** gjør et behovsstyrt kall
+Forsiden viser bare grender med lagret og manuelt kontrollert polygon. Ingen
+grend er valgt ved innlasting. Én knapp per grend velger og zoomer området;
+samme knapp slår valget av igjen. **Vis eiendommer** gjør et behovsstyrt kall
 til `GET /api/map/hamlets/[id]/properties`; alle grender og Kartverket-adresser
 forhåndshentes derfor ikke ved vanlig sidevisning.
 
-`lib/map/public-map-service.js` leser bare `h_number`, `cadastral_number` og
-`street_address` for aktive poster i valgt grend. Adressekoordinat kobles bare
-ved entydig normalisert adressetreff, eventuelt entydiggjort av gnr/bnr. Flere
-kandidater gir ingen gjettet markør; posten står fortsatt i listen. Responsen
+`lib/map/public-map-service.js` henter offisielle adresser i polygonet og grupperer
+dem etter matrikkelreferanse. Deretter leses bare `h_number`,
+`cadastral_number` og `street_address` fra aktive registerposter for å supplere
+med H-nummer. Gnr/bnr brukes primært; eksakt normalisert adresse brukes når
+matrikkelreferansen mangler. Flere tvetydige adressetreff gir ikke et gjettet
+H-nummer. Løsningen er derfor ikke avhengig av at `members.hamlet_id` allerede
+er masseoppdatert. Responsen
 inneholder ikke medlems-ID, navn, hjemmelshaver, e-post, telefon, reservasjoner
 eller interne notater. Kartverket mottar polygonet server-side, ikke registerdata.
 

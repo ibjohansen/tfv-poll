@@ -40,21 +40,29 @@ export default function PublicHamletMapView({ hamlets, activeHamlet, properties,
       layer.on('click', () => onSelectHamlet(hamlet));
     }
     for (const property of properties) {
-      if (!Number.isFinite(property.latitude) || !Number.isFinite(property.longitude)) continue;
+      if (!property.geometry && (!Number.isFinite(property.latitude) || !Number.isFinite(property.longitude))) continue;
       const active = property.id === selectedProperty?.id;
-      const marker = L.circleMarker([property.latitude, property.longitude], {
+      const feature = property.geometry ? { type: 'Feature', properties: {}, geometry: property.geometry }
+        : { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [property.longitude, property.latitude] } };
+      const layer = L.geoJSON(feature, { pointToLayer: (_feature, point) => L.circleMarker(point, {
         radius: active ? 9 : 6, color: active ? '#5a2636' : '#33626d', fillColor: active ? '#f79c80' : '#7cabb3', fillOpacity: 0.95, weight: 2,
-      }).addTo(group);
-      marker.bindTooltip([property.hNumber, property.address].filter(Boolean).join(' · '));
-      marker.on('click', () => onSelectProperty(property));
+      }) }).addTo(group);
+      layer.bindTooltip([property.hNumber, property.address, property.cadastralNumber].filter(Boolean).join(' · '));
+      layer.on('click', () => onSelectProperty(property));
     }
   }, [activeHamlet, hamlets, onSelectHamlet, onSelectProperty, properties, selectedProperty]);
 
   useEffect(() => {
-    const geometry = selectedProperty && Number.isFinite(selectedProperty.latitude) && Number.isFinite(selectedProperty.longitude)
+    const selectedGeometry = selectedProperty?.geometry || (selectedProperty
+      && Number.isFinite(selectedProperty.latitude) && Number.isFinite(selectedProperty.longitude)
       ? { type: 'Point', coordinates: [selectedProperty.longitude, selectedProperty.latitude] }
-      : activeHamlet?.polygon?.geometry;
-    if (!geometry || !mapRef.current) return;
+      : null);
+    const geometry = selectedGeometry || activeHamlet?.polygon?.geometry;
+    if (!mapRef.current) return;
+    if (!geometry) {
+      mapRef.current.setView(latLng(TURUFJELL_CENTER), 14);
+      return;
+    }
     if (geometry.type === 'Point') mapRef.current.setView(latLng(geometry.coordinates), 17);
     else {
       const bounds = L.geoJSON({ type: 'Feature', properties: {}, geometry }).getBounds();
