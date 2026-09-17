@@ -96,7 +96,7 @@ const admin = {
   },
   groups: {
     back: 'Back to the member register',
-    help: 'A property can belong to one hamlet and several email groups. Email counts cover unique addresses for ordinary members before any delivery suppression is applied.',
+    help: 'Create, rename and delete hamlets and email groups here. Assign email groups in the member register and maintain hamlet links in the map.',
     createTitle: 'Create group',
     type: 'Type',
     hamlet: 'Hamlet',

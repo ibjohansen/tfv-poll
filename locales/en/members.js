@@ -26,4 +26,24 @@ members.requests.reviewCodes = {
 };
 members.matrikkel.hNumberLabel = 'H-number';
 members.adminDirectory.saveStates.idle = '—';
+Object.assign(members.adminDirectory, {
+  groups: 'Manage groups',
+  tableCaption: 'Select properties with the checkboxes for export, cadastral updates or email-group assignment. Select a row to view and edit member details.',
+  selectAction: 'Select for export, cadastral update or email group',
+  assignSelected: 'Assign {count} selected properties to an email group',
+  chooseEmailGroup: 'Select email group',
+  addSelectedToGroup: 'Add to group',
+  assigning: 'Assigning …',
+  groupMembershipsEyebrow: 'Memberships',
+  groupMemberships: 'Hamlet and email groups',
+  editHamletInMap: 'Edit hamlet polygons in the map',
+  hamletMapNote: 'Select the hamlet here. Maintain polygons and automatic hamlet matching in the map.',
+  hamletAssigned: 'The property was assigned to the hamlet “{name}”.',
+  hamletRemoved: 'The hamlet link was removed.',
+  emailGroups: 'Email groups',
+  noEmailGroups: 'No email groups have been created.',
+  groupAdded: '{count} new group memberships were saved in “{name}”.',
+  groupRemoved: 'The property was removed from “{name}”.',
+  groupSaveError: 'The group membership could not be saved.',
+});
 export default members;

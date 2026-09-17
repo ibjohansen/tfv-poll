@@ -96,7 +96,7 @@ const admin = {
   },
   groups: {
     back: 'Til medlemsregisteret',
-    help: 'En tomt kan tilhøre én grend og flere e-postgrupper. E-posttelling gjelder unike adresser for ordinære medlemmer, før kontroll av eventuelle leveringsreservasjoner.',
+    help: 'Her oppretter, gir du nytt navn til og sletter grender og e-postgrupper. E-postgrupper tilordnes i medlemsregisteret, mens grendetilknytninger vedlikeholdes i kartet.',
     createTitle: 'Opprett gruppering',
     type: 'Type',
     hamlet: 'Grend',

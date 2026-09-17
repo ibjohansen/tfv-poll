@@ -1555,6 +1555,15 @@ input, textarea, select { caret-color: var(--accent); }
 .admin-meta dd { margin: 0; color: #27272a; font-size: 12px; overflow-wrap: anywhere; }
 .admin-remove, .admin-delete { justify-self: start; padding: 2px 0; border: 0; background: transparent; color: #b91c1c; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; text-decoration: none; }
 .admin-success { margin: 0; padding: 11px 13px; border: 1px solid #bbf7d0; border-radius: 9px; background: #f0fdf4; color: #166534; font-size: 12px; }
+.admin-bulk-group-action { display: flex; align-items: flex-end; gap: 12px; margin: 14px 0; padding: 14px; border: 1px solid #dbe3dc; border-radius: 12px; background: #f3f7f2; }
+.admin-bulk-group-action label { display: grid; flex: 1 1 300px; gap: 7px; color: #3f3f46; font-size: 12px; font-weight: 650; }
+.admin-bulk-group-action .shared-select { width: 100%; }
+.member-group-memberships { display: grid; gap: 14px; padding: 16px; border: 1px solid #e4e4e7; border-radius: 12px; background: #fafafa; }
+.member-group-memberships .admin-section-header .eyebrow { margin: 0 0 4px; color: #71717a; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+.member-group-memberships .admin-meta { padding: 12px 0; }
+.member-email-group-list { display: grid; gap: 10px; margin: 0; padding: 0; border: 0; }
+.member-email-group-list legend { margin-bottom: 9px; color: #3f3f46; font-size: 12px; font-weight: 650; }
+.member-email-group-list p { margin: 0; color: #71717a; font-size: 12px; }
 
 .confirm-backdrop { position: fixed; z-index: 80; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(24, 24, 27, .38); backdrop-filter: blur(2px); }
 .confirm-dialog { width: min(100%, 460px); padding: 28px; border: 1px solid #e4e4e7; border-radius: 16px; background: white; box-shadow: 0 24px 70px rgba(24, 24, 27, .2); }
@@ -2793,8 +2802,10 @@ input, textarea, select { caret-color: var(--accent); }
 }
 .member-groups-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; min-width: 0; }
 .member-groups-layout > *, .member-groups-layout .admin-detail-form { min-width: 0; }
-.member-group-selection { list-style: none; padding: 0; max-height: 24rem; overflow: auto; }
-.member-group-selection label { display: flex; align-items: center; gap: .75rem; padding: .6rem; }
+@media (max-width: 640px) {
+  .admin-bulk-group-action { align-items: stretch; flex-direction: column; }
+  .admin-bulk-group-action label { flex-basis: auto; }
+}
 
 .language-switcher {
   position: relative;

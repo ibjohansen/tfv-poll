@@ -1,7 +1,7 @@
 'use client';
 
 import Select from "@/components/Select";
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { useI18n } from '@/components/LocaleProvider';
@@ -13,19 +13,9 @@ export default function AdminMemberGroups({ initialGroups }) {
   const [kind, setKind] = useState('hamlet');
   const [name, setName] = useState('');
   const [rename, setRename] = useState('');
-  const [search, setSearch] = useState('');
-  const [query, setQuery] = useState('');
-  const [members, setMembers] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(0);
-  const [checked, setChecked] = useState([]);
-  const [allMatching, setAllMatching] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const searchTimer = useRef(null);
-  const searchRequest = useRef(null);
-  useEffect(() => () => { clearTimeout(searchTimer.current); searchRequest.current?.abort(); }, []);
   async function change(values) {
     setBusy(true); setMessage('');
     try {
@@ -42,24 +32,6 @@ export default function AdminMemberGroups({ initialGroups }) {
     } catch (error) { setMessage(error.message || t('serverError')); }
     finally { setBusy(false); }
   }
-  async function findMembers(nextPage = 1, searchValue = search) {
-    searchRequest.current?.abort();
-    const controller = new AbortController();
-    searchRequest.current = controller;
-    setBusy(true); setMessage('');
-    try {
-      const currentQuery = nextPage === 1 ? searchValue.trim() : query;
-      const response = await fetch(`/api/admin/members?${new URLSearchParams({ q: currentQuery, page: String(nextPage) })}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) });
-      if (!response.ok) throw new Error(t('propertyError'));
-      const body = await response.json();
-      if (controller.signal.aborted) return;
-      setMembers((current) => nextPage === 1 ? body.members : [...current, ...body.members]);
-      setTotal(body.total); setPage(body.page); setQuery(currentQuery);
-      if (nextPage === 1) { setChecked([]); setAllMatching(false); }
-    } catch (error) { if (!controller.signal.aborted) setMessage(error.message || t('serverError')); }
-    finally { if (searchRequest.current === controller) setBusy(false); }
-  }
-  const count = allMatching ? total : checked.length;
   return <div className="member-groups-layout">
     <Link className="admin-button" href="/admin/members">{t('back')}</Link>
     <p>{t('help')}</p>
@@ -76,17 +48,6 @@ export default function AdminMemberGroups({ initialGroups }) {
       <form className="admin-detail-form" onSubmit={(event) => { event.preventDefault(); change({ ...selected, action: 'rename', name: rename }); }}>
         <label>{t('newName')}<input value={rename} onChange={(event) => setRename(event.target.value)} maxLength={100} required /></label><button className="admin-button" disabled={busy}>{t('rename')}</button>
       </form>
-      <form className="admin-search" onSubmit={(event) => { event.preventDefault(); clearTimeout(searchTimer.current); findMembers(); }}><label htmlFor="group-member-search">{t('search')}</label><div><input id="group-member-search" type="search" value={search} onChange={(event) => {
-        const value = event.target.value; setSearch(value); setChecked([]); setAllMatching(false); setPage(0); searchRequest.current?.abort(); clearTimeout(searchTimer.current);
-        searchTimer.current = setTimeout(() => findMembers(1, value), 300);
-      }} maxLength={200} /></div></form>
-      {page > 0 && <><label><input type="checkbox" checked={allMatching} onChange={(event) => { setAllMatching(event.target.checked); setChecked([]); }} disabled={busy} /> {t('selectAll', {count: total, query: query || t('allProperties')})}</label>
-        <ul className="member-group-selection">{members.map((member) => <li key={member.id}><label><input type="checkbox" checked={allMatching || checked.includes(String(member.id))} disabled={busy || allMatching} onChange={(event) => setChecked((current) => event.target.checked ? [...current, String(member.id)] : current.filter((id) => id !== String(member.id)))} />{member.h_number} · {member.street_address || t('noAddress')} · {member.primary_contact_name || t('noContact')}</label></li>)}</ul>
-        {members.length < total && <button type="button" className="admin-button" onClick={() => findMembers(page + 1)} disabled={busy}>{t('showMore')}</button>}
-        <p>{t('selected', {count})} {selected.kind === 'hamlet' && t('moveWarning')}</p>
-        <button type="button" className="primary-button" disabled={busy || !count} onClick={() => change({ ...selected, action: 'add', memberIds: checked, allMatching, search: query })}>{t('add')}</button>{' '}
-        <button type="button" className="admin-button" disabled={busy || !count} onClick={() => change({ ...selected, action: 'remove', memberIds: checked, allMatching, search: query })}>{t('remove')}</button>
-      </>}
       <p><button type="button" className="admin-delete" disabled={busy} onClick={() => setConfirmDelete(true)}>{t('delete')}</button></p>
     </section>}
     {message && <p role="status">{message}</p>}

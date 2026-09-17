@@ -26,4 +26,24 @@ members.requests.reviewCodes = {
 };
 members.matrikkel.hNumberLabel = 'H-nummer';
 members.adminDirectory.saveStates.idle = '—';
+Object.assign(members.adminDirectory, {
+  groups: 'Administrer grupper',
+  tableCaption: 'Velg tomter med avkrysningsboksene for eksport, matrikkeloppdatering eller tilordning til e-postgruppe. Velg en rad for å se og redigere medlemsopplysninger.',
+  selectAction: 'Velg for eksport, matrikkeloppdatering eller e-postgruppe',
+  assignSelected: 'Tilordne {count} valgte til en e-postgruppe',
+  chooseEmailGroup: 'Velg e-postgruppe',
+  addSelectedToGroup: 'Legg til i gruppe',
+  assigning: 'Tilordner …',
+  groupMembershipsEyebrow: 'Tilknytninger',
+  groupMemberships: 'Grend og e-postgrupper',
+  editHamletInMap: 'Rediger grendepolygoner i kartet',
+  hamletMapNote: 'Grend kan velges her. Polygoner og automatisk grendematching vedlikeholdes i kartet.',
+  hamletAssigned: 'Tomten ble tilordnet grenden «{name}».',
+  hamletRemoved: 'Grendetilknytningen ble fjernet.',
+  emailGroups: 'E-postgrupper',
+  noEmailGroups: 'Ingen e-postgrupper er opprettet.',
+  groupAdded: '{count} nye gruppetilknytninger ble lagret i «{name}».',
+  groupRemoved: 'Tomten ble fjernet fra «{name}».',
+  groupSaveError: 'Gruppetilknytningen kunne ikke lagres.',
+});
 export default members;

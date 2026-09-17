@@ -55,9 +55,13 @@ test('email groups overlap, deduplicate recipients, rename, remove and delete on
   assert.equal(summary.plot_count, 3); assert.equal(summary.email_count, 2);
   const filtered = await directory.getAdminMembers('', 1, 'h_number', 'asc', false, false, { groupId: first.id });
   assert.equal(filtered.total, 3);
+  assert.deepEqual(new Set(filtered.members[0].email_group_ids), new Set([String(first.id), String(second.id)]));
+  const detail = await directory.getAdminMemberById(f.memberIds[0]);
+  assert.deepEqual(new Set(detail.email_group_ids), new Set([String(first.id), String(second.id)]));
   await groups.changeMemberGroup({ ...first, action: 'rename', name: `Renamed ${randomUUID()}` });
   await groups.changeMemberGroup({ ...first, action: 'remove', memberIds: [f.memberIds[0]] });
   assert.equal((await directory.getAdminMembers('', 1, 'h_number', 'asc', false, false, { groupId: first.id })).total, 2);
+  assert.deepEqual((await directory.getAdminMemberById(f.memberIds[0])).email_group_ids, [String(second.id)]);
   await groups.changeMemberGroup({ ...first, action: 'delete' });
   assert.equal((await db.sql`SELECT member_id FROM member_email_group_members WHERE group_id = ${second.id}`).length, 3);
   assert.equal((await db.sql`SELECT id FROM members WHERE id = ANY(${f.memberIds}::bigint[]) AND deleted_at IS NULL`).length, 3);

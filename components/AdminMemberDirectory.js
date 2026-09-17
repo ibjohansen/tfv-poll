@@ -29,7 +29,20 @@ function formFromMember(member) {
 }
 
 function payloadFromForm(form) {
-  return { ...form, other_contact_emails: form.other_contact_emails.split(/[\n,;]+/).map((value) => value.trim()).filter(Boolean) };
+  return {
+    h_number: form.h_number,
+    cadastral_number: form.cadastral_number,
+    section_number: form.section_number,
+    street_address: form.street_address,
+    title_holder: form.title_holder,
+    registration_date: form.registration_date,
+    primary_contact_name: form.primary_contact_name,
+    primary_contact_email: form.primary_contact_email,
+    other_contact_emails: form.other_contact_emails.split(/[\n,;]+/).map((value) => value.trim()).filter(Boolean),
+    admin_comment: form.admin_comment,
+    membership_status: form.membership_status,
+    turufjell_as_sharing_opt_out: form.turufjell_as_sharing_opt_out,
+  };
 }
 
 function payloadKey(form) {
@@ -57,6 +70,9 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
   const [exporting, setExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState('');
   const [excludeTurufjellAsOptOut, setExcludeTurufjellAsOptOut] = useState(true);
+  const [bulkGroupId, setBulkGroupId] = useState('');
+  const [groupBusy, setGroupBusy] = useState('');
+  const [groupMessage, setGroupMessage] = useState(null);
   const [saveState, setSaveState] = useState(initialSelected ? 'saved' : 'idle');
   const savedPayload = useRef(initialSelected ? payloadKey(formFromMember(initialSelected)) : '');
   const formVersion = useRef(0);
@@ -66,6 +82,8 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
   const detailCloseButton = useRef(null);
   const detailTrigger = useRef(null);
   const detailsOpen = Boolean(selected);
+  const emailGroups = useMemo(() => groups.filter((group) => group.kind === 'email'), [groups]);
+  const hamlets = useMemo(() => groups.filter((group) => group.kind === 'hamlet'), [groups]);
   useEffect(() => {
     if (!detailsOpen) return;
     detailCloseButton.current?.focus();
@@ -102,9 +120,9 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [exportOpen, exporting]);
-  const select = (member) => { const next = formFromMember(member); detailTrigger.current = document.activeElement; formVersion.current += 1; savedPayload.current = payloadKey(next); setSelected(member); setForm(next); setSaveState('saved'); setMessage(''); setNewToken(''); };
-  const create = () => { const next = { h_number: '', cadastral_number: '', section_number: '', street_address: '', title_holder: '', registration_date: '', primary_contact_name: '', primary_contact_email: '', other_contact_emails: '', admin_comment: '', turufjell_as_sharing_opt_out: false }; formVersion.current += 1; savedPayload.current = ''; setSelected({ isNew: true }); setForm(next); setSaveState('idle'); setMessage(''); setNewToken(''); };
-  const close = () => { setSelected(null); setForm(null); setNewToken(''); };
+  const select = (member) => { const next = formFromMember(member); detailTrigger.current = document.activeElement; formVersion.current += 1; savedPayload.current = payloadKey(next); setSelected(member); setForm(next); setSaveState('saved'); setMessage(''); setGroupMessage(null); setNewToken(''); };
+  const create = () => { const next = { h_number: '', cadastral_number: '', section_number: '', street_address: '', title_holder: '', registration_date: '', primary_contact_name: '', primary_contact_email: '', other_contact_emails: '', admin_comment: '', membership_status: 'member', turufjell_as_sharing_opt_out: false }; formVersion.current += 1; savedPayload.current = ''; setSelected({ isNew: true }); setForm(next); setSaveState('idle'); setMessage(''); setGroupMessage(null); setNewToken(''); };
+  const close = () => { setSelected(null); setForm(null); setGroupMessage(null); setNewToken(''); };
   const updateForm = (name, value) => { formVersion.current += 1; setForm((current) => ({ ...current, [name]: value })); };
   const persistForm = useCallback(async (payload, version, wasNew, memberId) => {
     if (savingRef.current) return false;
@@ -116,7 +134,7 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
       const returnedForm = formFromMember(body.member);
       savedPayload.current = payloadKey(returnedForm);
       setMembers((current) => wasNew ? [body.member, ...current] : current.map((item) => String(item.id) === String(body.member.id) ? { ...item, ...body.member } : item));
-      setSelected(body.member);
+      setSelected((current) => current && String(current.id) === String(body.member.id) ? { ...current, ...body.member } : body.member);
       if (formVersion.current === version) setForm(returnedForm);
       setNewToken(''); setSaveState(formVersion.current === version ? 'saved' : 'dirty');
       setMessage(wasNew ? body.member.hamlet_name
@@ -161,6 +179,52 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
       return next;
     });
   }
+  async function changeGroupMembership(group, action, memberIds, busyKey) {
+    setGroupBusy(busyKey); setGroupMessage(null);
+    try {
+      const response = await fetch('/api/admin/member-groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: group.kind, id: group.id, action, memberIds }),
+        signal: AbortSignal.timeout(20_000),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.message || t('groupSaveError'));
+      const groupIdValue = String(group.id);
+      const memberIdSet = new Set(memberIds.map(String));
+      const updateMembership = (member) => {
+        if (!member || !memberIdSet.has(String(member.id))) return member;
+        if (group.kind === 'hamlet') return action === 'add'
+          ? { ...member, hamlet_id: group.id, hamlet_name: group.name }
+          : { ...member, hamlet_id: null, hamlet_name: null };
+        const current = new Set((member.email_group_ids || []).map(String));
+        if (action === 'add') current.add(groupIdValue); else current.delete(groupIdValue);
+        return { ...member, email_group_ids: [...current] };
+      };
+      setMembers((current) => current.map(updateMembership));
+      setSelected((current) => updateMembership(current));
+      const text = group.kind === 'hamlet'
+        ? action === 'add' ? t('hamletAssigned', {name: group.name}) : t('hamletRemoved')
+        : action === 'add' ? t('groupAdded', { count: body.group?.changed_count ?? 0, name: group.name }) : t('groupRemoved', { name: group.name });
+      setGroupMessage({ type: 'success', text });
+      router.refresh();
+      return true;
+    } catch (error) {
+      setGroupMessage({ type: 'error', text: error.message || t('groupSaveError') });
+      return false;
+    } finally { setGroupBusy(''); }
+  }
+  async function assignSelectedToGroup() {
+    const group = emailGroups.find((item) => String(item.id) === String(bulkGroupId));
+    if (!group || !checked.size) return;
+    await changeGroupMembership(group, 'add', [...checked], 'bulk');
+  }
+  async function changeSelectedHamlet(nextHamletId) {
+    const currentHamlet = hamlets.find((group) => String(group.id) === String(selected.hamlet_id));
+    const nextHamlet = hamlets.find((group) => String(group.id) === String(nextHamletId));
+    if (nextHamlet) await changeGroupMembership(nextHamlet, 'add', [selected.id], 'hamlet');
+    else if (currentHamlet) await changeGroupMembership(currentHamlet, 'remove', [selected.id], 'hamlet');
+  }
   async function exportMembers(event) {
     event.preventDefault();
     setExporting(true); setExportMessage('');
@@ -195,6 +259,11 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
       {canMatrikkelSync && checked.size > 0 && <Link className="admin-button" href={`/admin/members/matrikkel?members=${encodeURIComponent(matrikkelSelection)}`}>{t('updateSelected', {count: checked.size})}</Link>}
       <button className="primary-button" type="button" onClick={create}>{t('newMember')}</button>
     </div>
+    {checked.size > 0 && <section className="admin-bulk-group-action" aria-label={t('assignSelected')}>
+      <label htmlFor="bulk-email-group">{t('assignSelected', {count: checked.size})}<Select id="bulk-email-group" value={bulkGroupId} onChange={(event) => setBulkGroupId(event.target.value)} disabled={Boolean(groupBusy) || data.mock}><option value="">{t('chooseEmailGroup')}</option>{emailGroups.map((group) => <option value={group.id} key={group.id}>{group.name}</option>)}</Select></label>
+      <button className="primary-button" type="button" disabled={!bulkGroupId || Boolean(groupBusy) || data.mock} onClick={assignSelectedToGroup}>{groupBusy === 'bulk' ? t('assigning') : t('addSelectedToGroup', {count: checked.size})}</button>
+    </section>}
+    {groupMessage && !selected && <p className={groupMessage.type === 'error' ? 'form-error' : 'admin-success'} role="status">{groupMessage.text}</p>}
     <AutoFilterForm className="admin-search admin-member-filters" action="/admin/members">
       <div className="admin-filter-grid">
         <label>{t('membershipStatus')}<Select name="membership" defaultValue={membershipStatus}><option value="">{t('allProperties')}</option><option value="member">{t('regularMembers')}</option><option value="exempt">{t('exemptMembership')}</option></Select></label>
@@ -227,6 +296,18 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
         {canMatrikkelSync && !selected.isNew && <Link className="admin-button" href={`/admin/members/matrikkel?member=${encodeURIComponent(selected.id)}`}>{t('updateMember')}</Link>}
         <label>{t('membershipStatus')}<Select value={form.membership_status || 'member'} onChange={(event) => updateForm('membership_status', event.target.value)}><option value="member">{t('regularMember')}</option><option value="exempt">{t('exemptMembership')}</option></Select></label>
         <label className="admin-checkbox"><input type="checkbox" checked={Boolean(form.turufjell_as_sharing_opt_out)} onChange={(event) => updateForm('turufjell_as_sharing_opt_out', event.target.checked)} /> {t('optOut')}</label><span className="admin-field-note">{t('optOutNote')}</span>
+        {!selected.isNew && <section className="member-group-memberships" aria-labelledby="member-group-memberships-title">
+          <div className="admin-section-header"><div><p className="eyebrow">{t('groupMembershipsEyebrow')}</p><h3 id="member-group-memberships-title">{t('groupMemberships')}</h3></div></div>
+          <label>{t('hamlet')}<Select value={selected.hamlet_id || ''} onChange={(event) => changeSelectedHamlet(event.target.value)} disabled={Boolean(groupBusy) || data.mock}><option value="">{t('notLinked')}</option>{hamlets.map((group) => <option value={group.id} key={group.id}>{group.name}</option>)}</Select></label>
+          <span className="admin-field-note">{t('hamletMapNote')} <Link href="/admin/map">{t('editHamletInMap')}</Link></span>
+          <fieldset className="member-email-group-list" disabled={Boolean(groupBusy) || data.mock}><legend>{t('emailGroups')}</legend>
+            {emailGroups.length ? emailGroups.map((group) => {
+              const checkedInGroup = (selected.email_group_ids || []).map(String).includes(String(group.id));
+              return <label className="admin-checkbox" key={group.id}><input type="checkbox" checked={checkedInGroup} onChange={(event) => changeGroupMembership(group, event.target.checked ? 'add' : 'remove', [selected.id], `detail-${group.id}`)} /> {group.name}</label>;
+            }) : <p>{t('noEmailGroups')}</p>}
+          </fieldset>
+          {groupMessage && <p className={groupMessage.type === 'error' ? 'form-error' : 'admin-success'} role="status">{groupMessage.text}</p>}
+        </section>}
         <div className="admin-detail-field-grid is-property">{propertyFields.map(renderField)}</div>{renderField(['street_address', true])}<div className="admin-detail-field-grid is-ownership">{ownershipFields.map(renderField)}</div>{selected?.street_address && <MemberPropertyMap streetAddress={selected.street_address} />}{contactFields.map(renderField)}
         {newToken && <p className="admin-success">{t('memberId', {id: newToken})}</p>}{message && <p className={saveState === 'error' ? 'form-error' : 'admin-success'} role="status">{message}</p>}
         <button className="primary-button" type="submit" disabled={saving || data.mock}>{saving ? t('saving') : selected.isNew ? t('createMember') : t('saveNow')}</button>{!selected.isNew && <button className="admin-delete" type="button" onClick={() => setConfirmDelete(true)} disabled={data.mock}>{t('delete')}</button>}{data.mock && <p className="privacy-subnote">{t('mockReadonly')}</p>}
