@@ -1,19 +1,42 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { timingSafeEqual } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { getSurveyEmailBackgroundStatus as runtimeStatus } from '../lib/survey-email-background.js';
 import { loadModule, request, routeContext } from './helpers/load-module.mjs';
 
 const campaignId = 'a'.repeat(32);
 const secret = 'test-only-job-secret';
 const origin = 'https://example.test';
+const productionRuntime = { '@netlify/functions': { getContext: () => ({ deploy: { context: 'production' } }) } };
+
+function loadBackground(globals = {}, dependencies = productionRuntime) {
+  return loadModule('lib/survey-email-background.js', dependencies, globals);
+}
+
+test('official Netlify helper retains the runtime context through asynchronous work', async () => {
+  // Same request store used by Netlify's Functions runtime. No credentials,
+  // network, database, or actual campaign processing are involved.
+  const store = globalThis[Symbol.for('@netlify/functions/request-context-store')];
+  assert.ok(store instanceof AsyncLocalStorage);
+  const env = { APP_ENVIRONMENT: 'production', MAILERSEND_JOB_SECRET: 'x'.repeat(32) };
+  assert.equal(runtimeStatus(env), 'production_required');
+  await Promise.all(['production', 'deploy-preview'].map((context) => store.run({ context: { deploy: { context } } }, async () => {
+    await Promise.resolve();
+    assert.equal(runtimeStatus(env), context === 'production' ? 'ready' : 'production_required');
+  })));
+  assert.equal(runtimeStatus(env), 'production_required');
+});
 
 test('bulk email requires the production context and a strong job secret', async () => {
-  const api = await loadModule('lib/survey-email-background.js');
-  const configured = { CONTEXT: 'production', APP_ENVIRONMENT: 'production', MAILERSEND_JOB_SECRET: 'x'.repeat(32) };
+  const api = await loadBackground();
+  // CONTEXT is deliberately absent, just as it may be in a deployed function.
+  const configured = { APP_ENVIRONMENT: 'production', MAILERSEND_JOB_SECRET: 'x'.repeat(32) };
   assert.equal(api.isSurveyEmailBackgroundConfigured(configured), true);
+  assert.equal(api.getSurveyEmailBackgroundStatus(configured), 'ready');
   for (const env of [
     {},
-    { ...configured, CONTEXT: 'dev' },
+    { ...configured, NETLIFY_LOCAL: 'true' },
     { ...configured, APP_ENVIRONMENT: 'development' },
     { ...configured, MAILERSEND_JOB_SECRET: 'too-short' },
   ]) {
@@ -21,11 +44,27 @@ test('bulk email requires the production context and a strong job secret', async
     assert.throws(() => api.requireSurveyEmailBackgroundConfigured(env), { code: 'JOB_NOT_CONFIGURED', status: 503 });
   }
   assert.equal(api.requireSurveyEmailBackgroundConfigured(configured), configured.MAILERSEND_JOB_SECRET);
+  assert.equal(api.getSurveyEmailBackgroundStatus({ ...configured, MAILERSEND_JOB_SECRET: '' }), 'job_secret_missing');
+});
+
+test('bulk email uses request-local runtime context, rejecting previews and local production .env values', async () => {
+  const env = { CONTEXT: 'production', APP_ENVIRONMENT: 'production', MAILERSEND_JOB_SECRET: 'x'.repeat(32) };
+  let runtimeContext = 'production';
+  const api = await loadBackground({}, { '@netlify/functions': { getContext() {
+    if (runtimeContext === null) throw new Error('Not in a Netlify request');
+    return { deploy: { context: runtimeContext } };
+  } } });
+  assert.equal(api.isSurveyEmailBackgroundConfigured(env), true);
+  await Promise.resolve();
+  for (runtimeContext of ['deploy-preview', 'branch-deploy', 'dev', undefined, null]) {
+    assert.equal(api.getSurveyEmailBackgroundStatus(env), 'production_required');
+    assert.throws(() => api.requireSurveyEmailBackgroundConfigured(env), { code: 'JOB_NOT_CONFIGURED', status: 503 });
+  }
 });
 
 test('email dispatch accepts only a direct 202 with a bounded, secret-authenticated request', async () => {
   for (const status of [200, 202, 204, 301, 307, 403, 429, 500]) {
-    const api = await loadModule('lib/survey-email-background.js', {}, {
+    const api = await loadBackground({
       process: { env: { MAILERSEND_JOB_SECRET: secret } }, AbortSignal,
       fetch: async (url, init) => {
         assert.equal(url.href, `${origin}/.netlify/functions/survey-email-background`);
@@ -43,7 +82,7 @@ test('email dispatch accepts only a direct 202 with a bounded, secret-authentica
 
 test('email dispatch can use the secret captured before asynchronous campaign setup', async () => {
   const capturedSecret = 'captured-before-await-job-secret';
-  const api = await loadModule('lib/survey-email-background.js', {}, {
+  const api = await loadBackground({
     process: { env: {} }, AbortSignal,
     fetch: async (_url, init) => {
       assert.equal(init.headers['X-MailerSend-Job-Secret'], capturedSecret);
@@ -55,7 +94,7 @@ test('email dispatch can use the secret captured before asynchronous campaign se
 
 test('email dispatch rejects missing secrets, invalid origins/IDs and redacts network failures', async () => {
   let calls = 0;
-  const api = await loadModule('lib/survey-email-background.js', {}, {
+  const api = await loadBackground({
     process: { env: { MAILERSEND_JOB_SECRET: secret } }, AbortSignal,
     fetch: async () => { calls++; throw new Error('https://private.test/secret'); },
   });
@@ -63,7 +102,7 @@ test('email dispatch rejects missing secrets, invalid origins/IDs and redacts ne
   for (const url of ['http://example.test', 'https://user:pass@example.test', undefined]) await assert.rejects(api.dispatchSurveyEmailCampaign(campaignId, url), { code: 'INVALID_JOB_ORIGIN' });
   assert.equal(calls, 0);
   await assert.rejects(api.dispatchSurveyEmailCampaign(campaignId, origin), (error) => error.code === 'JOB_DISPATCH_UNAVAILABLE' && !error.message.includes('private.test'));
-  const unconfigured = await loadModule('lib/survey-email-background.js');
+  const unconfigured = await loadBackground();
   await assert.rejects(unconfigured.dispatchSurveyEmailCampaign(campaignId, origin), { code: 'JOB_NOT_CONFIGURED' });
 });
 
@@ -74,7 +113,8 @@ test('email worker guards method/secret/body and forwards only a non-busy runnin
   const worker = await loadModule('netlify/functions/survey-email-background.mjs', {
     'node:crypto': { timingSafeEqual },
     '../../lib/survey-email.js': { processSurveyEmailCampaign: async () => { processed++; return result; } },
-    '../../lib/survey-email-background.js': { dispatchSurveyEmailCampaign: async (id, base, options) => {
+    '../../lib/survey-receipts.js': { processSurveyReceipts: async () => ({ pending: false }) },
+    '../../lib/survey-email-background.js': { dispatchSurveyReceipts: async () => {}, dispatchSurveyEmailCampaign: async (id, base, options) => {
       assert.equal(id, campaignId); assert.equal(base, origin); assert.equal(options.secret, secret); forwarded++;
     } },
   }, { process: { env: { MAILERSEND_JOB_SECRET: secret } } });
@@ -98,7 +138,7 @@ test('production email route shows failed dispatch but preserves a concurrently 
   for (const status of ['failed', 'running', 'completed']) {
     const route = await loadModule('app/api/admin/surveys/[id]/email/route.js', {
       '@/lib/survey-email': {
-        getSurveyEmailOverview: async () => ({}), sendSurveyTestEmail: async () => ({}),
+        getSurveyEmailOverview: async () => ({}), findSurveyRecipientProperties: async () => [], sendSurveyTestEmail: async () => ({}),
         createSurveyEmailCampaign: async () => ({ campaign: { id: campaignId, status: 'pending' } }),
         failPendingSurveyEmailCampaign: async () => ({ id: campaignId, status }),
       },
@@ -123,7 +163,7 @@ test('email route rejects non-production bulk sending before creating a campaign
     '@/lib/survey-email': {
       createSurveyEmailCampaign: async () => { created++; return {}; },
       failPendingSurveyEmailCampaign: async () => null,
-      getSurveyEmailOverview: async () => ({}),
+      getSurveyEmailOverview: async () => ({}), findSurveyRecipientProperties: async () => [],
       sendSurveyTestEmail: async () => ({}),
     },
     '@/lib/survey-email-background': {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as crypto from 'node:crypto';
 import { randomUUID } from 'node:crypto';
 import { createTestDatabase } from '../helpers/postgres.mjs';
-import { loadModule } from '../helpers/load-module.mjs';
+import { loadModule, plain } from '../helpers/load-module.mjs';
 import * as memberUtils from '../../lib/member-self-service-utils.js';
 import * as emailUtils from '../../lib/survey-email-utils.js';
 import * as securityConfig from '../../lib/security-config.js';
@@ -20,6 +20,7 @@ async function service(sendEmail, suppressionCheck = async () => []) {
     './admin-access.js': { requirePermission: async () => ({ email: 'admin@example.test' }) },
     './member-self-service-utils.js': memberUtils, './survey-email-utils.js': emailUtils,
     './security-config.js': securityConfig, './security-events.js': securityEvents,
+    './survey-email-background.js': { getSurveyEmailBackgroundStatus: () => 'ready' },
     './email-templates.js': { renderSurveyInvitationEmail: () => ({ subject: 'Synthetic', text: 'No actual send', html: '' }) },
     './mailer-service.js': { getMailerSendConfig: () => ({}), getMailerSendSuppressions: suppressionCheck,
       isMailerSendBulkEnabled: () => true, isMailerSendConfigured: () => true, isSuppressedRecipient: () => false,
@@ -42,6 +43,30 @@ async function fixture() {
   }
   return { surveyId, campaignId, rows };
 }
+
+test('additional emails are opt-in; adding overlapping groups and individual properties does not resend', async () => {
+  const surveyId = randomUUID().replaceAll('-', '');
+  await db.sql`INSERT INTO surveys (id, title, ends_on) VALUES (${surveyId}, 'Synthetic additions', '2099-12-31')`;
+  const [group] = await db.sql`INSERT INTO member_email_groups (name) VALUES (${randomUUID()}) RETURNING id`;
+  const [member] = await db.sql`INSERT INTO members (h_number, primary_contact_email, other_contact_emails)
+    VALUES (${randomUUID()}, 'primary@example.test', ARRAY['other@example.test', 'PRIMARY@example.test']) RETURNING id`;
+  await db.sql`INSERT INTO member_email_group_members (group_id, member_id) VALUES (${group.id}, ${member.id})`;
+  const api = await service(async () => ({ messageId: randomUUID() }));
+  const created = await api.createSurveyEmailCampaign(surveyId, { groupId: String(group.id) });
+  assert.equal(created.campaign.total_count, 1);
+  assert.equal(created.added_count, 1);
+  const appended = await api.createSurveyEmailCampaign(surveyId, { groupId: String(group.id), memberIds: [String(member.id)], includeOtherEmails: true, appendRecipients: true });
+  assert.equal(appended.campaign.id, created.campaign.id); assert.equal(appended.campaign.total_count, 2);
+  assert.equal(appended.added_count, 1);
+  const repeated = await api.createSurveyEmailCampaign(surveyId, { memberIds: [String(member.id)], includeOtherEmails: true, appendRecipients: true });
+  assert.equal(repeated.campaign.total_count, 2);
+  assert.equal(repeated.added_count, 0);
+  await assert.rejects(api.createSurveyEmailCampaign(surveyId, { memberIds: [String(member.id)], appendRecipients: true, singleResponsePerProperty: false }));
+  const sent = await api.processSurveyEmailCampaign(created.campaign.id, { delayMs: 0 });
+  assert.equal(sent.sent_count, 2);
+  const tokens = await db.sql`SELECT recipient_email FROM survey_access_tokens WHERE survey_id = ${surveyId} AND revoked_at IS NULL`;
+  assert.equal(tokens.length, 2);
+});
 test('email workers exclude duplicate invocations, retain partial failure and never resend completed deliveries', async () => {
   const f = await fixture();
   let started, release;
@@ -114,7 +139,7 @@ test('survey mailing previews and locks recipients to the selected email group',
   assert.equal(overview.selected_group_id, String(group.id));
   assert.equal(overview.recipient_count, 2);
   assert.equal(overview.missing_email_count, 1);
-  assert.deepEqual(overview.recipients.map(({ name, title_holder, primary_contact_email }) => (
+  assert.deepEqual(plain(overview.recipients).map(({ name, title_holder, primary_contact_email }) => (
     { name, title_holder, primary_contact_email }
   )), [
     { name: 'Kari Kontakt', title_holder: 'Kari Hjemmelshaver', primary_contact_email: 'kari@example.test' },

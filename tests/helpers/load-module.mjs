@@ -5,6 +5,7 @@ import { apiErrorStatus, readJsonObject } from '../../lib/api-errors.js';
 import { getRequestI18n } from '../../lib/i18n/request.js';
 import { LOCALE_COOKIE, normalizeLocale } from '../../lib/i18n/config.js';
 import { getApplicationOrigin, isSameOriginRequest } from '../../lib/request-origin.js';
+import * as surveyQuestions from '../../lib/survey-questions.js';
 
 // Execute the actual source with explicit dependencies. Never fall back to a
 // real database, mail provider, auth provider or network from a route test.
@@ -19,7 +20,8 @@ export async function loadModule(path, dependencies = {}, globals = {}) {
     ...globals,
   });
   const imports = {
-    'server-only': {}, 'next/server': { NextResponse }, '@/lib/api-errors': { apiErrorStatus, readJsonObject },
+    'server-only': {}, 'next/server': { NextResponse, after: () => {} }, '@/lib/api-errors': { apiErrorStatus, readJsonObject },
+    '@/lib/survey-questions': surveyQuestions,
     '@/lib/i18n/request': { getRequestI18n }, './lib/i18n/request': { getRequestI18n },
     '@/lib/request-origin': { getApplicationOrigin, isSameOriginRequest },
     '../../lib/request-origin.js': { getApplicationOrigin, isSameOriginRequest },

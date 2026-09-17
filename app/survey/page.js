@@ -41,7 +41,7 @@ export default async function HomePage({ searchParams }) {
       <div className="page-shell">
         <header className="hero">
           <div className="brand-logo">
-            <BrandLogo variant="stacked" priority className="h-auto w-full" />
+            <BrandLogo variant="stacked" className="h-auto w-full" />
           </div>
           <div className="hero-copy">
             <p className="eyebrow">Turufjell Vel</p>
@@ -104,7 +104,7 @@ export default async function HomePage({ searchParams }) {
             <p>{t('answerHelp')}</p>
           </div>
 
-          <SurveyForm key={`${access.survey.id}:${access.survey.question_version}`} questionVersion={access.survey.question_version} mockToken={isMockMode() ? memberToken : undefined} mockSurveyId={isMockMode() ? requestedSurveyId : undefined} questions={access.survey.questions} />
+          <SurveyForm key={`${access.survey.id}:${access.survey.question_version}`} singleResponsePerProperty={access.survey.single_response_per_property !== false} questionVersion={access.survey.question_version} mockToken={isMockMode() ? memberToken : undefined} mockSurveyId={isMockMode() ? requestedSurveyId : undefined} questions={access.survey.questions} />
         </section>}
 
         <footer className="page-footer">

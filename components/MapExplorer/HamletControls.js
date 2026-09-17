@@ -1,5 +1,6 @@
 'use client';
 
+import Select from "@/components/Select";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { loadMapHamlets, persistMapHamlet } from '@/lib/map/browser-client';
 import { useI18n } from '@/components/LocaleProvider';
@@ -88,13 +89,13 @@ const HamletControls = forwardRef(function HamletControls({ polygon, editing, dr
         <fieldset disabled={saving}>
           <legend>{t('legend')}</legend>
           <div className="select-action-row">
-            <label>{t('saved')}<select value={chosen} onChange={(event) => {
+            <label>{t('saved')}<Select value={chosen} onChange={(event) => {
               const hamlet = hamlets.find((item) => item.id === event.target.value);
               if (hamlet) load(hamlet);
             }} disabled={loading}>
               <option value="">{t('choose')}</option>
               {hamlets.map((h) => <option key={h.id} value={h.id}>{h.name}{!h.polygon ? ` · ${t('noPolygon')}` : h.reviewed ? '' : ` · ${t('reviewNeeded')}`}</option>)}
-            </select></label>
+            </Select></label>
             <button type="button" className="admin-button" onClick={() => load(null)}>{t('new')}</button>
           </div>
           <button type="button" className="admin-button map-hamlet-reload" disabled={loading} onClick={() => { setError(''); setLoading(true); setReload((n) => n + 1); }}>{t('reload')}</button>

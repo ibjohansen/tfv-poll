@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/components/LocaleProvider';
 
 const AUTOPLAY_DELAY_MS = 4000;
@@ -28,6 +28,8 @@ export default function HomeHeroCarousel({ images }) {
   const [isHovered, setIsHovered] = useState(false);
   const [hasFocusWithin, setHasFocusWithin] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [visible, setVisible] = useState(true);
+  const container = useRef(null);
   const imageCount = images.length;
 
   const showPrevious = useCallback(() => {
@@ -39,14 +41,21 @@ export default function HomeHeroCarousel({ images }) {
   }, [imageCount]);
 
   useEffect(() => {
-    if (imageCount < 2 || isHovered || hasFocusWithin || isPaused) return undefined;
+    if (!window.IntersectionObserver || !container.current) return;
+    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting));
+    observer.observe(container.current);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (imageCount < 2 || isHovered || hasFocusWithin || isPaused || !visible) return undefined;
 
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     if (reducedMotion.matches || document.hidden) return undefined;
 
     const timer = window.setTimeout(showNext, AUTOPLAY_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [activeIndex, hasFocusWithin, imageCount, isHovered, isPaused, showNext]);
+  }, [activeIndex, hasFocusWithin, imageCount, isHovered, isPaused, showNext, visible]);
 
   function handleKeyDown(event) {
     if (imageCount < 2) return;
@@ -73,6 +82,7 @@ export default function HomeHeroCarousel({ images }) {
 
   return (
     <section
+      ref={container}
       className="home-hero-carousel relative flex min-h-[clamp(26rem,60vh,46rem)] w-full items-end overflow-hidden focus-visible:outline-3 focus-visible:outline-offset-[-3px] focus-visible:outline-white"
       aria-roledescription={t('role')}
       aria-label={t('label')}

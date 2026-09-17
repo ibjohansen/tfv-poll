@@ -8,6 +8,8 @@ const surveys = {
 
 surveys.admin.questionVersionLabel = 'Question version';
 surveys.email.backgroundUnavailable = 'Bulk mailing can only be started from the configured production site.';
+surveys.email.backgroundSecretMissing = 'The production bulk-mail job secret is missing or invalid. Check MAILERSEND_JOB_SECRET in Netlify and redeploy.';
+surveys.email.surveyUnavailable = 'The survey must be open and its response deadline must not have passed before the mailing can start.';
 Object.assign(surveys.admin, {
   attachments: 'Attachments', attachmentsHelp: 'Upload background documents that are available only to administrators and recipients of this survey.',
   addAttachments: 'Add attachments', addAttachmentsHelp: 'Upload one or more documents to the survey.', uploadingAttachments: 'Uploading …',
@@ -18,4 +20,25 @@ Object.assign(surveys.admin, {
   removeAttachmentTitle: 'Remove the attachment “{title}”?', removeAttachmentDescription: 'The attachment will no longer be available to recipients.', noAttachments: 'No attachments have been uploaded.', file: 'File',
 });
 
+Object.assign(surveys.admin, {
+  answerType: 'Answer options', standardAnswers: 'Yes / No / Don’t know', customAnswers: 'Custom options',
+  multipleAnswers: 'Allow multiple options per question', optionNumber: 'Option {number}', removeOption: 'Remove option {number}', addOption: 'Add option',
+  copy: 'Copy to new survey', copyTitle: 'Copy of {title}', copiedDraft: 'The copy is a new, closed draft without recipients or responses.',
+});
+surveys.form.answers.usikker = 'Don’t know';
+surveys.admin.answers.usikker = 'Don’t know';
 export default surveys;
+Object.assign(surveys.form, { selectMany: 'Select one or more options.', selectOne: 'Select one option.' });
+Object.assign(surveys.email, {
+  chooseGroupOrProperties: 'Select an email group or add individual properties.', individualProperties: 'Individual properties', searchProperties: 'Search by H-number, address or name',
+  propertySearchError: 'Could not search for properties.', removeProperty: 'Remove {number} from selection',
+  includeOtherEmails: 'Also include other registered email addresses', additionalEmail: 'Additional email',
+  singleResponse: 'Limit to one response per property', singleResponseHelp: 'The first submission counts. The primary email receives a receipt with the effective answers and who submitted them.',
+  independentResponseHelp: 'Each invited email address may submit one independent, counted response. The primary email receives a receipt.',
+  policyLocked: 'The response rule is locked after the first mailing.', addRecipients: 'Add new recipients',
+  appendDescription: 'Only recipients not already registered for mailing in this survey are added. Existing responses and deliveries are retained.',
+  recipientCaption: 'Recipients from the selected group and individual properties. Additional emails are only included when checked.', primaryEmail: 'Primary email', recipientEmail: 'Recipient email',
+  receipts: 'Receipts to primary email', receiptCounts: 'Pending: {pending} · Sent: {sent} · Failed/suppressed: {failed}',
+  noNewRecipients: 'All selected recipients are already registered for mailing. No new invitations were created.',
+});
+Object.assign(surveys.form, { onePerRecipient: 'One independent response per invited email address.', notCounted: 'Another recipient has already submitted the effective response for this property. Your answers do not replace it. The primary email receives a receipt summarising both submissions.' });

@@ -70,6 +70,10 @@ export default function AdminNewsletters({ initialData, groups }) {
     }}>{item.subject}</button></td><td>{t(`statuses.${item.status}`, {}, item.status)}</td><td>{new Date(item.created_at).toLocaleString(formatLocale)}</td></tr>)}</tbody></table></div>
     {campaign && <section className="member-profile-section" aria-label={t('campaign')}>
       <h2>{campaign.subject || t('new')}</h2><p>{t(`statuses.${campaign.status}`, {}, campaign.status)}{dirty ? t('unsaved') : ''}</p>
+      {campaign.id && <button className="admin-button" type="button" disabled={busy || dirty} onClick={() => {
+        setCampaign({ subject: t('copyTitle', { title: campaign.subject }).slice(0, 160), body: structuredClone(campaign.body), group_ids: campaign.group_ids.filter((id) => groups.some((group) => String(group.id) === String(id))), status: 'draft' });
+        setPreview(null); setEditorKey((key) => key + 1); setDirty(true); setMessage(t('copied'));
+      }}>{t('copy')}</button>}
       {editable ? <form className="admin-detail-form" onSubmit={(event) => { event.preventDefault(); action('save'); }}>
         <label>{t('subject')}<input value={campaign.subject} onChange={(event) => edit({ subject: event.target.value })} maxLength={160} required disabled={busy} /></label>
         <RichTextEditor key={editorKey} value={campaign.body} onChange={(body) => edit({ body })} disabled={busy} />

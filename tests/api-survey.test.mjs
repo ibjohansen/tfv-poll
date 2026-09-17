@@ -4,18 +4,19 @@ import { loadModule, request } from './helpers/load-module.mjs';
 import { surveySessionCookieName, surveySessionCookieOptions } from '../lib/membership.js';
 
 async function setup() {
-  const state = { limited: false, status: 'ready', saved: true, writes: [], mock: false, secret: 'a'.repeat(64), error: null };
+  const state = { limited: false, status: 'ready', saved: true, accepted: true, questions: null, writes: [], mock: false, secret: 'a'.repeat(64), error: null };
   const access = async () => {
     if (state.error) throw state.error;
-    return { status: state.status, message: 'Tilgang kreves', survey: { question_version: 2, questions: [{ id: 'q1', text: 'Spørsmål 1' }, { id: 'q2', text: 'Spørsmål 2' }] } };
+    return { status: state.status, message: 'Tilgang kreves', survey: { question_version: 2, questions: state.questions || [{ id: 'q1', text: 'Spørsmål 1' }, { id: 'q2', text: 'Spørsmål 2' }] } };
   };
   const route = await loadModule('app/survey/api/responses/route.js', {
     'next/headers': { cookies: async () => ({ get: () => state.secret ? { value: state.secret } : undefined }) },
     '@/lib/mock-store': { isMockMode: () => state.mock },
     '@/lib/rate-limit': { isRateLimited: () => state.limited },
+    '@/lib/survey-email-background': { isSurveyEmailBackgroundConfigured: () => false, dispatchSurveyReceipts: () => { throw new Error('Unexpected email dispatch'); } },
     '@/lib/membership': {
       surveySessionCookieName, getSurveyAccess: access, getMockSurveyAccess: access,
-      submitSurveyResponse: async (...args) => { state.writes.push(args); return { saved: state.saved }; },
+      submitSurveyResponse: async (...args) => { state.writes.push(args); return { saved: state.saved, accepted: state.accepted }; },
       submitMockSurveyResponse: async (...args) => { state.writes.push(args); return { saved: state.saved }; },
     },
   });
@@ -35,6 +36,19 @@ test('survey responses require one allowed answer per question and write only ag
     assert.equal(state.writes.at(-1)[2].questionVersion, 2);
     assert.match(response.headers.get('set-cookie'), /Max-Age=0/);
   }
+});
+
+test('survey API validates custom multiple choices and reports a later non-counted response', async () => {
+  const { route, state } = await setup();
+  state.questions = [{ id: 'q1', text: 'Aktiviteter', multiple: true, options: [{ value: 'ski', label: 'Ski' }, { value: 'walk', label: 'Tur' }] }];
+  const send = (answer) => route.POST(request('/survey/api/responses', { method: 'POST', body: { questionVersion: 2, answers: { q1: answer } } }));
+  for (const value of ['ski', [], ['unknown'], ['ski', 'ski']]) assert.equal((await send(value)).status, 400);
+  assert.equal(state.writes.length, 0);
+  state.accepted = false;
+  const response = await send(['ski', 'walk']);
+  assert.equal(response.status, 201);
+  assert.equal((await response.json()).accepted, false);
+  assert.deepEqual(state.writes.at(-1)[1], { q1: ['ski', 'walk'] });
 });
 
 test('survey origin, throttling, expired sessions, closed surveys and duplicates prevent writes', async () => {

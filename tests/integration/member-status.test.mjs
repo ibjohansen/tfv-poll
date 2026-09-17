@@ -73,7 +73,7 @@ test('sharing reservation defaults off, records its change and can be filtered',
 });
 
 async function surveyFixture() {
-  const member = await admin.createAdminMember({ h_number: `survey-test-${randomUUID()}`, other_contact_emails: [] });
+  const member = await admin.createAdminMember({ h_number: `survey-test-${randomUUID()}`, primary_contact_email: `${randomUUID()}@example.test`, other_contact_emails: [] });
   const surveyId = randomUUID().replaceAll('-', '');
   await db.sql`INSERT INTO surveys (id, title, is_open, ends_on, question_version, questions)
     VALUES (${surveyId}, 'Syntetisk survey', TRUE, '2099-12-31', 1, '[{"id":"q1","text":"Syntetisk spørsmål"}]')`;
@@ -106,6 +106,18 @@ test('concurrent survey answers persist exactly one question snapshot', async ()
   const rows = await db.sql`SELECT questions, answers, question_version FROM survey_responses WHERE survey_id = ${f.surveyId}`;
   assert.equal(rows.length, 1);
   assert.deepEqual(rows[0], { questions: [{ id: 'q1', text: 'Syntetisk spørsmål' }], answers: { q1: 'ja' }, question_version: 1 });
+});
+
+test('legacy sessions without a remaining primary email fail safely, including a change during submission', async () => {
+  const f = await surveyFixture();
+  const sql = async (strings, ...values) => {
+    if (strings.join('').includes('INSERT INTO survey_responses')) await db.sql`UPDATE members SET primary_contact_email = NULL WHERE id = ${f.member.id}`;
+    return await db.sql(strings, ...values);
+  };
+  assert.equal((await submitSurveyResponse(f.secret, { q1: 'ja' }, { sql, env, questionVersion: 1 })).saved, false);
+  assert.equal((await getSurveyAccess(f.secret, { sql: db.sql, env })).status, 'not-found');
+  assert.equal((await db.sql`SELECT id FROM survey_responses WHERE survey_id = ${f.surveyId}`).length, 0);
+  assert.equal((await db.sql`SELECT id FROM survey_response_receipts WHERE survey_id = ${f.surveyId}`).length, 0);
 });
 
 test('changed question version between lookup and insert does not accept old answers', async () => {

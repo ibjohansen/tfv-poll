@@ -6,6 +6,7 @@ import { createTestDatabase } from '../helpers/postgres.mjs';
 import { loadModule } from '../helpers/load-module.mjs';
 import * as validation from '../../lib/cms-validation.js';
 import * as richText from '../../lib/rich-text.js';
+import { copyContentFiles } from '../../lib/content-copy.js';
 
 const db = createTestDatabase();
 let api;
@@ -15,7 +16,26 @@ before(async () => {
     'node:crypto': crypto, './db.js': { getSql: () => db.sql }, './mock-store.js': { isMockMode: () => false },
     './admin-access.js': { requirePermission: async () => ({ email: 'editor@example.test' }) },
     './cms-validation.js': validation, './rich-text.js': richText,
+    './public-content-cache.js': { revalidatePublicCmsContent: () => {} },
+    './content-copy.js': { copyContentFiles: (files, prefix, persist) => copyContentFiles(files, prefix, persist, {
+      downloadCmsObject: async () => ({ Body: { transformToByteArray: async () => new Uint8Array([1, 2]) } }), uploadCmsObject: async () => {}, deleteCmsObject: async () => {},
+    }) },
   });
+});
+
+test('copying a published article creates an independent unpublished draft', async () => {
+  const original = await api.createAdminCmsPage({ title: 'Original', slug: `test-${randomUUID()}`, category: 'Nyheter', status: 'published', body: 'Original body' });
+  const fileId = randomUUID().replaceAll('-', '');
+  await db.sql`INSERT INTO cms_attachments (id, page_id, kind, title, original_filename, storage_key, mime_type, size_bytes)
+    VALUES (${fileId}, ${original.id}, 'image', 'Foto', 'test.jpg', ${`synthetic/${fileId}`}, 'image/jpeg', 2)`;
+  const copy = await api.copyAdminCmsPage(original.id);
+  assert.notEqual(copy.id, original.id); assert.notEqual(copy.slug, original.slug);
+  assert.equal(copy.status, 'draft'); assert.equal(copy.published_at, null); assert.equal(copy.body, original.body);
+  assert.notEqual(copy.image.id, fileId);
+  const [copyFile] = await db.sql`SELECT storage_key FROM cms_attachments WHERE id = ${copy.image.id}`;
+  assert.notEqual(copyFile.storage_key, `synthetic/${fileId}`);
+  await api.deleteAdminCmsPage(copy.id);
+  assert.equal((await api.getAdminCmsPage(original.id)).status, 'published');
 });
 after(async () => db.close());
 

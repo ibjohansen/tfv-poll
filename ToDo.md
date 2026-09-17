@@ -1,7 +1,43 @@
 # ToDo
 
-Gjennomgått 14.–17. september 2026. Kvalitetsarbeidet nedenfor er implementert lokalt;
-ingen produksjonsdeploy, GitHub-push eller Entra-endring er kjørt.
+## Nye grensesnitt- og undersøkelsesendringer, 17. september
+
+- [x] Felles store nedtrekkslister med tastaturstøtte på desktop/mobil.
+- [x] Umiddelbare filtre uten filterknapp og mindre avkrysninger i registeret.
+- [x] Eiendomstooltip med H-nummer, adresse og gnr./bnr. på tre rader.
+- [x] Lazy-loading av bilder utenfor første visning, pause av karusell utenfor
+  skjermen, og støtte for nullutfylte bildenummer. Første hero prioriteres.
+- [x] Dokumenter egne SVG-ikoner og alternative kataloger i `docs/icons.md`.
+- [x] Egendefinerte svaralternativer, enkelt-/flervalg og versjonerte resultater.
+- [x] Hoved-e-post som standard; eksplisitt valg for flere kontaktadresser.
+- [x] Atomisk første svar per tomt, mottakeravgrensede lenker og kvitteringsutboks.
+- [x] Legg til grupper/enkelttomter uten å gjenta eksisterende invitasjoner.
+- [x] Kopier undersøkelser, artikler og nyhetsbrev som nye utkast med egne filer.
+- [x] Lokal lint, produksjonsbygg, 317 enhetstester, 44 nettlesertester og fire
+  ekstra regresjonstester for faktisk bildelasting/utsendelse. `npm audit`: 0 funn.
+- [x] Godkjenn og kjør isolerte Postgres-integrasjonstester før produksjonssetting.
+  57 tester bestått på midlertidig Neon-schema-only-gren 17. september, kun med
+  syntetiske data. Gjentatt migrering bevarer eldre svar og invitasjoner; se
+  [testrapport](docs/database-test-survey-options-2026-09-17.md).
+- [x] Rett funn fra databasekjøringen: kopiering av artikler uten riktekst,
+  svarregel ved undersøkelseskopiering og kontrollert avvisning av eldre
+  svarøkter uten gjenværende hoved-e-post.
+- [x] Godkjenn og utfør koordinert produksjonsmigrering og deploy. Utført
+  17. september 2026 med gjenopprettingspunkt og datakontroll av 14 tabeller.
+  Publiseringsfeil for statiske filer ble rettet med komplett bygg/deploy; se
+  [produksjonsrapport](docs/database-release-survey-options-2026-09-17.md).
+- [ ] Commit og push de publiserte kildeendringene etter egen godkjenning, slik
+  at neste Git-basert deploy ikke erstatter dem med eldre, inkompatibel kode.
+- [ ] Verifiser kvitteringer og første-svar-regelen med godkjente testmottakere.
+
+Se `docs/survey-options-and-recipients.md` for svarregler, avgrensninger og
+migreringsprosedyre. Statusbeskrivelsen nedenfor gjelder tidligere endringer.
+
+Gjennomgått 14.–17. september 2026. Kvalitetsarbeidet nedenfor ble først
+implementert lokalt. Siste godkjente produksjonsdeploy er dokumentert i
+[produksjonsrapporten 17. september](docs/database-release-survey-options-2026-09-17.md);
+gjenstående funksjonelle kontroller beholdes nedenfor. Ingen GitHub-push
+eller Entra-endring er kjørt i denne produksjonsrunden.
 Databasemigreringene er testet på en isolert Neon-schema-only-gren og deretter
 kjørt i produksjon etter eksplisitt godkjenning. Gjenopprettingspunkter er
 opprettet, og eksisterende data er verifisert bevart; se migreringsstatus for
@@ -988,9 +1024,29 @@ Eventuelle funn fra sikkerhetsgjennomgangen legges inn som egne P1- eller P2-sak
 - [x] Masseutsendelse krever produksjonskontekst og en separat jobbhemmelighet
   før databasen endres. Lokal utvikling kan ikke opprette en kampanje som blir
   stående i «Venter», og grensesnittet viser manglende worker-konfigurasjon.
-- [x] Skjult `MAILERSEND_JOB_SECRET` er konfigurert i Netlifys
-  `production/functions`-scope, og rettelsesdeploy `6aabda71bcbad489e7278851`
-  ble publisert 17. september 2026 uten å starte den ventende kampanjen.
+- [x] Bruk Netlifys faktiske forespørselskontekst for produksjonskontrollen;
+  ikke krev byggvariabelen `CONTEXT` ved kjøring. Vis gjenopptakingsknappen
+  også når oppsettet mangler, deaktivert med forklaring på norsk og engelsk.
+- [x] Opprett og verifiser `MAILERSEND_JOB_SECRET` i Netlifys
+  produksjonskontekst. Etter eksplisitt godkjenning ble hemmeligheten opprettet
+  17. september med omfang `builds/functions/runtime`, kun `production` og
+  `is_secret=true`. Direkte API-kontroll bekreftet opprettelse (201) og lesing
+  av metadata (200); hemmelighetens verdi ble ikke skrevet til fil eller logg.
+- [x] Rettelsen er publisert i Netlify-produksjonsdeploy
+  `6aabf888aceb2d217e4b3d77` 17. september 2026. Netlifys API bekrefter
+  `ready/production` og riktig publisert deploy. JavaScript-filen for
+  utsendelsespanelet på produksjonsdomenet er hash-verifisert mot bygget.
+  Forside og innlogging svarer 200; admin krever innlogging og e-post-API-et
+  svarer 401 uten økt. Ingen utsendelse ble startet.
+- [ ] Verifiser innlogget API-status og knapp uten å starte en reell utsendelse.
+  Nettleserverktøyet fikk ikke tilgang til eksisterende økt. HTTP 202 alene
+  bekrefter ikke fungerende jobb.
+- [x] Kontrollert lokalt: enhetstester, lint, produksjonsbygg og åtte isolerte
+  nettlesertester av utsendelsesknappen på desktop/mobil. `npm audit` uten funn.
+- [x] Bygg Netlify-deploy i ren mappe uten lokale miljøfiler. Ny pakkekontroll
+  17. september bekreftet at alle seks funksjonspakkene er uten `.env`-filer.
+  Den tidligere pakken med `.env.local` ble ikke brukt. Se
+  produksjonsprosedyren i README.
 - [ ] Legg inn Signing Secret fra MailerSend som
   `MAILERSEND_WEBHOOK_SIGNING_SECRET` i Netlify og kontroller at webhooken
   oppdaterer levert, avvist og undertrykt status.

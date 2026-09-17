@@ -148,7 +148,14 @@ export default function PublicHamletMapView({ hamlets, activeHamlet, properties,
           ...baseStyle, radius: baseRadius, fillOpacity: 0.95,
         }),
       }).addTo(group);
-      layer.bindTooltip([property.hNumber, property.address, property.cadastralNumber].filter(Boolean).join(' · '),
+      const tooltip = document.createElement('div');
+      tooltip.className = 'public-property-tooltip';
+      for (const value of [property.hNumber, property.address, property.cadastralNumber]) {
+        const row = document.createElement('div');
+        row.textContent = value || '–';
+        tooltip.appendChild(row);
+      }
+      layer.bindTooltip(tooltip,
         { sticky: true, direction: 'right', offset: L.point(18, 0) });
       layer.on('mouseover', () => {
         stylePropertyLayer(layer, hoverStyle, active ? 10 : 8);

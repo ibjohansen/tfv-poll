@@ -1,4 +1,5 @@
 'use client';
+import { surveyAnswerLabel } from '@/lib/survey-questions';
 
 import { useState } from 'react';
 import Link from 'next/link';
@@ -118,7 +119,7 @@ export default function MemberSelfServiceProfile({ initialProfile }) {
 
     <section className="member-profile-section" aria-labelledby="survey-data-title">
       <p className="eyebrow">{t('history')}</p><h2 id="survey-data-title">{t('surveyAnswers')}</h2>
-      {!initialProfile.responses.length ? <p>{t('noAnswers')}</p> : initialProfile.responses.map((response) => <article className="member-history-card" key={response.id}><h3>{response.survey_title || t('survey')}</h3><p>{displayDate(response.created_at)} · {t('questionVersion', {version: response.question_version})}</p><dl>{(response.questions || []).map((question) => <div key={question.id}><dt>{question.text}</dt><dd>{t(`answers.${response.answers?.[question.id]}`, {}, t('unanswered'))}</dd></div>)}</dl></article>)}
+      {!initialProfile.responses.length ? <p>{t('noAnswers')}</p> : initialProfile.responses.map((response) => <article className="member-history-card" key={response.id}><h3>{response.survey_title || t('survey')}</h3><p>{displayDate(response.created_at)} · {t('questionVersion', {version: response.question_version})}</p><dl>{(response.questions || []).map((question) => <div key={question.id}><dt>{question.text}</dt><dd>{question.options || question.multiple ? surveyAnswerLabel(question, response.answers?.[question.id]) : t(`answers.${response.answers?.[question.id]}`, {}, t('unanswered'))}</dd></div>)}</dl></article>)}
     </section>
 
     <section className="member-profile-section" aria-labelledby="email-history-title">

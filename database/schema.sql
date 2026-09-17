@@ -61,8 +61,14 @@ ALTER TABLE survey_responses DROP CONSTRAINT IF EXISTS survey_responses_member_a
 ALTER TABLE survey_responses ADD CONSTRAINT survey_responses_member_answers_check
   CHECK (member_id IS NULL OR (answers IS NOT NULL AND question_version IS NOT NULL));
 
-CREATE UNIQUE INDEX IF NOT EXISTS survey_responses_member_survey_idx
-  ON survey_responses (member_id, survey_id);
+-- Existing answers stay property-scoped. New independent answers use an email key.
+ALTER TABLE surveys ADD COLUMN IF NOT EXISTS single_response_per_property BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS response_key TEXT NOT NULL DEFAULT 'property';
+ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS respondent_email TEXT;
+ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS submission_session_id TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS survey_responses_scope_idx
+  ON survey_responses (member_id, survey_id, response_key);
+DROP INDEX IF EXISTS survey_responses_member_survey_idx;
 
 -- Adminfelt og stabil importidentitet. Flere medlemmer kan vente på H-nummer.
 ALTER TABLE members ADD COLUMN IF NOT EXISTS admin_comment TEXT;
@@ -327,8 +333,10 @@ CREATE TABLE IF NOT EXISTS email_deliveries (
   failed_at TIMESTAMPTZ
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS email_deliveries_campaign_member_idx
-  ON email_deliveries (campaign_id, member_id) WHERE campaign_id IS NOT NULL;
+ALTER TABLE email_campaigns ADD COLUMN IF NOT EXISTS include_other_emails BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE UNIQUE INDEX IF NOT EXISTS email_deliveries_campaign_recipient_idx
+  ON email_deliveries (campaign_id, member_id, recipient_email) WHERE campaign_id IS NOT NULL;
+DROP INDEX IF EXISTS email_deliveries_campaign_member_idx;
 CREATE INDEX IF NOT EXISTS email_deliveries_campaign_status_idx
   ON email_deliveries (campaign_id, status, created_at);
 ALTER TABLE email_deliveries ADD COLUMN IF NOT EXISTS requested_by TEXT;
@@ -420,6 +428,12 @@ CREATE INDEX IF NOT EXISTS member_email_group_members_member_idx ON member_email
 -- Mottakergrunnlaget for en undersøkelsesutsendelse låses til én eksplisitt
 -- e-postgruppe. Eldre kampanjer uten gruppe beholdes for historikk.
 ALTER TABLE email_campaigns ADD COLUMN IF NOT EXISTS group_id BIGINT REFERENCES member_email_groups(id) ON DELETE RESTRICT;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'email_deliveries' AND column_name = 'source_group_id') THEN
+    ALTER TABLE email_deliveries ADD COLUMN source_group_id BIGINT;
+    UPDATE email_deliveries d SET source_group_id = c.group_id FROM email_campaigns c WHERE c.id = d.campaign_id;
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS email_campaigns_group_idx ON email_campaigns (group_id) WHERE group_id IS NOT NULL;
 
 -- Tidsbegrenset e-postinnlogging for medlemmenes selvbetjening. Bare SHA-256-
@@ -516,9 +530,11 @@ CREATE TABLE IF NOT EXISTS survey_access_tokens (
 
 CREATE INDEX IF NOT EXISTS survey_access_tokens_member_survey_idx
   ON survey_access_tokens (member_id, survey_id, created_at DESC);
-CREATE UNIQUE INDEX IF NOT EXISTS survey_access_tokens_one_active_idx
-  ON survey_access_tokens (member_id, survey_id)
+ALTER TABLE survey_access_tokens ADD COLUMN IF NOT EXISTS recipient_email TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS survey_access_tokens_recipient_active_idx
+  ON survey_access_tokens (member_id, survey_id, COALESCE(recipient_email, ''))
   WHERE consumed_at IS NULL AND answered_at IS NULL AND revoked_at IS NULL;
+DROP INDEX IF EXISTS survey_access_tokens_one_active_idx;
 
 CREATE TABLE IF NOT EXISTS survey_sessions (
   id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
@@ -537,6 +553,37 @@ CREATE TABLE IF NOT EXISTS survey_sessions (
 
 CREATE INDEX IF NOT EXISTS survey_sessions_member_survey_idx
   ON survey_sessions (member_id, survey_id, expires_at DESC);
+ALTER TABLE survey_sessions ADD COLUMN IF NOT EXISTS recipient_email TEXT;
+
+-- Transactional outbox: response and its primary-contact receipt are committed
+-- together. A receipt also records a later attempt, without replacing the winner.
+CREATE TABLE IF NOT EXISTS survey_response_receipts (
+  id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
+  response_id BIGINT NOT NULL REFERENCES survey_responses(id) ON DELETE RESTRICT,
+  member_id BIGINT NOT NULL REFERENCES members(id) ON DELETE RESTRICT,
+  survey_id TEXT NOT NULL REFERENCES surveys(id) ON DELETE RESTRICT,
+  recipient_email TEXT,
+  submitted_by TEXT NOT NULL,
+  accepted BOOLEAN NOT NULL,
+  attempted_questions JSONB NOT NULL,
+  attempted_answers JSONB NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'sent', 'failed', 'suppressed')),
+  failure_reason TEXT,
+  provider_message_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  processing_at TIMESTAMPTZ,
+  sent_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS survey_response_receipts_pending_idx ON survey_response_receipts (created_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS survey_response_receipts_response_idx ON survey_response_receipts (response_id);
+CREATE INDEX IF NOT EXISTS survey_response_receipts_member_idx ON survey_response_receipts (member_id, survey_id);
+CREATE INDEX IF NOT EXISTS survey_response_receipts_survey_idx ON survey_response_receipts (survey_id);
+CREATE TABLE IF NOT EXISTS survey_receipt_worker (
+  singleton BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (singleton),
+  token TEXT,
+  lease_expires_at TIMESTAMPTZ
+);
+INSERT INTO survey_receipt_worker (singleton) VALUES (TRUE) ON CONFLICT DO NOTHING;
 
 -- Eierskifte og innmelding krever manuell behandling. Offisielle eiendomsdata
 -- endres aldri direkte fra det offentlige skjemaet.

@@ -21,7 +21,8 @@ This is a small production-oriented member administration application for Turufj
 - data/survey.js contains the initial seed and mock survey. Runtime survey questions are stored in Neon and managed from the admin portal.
 - Responses are written only through app/survey/api/responses/route.js.
 - New responses must retain a snapshot of the question version and question text used when the response was submitted.
-- Valid answers are: ja, nei, usikker.
+- Legacy/default answer IDs are ja, nei, usikker (displayed as Ja/Nei/Vet ikke). Questions may define custom stable option IDs and allow one or multiple choices; validate with lib/survey-questions.js. Retain option labels and selection mode in response snapshots.
+- Response scope is fixed when invitations start: first response per property by default, or one per invited email. Never replace an effective response with a later submission. Primary-email receipts use the transactional outbox.
 - Documents are placed in public/survey/dokumenter and configured in data/survey.js.
 
 ## Production and deployment

@@ -8,6 +8,8 @@ import AdminNewsletters from '@/components/AdminNewsletters';
 import SurveyEmailPanel from '@/components/SurveyEmailPanel';
 import AdminUsageStatistics from '@/components/AdminUsageStatistics';
 import MatrikkelSyncPanel from '@/components/MatrikkelSyncPanel';
+import SurveyForm from '@/components/SurveyForm';
+import Select from '@/components/Select';
 import { surveyId } from '@/data/survey';
 
 export default async function BrowserFixtures() {
@@ -15,6 +17,13 @@ export default async function BrowserFixtures() {
   const member = { id: '7001', h_number: 'H-SYNTHETIC-1', street_address: 'Testvegen 1', cadastral_number: '10/7001',
     primary_contact_name: 'Syntetisk kontakt', primary_contact_email: 'fixture@example.invalid', other_contact_emails: [] };
   return <main className="admin-main"><h1>Isolerte komponenttester</h1>
+    <section aria-label="Test av flervalg"><SurveyForm questionVersion={4} questions={[
+      { id: 'q1', number: 1, text: 'Velg aktiviteter', multiple: true, options: [{ value: 'ski', label: 'Skitur' }, { value: 'walk', label: 'Fottur' }] },
+      { id: 'q2', number: 2, text: 'Ønsker du mer informasjon?' },
+    ]} /></section>
+    <form aria-label="Test av nedtrekksliste"><label>Farge<Select name="color" defaultValue="blue" required>
+      <option value="">Velg farge</option><option value="blue">Blå</option><option value="red">Rød</option><option value="green" disabled>Grønn</option>
+    </Select></label><button type="reset">Tilbakestill valg</button></form>
     <MemberSelfServiceProfile initialProfile={{ member, properties: [member, { id: '7002', h_number: 'H-SYNTHETIC-2', street_address: 'Testvegen 2' }],
       responses: [], deliveries: [], requests: [], updates: [{ created_at: '2026-09-15T12:00:00Z', changed_fields: ['primary_contact_name'], comment: '<img src=x onerror=alert(1)>' }] }} />
     <AdminMemberRequests showEmpty initialRequests={[{ id: '7003', member_id: '7001', request_type: 'profile_update', status: 'completed', h_number: 'H-SYNTHETIC-1',

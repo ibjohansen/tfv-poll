@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { processSurveyEmailCampaign } from '../../lib/survey-email.js';
-import { dispatchSurveyEmailCampaign } from '../../lib/survey-email-background.js';
+import { dispatchSurveyEmailCampaign, dispatchSurveyReceipts } from '../../lib/survey-email-background.js';
+import { processSurveyReceipts } from '../../lib/survey-receipts.js';
 
 function validSecret(received, expected) {
   if (!received || !expected) return false;
@@ -15,6 +16,16 @@ export default async function handler(request) {
   if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } });
   let input;
   try { input = await request.json(); } catch { return new Response(null, { status: 400 }); }
+  if (input?.receipts === true) {
+    try {
+      const result = await processSurveyReceipts();
+      if (result.pending) await dispatchSurveyReceipts(new URL(request.url).origin, { secret });
+    } catch {
+      console.error('Survey receipt background failed', { occurredAt: new Date().toISOString() });
+      throw new Error('Survey receipt background failed');
+    }
+    return new Response(null, { status: 204 });
+  }
   if (!input || typeof input.campaignId !== 'string' || !/^[a-f0-9]{32}$/.test(input.campaignId)) return new Response(null, { status: 400 });
 
   let campaign;

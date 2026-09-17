@@ -6,14 +6,12 @@ import { useRouter } from 'next/navigation';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import SurveyEmailPanel from '@/components/SurveyEmailPanel';
 import SurveyAttachments from '@/components/SurveyAttachments';
+import SurveyQuestionOptions from '@/components/SurveyQuestionOptions';
+import { normalizeSurveyQuestions, questionOptions } from '@/lib/survey-questions';
 import { useI18n } from '@/components/LocaleProvider';
 
 const blankQuestion = (number) => ({ id: `q${number}`, number, text: '' });
-const answerOptions = [
-  { value: 'ja', color: '#15803d' },
-  { value: 'nei', color: '#b91c1c' },
-  { value: 'usikker', color: '#a16207' },
-];
+const chartColors = ['#15803d', '#b91c1c', '#a16207', '#2563eb', '#7c3aed', '#be185d', '#0e7490'];
 
 function normalizeQuestions(questions) {
   return questions.map((question, index) => ({ ...question, number: index + 1 }));
@@ -66,10 +64,11 @@ function SurveyResults({ data, state, surveyId, t, formatLocale }) {
           </div>
           <div className="survey-result-grid">
             {version.questions.map((question) => {
-              const jaEnd = question.percentages.ja;
-              const neiEnd = jaEnd + question.percentages.nei;
+              const answerOptions = questionOptions(question).map((option, index) => ({ ...option, color: chartColors[index % chartColors.length] }));
+              let end = 0;
+              const gradient = answerOptions.map(({ value, color }) => { const start = end; end += question.percentages[value]; return `${color} ${start}% ${end}%`; }).join(', ');
               const chartLabel = answerOptions
-                .map(({ value }) => t('percent', {label: t(`answers.${value}`), count: question.counts[value], percent: question.percentages[value].toLocaleString(formatLocale)}))
+                .map(({ value, label }) => t('percent', {label: question.options ? label : t(`answers.${value}`), count: question.counts[value], percent: question.percentages[value].toLocaleString(formatLocale)}))
                 .join(', ');
               return (
                 <article className="survey-result-card" key={question.id}>
@@ -78,20 +77,21 @@ function SurveyResults({ data, state, surveyId, t, formatLocale }) {
                     <h5>{question.text}</h5>
                   </div>
                   <div className="survey-result-visual">
-                    <div
+                    {!question.multiple && <div
                       className={`survey-donut${question.answered_count ? '' : ' is-empty'}`}
-                      style={{ '--chart-ja': `${jaEnd}%`, '--chart-nei': `${neiEnd}%` }}
+                      style={question.answered_count ? { background: `conic-gradient(${gradient})` } : undefined}
                       role="img"
                       aria-label={chartLabel}
                     >
                       <span><strong>{question.answered_count}</strong><small>{t('answered')}</small></span>
-                    </div>
+                    </div>}
                     <ul className="survey-result-legend" aria-label={t('distribution', {number: question.number})}>
-                      {answerOptions.map(({ value, color }) => (
+                      {answerOptions.map(({ value, color, label }) => (
                         <li key={value}>
-                          <span className="survey-result-key"><i style={{ backgroundColor: color }} aria-hidden="true" />{t(`answers.${value}`)}</span>
+                          <span className="survey-result-key"><i style={{ backgroundColor: color }} aria-hidden="true" />{question.options ? label : t(`answers.${value}`)}</span>
                           <strong>{question.counts[value]}</strong>
                           <small>{question.percentages[value].toLocaleString(formatLocale)} %</small>
+                          {question.multiple && <meter min={0} max={100} value={question.percentages[value]} aria-label={label} />}
                         </li>
                       ))}
                     </ul>
@@ -212,11 +212,23 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
     await persistSurvey(draftPayload, selected.isNew, selected.id);
   }
 
+  async function copy() {
+    setSaving(true); setMessage('');
+    try {
+      const response = await fetch('/api/admin/surveys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'copy', sourceId: selected.id }), signal: AbortSignal.timeout(60000) });
+      const body = await response.json();
+      if (!response.ok || !body.ok) throw new Error(body.message || t('saveError'));
+      select(body.survey); setMessage(t('copiedDraft')); router.refresh();
+    } catch (error) { setMessage(error.message || t('saveError')); }
+    finally { setSaving(false); }
+  }
+
   useEffect(() => { latestDraftKey.current = draftKey; }, [draftKey]);
 
   useEffect(() => {
     if (!selected || selected.isNew || selected.mock || saving || draftKey === savedPayloadKey) return undefined;
     if (!title.trim() || !endsOn || !questions.length || questions.some((question) => !question.text.trim())) return undefined;
+    try { normalizeSurveyQuestions(questions); } catch { return undefined; }
     const timer = setTimeout(() => persistSurvey(draftPayload, false, selected.id), 900);
     return () => clearTimeout(timer);
   }, [draftKey, draftPayload, endsOn, isOpen, persistSurvey, questions, savedPayloadKey, saving, selected, title]);
@@ -306,6 +318,7 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
                   {questions.map((question, index) => (
                     <div className="admin-question-editor" key={question.id}>
                       <label>{t('question', {number: index + 1})}<textarea value={question.text} onChange={(event) => updateQuestion(index, event.target.value)} rows={4} required /></label>
+                      <SurveyQuestionOptions question={question} onChange={(next) => setQuestions((current) => current.map((item, i) => i === index ? next : item))} />
                       {questions.length > 1 && <button className="admin-remove" type="button" onClick={() => removeQuestion(index)}>{t('remove')}</button>}
                     </div>
                   ))}
@@ -315,6 +328,7 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
                 {!selected.isNew && <dl className="admin-meta"><div><dt>{t('surveyId')}</dt><dd>{selected.id}</dd></div><div><dt>{t('responses')}</dt><dd>{selected.response_count}</dd></div><div><dt>{t('questionVersionLabel')}</dt><dd>{selected.question_version}</dd></div></dl>}
                 {message && <p className={saveState === 'error' ? 'form-error' : 'admin-success'} role="status">{message}</p>}
                 <button className="primary-button" type="submit" disabled={saving || selected.mock}>{saving ? t('saving') : selected.isNew ? t('create') : t('saveChanges')}</button>
+                {!selected.isNew && <button className="admin-button" type="button" disabled={saving || selected.mock || displayedSaveState !== 'saved'} onClick={copy}>{t('copy')}</button>}
                 {!selected.isNew && <button className="admin-delete" type="button" onClick={() => setConfirmDelete(true)} disabled={selected.mock}>{t('delete')}</button>}
                 {selected.mock && <p className="privacy-subnote">{t('mockReadonly')}</p>}
               </form>

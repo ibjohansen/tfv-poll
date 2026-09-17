@@ -29,7 +29,7 @@ const variants = {
   'stående-creme': { src: '/Turufjell_staende_VEL_logo_creme.svg', width: 1793, height: 1656 },
 };
 
-export default function BrandLogo({ variant = 'horizontal', tone = 'light', className = '', priority = false, decorative = false }) {
+export default function BrandLogo({ variant = 'horizontal', tone = 'light', className = '', decorative = false }) {
   const logo = variants[variant] || variants[`${variant}-${tone}`] || variants['horizontal-light'];
   return (
     <Image
@@ -38,7 +38,7 @@ export default function BrandLogo({ variant = 'horizontal', tone = 'light', clas
       height={logo.height}
       alt={decorative ? '' : 'Turufjell Vel'}
       className={className}
-      priority={priority}
+      loading="lazy"
     />
   );
 }

@@ -2,19 +2,20 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { answerOptions } from "@/data/survey";
+import { questionOptions } from '@/lib/survey-questions';
 import { useI18n } from '@/components/LocaleProvider';
 
-export default function SurveyForm({ mockToken, mockSurveyId, questions, questionVersion }) {
+export default function SurveyForm({ mockToken, mockSurveyId, questions, questionVersion, singleResponsePerProperty = true }) {
   const { t } = useI18n('surveys.form');
   const router = useRouter();
   const [answers, setAnswers] = useState(() => Object.fromEntries(questions.map(({ id }) => [id, ""])));
   const [website, setWebsite] = useState("");
   const [status, setStatus] = useState("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [accepted, setAccepted] = useState(true);
 
   const answeredCount = useMemo(
-    () => Object.values(answers).filter(Boolean).length,
+    () => Object.values(answers).filter((value) => Array.isArray(value) ? value.length > 0 : Boolean(value)).length,
     [answers],
   );
 
@@ -62,6 +63,7 @@ export default function SurveyForm({ mockToken, mockSurveyId, questions, questio
         throw new Error(data.message || t('submitError'));
       }
 
+      setAccepted(data.accepted !== false);
       setStatus("success");
     } catch (error) {
       setStatus("idle");
@@ -86,7 +88,7 @@ export default function SurveyForm({ mockToken, mockSurveyId, questions, questio
         </div>
         <p className="eyebrow">{t('received')}</p>
         <h2>{t('thanks')}</h2>
-        <p>{t('success')}</p>
+        <p>{t(accepted ? 'success' : 'notCounted')}</p>
       </section>
     );
   }
@@ -123,11 +125,12 @@ export default function SurveyForm({ mockToken, mockSurveyId, questions, questio
               <span className="question-number">{question.number}</span>
               <span>{question.text}</span>
             </legend>
+            <p className="privacy-subnote">{t(question.multiple ? 'selectMany' : 'selectOne')}</p>
 
             <div className="answer-grid">
-              {answerOptions.map((option) => {
+              {questionOptions(question).map((option) => {
                 const inputId = `${question.id}-${option.value}`;
-                const checked = answers[question.id] === option.value;
+                const checked = question.multiple ? (answers[question.id] || []).includes(option.value) : answers[question.id] === option.value;
 
                 return (
                   <label
@@ -137,16 +140,18 @@ export default function SurveyForm({ mockToken, mockSurveyId, questions, questio
                   >
                     <input
                       id={inputId}
-                      type="radio"
+                      type={question.multiple ? 'checkbox' : 'radio'}
                       name={question.id}
                       value={option.value}
                       checked={checked}
                       onChange={(event) =>
-                        updateAnswer(question.id, event.target.value)
+                        updateAnswer(question.id, question.multiple ? (event.target.checked
+                          ? [...(answers[question.id] || []), option.value]
+                          : answers[question.id].filter((value) => value !== option.value)) : option.value)
                       }
                     />
                     <span className="radio-mark" aria-hidden="true" />
-                    <span>{t(`answers.${option.value}`, {}, option.label)}</span>
+                    <span>{question.options ? option.label : t(`answers.${option.value}`, {}, option.label)}</span>
                   </label>
                 );
               })}
@@ -163,7 +168,7 @@ export default function SurveyForm({ mockToken, mockSurveyId, questions, questio
 
       <div className="submit-row">
         <div>
-          <p className="privacy-note">{t('onePerProperty')}</p>
+          <p className="privacy-note">{t(singleResponsePerProperty ? 'onePerProperty' : 'onePerRecipient')}</p>
           <p className="privacy-subnote">{t('privacy')}</p>
         </div>
         <button

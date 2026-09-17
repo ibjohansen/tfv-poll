@@ -41,7 +41,7 @@ export default async function AdminLogin({ searchParams }) {
             src={landscape}
             alt={t('landscapeAlt')}
             fill
-            priority
+            loading="lazy"
             sizes="55vw"
             className="object-cover object-[15%_center]"
           />
@@ -49,7 +49,7 @@ export default async function AdminLogin({ searchParams }) {
         <div className="absolute inset-0 bg-linear-to-t from-[#493F39]/90 via-[#493F39]/30 to-primary/10" />
         <div className="absolute inset-x-0 bottom-0 p-12 xl:p-16">
           <div className="max-w-xl text-white">
-            <BrandLogo variant="horizontal" tone="dark" decorative priority className="mb-10 h-auto w-80 max-w-full" />
+            <BrandLogo variant="horizontal" tone="dark" decorative className="mb-10 h-auto w-80 max-w-full" />
             <p className="mb-5 text-xs font-semibold tracking-[0.2em] text-white/70 uppercase">Turufjell Vel</p>
             <h2 className="whitespace-pre-line text-4xl leading-tight font-semibold tracking-tight xl:text-5xl">{t('hero')}</h2>
             <p className="mt-6 max-w-lg text-base leading-7 text-white/75">{t('heroIntro')}</p>
@@ -65,7 +65,7 @@ export default async function AdminLogin({ searchParams }) {
           </Link>
 
           <div className="rounded-3xl border border-foreground/15 bg-white p-7 shadow-xl shadow-[#493F39]/8 sm:p-10">
-            <BrandLogo variant="stacked" decorative priority className="mb-8 h-auto w-32" />
+            <BrandLogo variant="stacked" decorative className="mb-8 h-auto w-32" />
             <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-semibold tracking-[0.16em] text-primary uppercase">{t('eyebrow')}</p><h1 id="login-title" className="mt-3 text-3xl font-light tracking-tight text-foreground sm:text-4xl">{t('title')}</h1></div><LanguageSwitcher /></div>
             <p className="mt-4 text-[0.95rem] leading-6 text-[#6F645E]">{t('introduction')}</p>
 

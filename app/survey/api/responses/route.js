@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { isMockMode } from '@/lib/mock-store';
 import {
   getMockSurveyAccess, getSurveyAccess, submitMockSurveyResponse,
@@ -7,10 +7,11 @@ import {
 } from '@/lib/membership';
 import { isRateLimited } from '@/lib/rate-limit';
 import { getRequestI18n } from '@/lib/i18n/request';
+import { hasValidSurveyAnswers } from '@/lib/survey-questions';
+import { dispatchSurveyReceipts, isSurveyEmailBackgroundConfigured } from '@/lib/survey-email-background';
+import { getApplicationOrigin } from '@/lib/request-origin';
 
 export const runtime = 'nodejs';
-
-const allowedAnswers = new Set(['ja', 'nei', 'usikker']);
 
 function reply(body, status) {
   return NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -19,12 +20,6 @@ function reply(body, status) {
 function hasValidOrigin(request) {
   const origin = request.headers.get('origin');
   return !origin || origin === new URL(request.url).origin;
-}
-
-function hasValidAnswers(answers, questions) {
-  if (!answers || typeof answers !== 'object' || Array.isArray(answers)) return false;
-  const ids = questions.map(({ id }) => id);
-  return Object.keys(answers).length === ids.length && ids.every((id) => allowedAnswers.has(answers[id]));
 }
 
 function accessErrorStatus(status) {
@@ -55,14 +50,21 @@ export async function POST(request) {
     if (body.questionVersion !== access.survey.question_version) {
       return reply({ ok: false, code: 'SURVEY_CHANGED', message: t('survey.changed') }, 409);
     }
-    if (!hasValidAnswers(body.answers, access.survey.questions)) {
+    if (!hasValidSurveyAnswers(body.answers, access.survey.questions)) {
       return reply({ ok: false, message: t('survey.allRequired') }, 400);
     }
     const result = isMockMode()
       ? await submitMockSurveyResponse(body.mockToken, body.mockSurveyId, body.answers)
       : await submitSurveyResponse(secret, body.answers, { questionVersion: body.questionVersion });
     if (!result.saved) return reply({ ok: false, code: 'SURVEY_CONFLICT', message: t('survey.conflict') }, 409);
-    const response = reply({ ok: true }, 201);
+    if (result.receiptId && isSurveyEmailBackgroundConfigured()) {
+      const origin = getApplicationOrigin(request);
+      after(async () => {
+        try { await dispatchSurveyReceipts(origin); }
+        catch { console.error('Survey receipt dispatch failed; receipt remains queued'); }
+      });
+    }
+    const response = reply({ ok: true, accepted: result.accepted !== false }, 201);
     if (!isMockMode()) response.cookies.set(surveySessionCookieName(), '', {
       maxAge: 0, path: '/', httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production',
     });

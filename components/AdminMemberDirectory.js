@@ -1,6 +1,8 @@
 'use client';
 
+import Select from "@/components/Select";
 import Link from 'next/link';
+import AutoFilterForm from '@/components/AutoFilterForm';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -193,16 +195,16 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
       {canMatrikkelSync && checked.size > 0 && <Link className="admin-button" href={`/admin/members/matrikkel?members=${encodeURIComponent(matrikkelSelection)}`}>{t('updateSelected', {count: checked.size})}</Link>}
       <button className="primary-button" type="button" onClick={create}>{t('newMember')}</button>
     </div>
-    <form className="admin-search admin-member-filters" action="/admin/members">
+    <AutoFilterForm className="admin-search admin-member-filters" action="/admin/members">
       <div className="admin-filter-grid">
-        <label>{t('membershipStatus')}<select name="membership" defaultValue={membershipStatus}><option value="">{t('allProperties')}</option><option value="member">{t('regularMembers')}</option><option value="exempt">{t('exemptMembership')}</option></select></label>
-        <label>{t('hamlet')}<select name="hamlet" defaultValue={hamletId}><option value="">{t('allHamlets')}</option><option value="unassigned">{t('noHamlet')}</option>{groups.filter((group) => group.kind === 'hamlet').map((group) => <option value={group.id} key={group.id}>{group.name} ({group.plot_count})</option>)}</select></label>
-        <label>{t('emailGroup')}<select name="group" defaultValue={groupId}><option value="">{t('allGroups')}</option>{groups.filter((group) => group.kind === 'email').map((group) => <option value={group.id} key={group.id}>{group.name}</option>)}</select></label>
-        <label>{t('sharing')}<select name="sharing" defaultValue={turufjellAsSharing}><option value="">{t('all')}</option><option value="allowed">{t('allowed')}</option><option value="opted_out">{t('optedOut')}</option></select></label>
+        <label>{t('membershipStatus')}<Select name="membership" defaultValue={membershipStatus}><option value="">{t('allProperties')}</option><option value="member">{t('regularMembers')}</option><option value="exempt">{t('exemptMembership')}</option></Select></label>
+        <label>{t('hamlet')}<Select name="hamlet" defaultValue={hamletId}><option value="">{t('allHamlets')}</option><option value="unassigned">{t('noHamlet')}</option>{groups.filter((group) => group.kind === 'hamlet').map((group) => <option value={group.id} key={group.id}>{group.name} ({group.plot_count})</option>)}</Select></label>
+        <label>{t('emailGroup')}<Select name="group" defaultValue={groupId}><option value="">{t('allGroups')}</option>{groups.filter((group) => group.kind === 'email').map((group) => <option value={group.id} key={group.id}>{group.name}</option>)}</Select></label>
+        <label>{t('sharing')}<Select name="sharing" defaultValue={turufjellAsSharing}><option value="">{t('all')}</option><option value="allowed">{t('allowed')}</option><option value="opted_out">{t('optedOut')}</option></Select></label>
       </div>
       <fieldset className="admin-filter-toggles"><legend>{t('onlyShow')}</legend><label><input type="checkbox" name="contact" value="incomplete" defaultChecked={incompleteContact} /> {t('incomplete')}</label><label><input type="checkbox" name="comment" value="present" defaultChecked={hasComment} /> {t('withComment')}</label></fieldset>
-      <label htmlFor="member-search">{t('search')}</label><div><input id="member-search" name="q" type="search" defaultValue={search} placeholder={t('searchPlaceholder')} maxLength={200} /><button className="primary-button" type="submit">{t('applyFilter')}</button>{(search || Object.keys(activeFilters).length > 0) && <Link href="/admin/members">{t('resetFilter')}</Link>}</div>
-    </form>
+      <label htmlFor="member-search">{t('search')}</label><div><input id="member-search" name="q" type="search" defaultValue={search} placeholder={t('searchPlaceholder')} maxLength={200} />{(search || Object.keys(activeFilters).length > 0) && <Link href="/admin/members">{t('resetFilter')}</Link>}</div>
+    </AutoFilterForm>
     <p className="admin-count" role="status">{t('count', {count: data.total, suffix: countSuffix})}</p>
     {members.length ? <>
       <div className="admin-table-scroll" role="region" aria-label={t('members')} tabIndex={0}><table className="admin-table"><caption>{t('tableCaption')}</caption><thead><tr>
@@ -223,7 +225,7 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
       {form && <form className="admin-detail-form" onSubmit={save}>
         <section aria-label={t('sharedProperties')}>{selected.shared_email_groups?.map((group) => <details key={group.email}><summary>{group.email} · {t('propertyCount', {count: group.properties.length})}</summary><ul>{group.properties.map((property) => <li key={property.id}><Link href={`/admin/members?member=${encodeURIComponent(property.id)}`}>{property.h_number} · {property.contact_name || t('contactMissing')} · {property.street_address || t('addressMissing')}</Link></li>)}</ul></details>)}</section>
         {canMatrikkelSync && !selected.isNew && <Link className="admin-button" href={`/admin/members/matrikkel?member=${encodeURIComponent(selected.id)}`}>{t('updateMember')}</Link>}
-        <label>{t('membershipStatus')}<select value={form.membership_status || 'member'} onChange={(event) => updateForm('membership_status', event.target.value)}><option value="member">{t('regularMember')}</option><option value="exempt">{t('exemptMembership')}</option></select></label>
+        <label>{t('membershipStatus')}<Select value={form.membership_status || 'member'} onChange={(event) => updateForm('membership_status', event.target.value)}><option value="member">{t('regularMember')}</option><option value="exempt">{t('exemptMembership')}</option></Select></label>
         <label className="admin-checkbox"><input type="checkbox" checked={Boolean(form.turufjell_as_sharing_opt_out)} onChange={(event) => updateForm('turufjell_as_sharing_opt_out', event.target.checked)} /> {t('optOut')}</label><span className="admin-field-note">{t('optOutNote')}</span>
         <div className="admin-detail-field-grid is-property">{propertyFields.map(renderField)}</div>{renderField(['street_address', true])}<div className="admin-detail-field-grid is-ownership">{ownershipFields.map(renderField)}</div>{selected?.street_address && <MemberPropertyMap streetAddress={selected.street_address} />}{contactFields.map(renderField)}
         {newToken && <p className="admin-success">{t('memberId', {id: newToken})}</p>}{message && <p className={saveState === 'error' ? 'form-error' : 'admin-success'} role="status">{message}</p>}
@@ -234,7 +236,7 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
     {exportOpen && <div className="confirm-backdrop" role="presentation"><section className="confirm-dialog export-dialog" role="dialog" aria-modal="true" aria-labelledby="export-title"><p className="eyebrow">{t('exportEyebrow')}</p><h2 id="export-title">{t('exportTitle')}</h2><form className="export-form" onSubmit={exportMembers}>
       <fieldset><legend>{t('exportMembers')}</legend><label><input type="radio" name="export-scope" value="all" checked={exportScope === 'all'} onChange={() => setExportScope('all')} /> {t('exportAll')}</label><label><input type="radio" name="export-scope" value="selected" checked={exportScope === 'selected'} onChange={() => setExportScope('selected')} disabled={!checked.size} /> {t('exportSelected', {count: checked.size})}</label></fieldset>
       <label className="admin-checkbox"><input type="checkbox" checked={excludeTurufjellAsOptOut} onChange={(event) => setExcludeTurufjellAsOptOut(event.target.checked)} /> {t('excludeOptOut')}</label>
-      <label htmlFor="export-survey">{t('survey')}<select id="export-survey" value={exportSurveyId} onChange={(event) => setExportSurveyId(event.target.value)} required>{surveys.map((survey) => <option value={survey.id} key={survey.id}>{survey.title}{survey.has_ended ? t('ended') : survey.is_open ? '' : t('closed')}</option>)}</select></label>
+      <label htmlFor="export-survey">{t('survey')}<Select id="export-survey" value={exportSurveyId} onChange={(event) => setExportSurveyId(event.target.value)} required>{surveys.map((survey) => <option value={survey.id} key={survey.id}>{survey.title}{survey.has_ended ? t('ended') : survey.is_open ? '' : t('closed')}</option>)}</Select></label>
       <p className="privacy-subnote">{t('exportPrivacy')}</p>{exportMessage && <p className="form-error" role="alert">{exportMessage}</p>}<div className="confirm-actions"><button ref={exportCancelButton} className="admin-button" type="button" onClick={() => setExportOpen(false)} disabled={exporting}>{t('cancel')}</button><button className="primary-button" type="submit" disabled={exporting || !exportSurveyId || (exportScope === 'selected' && !checked.size)}>{exporting ? t('generating') : t('download')}</button></div>
     </form></section></div>}
   </>;

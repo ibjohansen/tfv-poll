@@ -15,6 +15,7 @@ before(async () => {
     '../admin-access.js': { requirePermission: async () => ({ email: 'map-admin@example.test' }) },
     '../db.js': { getSql: () => db.sql }, '../mock-store.js': { isMockMode: () => false },
     './geo.js': { MapError }, './hamlets.js': hamlets,
+    '../public-content-cache.js': { revalidatePublicHamlets: () => {} },
   });
   groups = await loadModule('lib/member-groups.js', {
     './admin-access.js': { requirePermission: async () => ({ email: 'group-admin@example.test' }) },

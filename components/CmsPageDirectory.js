@@ -1,5 +1,7 @@
 'use client';
 
+import Select from "@/components/Select";
+import AutoFilterForm from '@/components/AutoFilterForm';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -70,6 +72,17 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
     setMessage('');
     setSavedPageKey('');
     setSaveState('idle');
+  }
+
+  async function copyPage() {
+    setBusy(true); setMessage('');
+    try {
+      const response = await fetch('/api/admin/cms/pages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'copy', sourceId: selected.id }), signal: AbortSignal.timeout(60000) });
+      const body = await response.json();
+      if (!response.ok || !body.ok) throw new Error(body.message || t('saveError'));
+      setSelected(body.page); setSlugEdited(true); setSavedPageKey(pageKey(body.page)); setSaveState('saved'); setMessage(t('copied')); router.refresh();
+    } catch (error) { setMessage(error.message || t('saveError')); }
+    finally { setBusy(false); }
   }
 
   async function editPage(summary) {
@@ -330,10 +343,10 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
   return (
     <>
       <div className="cms-admin-toolbar">
-        <form className="cms-search" action="/admin/web">
+        <AutoFilterForm key={search} className="cms-search" action="/admin/web">
           <label htmlFor="cms-search">{t('searchLabel')}</label>
-          <div><input id="cms-search" name="search" defaultValue={search} placeholder={t('searchPlaceholder')} /><button className="admin-button" type="submit">{t('search')}</button>{search && <Link href="/admin/web">{t('reset')}</Link>}</div>
-        </form>
+          <div><input id="cms-search" name="search" type="search" defaultValue={search} placeholder={t('searchPlaceholder')} />{search && <Link href="/admin/web">{t('reset')}</Link>}</div>
+        </AutoFilterForm>
         <button className="primary-button" type="button" onClick={newPage}>{t('newPage')}</button>
       </div>
 
@@ -351,6 +364,7 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
       </div>
 
       <aside className={`admin-detail-panel cms-editor${selected ? ' is-open' : ''}`} aria-hidden={!selected} aria-label={t('editPage')}>
+        {selected?.id && <button className="admin-button" type="button" disabled={busy || displayedSaveState !== 'saved'} onClick={copyPage}>{t('copy')}</button>}
         <div className="admin-detail-header"><div><p className="eyebrow">{selected?.isNew ? t('newPage') : t('website')}</p><h2>{selected?.isNew ? t('createPage') : selected?.title}</h2>{!selected?.isNew && <span className={`admin-save-status is-${displayedSaveState}`} role="status">{t(`saveStates.${displayedSaveState}`)}</span>}</div><button className="admin-button" type="button" onClick={() => setSelected(null)} disabled={busy}>{t('close')}</button></div>
         {selected && <CmsEditorForm page={selected} busy={busy} message={message} storageConfigured={storageConfigured} t={t} formatLocale={formatLocale} onUpdate={update} onTitleChange={(title) => setSelected((current) => ({ ...current, title, slug: slugEdited ? current.slug : createSlug(title) }))} onSlugChange={(value) => { setSlugEdited(true); update('slug', normalizeSlugInput(value)); }} onSave={save} onUploadImage={uploadImage} onUploadAttachments={uploadAttachments} onRenameAttachment={renameAttachment} onMoveAttachment={moveAttachment} onDelete={setDeleteCandidate} />}
       </aside>
@@ -368,7 +382,7 @@ function CmsEditorForm({ page, busy, message, storageConfigured, t, formatLocale
         <legend className="visually-hidden">{t('pageContent')}</legend>
         <label>{t('title')} <span aria-hidden="true">*</span><input value={page.title} maxLength={120} required onChange={(event) => onTitleChange(event.target.value)} /><small>{t('characters', {count: page.title.length, max: 120})}</small></label>
         <label>URL <span aria-hidden="true">*</span><div className="cms-slug-field"><span>/</span><input value={page.slug} maxLength={100} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" required onChange={(event) => onSlugChange(event.target.value)} /></div><small>{t('slugHelp')}</small></label>
-        <label>{t('category')} <span aria-hidden="true">*</span><select value={page.category} onChange={(event) => onUpdate('category', event.target.value)}>{cmsCategories.map((category) => <option key={category} value={category}>{t(`categories.${category}`, {}, category)}</option>)}</select></label>
+        <label>{t('category')} <span aria-hidden="true">*</span><Select value={page.category} onChange={(event) => onUpdate('category', event.target.value)}>{cmsCategories.map((category) => <option key={category} value={category}>{t(`categories.${category}`, {}, category)}</option>)}</Select></label>
         <label>{t('intro')}<textarea value={page.intro || ''} maxLength={500} rows={4} onChange={(event) => onUpdate('intro', event.target.value)} /><small>{t('introHelp', {count: (page.intro || '').length})}</small></label>
         <RichTextEditor key={page.id || 'new'} value={page.body_rich_text} plainText={page.body || ''} onChange={(value) => onUpdate('body_rich_text', value)} disabled={busy} />
       </fieldset>

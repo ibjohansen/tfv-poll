@@ -94,7 +94,9 @@ test('response snapshot and version condition are part of the same insert statem
   };
   assert.equal((await submitSurveyResponse(secret, { q1: 'ja' }, { sql, env, questionVersion: 2 })).saved, true);
   const insert = queries.find(({ query }) => query.includes('INSERT INTO survey_responses'));
-  assert.match(insert.query, /SELECT v.member_id, v.survey_id, s.question_version, s.questions/);
+  assert.match(insert.query, /respondent_email, id, question_version, questions/);
+  assert.match(insert.query, /ON CONFLICT \(member_id, survey_id, response_key\) DO UPDATE SET response_key = EXCLUDED.response_key/);
+  assert.match(insert.query, /INSERT INTO survey_response_receipts/);
   assert.match(insert.query, /AND s.question_version = \?/);
   assert.ok(insert.values.includes(2));
   assert.ok(insert.values.includes(JSON.stringify({ q1: 'ja' })));

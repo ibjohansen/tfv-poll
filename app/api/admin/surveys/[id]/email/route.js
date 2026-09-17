@@ -1,6 +1,6 @@
 import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
-import { createSurveyEmailCampaign, failPendingSurveyEmailCampaign, getSurveyEmailOverview, sendSurveyTestEmail } from '@/lib/survey-email';
+import { createSurveyEmailCampaign, failPendingSurveyEmailCampaign, getSurveyEmailOverview, findSurveyRecipientProperties, sendSurveyTestEmail } from '@/lib/survey-email';
 import { dispatchSurveyEmailCampaign, requireSurveyEmailBackgroundConfigured } from '@/lib/survey-email-background';
 import { isEmailRateLimited } from '@/lib/rate-limit';
 import { getRequestI18n } from '@/lib/i18n/request';
@@ -25,10 +25,16 @@ function errorResponse(error, t) {
 export async function GET(request, { params }) {
   const { t } = getRequestI18n(request, 'backend.adminSurveys');
   try {
+    if (request.nextUrl.searchParams.has('search')) {
+      const members = await findSurveyRecipientProperties((await params).id, request.nextUrl.searchParams.get('search'));
+      return NextResponse.json({ ok: true, members }, { headers: { 'Cache-Control': 'no-store, private' } });
+    }
     const overview = await getSurveyEmailOverview(
       (await params).id,
       request.nextUrl.searchParams.get('page'),
       request.nextUrl.searchParams.get('groupId'),
+      { includeOtherEmails: request.nextUrl.searchParams.get('includeOtherEmails') === 'true',
+        memberIds: request.nextUrl.searchParams.get('memberIds')?.split(',').filter(Boolean) || [] },
     );
     return NextResponse.json({ ok: true, overview }, { headers: { 'Cache-Control': 'no-store, private' } });
   } catch (error) { return errorResponse(error, t); }
@@ -45,10 +51,11 @@ export async function POST(request, { params }) {
       const delivery = await sendSurveyTestEmail(surveyId, input.recipient);
       return NextResponse.json({ ok: true, delivery }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
-    if (!['send', 'resend'].includes(input.action)) return NextResponse.json({ ok: false, message: t('adminSurveys.invalidEmailAction') }, { status: 400 });
+    if (!['send', 'resend', 'append'].includes(input.action)) return NextResponse.json({ ok: false, message: t('adminSurveys.invalidEmailAction') }, { status: 400 });
     const jobSecret = requireSurveyEmailBackgroundConfigured();
     const result = await createSurveyEmailCampaign(surveyId, {
-      replaceCompleted: input.action === 'resend', groupId: input.groupId,
+      replaceCompleted: input.action === 'resend', appendRecipients: input.action === 'append', groupId: input.groupId,
+      includeOtherEmails: input.includeOtherEmails, singleResponsePerProperty: input.singleResponsePerProperty, memberIds: input.memberIds,
     });
     let backgroundStarted = false;
     if (process.env.NODE_ENV === 'production' && ['pending', 'running', 'failed'].includes(result.campaign.status)) {

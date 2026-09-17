@@ -1,5 +1,6 @@
 'use client';
 
+import Select from "@/components/Select";
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import MemberPropertyMap from '@/components/MemberPropertyMap';
@@ -80,7 +81,7 @@ export default function MapMemberDetails({ memberId, canMatrikkelSync = false, o
     {form && <form className="admin-detail-form" onSubmit={(event) => { event.preventDefault(); save(payload(form)); }}>
       <div className="map-actions"><Link className="admin-button" href={`/admin/members?member=${encodeURIComponent(memberId)}`}>{t('openRegister')}</Link>
         {canMatrikkelSync && <Link className="admin-button" href={`/admin/members/matrikkel?member=${encodeURIComponent(memberId)}`}>{t('updateCadastral')}</Link>}</div>
-      <label>{t('membershipStatus')}<select value={form.membership_status || 'member'} onChange={(event) => update('membership_status', event.target.value)}><option value="member">{t('regularMember')}</option><option value="exempt">{t('exempt')}</option></select></label>
+      <label>{t('membershipStatus')}<Select value={form.membership_status || 'member'} onChange={(event) => update('membership_status', event.target.value)}><option value="member">{t('regularMember')}</option><option value="exempt">{t('exempt')}</option></Select></label>
       <label className="admin-checkbox"><input type="checkbox" checked={Boolean(form.turufjell_as_sharing_opt_out)} onChange={(event) => update('turufjell_as_sharing_opt_out', event.target.checked)} /> {t('sharingOptOut')}</label>
       <div className="admin-detail-field-grid is-property">{propertyFields.map((name) => <div className="admin-detail-field" key={name}><label>{t(`fields.${name}`)}<input value={form[name] || ''} readOnly /></label></div>)}</div>
       <div className="admin-detail-field"><label>{t('streetAddress')}<input value={form.street_address || ''} readOnly /></label></div>

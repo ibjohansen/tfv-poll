@@ -49,11 +49,11 @@ const exportsByModule = {
   'admin-member-updates': ['createAdminMember', 'updateAdminMember', 'deleteAdminMember'],
   'member-export': ['createMemberExport'],
   'member-self-service': ['resolveAdminMemberRequest', 'updateAdminMemberRequestProperty'],
-  'admin-surveys': ['getAdminSurveys', 'createAdminSurvey', 'updateAdminSurvey', 'deleteAdminSurvey'],
+  'admin-surveys': ['getAdminSurveys', 'createAdminSurvey', 'copyAdminSurvey', 'updateAdminSurvey', 'deleteAdminSurvey'],
   'admin-survey-results': ['getAdminSurveyResults', 'createAdminSurveyResultsExport'],
-  'survey-email': ['getSurveyEmailOverview', 'sendSurveyTestEmail', 'createSurveyEmailCampaign', 'failPendingSurveyEmailCampaign'],
+  'survey-email': ['getSurveyEmailOverview', 'findSurveyRecipientProperties', 'sendSurveyTestEmail', 'createSurveyEmailCampaign', 'failPendingSurveyEmailCampaign'],
   'survey-files': ['uploadAdminSurveyAttachment', 'updateAdminSurveyAttachment', 'deleteAdminSurveyAttachment'],
-  'cms-pages': ['getAdminCmsPages', 'createAdminCmsPage', 'getAdminCmsPage', 'updateAdminCmsPage', 'deleteAdminCmsPage', 'setAdminCmsPageStatus'],
+  'cms-pages': ['getAdminCmsPages', 'createAdminCmsPage', 'copyAdminCmsPage', 'getAdminCmsPage', 'updateAdminCmsPage', 'deleteAdminCmsPage', 'setAdminCmsPageStatus'],
   'cms-files': ['uploadAdminCmsFile', 'deleteAdminCmsFile', 'reorderAdminCmsAttachments', 'updateAdminCmsAttachment'],
   'matrikkel-sync': ['getMatrikkelRuns', 'getMatrikkelRun', 'getMatrikkelMemberOptions', 'createMatrikkelRun', 'failPendingMatrikkelRun', 'deleteMatrikkelRunLog', 'cancelMatrikkelRun', 'processMatrikkelRun', 'approveMatrikkelItem'],
 };
@@ -166,11 +166,42 @@ test('email actions require a valid action and respect rate limits', async () =>
 test('survey mailing forwards the selected email group to preview and campaign creation', async () => {
   const { route, calls } = await setup('surveys/[id]/email');
   await route.GET(request('/api/admin/surveys/test/email?page=2&groupId=71'), routeContext());
-  assert.deepEqual(plain(calls.at(-1).args), ['a'.repeat(32), '2', '71']);
+  assert.deepEqual(plain(calls.at(-1).args), ['a'.repeat(32), '2', '71', { includeOtherEmails: false, memberIds: [] }]);
   await route.POST(request('/api/admin/surveys/test/email', {
     method: 'POST', body: { action: 'send', groupId: '71' },
   }), routeContext());
-  assert.deepEqual(plain(calls.at(-1).args), ['a'.repeat(32), { replaceCompleted: false, groupId: '71' }]);
+  assert.deepEqual(plain(calls.at(-1).args), ['a'.repeat(32), { replaceCompleted: false, appendRecipients: false, groupId: '71' }]);
+});
+
+test('survey recipient search uses the protected survey service without returning full member records', async () => {
+  const { route, calls } = await setup('surveys/[id]/email');
+  const response = await route.GET(request('/api/admin/surveys/test/email?search=H25'), routeContext());
+  assert.equal(response.status, 200);
+  assert.equal(calls.at(-1).name, 'findSurveyRecipientProperties');
+  assert.deepEqual(plain(calls.at(-1).args), ['a'.repeat(32), 'H25']);
+  assert.match(response.headers.get('cache-control'), /private/);
+});
+
+test('survey append forwards only the explicitly selected group, properties and recipient policy', async () => {
+  const { route, calls } = await setup('surveys/[id]/email');
+  const response = await route.POST(request('/api/admin/surveys/test/email', { method: 'POST', body: {
+    action: 'append', groupId: '71', memberIds: ['7'], includeOtherEmails: true, singleResponsePerProperty: true,
+  } }), routeContext());
+  assert.equal(response.status, 201);
+  assert.deepEqual(plain(calls.at(-1).args), ['a'.repeat(32), { replaceCompleted: false, appendRecipients: true, groupId: '71',
+    memberIds: ['7'], includeOtherEmails: true, singleResponsePerProperty: true }]);
+});
+
+test('copy actions use permission-checked copy services for surveys and articles', async () => {
+  for (const [path, expected] of [['surveys', 'copyAdminSurvey'], ['cms/pages', 'copyAdminCmsPage']]) {
+    const { route, calls, state } = await setup(path);
+    const send = () => route.POST(request(`/api/admin/${path}`, { method: 'POST', body: { action: 'copy', sourceId: 'b'.repeat(32) } }));
+    assert.equal((await send()).status, 201);
+    assert.equal(calls.at(-1).name, expected);
+    assert.deepEqual(plain(calls.at(-1).args), ['b'.repeat(32)]);
+    state.error = new Error('Forbidden');
+    assert.equal((await send()).status, 403);
+  }
 });
 
 test('malformed JSON and non-object bodies never initiate an admin mutation or full sync', async () => {

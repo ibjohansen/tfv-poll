@@ -1,9 +1,9 @@
 # Språk og oversettelser
 
 Applikasjonens grensesnitt støtter norsk bokmål (`nb`) og engelsk (`en`). Norsk
-er standardspråk. Første besøk bruker `Accept-Language` når nettleseren ber om
-et støttet språk; brukerens valg lagres deretter i den sikre, HTTP-only cookien
-`tfv_locale` i ett år.
+er alltid standardspråk inntil brukeren selv velger et annet språk. Nettleserens
+språkinnstilling og `Accept-Language` ignoreres. Brukerens manuelle valg lagres
+i den sikre, HTTP-only cookien `tfv_locale` i ett år.
 
 ## Struktur
 
@@ -24,7 +24,7 @@ Oversettelsene ligger i `locales/nb` og `locales/en`, gruppert etter område:
 og API-ruter. Den vedvarende språkvelgeren i sidetoppen bruker et globeikon og
 språkenes egne navn, **Norsk** og **English**. Valget navigerer til samme side
 med den delbare parameteren `?lang=nb` eller `?lang=en`; proxyen bruker denne
-verdien for samme respons og lagrer deretter språkoden i cookien. Den eldre
+verdien for samme respons og lagrer deretter språkkoden i cookien. Den eldre
 `POST /api/locale` beholdes for kompatibilitet. Ingen av mekanismene lagrer
 brukeridentifikator eller annen personopplysning.
 

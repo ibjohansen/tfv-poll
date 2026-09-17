@@ -12,6 +12,12 @@ const directory = await mkdtemp(join(tmpdir(), 'tfv-browser-tests-'));
 const entries = ['app', 'components', 'lib', 'locales', 'data', 'public', 'auth.js', 'proxy.js',
   'package.json', 'package-lock.json', 'jsconfig.json', 'next.config.mjs', 'postcss.config.mjs', 'tailwind.config.js'];
 await Promise.all(entries.map((entry) => cp(join(root, entry), join(directory, entry), { recursive: true })));
+// Stable small fixtures, independent of user uploads and ongoing file renames.
+// Only the disposable copy is replaced; original images are never changed.
+await rm(join(directory, 'public/carousel'), { recursive: true });
+await mkdir(join(directory, 'public/carousel'));
+await cp(join(root, 'public/turufjell.jpeg'), join(directory, 'public/carousel/Ø Testfotograf_tf001.jpg'));
+await cp(join(root, 'public/turufjell.jpeg'), join(directory, 'public/carousel/Testfotograf_tf002.jpg'));
 await mkdir(join(directory, 'app/admin/browser-test'), { recursive: true });
 await cp(join(root, 'tests/e2e/fixture-page.jsx'), join(directory, 'app/admin/browser-test/page.js'));
 await symlink(join(root, 'node_modules'), join(directory, 'node_modules'), 'dir');

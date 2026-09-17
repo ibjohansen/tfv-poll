@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_LOCALE, formatLocale, localeFromAcceptLanguage, normalizeLocale } from '../lib/i18n/config.js';
+import { DEFAULT_LOCALE, formatLocale, normalizeLocale } from '../lib/i18n/config.js';
 import { getRequestLocale } from '../lib/i18n/request.js';
 import { dictionaries, getDictionary } from '../locales/index.js';
 import { scopedTranslator, translate } from '../lib/i18n/translate.js';
@@ -21,11 +21,11 @@ test('supported locales are normalized and unsupported locales fall back to Norw
   assert.equal(formatLocale('en'), 'en-GB');
 });
 
-test('Accept-Language honours quality and request cookies take precedence', () => {
-  assert.equal(localeFromAcceptLanguage('nb-NO;q=0.6,en-GB;q=0.9'), 'en');
-  assert.equal(localeFromAcceptLanguage('de-DE,en;q=0'), DEFAULT_LOCALE);
+test('only a stored manual choice changes the request locale', () => {
   const request = { headers: new Headers({ cookie: 'other=x; tfv_locale=en', 'accept-language': 'nb-NO' }) };
   assert.equal(getRequestLocale(request), 'en');
+  assert.equal(getRequestLocale({ headers: new Headers({ 'accept-language': 'en-US,en;q=0.9' }) }), DEFAULT_LOCALE);
+  assert.equal(getRequestLocale({ headers: new Headers({ cookie: 'tfv_locale=de', 'accept-language': 'en' }) }), DEFAULT_LOCALE);
 });
 
 test('translation supports scopes, interpolation and explicit fallback values', () => {

@@ -1,5 +1,6 @@
 'use client';
 
+import Select from "@/components/Select";
 import { useState } from 'react';
 import { addressLabel, normalizeAddress, propertyLabel, sortAddresses } from '@/lib/map/normalization';
 import { COMPARISON_STATUSES } from '@/lib/map/comparison';
@@ -36,8 +37,8 @@ export default function ResultsPanel({ addresses, properties, boundaries, roads,
   return <section className="map-results" aria-label={t('results.title')}>
     <nav className="map-actions" aria-label={t('results.view')}>{tabs.map((key) => <button type="button" className="admin-button" aria-pressed={tab === key} key={key} onClick={() => { setTab(key); setFilter(''); }}>{t(`results.tabs.${key}`)}</button>)}</nav>
     <div className="map-actions"><label>{t('results.search')} <input type="search" value={filter} onChange={(event) => setFilter(event.target.value)} /></label>
-      {tab === 'addresses' && <label>{t('results.sorting')} <select value={descending ? 'desc' : 'asc'} onChange={(event) => setDescending(event.target.value === 'desc')}><option value="asc">{t('results.asc')}</option><option value="desc">{t('results.desc')}</option></select></label>}
-      {tab === 'comparison' && <label>{t('results.status')} <select value={status} onChange={(event) => setStatus(event.target.value)}><option value="">{t('results.allStatuses')}</option>{COMPARISON_STATUSES.map((value) => <option key={value} value={value}>{t(`statuses.${value}`, {}, value)}</option>)}</select></label>}
+      {tab === 'addresses' && <label>{t('results.sorting')} <Select value={descending ? 'desc' : 'asc'} onChange={(event) => setDescending(event.target.value === 'desc')}><option value="asc">{t('results.asc')}</option><option value="desc">{t('results.desc')}</option></Select></label>}
+      {tab === 'comparison' && <label>{t('results.status')} <Select value={status} onChange={(event) => setStatus(event.target.value)}><option value="">{t('results.allStatuses')}</option>{COMPARISON_STATUSES.map((value) => <option key={value} value={value}>{t(`statuses.${value}`, {}, value)}</option>)}</Select></label>}
     </div>
     {tab === 'addresses' && (addresses ? <ResultTable key={`addresses:${filter}:${descending}`} caption={t('results.addressCaption')} rows={sortAddresses(addresses, descending).filter((a) => includes([addressLabel(a), propertyLabel(a), a.postalCode]))} onSelect={onSelect}
       columns={[[c('address'), addressLabel], [c('cadastral'), propertyLabel], [c('postalCode'), (a) => a.postalCode || '–'], [c('postalPlace'), (a) => a.postalPlace || '–'], [c('source'), (a) => a.source]]} /> : <p>{t('results.fetchAddresses')}</p>)}

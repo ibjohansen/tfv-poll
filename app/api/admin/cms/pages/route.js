@@ -1,6 +1,6 @@
 import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
-import { createAdminCmsPage, getAdminCmsPages } from '@/lib/cms-pages';
+import { createAdminCmsPage, copyAdminCmsPage, getAdminCmsPages } from '@/lib/cms-pages';
 import { getRequestI18n } from '@/lib/i18n/request';
 
 export const runtime = 'nodejs';
@@ -31,7 +31,8 @@ export async function POST(request) {
   const { t } = getRequestI18n(request, 'backend');
   if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return response({ ok: false, message: t('api.invalidRequest') }, 403);
   try {
-    return response({ ok: true, page: await createAdminCmsPage(await readJsonObject(request)) }, 201);
+    const input = await readJsonObject(request);
+    return response({ ok: true, page: input.action === 'copy' ? await copyAdminCmsPage(input.sourceId) : await createAdminCmsPage(input) }, 201);
   } catch (error) {
     console.error('CMS page create failed', { code: error.code || error.cause?.code, message: error.message });
     return errorResponse(error, (key) => t(`adminCms.${key}`));

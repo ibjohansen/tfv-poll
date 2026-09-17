@@ -8,6 +8,8 @@ const surveys = {
 
 surveys.admin.questionVersionLabel = 'Spørsmålsversjon';
 surveys.email.backgroundUnavailable = 'Masseutsendelse kan bare startes fra den konfigurerte produksjonssiden.';
+surveys.email.backgroundSecretMissing = 'Jobbhemmeligheten for masseutsendelse mangler eller er ugyldig i produksjon. Kontroller MAILERSEND_JOB_SECRET i Netlify og kjør en ny deploy.';
+surveys.email.surveyUnavailable = 'Undersøkelsen må være åpen og svarfristen må ikke være utløpt før utsendelsen kan startes.';
 Object.assign(surveys.admin, {
   attachments: 'Vedlegg', attachmentsHelp: 'Last opp bakgrunnsdokumenter som bare er tilgjengelige for administratorer og mottakere av denne undersøkelsen.',
   addAttachments: 'Legg til vedlegg', addAttachmentsHelp: 'Last opp ett eller flere dokumenter til undersøkelsen.', uploadingAttachments: 'Laster opp …',
@@ -18,4 +20,25 @@ Object.assign(surveys.admin, {
   removeAttachmentTitle: 'Fjerne vedlegget «{title}»?', removeAttachmentDescription: 'Vedlegget blir ikke lenger tilgjengelig for mottakerne.', noAttachments: 'Ingen vedlegg er lastet opp.', file: 'Fil',
 });
 
+Object.assign(surveys.admin, {
+  answerType: 'Svaralternativer', standardAnswers: 'Ja / Nei / Vet ikke', customAnswers: 'Egendefinerte alternativer',
+  multipleAnswers: 'Tillat flere alternativer per spørsmål', optionNumber: 'Alternativ {number}', removeOption: 'Fjern alternativ {number}', addOption: 'Legg til alternativ',
+  copy: 'Kopier til ny undersøkelse', copyTitle: 'Kopi av {title}', copiedDraft: 'Kopien er et nytt, stengt utkast uten mottakere eller svar.',
+});
+surveys.form.answers.usikker = 'Vet ikke';
+surveys.admin.answers.usikker = 'Vet ikke';
 export default surveys;
+Object.assign(surveys.form, { selectMany: 'Velg ett eller flere alternativer.', selectOne: 'Velg ett alternativ.' });
+Object.assign(surveys.email, {
+  chooseGroupOrProperties: 'Velg en e-postgruppe eller legg til enkelttomter.', individualProperties: 'Enkelttomter', searchProperties: 'Søk på H-nummer, adresse eller navn',
+  propertySearchError: 'Kunne ikke søke etter tomter.', removeProperty: 'Fjern {number} fra utvalget',
+  includeOtherEmails: 'Ta også med øvrige registrerte e-postadresser', additionalEmail: 'Øvrig e-post',
+  singleResponse: 'Begrenset til ett svar per tomt', singleResponseHelp: 'Første innsendte svar gjelder. Hoved-e-post får kvittering med tellende svar og hvem som sendte det.',
+  independentResponseHelp: 'Hver invitert e-postadresse kan sende inn ett selvstendig, tellende svar. Hoved-e-post får kvittering.',
+  policyLocked: 'Svarregelen er låst for denne undersøkelsen etter første utsendelse.', addRecipients: 'Legg til nye mottakere',
+  appendDescription: 'Bare mottakere som ikke allerede er registrert for utsendelse i denne undersøkelsen legges til. Eksisterende svar og utsendelser beholdes.',
+  recipientCaption: 'Mottakere i valgt gruppe og valgte enkelttomter. Øvrige e-postadresser tas bare med når dette er krysset av.', primaryEmail: 'Hoved-e-post', recipientEmail: 'Mottakeradresse',
+  receipts: 'Kvitteringer til hoved-e-post', receiptCounts: 'Venter: {pending} · Sendt: {sent} · Feilet/undertrykt: {failed}',
+  noNewRecipients: 'Alle valgte mottakere er allerede registrert for utsendelse. Ingen nye invitasjoner ble opprettet.',
+});
+Object.assign(surveys.form, { onePerRecipient: 'Én selvstendig besvarelse per invitert e-postadresse.', notCounted: 'En annen mottaker har allerede sendt inn det tellende svaret for tomten. Ditt svar erstatter ikke dette. Hoved-e-post får en kvittering som oppsummerer begge innsendingene.' });

@@ -1,7 +1,34 @@
 # Endringslogg
 
-## Ikke publisert
+## Publisert 17. september 2026 – svaralternativer og mottakere
 
+- Migrering og 57 databaseintegrasjonstester verifisert på godkjent, midlertidig
+  Neon-schema-only-gren med syntetiske data. Produksjonsmigrering og deploy
+  deretter godkjent og utført med gjenopprettingspunkt og bevarte data i
+  14 kontrollerte tabeller; se
+  [produksjonsrapport](docs/database-release-survey-options-2026-09-17.md).
+  Rettet kopiering av artikler uten riktekst, bevaring av svarregel ved kopiering
+  og avvisning av eldre svarøkter når hoved-e-post er fjernet.
+- Felles tilgjengelige nedtrekkslister, umiddelbare filtre, mindre
+  registeravkrysninger og eiendomstooltip på tre rader. Ikonoversikt i docs.
+- Behovsstyrt bildelasting og pause av karusellen utenfor skjermen; filnavn med
+  nullutfylte bildenummer godtas.
+- Egne svaralternativer og enkelt-/flervalg, versjonerte resultater og eksport.
+- Valgfri utsendelse til ekstra e-postadresser, tillegg av grupper/enkelttomter,
+  atomisk første-svar-regel per tomt og privat kvitteringsutboks til hoved-e-post.
+- Kopiering av undersøkelser, artikler og nyhetsbrev til nye utkast. Private
+  filer kopieres til egne objektnøkler. Koordinert migrering og deploy er utført;
+  innlogget produksjonskontroll og faktisk e-postlevering gjenstår.
+- Rettet publisering av statiske Next.js-filer ved å bruke komplett bygg/deploy
+  fra en ren byggmappe. Ingen miljøvariabler, Git-push eller ekte utsendelser
+  ble endret/utført i denne produksjonsrunden.
+
+## Tidligere endringer
+
+- Undersøkelsesutsendelse kontrollerer Netlifys faktiske forespørselskontekst
+  i stedet for byggvariabelen `CONTEXT`. Start-/gjenopptakingsknapper beholdes
+  synlige ved feilkonfigurasjon, med forklaring om manglende jobbhemmelighet,
+  produksjonsmiljø eller stengt undersøkelse.
 - Private undersøkelsesvedlegg kan lastes opp, navngis og fjernes direkte i
   administrasjonen, og er bare tilgjengelige med riktig surveyøkt eller
   administratorrettighet.
@@ -45,4 +72,5 @@
 - Ukjent geografisk plassering holdes utenfor mangeltall; teiggrenser vises med tydelig kilde og datakvalitet.
 - Reproduserbar, rollback-basert loggsøkmåling på 100 000 syntetiske endringer.
 
-Disse endringene krever godkjent migrering og publisering før de er tilgjengelige i produksjon.
+Se README og migreringsrapportene for produksjonsstatus og gjenstående
+funksjonelle kontroller. En deploy alene bekrefter ikke ekte e-postlevering.

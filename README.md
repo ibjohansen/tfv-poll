@@ -54,7 +54,7 @@ Sertifikatkontrollen skal ikke deaktiveres.
   grendekart, medlemsselvbetjening, publiserte artikler og bunnfelt.
 - Forsidekarusellen leser bildefiler fra `public/carousel`. Filnavn skal følge
   `[FOTOGRAF]_tf[NUMMER].jpg` (også JPEG, PNG, WebP og AVIF støttes), for eksempel
-  `Ib Johansen_tf1.jpg`. Fotografnavnet vises som kreditering på bildet. Bildene
+  `Ib Johansen_tf002.jpg`. Fotografnavnet vises som kreditering på bildet. Bildene
   sorteres på nummeret, byttes automatisk og kan styres med piler, tastaturets
   piltaster, indikatorene eller pauseknappen. Automatisk bildebytte stopper når
   pekeren er over karusellen, når den har tastaturfokus eller redusert bevegelse
@@ -538,9 +538,42 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Postgres-testene nekter andre verter enn loopback, andre databasenavn enn
-`tfv_test` og databaser merket som produksjon/staging. Bruk en separat
-testcontainer, ikke en eksisterende utviklingsdatabase. Dataene er syntetiske.
+Postgres-testene bruker som standard bare loopback og databasen `tfv_test`.
+Bruk en separat testcontainer, ikke en eksisterende utviklingsdatabase.
+Dataene er syntetiske. En eksplisitt godkjent, midlertidig Neon-schema-only-gren
+kan brukes med `scripts/test-neon-branch.mjs` når lokal Postgres mangler:
+
+```bash
+node --use-system-ca scripts/test-neon-branch.mjs \
+  --project <prosjekt-id> --branch <godkjent-testgren-id> --host <direkte-endepunkt>
+```
+
+Opprett grenen separat med `--schema-only` og et kort automatisk utløp. Kjøreren
+krever en ikke-standard, ubeskyttet `test-*`-gren med `init_source=parent-schema`
+og utløp innen sju dager. Den sjekker at alle tabeller er tomme før den setter
+utviklingsmarkør og syntetiske eldre data. Senere kjøringer krever samme
+testmarkør. Direkte forbindelse med verifisert TLS brukes; pooled endepunkt
+eller produksjons-/stagingmarkør avvises. Forbindelsen hentes i minnet fra Neon
+CLI og skrives ikke til disk eller konsoll. `TEST_NEON_HOST`, `TEST_NEON_BRANCH_ID`
+og `TEST_NEON_RUN_ID` gis bare til underprosessen, aldri til Netlify.
+`.env.local` lastes eller endres ikke, og eksterne e-post-/lagringskall erstattes.
+Ingen deploy eller produksjonsmigrering inngår i kommandoen. Se
+[godkjent testkjøring 17. september](docs/database-test-survey-options-2026-09-17.md).
+
+Ved den særskilt godkjente survey-migreringen brukes
+`scripts/release-survey-schema.mjs` med eksplisitt vert, miljø, handling og
+bekreftelse. `status` er bare lesing. `migrate` krever verifisert snapshot-ID i
+produksjon, ingen aktive/ventende jobber og nøyaktig SHA-256 for det testede
+skjemaet. Migreringen og sju midlertidige skrivesperrer lagres atomisk;
+radantall og kontrollsummer for 14 eksisterende tabeller må være uendret.
+Sperrene stopper svar, tilgangsøkter og utsendelsesendringer mens deployen byttes,
+uten å endre undersøkelsenes åpnet/lukket-status. I dette korte vinduet må slike
+handlinger prøves igjen. `resume` fjerner bare sperrene og deres funksjon,
+og skal først kjøres etter verifisert publisering av tilhørende kode.
+Ved deployfeil beholdes sperrene; ikke publiser gammel svarkode mot nytt skjema.
+Skriptet leser direkte `DATABASE_URL_UNPOOLED` fra prosessen, ikke `.env.local`,
+og skriver verken raddata eller credentials. Ingen ny Netlify-variabel trengs.
+
 Playwright starter en midlertidig appkopi uten `.env`-filer, uten DB-forbindelse,
 med deaktivert e-post og eksisterende mockregister. Administrator får en signert
 testsesjon med en separat syntetisk hemmelighet; ingen innloggingsbakdør er
@@ -562,9 +595,10 @@ Tiptap (`@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`) brukes i editoren.
 
 [Kvalitetsgjennomgangen](docs/quality-review.md) beskriver rutedekning,
 begrensninger, anbefalte neste tester og vurderingen av hvilke hendelser som
-bør registreres. Testene kobler ikke til Neon, Microsoft, MailerSend eller
-Kartverket. Reelle transaksjoner testes nå i lokal Postgres og nettleserflyter
-med syntetiske data. Entra OAuth og Netlify/Neon-produksjon er ikke simulert fullt ut.
+bør registreres. Modul- og nettlesertestene bruker ingen eksterne tjenester.
+Reelle transaksjoner testes i lokal Postgres eller en særskilt godkjent,
+isolert Neon-testgren. Microsoft, MailerSend, filstorage og Kartverket er
+erstattet i testene. Entra OAuth og Netlify/Neon-produksjon er ikke simulert fullt ut.
 
 `/admin/audit` har søk i aktør, post-ID og før-/etterverdier, samt filtre for
 bruker, område, endringstype, status og datointervall. Datoene er hele kalenderdager
@@ -671,6 +705,17 @@ Medlems-ID, navn,
 hjemmelshaver, e-post, telefon og interne notater inngår ikke i responsen. Ruten har en lokal
 rate-limit på 20 oppslag per minutt og trenger samme delte/WAF-beskyttelse som
 de øvrige offentlige rutene i produksjon. Ingen ny miljøvariabel er nødvendig.
+
+Alle nedtrekkslister bruker en felles, tastatur- og mobilvennlig komponent.
+Register-, artikkel- og loggfiltre reagerer ved endring (tekst etter 300 ms),
+uten en egen filterknapp. Kartets eiendomstooltip viser H-nummer, adresse og
+gårds-/bruksnummer på tre rader. Se [ikonoversikten](docs/icons.md) for
+plasseringen av de eksisterende SVG-ikonene og lenker til ikonkataloger.
+
+Bildene lazy-loades som standard. Det første synlige karusellbildet prioriteres
+fortsatt for å unngå tregere førstegangsvisning; øvrige karusellbilder monteres
+først ved bildebytte. Automatisk bytte pauses også utenfor skjermen. Filnavn med
+nullutfylling, eksempelvis `_tf001`, og `_tf000` støttes.
 
 Forsidens CMS-oppslag og grendeliste mellomlagres i fem minutter og invalideres
 ved redigering. Next.js-optimaliserte bilder mellomlagres i minst én time;
@@ -985,6 +1030,13 @@ ingen databasemigrering er nødvendig.
 Legg variablene inn enkeltvis og bare i produksjonskonteksten. Generer
 `MAILERSEND_JOB_SECRET` separat fra alle andre hemmeligheter. Ingen av disse
 verdiene skal inn i `netlify.toml`, GitHub eller ha `NEXT_PUBLIC_`-prefiks.
+Hemmeligheten må være tilgjengelig for **Functions**. Velg dette omfanget alene
+der abonnementet støtter det. Dersom Netlify avviser dette med «Upgrade your
+Netlify account to set specific scopes», må bredere omfang godkjennes før det
+endres; behold uansett verdien kun i `production`. Kontroller etter lagring
+at nøkkelen faktisk finnes i prosjektets produksjonskontekst, og deploy på nytt.
+Et vellykket CLI-prosessavslutningssignal alene bekrefter ikke at variabelen ble
+lagret; kontroller også API-status og metadata uten å vise hemmelighetens verdi.
 API-tokenet må minst ha tillatelsene `email_full` og `suppressions_read`, og bør
 begrenses til sending domain der MailerSend-kontoen tilbyr dette.
 
@@ -1064,11 +1116,63 @@ produksjonskonfigurasjonen, mens API-ruter og bakgrunnsfunksjoner alltid
 validerer nødvendige hemmeligheter på nytt ved kjøring. Ikke legg inn
 midlertidige produksjonshemmeligheter i `.env.local`, `netlify.toml` eller
 kommandolinjen for å få et lokalt bygg til å passere.
+Bruk en ren byggmappe uten `.env`/`.env.*` ved manuell CLI-deploy: Next.js-
+adapteren kopierer disse filene til serverfunksjonen hvis de finnes, også når
+de er gitignored. Vanlige `included_files`-unntak overstyrer ikke adapterens
+egen pakkemanifest. Kontroller at slike filer ikke finnes i den ferdige
+`___netlify-server-handler.zip` før publisering. Produksjon skal hente
+hemmeligheter fra Netlify, ikke fra en medpakket utviklerfil.
+
+Kjør bygg og publisering i **samme** `netlify deploy --prod --build`-kommando.
+Ikke erstatt denne med `netlify build` fulgt av `netlify deploy --no-build`
+mot `.next`: Next-adapteren 5.16 flytter de statiske filene midlertidig inn i
+publiseringsmappen under deploy og tilbake til `.netlify/static` etter bygg.
+Den separate kommandoen kan derfor publisere feil mappe og gi 404 for alle
+`/_next/static`-filer. Verifiser minst JavaScript, CSS og et offentlig bilde
+fra den publiserte siden; HTTP 200 for HTML alene er ikke tilstrekkelig.
+CLI 27.8 tillater heller ikke `--context` sammen med `--no-build`.
+
+Rettelsesdeploy `6aabf888aceb2d217e4b3d77` ble publisert 17. september 2026
+fra en slik ren byggmappe. Netlifys API bekreftet publisert `ready/production`,
+og utsendelsespanelets publiserte JavaScript ble hash-verifisert mot bygget.
+`MAILERSEND_JOB_SECRET` ble etter eksplisitt godkjenning opprettet som skjult
+verdi med omfang `builds/functions/runtime`, kun i `production`. Alle seks
+funksjonspakkene ble kontrollert uten lokale miljøfiler. Ingen reell utsendelse
+ble startet; kontroll av innlogget knapp/API-status gjenstår. Kildeendringene
+må fortsatt committes og pushes før en senere Git-basert deploy skal inkludere
+rettelsen.
 
 ### 7. Verifiser produksjonen
 
+**Nye svaralternativer og mottakerregler er migrert og publisert i produksjon
+17. september 2026 etter eksplisitt godkjenning.** Se
+[produksjonsrapporten](docs/database-release-survey-options-2026-09-17.md) og
+[migrerings- og testprosedyren](docs/survey-options-and-recipients.md).
+Migreringen erstatter tre unike indekser og ble kjørt med koordinert
+skrivesperre for svar/utsendelser, datakontroll og deploy av samme kode.
+Den midlertidige sperren er fjernet. Innlogget funksjonskontroll og ekte
+kvitteringslevering med godkjente testmottakere gjenstår.
+57 integrasjonstester, samtidige svar og gjentatt migrering bestod 17. september
+med syntetiske data; [testrapport](docs/database-test-survey-options-2026-09-17.md).
+Kjør testene igjen dersom kode/skjema endres. Ingen nye produksjonsmiljøvariabler
+eller funksjonsnavn innføres.
+Den eksisterende `survey-email-background` behandler også kvitteringsutboksen;
+`background-watchdog` gjenopptar ventende kvitteringer hvert femte minutt og
+kontrollerer `context.deploy.context` i stedet for byggvariabelen `CONTEXT`.
+Verifiser begge med godkjente testmottakere, inkludert hoved-e-postkvittering ved
+et senere, ikke tellende svar. Kontroller at invitasjonen bare viser mottakere
+på samme tomt, og at tillegg av mottakere ikke sender tidligere invitasjoner på nytt.
+
 Utfør kontrollene i denne rekkefølgen:
 
+- Åpne **Undersøkelser → Utsendelse** innlogget. Kontroller at en ventende eller
+  feilet kampanje viser **Start bakgrunnsjobben på nytt**, og at knappen er aktiv
+  når API-oversikten har `background_status: "ready"`, e-post er konfigurert,
+  masseutsendelse er aktivert og undersøkelsen er åpen innenfor svarfristen.
+  En deaktivert knapp skal ha en synlig årsaksforklaring. Ikke trykk start som
+  en teknisk røykprøve: det sender reelle e-poster. HTTP 202 fra bakgrunnsruten
+  beviser bare mottatt invokasjon, ikke at hemmeligheten ble godtatt eller at
+  en kampanje ble behandlet.
 - Åpne `/` og kontroller toppbilde, publiserte artikler og artikkelpanelet.
 - Kontroller favicon i lys/mørk nettleserflate, og at `/icon` og `/apple-icon`
   gir PNG uten innlogging. Kontroller også i Safari/Firefox før endelig godkjenning.
@@ -1255,8 +1359,10 @@ Utfør kontrollene i denne rekkefølgen:
 
 - Ved feil i applikasjonen: åpne **Deploys** i Netlify og publiser siste kjente
   fungerende deploy på nytt.
-- Ikke reverser databaseskjemaet automatisk. Endringene er additive; undersøk
-  dataene og bruk Neon restore/branch ved behov før en korrigerende migrering.
+- Ikke reverser databaseskjemaet automatisk. Migreringen for flere mottakere
+  erstatter unike indekser og er **ikke bare additiv**. En gammel deploy er ikke
+  kompatibel med det nye svarskjemaet. Planlegg koordinert tilbakeføring og
+  bevar alle innsendte svar; se den særskilte migreringsprosedyren.
 - Behold tidligere Entra redirect URI til den nye innloggingen er verifisert.
 - Registrer eier og utløpsdato for Entra client secret, Matrikkel-legitimasjonen
   og interne hemmeligheter, slik at de kan roteres før utløp.
@@ -1294,7 +1400,7 @@ Skriptet kan kjøres på en eksisterende database: gamle anonyme svar beholdes m
 
 Tabellen `members` har et internt løpenummer (`id`), men ingen global
 surveyhemmelighet. Hver invitasjon oppretter i stedet en tilfeldig 256-bits
-engangskode for nøyaktig ett medlem og én undersøkelse. Bare SHA-256-hashen
+engangskode for nøyaktig én tomt, én undersøkelse og én mottakeradresse. Bare SHA-256-hashen
 lagres i `survey_access_tokens`; koden er miljø- og audience-bundet og utveksles
 umiddelbart mot en separat, kortlivet surveyøkt.
 
@@ -1312,8 +1418,13 @@ er avsluttet og API-et avviser nye svar. Svar lagres som et JSON-objekt med spø
 og `surveyVersion`; versjonen økes automatisk når spørsmålene endres. Hver
 besvarelse beholder også et snapshot av spørsmålstekstene som var aktive ved
 innsending. Eldre svar får beste tilgjengelige snapshot ved migreringen, siden
-tidligere spørsmålstekster ikke kan rekonstrueres. Tillatte svar er `ja`, `nei`
-og `usikker`.
+tidligere spørsmålstekster ikke kan rekonstrueres. Standardalternativene er
+Ja/Nei/Vet ikke (lagrede ID-er `ja`, `nei`, `usikker`). Administrator kan i stedet
+lage 2–20 egne alternativer og velge enkeltvalg eller flervalg per spørsmål.
+ID-er, tekster og valgtype lagres i snapshotet; flervalg lagres som en liste.
+Kopiering gir en ny, stengt undersøkelse uten svar eller utsendelser, med egne
+kopier av vedlegg. Artikler kopieres til upubliserte utkast med egne filkopier,
+og nyhetsbrev til nye, usendte utkast.
 
 Administrator kan laste opp vedlegg direkte på en lagret undersøkelse.
 `survey_attachments` knytter metadata til undersøkelsen, mens filen ligger i
@@ -1323,7 +1434,8 @@ for samme undersøkelse. Produksjonsmigreringen ble utført og verifisert
 funksjonen tas i bruk i andre miljøer som mangler tabellen.
 
 Klikk på en undersøkelse i `/admin/surveys` og velg fanen **Resultater** for å
-se svarfordeling per spørsmål som kakediagram, antall og prosent. Dersom
+se svarfordeling per spørsmål som kakediagram (enkeltvalg), eller søyler
+(flervalg), antall og prosent. Flervalgsprosenter kan summere til over 100 %. Dersom
 spørsmålene har blitt endret, vises resultatene separat per spørsmålsversjon.
 Excel-eksporten inneholder både en aggregert oppsummering og et detaljark med
 én rad per spørsmål og besvarelse. Resultater og eksport er tilgjengelige både
@@ -1333,7 +1445,11 @@ Manglende, ugyldig eller konsumert engangskode og allerede innsendt svar vises
 med en generell tilgangsmelding. Ved databasefeil vises en melding om at
 registeret er utilgjengelig. Skjemaet er bare tilgjengelig med gyldig surveyøkt.
 API-et validerer samme tilgang på nytt. En unik databaseindeks på
-`(member_id, survey_id)` hindrer også dobbeltsvar ved samtidige innsendinger.
+`(member_id, survey_id, response_key)` hindrer også dobbeltsvar ved samtidige
+innsendinger. Standard er første svar per tomt; uten denne begrensningen teller
+hvert invitert e-postsvar selvstendig. Senere forsøk i tomtemodus lagres bare i
+kvitteringsutboksen, aldri over det tellende svaret. Hoved-e-post får kvittering
+med tellende svar, avsender og eventuelt det senere forsøket.
 Endepunktet har i tillegg en enkel per-instans rategrense og origin-kontroll.
 Delt Netlify- og Postgres-rategrense beskytter verifikasjon og innsending.
 
@@ -1640,19 +1756,33 @@ medlemsregisteret eller gi tilgang på vegne av et medlem.
 Masseutsendelse er sperret både i grensesnittet og på serveren når
 `MAILERSEND_BULK_ENABLED` ikke er nøyaktig `true`. Standardinnstillingen er
 `false`; den skal ikke endres før masseutsendelse er uttrykkelig godkjent.
-I tillegg må `CONTEXT` og `APP_ENVIRONMENT` begge være `production`, og
-`MAILERSEND_JOB_SECRET` må være minst 32 tegn. Kontrollen skjer før kampanje og
+I tillegg må Netlifys forespørselskontekst (`getContext().deploy.context` fra
+`@netlify/functions`) og `APP_ENVIRONMENT` begge være `production`, og
+`MAILERSEND_JOB_SECRET` må være minst 32 tegn. Byggvariabelen `CONTEXT` brukes
+ikke som kjøretidsbevis: den er ikke garantert tilgjengelig i Functions.
+Manglende forespørselskontekst, lokal Netlify-kjøring og preview avvises også
+om en lokal miljøfil inneholder produksjonsverdier. Se
+[Netlifys kjøretidskontekst](https://docs.netlify.com/build/functions/api/#getcontext)
+og [miljøvariabler i Functions](https://docs.netlify.com/build/functions/environment-variables/).
+Kontrollen skjer før kampanje og
 leveranser opprettes, slik at localhost eller feilkonfigurerte deployer ikke kan
 etterlate en utsendelse i «Venter». Testmail til inntil to eksplisitte adresser
 er fortsatt tilgjengelig uten bakgrunnsjobben.
+Oversikten returnerer `background_status` med `ready`, `production_required`
+eller `job_secret_missing`, aldri hemmeligheten. Start-/gjenopptakingsknappen
+skjules ikke ved manglende oppsett; den deaktiveres med en lesbar forklaring.
 
-Før utsendelse må administrator velge én e-postgruppe. Ingen gruppe velges
-automatisk. Alle ordinære medlemmer i gruppen med gyldig hoved-e-post vises med
-kontaktperson, hjemmelshaver og hoved-e-post, sammen med antallet som mangler
-gyldig adresse. Administrator må bekrefte det eksakte mottakertallet.
-Deretter opprettes én `email_campaigns`-rad med den valgte gruppen og én
-`email_deliveries`-rad per mottaker i samme databasetransaksjon. Gruppemedlemskap,
-medlemsstatus og hoved-e-post kontrolleres på nytt rett før sending. Den unike kampanjeindeksen gjør at refresh,
+Før utsendelse velger administrator en e-postgruppe, enkelttomter eller begge.
+Ingen gruppe velges automatisk. Hoved-e-post benyttes som standard, med et
+eksplisitt valg for øvrige registrerte adresser. Preview viser kontaktperson,
+hjemmelshaver, hoved-e-post og faktisk mottakeradresse før bekreftelse.
+Én `email_campaigns`-rad og én `email_deliveries`-rad per tomt/mottaker opprettes
+i samme transaksjon. Medlemsstatus, aktuell kontaktadresse og eventuell
+gruppe for leveransen kontrolleres på nytt rett før sending. Nye grupper eller
+enkelttomter kan legges til en pågående eller fullført kampanje uten å gjenta
+invitasjoner som allerede er registrert. Svarregelen låses etter første
+invitasjon/svar. Se [detaljer om mottakere og kvitteringer](docs/survey-options-and-recipients.md).
+Den unike kampanjeindeksen gjør at refresh,
 gjentatt request eller Netlify-retry ikke oppretter en ny utsendelse for samme
 survey.
 
@@ -1660,7 +1790,7 @@ survey.
 kontrollert med minst 6,1 sekunder mellom Email API-kall. Dette holder seg innen
 MailerSends dokumenterte lave rategrense uten ukontrollerte browser-kall. For
 hver levering opprettes en ny, hashet engangskode bundet til medlem,
-undersøkelse og miljø. Den rå koden brukes bare til invitasjons-URL-en og
+undersøkelse, mottakeradresse og miljø. Den rå koden brukes bare til invitasjons-URL-en og
 lagres eller logges ikke.
 Hvis en worker avbrytes etter at den har hevdet en melding, markeres den etter 15
 minutter som `UNCERTAIN_AFTER_INTERRUPTION` i stedet for automatisk å kunne

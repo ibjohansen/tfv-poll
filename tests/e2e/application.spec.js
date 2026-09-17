@@ -14,6 +14,42 @@ async function authenticate(context, roles = ['TFV.MemberAdmin', 'TFV.SurveyAdmi
   await context.addCookies([{ name, value, url: testOrigin, httpOnly: true, sameSite: 'Lax' }]);
 }
 
+test('shared select supports keyboard, ordinary form values, reset and language round-trip', async ({ page, context }) => {
+  await authenticate(context); await page.goto('/admin/browser-test');
+  const form = page.getByRole('form', { name: 'Test av nedtrekksliste' });
+  const select = form.getByRole('combobox', { name: 'Farge' });
+  await select.focus(); await select.press('Enter'); await select.press('ArrowDown'); await select.press('Enter');
+  await expect(select).toContainText('Rød');
+  expect(await form.evaluate((element) => new FormData(element).get('color'))).toBe('red');
+  await form.getByRole('button', { name: 'Tilbakestill valg' }).click();
+  await expect(select).toContainText('Blå');
+  await select.click(); await page.keyboard.press('Escape'); await expect(select).toBeFocused();
+  await expect(page.getByRole('listbox')).toHaveCount(0);
+  await page.getByRole('combobox', { name: 'Språk', exact: true }).click();
+  await page.getByRole('option', { name: 'English', exact: true }).click();
+  await expect(page).toHaveURL(/lang=en/);
+  await page.getByRole('combobox', { name: 'Language', exact: true }).click();
+  await page.getByRole('option', { name: 'Norsk', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Språk', exact: true })).toContainText('Norsk');
+});
+
+test('custom multiple choices submit arrays and explain a non-counted later response', async ({ page, context }) => {
+  await authenticate(context); await page.goto('/admin/browser-test');
+  const form = page.getByRole('region', { name: 'Test av flervalg' });
+  let payload;
+  await page.route('**/survey/api/responses', (route) => {
+    payload = route.request().postDataJSON();
+    return route.fulfill({ status: 201, json: { ok: true, accepted: false } });
+  });
+  await form.getByText('Skitur', { exact: true }).click();
+  await form.getByText('Fottur', { exact: true }).click();
+  await form.getByText('Vet ikke', { exact: true }).click();
+  await form.getByRole('button', { name: /Send/ }).click();
+  await expect.poll(() => payload?.answers).toEqual({ q1: ['ski', 'walk'], q2: 'usikker' });
+  await expect(form).toContainText('Ditt svar erstatter ikke dette');
+  await expect(form.getByRole('checkbox')).toHaveCount(0);
+});
+
 test('public pageviews send only coarse anonymous dimensions and usage dashboard requires audit access', async ({ page, context }) => {
   let payload;
   await page.route('**/api/usage/pageview', (route) => {
@@ -24,13 +60,14 @@ test('public pageviews send only coarse anonymous dimensions and usage dashboard
   await page.goto('/');
   const carousel = page.getByRole('region', { name: 'Bilder fra Turufjell' });
   await expect(carousel).toBeVisible();
-  await expect(carousel.getByText('Foto: Ib Johansen')).toBeVisible();
+  await expect.poll(() => carousel.getByRole('img').evaluate((image) => image.complete && image.naturalWidth > 0)).toBe(true);
+  await expect(carousel.getByText(/^Foto: /)).toBeVisible();
   await carousel.getByRole('button', { name: 'Pause automatisk bildebytte' }).click();
-  await carousel.getByRole('button', { name: 'Vis bilde 1 av 4' }).click();
-  await expect(carousel.getByRole('button', { name: 'Vis bilde 1 av 4' })).toHaveAttribute('aria-current', 'true');
+  await carousel.getByRole('button', { name: /^Bilde 1 av / }).click();
+  await expect(carousel.getByRole('button', { name: /^Bilde 1 av / })).toHaveAttribute('aria-current', 'true');
   await carousel.focus();
   await carousel.press('ArrowRight');
-  await expect(carousel.getByRole('button', { name: 'Vis bilde 2 av 4' })).toHaveAttribute('aria-current', 'true');
+  await expect(carousel.getByRole('button', { name: /^Bilde 2 av / })).toHaveAttribute('aria-current', 'true');
   const expectedDevice = page.viewportSize().width < 768 ? 'mobile' : page.viewportSize().width < 1100 ? 'tablet' : 'desktop';
   await expect.poll(() => payload).toEqual({ pageType: 'home', deviceCategory: expectedDevice });
   expect(Object.keys(payload).sort()).toEqual(['deviceCategory', 'pageType']);
@@ -67,8 +104,9 @@ test('matrikkel picker filters members and starts an exact one-member run', asyn
   const picker = page.getByRole('region', { name: 'Test av matrikkelvalg' });
   await picker.getByRole('searchbox', { name: 'Søk etter medlem' }).fill('sprenåsen');
   const select = picker.getByRole('combobox', { name: 'Medlem' });
-  await expect(select.getByRole('option')).toHaveCount(2);
-  await select.selectOption('702');
+  await select.click();
+  await expect(page.getByRole('listbox').getByRole('option')).toHaveCount(2);
+  await page.getByRole('option', { name: /H392/ }).click();
   const updateButton = picker.getByRole('button', { name: 'Oppdater valgt medlem' });
   const memberSelectBox = await select.boundingBox();
   const updateButtonBox = await updateButton.boundingBox();
@@ -88,17 +126,17 @@ test('profile keeps property scope, renders comments as text and preserves edits
   await expect(page.getByRole('link', { name: 'Last ned som JSON' })).toHaveAttribute('href', '/api/member-access/export?member=7001');
   await expect(page.getByText('<img src=x onerror=alert(1)>', { exact: true })).toBeVisible();
   await expect(page.locator('.member-comment-text img')).toHaveCount(0);
-  const contact = page.getByRole('region', { name: 'Kontaktopplysninger', exact: true });
+  const contact = page.getByRole('region', { name: 'Kontaktopplysninger og deling', exact: true });
   await contact.getByLabel('Kontaktperson', { exact: true }).fill('Ny syntetisk kontakt');
   await contact.getByLabel('Kommentar til endringen (valgfritt)').fill('En syntetisk retting');
   let payload;
   await page.route('**/api/member-access/profile', async (route) => { payload = route.request().postDataJSON(); await route.fulfill({ status: 401, json: { ok: false, message: 'Økten er utløpt. Be om ny lenke.' } }); });
-  await contact.getByRole('button', { name: 'Lagre kontaktopplysninger' }).click();
+  await contact.getByRole('button', { name: 'Lagre opplysninger', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Økten er utløpt' })).toBeVisible();
   expect(payload.memberId).toBe('7001'); expect(payload.comment).toBe('En syntetisk retting');
   await expect(contact.getByLabel('Kontaktperson', { exact: true })).toHaveValue('Ny syntetisk kontakt');
   await page.route('**/api/member-access/profile', (route) => route.fulfill({ json: { ok: true, message: 'Kontaktopplysningene er lagret.', member: { primary_contact_name: 'Ny syntetisk kontakt' } } }));
-  await contact.getByRole('button', { name: 'Lagre kontaktopplysninger' }).click();
+  await contact.getByRole('button', { name: 'Lagre opplysninger', exact: true }).click();
   await expect(contact.getByLabel('Kommentar til endringen (valgfritt)')).toHaveValue('');
 });
 
@@ -127,7 +165,7 @@ test('audit details work by keyboard, escape displayed values and preserve filte
   await expect(audit.getByRole('link', { name: 'Neste' })).toHaveAttribute('href', /q=Syntetisk/);
   await expect(audit.getByRole('link', { name: 'Neste' })).toHaveAttribute('href', /page=2/);
   await audit.getByRole('searchbox', { name: 'Søk', exact: true }).fill('nytt søk');
-  await audit.getByRole('button', { name: 'Filtrer' }).click();
+  await expect(audit.getByRole('button', { name: 'Filtrer', exact: true })).toHaveCount(0);
   await expect(page).toHaveURL(/\/admin\/audit\?.*q=nytt\+s%C3%B8k/);
 });
 
@@ -183,20 +221,56 @@ test('survey email panel keeps failed dispatch status and offers safe restart', 
     recipient_count: 2, missing_email_count: 0, campaign: null, deliveries: [], page: 1, pages: 1 };
   await page.route(`**/api/admin/surveys/${surveyId}/email*`, (route) => {
     if (route.request().method() === 'GET') return route.fulfill({ json: { ok: true, overview } });
-    expect(route.request().postDataJSON()).toEqual({ action: 'send', groupId: '71' });
+    expect(route.request().postDataJSON()).toEqual({ action: 'send', groupId: '71', includeOtherEmails: false, singleResponsePerProperty: true, memberIds: [] });
     return route.fulfill({ status: 503, json: { ok: false, message: 'Bakgrunnsjobben kunne ikke startes.', campaign: { id: 'a'.repeat(32), status: 'failed', total_count: 2, sent_count: 0, failed_count: 0, suppressed_count: 0, delivered_count: 0, error_message: 'Oppstart ikke bekreftet.' } } });
   });
   await page.goto('/admin/browser-test');
   const section = page.getByRole('region', { name: 'Send undersøkelsen', exact: true });
-  await section.getByRole('combobox', { name: 'E-postgruppe' }).selectOption('71');
-  await expect(section.getByRole('table', { name: /Alle mottakere/ })).toContainText('Kari Kontakt');
-  await expect(section.getByRole('table', { name: /Alle mottakere/ })).toContainText('Kari Hjemmelshaver');
-  await expect(section.getByRole('table', { name: /Alle mottakere/ })).toContainText('kari@example.invalid');
+  await section.getByRole('combobox', { name: 'E-postgruppe' }).click();
+  await page.getByRole('option', { name: /Syntetisk/ }).click();
+  await expect(section.getByRole('table', { name: /Mottakere i valgt/ })).toContainText('Kari Kontakt');
+  await expect(section.getByRole('table', { name: /Mottakere i valgt/ })).toContainText('Kari Hjemmelshaver');
+  await expect(section.getByRole('table', { name: /Mottakere i valgt/ })).toContainText('kari@example.invalid');
   await section.getByRole('button', { name: 'Start utsendelse', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Start utsendelse' }).click();
   await expect(section.getByRole('alert').filter({ hasText: 'Oppstart ikke bekreftet' })).toBeVisible();
   await expect(section.getByRole('button', { name: 'Start bakgrunnsjobben på nytt' })).toBeEnabled();
 });
+
+for (const status of ['pending', 'failed', 'completed']) {
+  test(`survey email panel keeps the ${status} action visible when production configuration is missing`, async ({ page, context }) => {
+    await authenticate(context);
+    let configured = false;
+    let posts = 0;
+    await page.route(`**/api/admin/surveys/${surveyId}/email*`, (route) => {
+      if (route.request().method() !== 'GET') { posts++; return route.abort(); }
+      return route.fulfill({ json: { ok: true, overview: {
+        configured: true, background_configured: configured, background_status: configured ? 'ready' : 'job_secret_missing',
+        bulk_enabled: true, survey: { can_send: true }, groups: [{ id: '71', name: 'Syntetisk gruppe', recipient_count: 2 }],
+        selected_group_id: '71', recipients: [], recipient_count: 2, missing_email_count: 0,
+        campaign: { id: 'a'.repeat(32), status, group_name: 'Syntetisk gruppe', total_count: 2,
+          sent_count: 0, failed_count: 0, suppressed_count: 0, delivered_count: 0 }, deliveries: [], page: 1, pages: 1,
+      } } });
+    });
+    await page.goto('/admin/browser-test');
+    const section = page.getByRole('region', { name: 'Send undersøkelsen', exact: true });
+    const button = section.getByRole('button', { name: status === 'completed' ? 'Send nye sikre lenker' : 'Start bakgrunnsjobben på nytt' });
+    await expect(button).toBeVisible();
+    await expect(button).toBeDisabled();
+    await expect(button).toHaveAccessibleDescription(/MAILERSEND_JOB_SECRET/);
+    configured = true;
+    await page.reload();
+    if (status === 'completed') {
+      await section.getByRole('combobox', { name: 'E-postgruppe' }).click();
+      await page.getByRole('option', { name: /Syntetisk gruppe/ }).click();
+    }
+    await expect(button).toBeEnabled();
+    await button.click();
+    await expect(page.getByRole('alertdialog')).toBeVisible();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Avbryt' }).click();
+    expect(posts).toBe(0);
+  });
+}
 
 test('anonymous and wrong-role users cannot open member/map administration', async ({ page, context }) => {
   await page.goto('/admin/map');
@@ -338,7 +412,7 @@ test('hamlet polygons persist across reload, mark edited boundaries as drafts an
   expect(writes[0].polygon.geometry.type).toBe('Polygon');
   await page.reload();
   await editor.locator('.leaflet-overlay-pane path').first().click({ force: true });
-  await expect(editor.getByLabel('Lagret grend')).toHaveValue('13');
+  await expect(editor.getByRole('combobox', { name: 'Lagret grend' })).toContainText('Slåtta Øst');
   await page.getByRole('button', { name: 'Testvegen 1', exact: true }).first().click();
   const memberPanel = page.getByRole('complementary', { name: 'Medlemsdetaljer fra kartet' });
   await expect(memberPanel.getByRole('heading', { name: 'H-SYNTHETIC-1' })).toBeVisible();
@@ -376,7 +450,7 @@ test('hamlet polygons persist across reload, mark edited boundaries as drafts an
   page.once('dialog', (dialog) => dialog.accept());
   await editor.getByRole('button', { name: 'Fjern lagret polygon' }).click();
   await expect(editor.getByRole('status')).toContainText('Grenden og medlemskoblingene er beholdt');
-  await expect(editor.getByRole('option', { name: 'Slåtta Øst endret · uten polygon' })).toHaveCount(1);
+  await expect(editor.getByRole('combobox', { name: 'Lagret grend' })).toContainText('Slåtta Øst endret · uten polygon');
   expect(writes.at(-1).action).toBe('clear');
   const layout = await page.evaluate(() => ({ viewport: innerWidth, width: document.documentElement.scrollWidth }));
   expect(layout.width).toBeLessThanOrEqual(layout.viewport);
@@ -430,7 +504,7 @@ test('group creation, selection, counts and safe deletion are wired to the prote
   await page.getByLabel('Navn', { exact: true }).fill(group.name);
   await page.getByRole('button', { name: 'Opprett', exact: true }).click();
   await expect(page.getByRole('heading', { name: group.name })).toBeVisible();
-  await page.getByRole('button', { name: 'Finn tomter' }).click();
+  await page.getByRole('searchbox').fill('Test');
   await page.getByLabel(/Velg alle .* treff/).check();
   await page.getByRole('button', { name: 'Legg til / flytt valgte' }).click();
   await expect(page.getByRole('status').filter({ hasText: '2 tomter behandlet' })).toBeVisible();
