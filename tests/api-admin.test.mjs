@@ -70,7 +70,10 @@ async function setup(path, overrides = {}) {
   ]));
   dependencies['@/lib/rate-limit'] = { isEmailRateLimited: () => state.limited };
   dependencies['@/lib/matrikkel-background'] = { dispatchMatrikkelRun: async () => { throw new Error('Unexpected background dispatch'); } };
-  dependencies['@/lib/survey-email-background'] = { dispatchSurveyEmailCampaign: async () => { throw new Error('Unexpected background dispatch'); } };
+  dependencies['@/lib/survey-email-background'] = {
+    dispatchSurveyEmailCampaign: async () => { throw new Error('Unexpected background dispatch'); },
+    requireSurveyEmailBackgroundConfigured: () => {},
+  };
   dependencies['@/lib/admin-access'] = { requireMatrikkelSync: async () => {
     if (state.error?.message === 'Unauthorized') throw state.error;
   } };

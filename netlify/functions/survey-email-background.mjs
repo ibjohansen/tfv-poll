@@ -29,7 +29,7 @@ export default async function handler(request) {
   }
 
   if (campaign?.status === 'running' && !campaign.workerBusy) {
-    await dispatchSurveyEmailCampaign(input.campaignId, new URL(request.url).origin);
+    await dispatchSurveyEmailCampaign(input.campaignId, new URL(request.url).origin, { secret });
   }
   console.info('Survey email background finished', { campaignId: input.campaignId, status: campaign?.status, workerBusy: Boolean(campaign?.workerBusy) });
   return new Response(null, { status: 204 });

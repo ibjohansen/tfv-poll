@@ -985,6 +985,15 @@ Eventuelle funn fra sikkerhetsgjennomgangen legges inn som egne P1- eller P2-sak
 
 ### Undersøkelsesutsendelse
 
+- [x] Masseutsendelse krever produksjonskontekst og en separat jobbhemmelighet
+  før databasen endres. Lokal utvikling kan ikke opprette en kampanje som blir
+  stående i «Venter», og grensesnittet viser manglende worker-konfigurasjon.
+- [x] Skjult `MAILERSEND_JOB_SECRET` er konfigurert i Netlifys
+  `production/functions`-scope, og rettelsesdeploy `6aabda71bcbad489e7278851`
+  ble publisert 17. september 2026 uten å starte den ventende kampanjen.
+- [ ] Legg inn Signing Secret fra MailerSend som
+  `MAILERSEND_WEBHOOK_SIGNING_SECRET` i Netlify og kontroller at webhooken
+  oppdaterer levert, avvist og undertrykt status.
 - [x] Administrator må velge én e-postgruppe før en ny undersøkelsesutsendelse.
   Valget lagres på kampanjen, og mottakerlisten viser kontaktperson,
   hjemmelshaver og hoved-e-post før bekreftelse. Medlemsstatus,

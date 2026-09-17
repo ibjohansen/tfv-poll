@@ -26,6 +26,9 @@
 - Matrikkeldata kan oppdateres for ett søkbart, entydig valgt medlem.
 - Egenhostet, anonym bruksstatistikk med varige dagsaggregater, Visx-grafer og adminoversikt.
 - Sikrere oppstart av survey-e-postjobben: kun direkte HTTP 202 godtas.
+- Masseutsendelse fra undersøkelser krever nå Netlify-produksjonskontekst og
+  en sterk jobbhemmelighet før kampanjen opprettes; localhost kan ikke legge
+  igjen en utsendelse som blir stående i «Venter».
 - Matrikkeljobber med tidsbegrenset reservasjon, avgrenset gjenopptaking og overvåking.
 - Atomisk Matrikkel-start: parallelle forespørsler kan ikke opprette to aktive kjøringer.
 - Aktørlogg for stopp, godkjenning og skjuling av matrikkelkjøringer.

@@ -7,6 +7,7 @@ const surveys = {
 };
 
 surveys.admin.questionVersionLabel = 'Question version';
+surveys.email.backgroundUnavailable = 'Bulk mailing can only be started from the configured production site.';
 Object.assign(surveys.admin, {
   attachments: 'Attachments', attachmentsHelp: 'Upload background documents that are available only to administrators and recipients of this survey.',
   addAttachments: 'Add attachments', addAttachmentsHelp: 'Upload one or more documents to the survey.', uploadingAttachments: 'Uploading …',

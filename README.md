@@ -456,6 +456,10 @@ administrator fortsatt laste opp og fjerne en ufarlig testfil og kontrollere
 nedlasting både med riktig surveyøkt og uten tilgang, som beskrevet i
 verifikasjonssjekklisten nedenfor.
 
+Rettelsesdeploy `6aabda71bcbad489e7278851` samme dag la i tillegg inn
+produksjonsvern for undersøkelsesutsendelser og aktiv jobbhemmelighet for
+`survey-email-background`. Deployen startet ingen eksisterende kampanje.
+
 Den tidligere statiske løsningen beholdes for bakoverkompatibilitet. Eldre
 PDF-er eller andre filer kan ligge i:
 
@@ -1052,6 +1056,15 @@ URI i Entra oppdateres. Utløs en ny deploy etter endringen.
 Etter at GitHub-repositoriet er koblet til Netlify, utløser senere pushes til
 `main` normalt en ny produksjonsdeploy.
 
+Ved en uttrykkelig godkjent manuell CLI-deploy kan `netlify deploy --prod
+--build` brukes fra en kontrollert arbeidskopi etter `npm run check`. Netlify
+setter da `NETLIFY_LOCAL=true` og holder Functions-avgrensede hemmeligheter
+utenfor den lokale byggeprosessen. Skybygg validerer fortsatt hele
+produksjonskonfigurasjonen, mens API-ruter og bakgrunnsfunksjoner alltid
+validerer nødvendige hemmeligheter på nytt ved kjøring. Ikke legg inn
+midlertidige produksjonshemmeligheter i `.env.local`, `netlify.toml` eller
+kommandolinjen for å få et lokalt bygg til å passere.
+
 ### 7. Verifiser produksjonen
 
 Utfør kontrollene i denne rekkefølgen:
@@ -1625,9 +1638,13 @@ medlemsregisteret eller gi tilgang på vegne av et medlem.
 ### Masseutsendelse og idempotens
 
 Masseutsendelse er sperret både i grensesnittet og på serveren når
-`MAILERSEND_BULK_ENABLED` ikke er nøyaktig `true`. Standard og nåværende
-innstilling er `false`; den skal ikke endres før masseutsendelse er uttrykkelig
-godkjent. Testmail til inntil to eksplisitte adresser er fortsatt tilgjengelig.
+`MAILERSEND_BULK_ENABLED` ikke er nøyaktig `true`. Standardinnstillingen er
+`false`; den skal ikke endres før masseutsendelse er uttrykkelig godkjent.
+I tillegg må `CONTEXT` og `APP_ENVIRONMENT` begge være `production`, og
+`MAILERSEND_JOB_SECRET` må være minst 32 tegn. Kontrollen skjer før kampanje og
+leveranser opprettes, slik at localhost eller feilkonfigurerte deployer ikke kan
+etterlate en utsendelse i «Venter». Testmail til inntil to eksplisitte adresser
+er fortsatt tilgjengelig uten bakgrunnsjobben.
 
 Før utsendelse må administrator velge én e-postgruppe. Ingen gruppe velges
 automatisk. Alle ordinære medlemmer i gruppen med gyldig hoved-e-post vises med

@@ -176,7 +176,7 @@ test('newsletter requires saved groups and preview, supports test errors and can
 
 test('survey email panel keeps failed dispatch status and offers safe restart', async ({ page, context }) => {
   await authenticate(context);
-  const overview = { configured: true, bulk_enabled: true, survey: { can_send: true },
+  const overview = { configured: true, background_configured: true, bulk_enabled: true, survey: { can_send: true },
     groups: [{ id: '71', name: 'Syntetisk e-postgruppe', recipient_count: 2 }], selected_group_id: null,
     recipients: [{ id: '7001', name: 'Kari Kontakt', title_holder: 'Kari Hjemmelshaver', primary_contact_email: 'kari@example.invalid' },
       { id: '7002', name: 'Ola Kontakt', title_holder: 'Ola Hjemmelshaver', primary_contact_email: 'ola@example.invalid' }],

@@ -1,7 +1,7 @@
 import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { createSurveyEmailCampaign, failPendingSurveyEmailCampaign, getSurveyEmailOverview, sendSurveyTestEmail } from '@/lib/survey-email';
-import { dispatchSurveyEmailCampaign } from '@/lib/survey-email-background';
+import { dispatchSurveyEmailCampaign, requireSurveyEmailBackgroundConfigured } from '@/lib/survey-email-background';
 import { isEmailRateLimited } from '@/lib/rate-limit';
 import { getRequestI18n } from '@/lib/i18n/request';
 import { getApplicationOrigin, isSameOriginRequest } from '@/lib/request-origin';
@@ -9,11 +9,12 @@ import { getApplicationOrigin, isSameOriginRequest } from '@/lib/request-origin'
 export const runtime = 'nodejs';
 
 function errorResponse(error, t) {
-  const status = apiErrorStatus(error, 403);
+  const status = error.code === 'JOB_NOT_CONFIGURED' ? 503 : apiErrorStatus(error, 403);
   const messages = {
     DISABLED: t('emailDisabled'),
     CONFIGURATION: t('emailConfiguration'),
     BULK_DISABLED: t('bulkDisabled'),
+    JOB_NOT_CONFIGURED: t('emailJobConfiguration'),
     SUPPRESSION_PERMISSION: t('emailPermission'),
     SUPPRESSED: t('suppressed'),
   };
@@ -45,13 +46,14 @@ export async function POST(request, { params }) {
       return NextResponse.json({ ok: true, delivery }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
     if (!['send', 'resend'].includes(input.action)) return NextResponse.json({ ok: false, message: t('adminSurveys.invalidEmailAction') }, { status: 400 });
+    const jobSecret = requireSurveyEmailBackgroundConfigured();
     const result = await createSurveyEmailCampaign(surveyId, {
       replaceCompleted: input.action === 'resend', groupId: input.groupId,
     });
     let backgroundStarted = false;
     if (process.env.NODE_ENV === 'production' && ['pending', 'running', 'failed'].includes(result.campaign.status)) {
       try {
-        await dispatchSurveyEmailCampaign(result.campaign.id, getApplicationOrigin(request));
+        await dispatchSurveyEmailCampaign(result.campaign.id, getApplicationOrigin(request), { secret: jobSecret });
         backgroundStarted = true;
       } catch (error) {
         console.error('Survey email background start failed', { campaignId: result.campaign.id, code: error.code, occurredAt: new Date().toISOString() });

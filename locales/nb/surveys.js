@@ -7,6 +7,7 @@ const surveys = {
 };
 
 surveys.admin.questionVersionLabel = 'Spørsmålsversjon';
+surveys.email.backgroundUnavailable = 'Masseutsendelse kan bare startes fra den konfigurerte produksjonssiden.';
 Object.assign(surveys.admin, {
   attachments: 'Vedlegg', attachmentsHelp: 'Last opp bakgrunnsdokumenter som bare er tilgjengelige for administratorer og mottakere av denne undersøkelsen.',
   addAttachments: 'Legg til vedlegg', addAttachmentsHelp: 'Last opp ett eller flere dokumenter til undersøkelsen.', uploadingAttachments: 'Laster opp …',

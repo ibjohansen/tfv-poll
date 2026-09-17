@@ -7,6 +7,22 @@ const campaignId = 'a'.repeat(32);
 const secret = 'test-only-job-secret';
 const origin = 'https://example.test';
 
+test('bulk email requires the production context and a strong job secret', async () => {
+  const api = await loadModule('lib/survey-email-background.js');
+  const configured = { CONTEXT: 'production', APP_ENVIRONMENT: 'production', MAILERSEND_JOB_SECRET: 'x'.repeat(32) };
+  assert.equal(api.isSurveyEmailBackgroundConfigured(configured), true);
+  for (const env of [
+    {},
+    { ...configured, CONTEXT: 'dev' },
+    { ...configured, APP_ENVIRONMENT: 'development' },
+    { ...configured, MAILERSEND_JOB_SECRET: 'too-short' },
+  ]) {
+    assert.equal(api.isSurveyEmailBackgroundConfigured(env), false);
+    assert.throws(() => api.requireSurveyEmailBackgroundConfigured(env), { code: 'JOB_NOT_CONFIGURED', status: 503 });
+  }
+  assert.equal(api.requireSurveyEmailBackgroundConfigured(configured), configured.MAILERSEND_JOB_SECRET);
+});
+
 test('email dispatch accepts only a direct 202 with a bounded, secret-authenticated request', async () => {
   for (const status of [200, 202, 204, 301, 307, 403, 429, 500]) {
     const api = await loadModule('lib/survey-email-background.js', {}, {
@@ -23,6 +39,18 @@ test('email dispatch accepts only a direct 202 with a bounded, secret-authentica
     if (status === 202) await api.dispatchSurveyEmailCampaign(campaignId, origin);
     else await assert.rejects(api.dispatchSurveyEmailCampaign(campaignId, origin), { code: 'JOB_DISPATCH_REJECTED' });
   }
+});
+
+test('email dispatch can use the secret captured before asynchronous campaign setup', async () => {
+  const capturedSecret = 'captured-before-await-job-secret';
+  const api = await loadModule('lib/survey-email-background.js', {}, {
+    process: { env: {} }, AbortSignal,
+    fetch: async (_url, init) => {
+      assert.equal(init.headers['X-MailerSend-Job-Secret'], capturedSecret);
+      return { status: 202, redirected: false };
+    },
+  });
+  await api.dispatchSurveyEmailCampaign(campaignId, origin, { secret: capturedSecret });
 });
 
 test('email dispatch rejects missing secrets, invalid origins/IDs and redacts network failures', async () => {
@@ -46,7 +74,9 @@ test('email worker guards method/secret/body and forwards only a non-busy runnin
   const worker = await loadModule('netlify/functions/survey-email-background.mjs', {
     'node:crypto': { timingSafeEqual },
     '../../lib/survey-email.js': { processSurveyEmailCampaign: async () => { processed++; return result; } },
-    '../../lib/survey-email-background.js': { dispatchSurveyEmailCampaign: async (id, base) => { assert.equal(id, campaignId); assert.equal(base, origin); forwarded++; } },
+    '../../lib/survey-email-background.js': { dispatchSurveyEmailCampaign: async (id, base, options) => {
+      assert.equal(id, campaignId); assert.equal(base, origin); assert.equal(options.secret, secret); forwarded++;
+    } },
   }, { process: { env: { MAILERSEND_JOB_SECRET: secret } } });
   const path = '/.netlify/functions/survey-email-background';
   assert.equal((await worker.default(request(path, { method: 'POST', body: { campaignId } }))).status, 403);
@@ -72,11 +102,41 @@ test('production email route shows failed dispatch but preserves a concurrently 
         createSurveyEmailCampaign: async () => ({ campaign: { id: campaignId, status: 'pending' } }),
         failPendingSurveyEmailCampaign: async () => ({ id: campaignId, status }),
       },
-      '@/lib/survey-email-background': { dispatchSurveyEmailCampaign: async () => { throw new Error('dispatch failed'); } },
+      '@/lib/survey-email-background': {
+        dispatchSurveyEmailCampaign: async (_id, _origin, options) => {
+          assert.equal(options.secret, secret);
+          throw new Error('dispatch failed');
+        },
+        requireSurveyEmailBackgroundConfigured: () => secret,
+      },
       '@/lib/rate-limit': { isEmailRateLimited: () => false },
     }, { process: { env: { NODE_ENV: 'production' } } });
     const response = await route.POST(request(`/api/admin/surveys/${campaignId}/email`, { method: 'POST', body: { action: 'send' } }), routeContext());
     assert.equal(response.status, status === 'failed' ? 503 : 201);
     assert.equal((await response.json()).backgroundStarted, status !== 'failed');
   }
+});
+
+test('email route rejects non-production bulk sending before creating a campaign', async () => {
+  let created = 0;
+  const route = await loadModule('app/api/admin/surveys/[id]/email/route.js', {
+    '@/lib/survey-email': {
+      createSurveyEmailCampaign: async () => { created++; return {}; },
+      failPendingSurveyEmailCampaign: async () => null,
+      getSurveyEmailOverview: async () => ({}),
+      sendSurveyTestEmail: async () => ({}),
+    },
+    '@/lib/survey-email-background': {
+      dispatchSurveyEmailCampaign: async () => assert.fail('Unexpected dispatch'),
+      requireSurveyEmailBackgroundConfigured: () => {
+        throw Object.assign(new Error('Not configured'), { code: 'JOB_NOT_CONFIGURED', status: 503 });
+      },
+    },
+    '@/lib/rate-limit': { isEmailRateLimited: () => false },
+  });
+  const response = await route.POST(request(`/api/admin/surveys/${campaignId}/email`, {
+    method: 'POST', body: { action: 'send', groupId: '71' },
+  }), routeContext());
+  assert.equal(response.status, 503);
+  assert.equal(created, 0);
 });

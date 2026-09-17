@@ -66,9 +66,9 @@ export default function SurveyEmailPanel({ surveyId, adminEmail }) {
   const groups = overview.groups || [];
   const previewRecipients = overview.recipients || [];
   const progress = campaign?.total_count ? Math.round(((campaign.sent_count + campaign.failed_count + campaign.suppressed_count) / campaign.total_count) * 100) : 0;
-  const canStart = overview.configured && overview.bulk_enabled && overview.survey?.can_send && !campaign && groupId && overview.recipient_count > 0;
-  const canResume = overview.configured && overview.bulk_enabled && overview.survey?.can_send && ['pending', 'failed'].includes(campaign?.status);
-  const canReplace = overview.configured && overview.bulk_enabled && overview.survey?.can_send && campaign?.status === 'completed' && groupId && overview.recipient_count > 0;
+  const canStart = overview.configured && overview.background_configured && overview.bulk_enabled && overview.survey?.can_send && !campaign && groupId && overview.recipient_count > 0;
+  const canResume = overview.configured && overview.background_configured && overview.bulk_enabled && overview.survey?.can_send && ['pending', 'failed'].includes(campaign?.status);
+  const canReplace = overview.configured && overview.background_configured && overview.bulk_enabled && overview.survey?.can_send && campaign?.status === 'completed' && groupId && overview.recipient_count > 0;
   const groupSelectionLocked = Boolean(campaign && campaign.status !== 'completed');
 
   return <section className="survey-email" aria-labelledby="survey-email-heading">
@@ -89,6 +89,7 @@ export default function SurveyEmailPanel({ surveyId, adminEmail }) {
     <section className="survey-email-card">
       <h4>{t('bulkTitle')}</h4>
       {!overview.bulk_enabled && <p className="survey-email-warning" role="status">{t('bulkDisabled')}</p>}
+      {!overview.background_configured && <p className="survey-email-warning" role="status">{t('backgroundUnavailable')}</p>}
       <label className="survey-email-group">{t('recipientGroup')}
         <select value={groupId} disabled={Boolean(busy) || groupSelectionLocked} onChange={(event) => {
           const nextGroupId = event.target.value;
