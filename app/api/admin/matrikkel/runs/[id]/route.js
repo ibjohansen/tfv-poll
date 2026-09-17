@@ -2,12 +2,13 @@ import { apiErrorStatus } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { cancelMatrikkelRun, deleteMatrikkelRunLog } from '@/lib/matrikkel-sync';
 import { getRequestI18n } from '@/lib/i18n/request';
+import { isSameOriginRequest } from '@/lib/request-origin';
 
 export const runtime = 'nodejs';
 
 export async function DELETE(request, { params }) {
   const { t } = getRequestI18n(request, 'backend');
-  if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) {
+  if (!isSameOriginRequest(request)) {
     return NextResponse.json({ ok: false, message: t('api.invalidRequest') }, { status: 403 });
   }
   try {

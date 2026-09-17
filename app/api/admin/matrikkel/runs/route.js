@@ -3,13 +3,9 @@ import { NextResponse } from 'next/server';
 import { createMatrikkelRun, failPendingMatrikkelRun, getMatrikkelRun, getMatrikkelRuns } from '@/lib/matrikkel-sync';
 import { dispatchMatrikkelRun } from '@/lib/matrikkel-background';
 import { getRequestI18n } from '@/lib/i18n/request';
+import { getApplicationOrigin, isSameOriginRequest } from '@/lib/request-origin';
 
 export const runtime = 'nodejs';
-
-function sameOrigin(request) {
-  const origin = request.headers.get('origin');
-  return !origin || origin === request.nextUrl.origin;
-}
 
 export async function GET(request) {
   const { t } = getRequestI18n(request, 'backend.adminMatrikkel');
@@ -26,14 +22,14 @@ export async function GET(request) {
 
 export async function POST(request) {
   const { t } = getRequestI18n(request, 'backend');
-  if (!sameOrigin(request)) return NextResponse.json({ ok: false, message: t('api.invalidRequest') }, { status: 403 });
+  if (!isSameOriginRequest(request)) return NextResponse.json({ ok: false, message: t('api.invalidRequest') }, { status: 403 });
   try {
     const input = await readJsonObject(request);
     let run = await createMatrikkelRun({ hNumber: input.hNumber, memberId: input.memberId, memberIds: input.memberIds });
     let backgroundStarted = false;
     if (process.env.NODE_ENV === 'production' && run.status === 'pending') {
       try {
-        await dispatchMatrikkelRun(run.id, request.nextUrl.origin);
+        await dispatchMatrikkelRun(run.id, getApplicationOrigin(request));
         backgroundStarted = true;
       } catch (error) {
         console.error('Matrikkel background dispatch failed', { runId: run.id, code: error.code, status: error.status, occurredAt: new Date().toISOString() });

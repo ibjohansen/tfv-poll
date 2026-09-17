@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { dispatchMatrikkelRun } from '../../lib/matrikkel-background.js';
 import { processMatrikkelRun } from '../../lib/matrikkel-sync.js';
+import { getApplicationOrigin } from '../../lib/request-origin.js';
 
 function validSecret(received, expected) {
   if (!received || !expected) return false;
@@ -27,7 +28,7 @@ export default async function handler(request) {
     while (run?.status === 'running' && !run.workerBusy && Date.now() < deadline);
 
     if (run?.status === 'running' && !run.workerBusy) {
-      await dispatchMatrikkelRun(input.runId, new URL(request.url).origin);
+      await dispatchMatrikkelRun(input.runId, getApplicationOrigin(request));
       console.info('Matrikkel background continuation accepted', { runId: input.runId, occurredAt: new Date().toISOString() });
     } else {
       console.info('Matrikkel background processing finished', { runId: input.runId, status: run?.status, occurredAt: new Date().toISOString() });

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { timingSafeEqual } from 'node:crypto';
 import { loadModule, plain, request } from './helpers/load-module.mjs';
+import { getApplicationOrigin, isSameOriginRequest } from '../lib/request-origin.js';
 
 const runId = 'a'.repeat(32);
 const secret = 'synthetic-job-secret-not-a-real-credential';
@@ -76,7 +77,7 @@ test('missing configuration, invalid identity and unsafe origins fail before con
 async function setupStart(options = {}) {
   const dispatch = await setupDispatch(options);
   const state = { created: 0, createArgs: [], failed: 0, logs: [], run: { id: runId, status: 'pending', total_count: 426, ...options.run } };
-  const route = await loadModule('app/api/admin/matrikkel/runs/route.js', {
+  const dependencies = {
     '@/lib/matrikkel-background': dispatch.api,
     '@/lib/matrikkel-sync': {
       createMatrikkelRun: async (...args) => {
@@ -95,8 +96,13 @@ async function setupStart(options = {}) {
       },
       getMatrikkelRuns: async () => [], getMatrikkelRun: async () => state.run,
     },
-  }, {
-    process: { env: { NODE_ENV: options.mode || 'production' } },
+  };
+  if (options.authUrl) dependencies['@/lib/request-origin'] = {
+    getApplicationOrigin: (requestValue) => getApplicationOrigin(requestValue, { AUTH_URL: options.authUrl }),
+    isSameOriginRequest: (requestValue) => isSameOriginRequest(requestValue, { AUTH_URL: options.authUrl }),
+  };
+  const route = await loadModule('app/api/admin/matrikkel/runs/route.js', dependencies, {
+    process: { env: { NODE_ENV: options.mode || 'production', ...(options.authUrl ? { AUTH_URL: options.authUrl } : {}) } },
     console: { error: (...args) => state.logs.push(args) },
   });
   return { route, state, dispatch };
@@ -122,6 +128,17 @@ test('production start accepts 202 but retains pending until the worker actually
   assert.equal(body.run.status, 'pending');
   assert.equal(state.failed, 0);
   assert.equal(dispatch.calls.length, 1);
+});
+
+test('production start trusts configured public origin behind the Netlify proxy', async () => {
+  const publicOrigin = 'https://medlemsservice.turufjellvel.no';
+  const { route, dispatch } = await setupStart({ authUrl: publicOrigin });
+  const response = await route.POST(request('https://internal-deploy.example/api/admin/matrikkel/runs', {
+    method: 'POST', body: { hNumber: '25' },
+    headers: { origin: publicOrigin, 'sec-fetch-site': 'same-origin' },
+  }));
+  assert.equal(response.status, 201);
+  assert.equal(dispatch.calls[0].url.href, `${publicOrigin}${functionPath}`);
 });
 
 test('production start records a visible failure for login HTML, redirects, missing secret and timeout', async () => {

@@ -916,7 +916,7 @@ openssl rand -base64 32
 
 | Variabel | Produksjonsverdi |
 | --- | --- |
-| `API_MATRIKKEL_BASE_URL` | `https://matrikkel.no/matrikkelapi/wsapi/v1` |
+| `API_MATRIKKEL_BASE_URL` | `https://innsyn.matrikkel.no/matrikkelapi/wsapi/v1` (lesetrafikk) |
 | `API_MATRIKKEL_USR` | Matrikkel-brukernavn |
 | `API_MATRIKKEL_PWD` | Matrikkel-passord, skrevet normalt uten `\$`-escaping |
 | `MATRIKKEL_SYNC_EMAILS` | Kommaseparert rolle-allowlist for godkjente driftskontoer |
@@ -1467,7 +1467,7 @@ Kartverkets produksjonslegitimasjon skal bare ligge i `.env.local` lokalt og i
 Netlifys server-side miljøvariabler i produksjon:
 
 ```env
-API_MATRIKKEL_BASE_URL=https://matrikkel.no/matrikkelapi/wsapi/v1
+API_MATRIKKEL_BASE_URL=https://innsyn.matrikkel.no/matrikkelapi/wsapi/v1
 API_MATRIKKEL_USR=<brukernavn>
 API_MATRIKKEL_PWD=<passord>
 MATRIKKEL_JOB_SECRET=<tilfeldig hemmelighet på minst 32 bytes>
@@ -1481,6 +1481,9 @@ inn normalt, uten denne escapingen.
 Ingen av variablene skal ha `NEXT_PUBLIC_`-prefiks. `MATRIKKEL_JOB_SECRET`
 brukes bare til å autentisere den interne bakgrunnsjobben. Prodtest avvises som
 standard; ved en bevisst lokal test kan `MATRIKKEL_ALLOW_PRODTEST=true` settes.
+Integrasjonen gjør bare lesekall og bruker derfor Kartverkets dedikerte
+`innsyn.matrikkel.no`-endepunkt. `registrering.matrikkel.no` skal ikke brukes
+uten at løsningen senere får eksplisitte oppdateringskall mot Matrikkelen.
 
 Oppstart og videreføring bruker `lib/matrikkel-background.js`: HTTPS, ingen
 omdirigeringer, 10 sekunders timeout og bare HTTP `202` som gyldig kvittering.

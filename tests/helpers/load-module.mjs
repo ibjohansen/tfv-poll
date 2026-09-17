@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server.js';
 import { apiErrorStatus, readJsonObject } from '../../lib/api-errors.js';
 import { getRequestI18n } from '../../lib/i18n/request.js';
 import { LOCALE_COOKIE, normalizeLocale } from '../../lib/i18n/config.js';
+import { getApplicationOrigin, isSameOriginRequest } from '../../lib/request-origin.js';
 
 // Execute the actual source with explicit dependencies. Never fall back to a
 // real database, mail provider, auth provider or network from a route test.
@@ -20,6 +21,8 @@ export async function loadModule(path, dependencies = {}, globals = {}) {
   const imports = {
     'server-only': {}, 'next/server': { NextResponse }, '@/lib/api-errors': { apiErrorStatus, readJsonObject },
     '@/lib/i18n/request': { getRequestI18n }, './lib/i18n/request': { getRequestI18n },
+    '@/lib/request-origin': { getApplicationOrigin, isSameOriginRequest },
+    '../../lib/request-origin.js': { getApplicationOrigin, isSameOriginRequest },
     './lib/i18n/config': { LOCALE_COOKIE, normalizeLocale }, ...dependencies,
   };
   const mocks = new Map();
