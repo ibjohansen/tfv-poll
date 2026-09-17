@@ -8,6 +8,7 @@ import * as usageMetrics from '../lib/usage-metrics.js';
 import { loadModule, plain, request } from './helpers/load-module.mjs';
 import { isPublicPath } from '../lib/route-access.js';
 import * as policy from '../lib/admin-policy.js';
+import { isSameOriginRequest } from '../lib/request-origin.js';
 
 test('public paths are reduced to an allowlisted page type without URL details', () => {
   assert.equal(pageTypeForPath('/'), 'home');
@@ -60,6 +61,25 @@ test('pageview endpoint requires same origin and exposes no storage error detail
   const failed = await failedRoute.POST(request('/api/usage/pageview', { method: 'POST', headers, body: { pageType: 'home', deviceCategory: 'desktop' } }));
   assert.equal(failed.status, 503);
   assert.doesNotMatch(await failed.text(), /DATABASE_URL|secret/);
+});
+
+test('pageview endpoint accepts the configured public origin behind Netlify proxying', async () => {
+  const calls = [];
+  const publicOrigin = 'https://medlemsservice.turufjellvel.no';
+  const route = await loadModule('app/api/usage/pageview/route.js', {
+    '@/lib/usage-statistics': { recordUsagePageView: async (value) => calls.push(value) },
+    '@/lib/usage-metrics': { normalizeUsageEvent },
+    '@/lib/request-origin': {
+      isSameOriginRequest: (requestValue) => isSameOriginRequest(requestValue, { AUTH_URL: publicOrigin }),
+    },
+  });
+  const response = await route.POST(request('https://internal-deploy.example/api/usage/pageview', {
+    method: 'POST',
+    headers: { origin: publicOrigin, 'sec-fetch-site': 'same-origin' },
+    body: { pageType: 'home', deviceCategory: 'desktop' },
+  }));
+  assert.equal(response.status, 204);
+  assert.deepEqual(calls, [{ pageType: 'home', deviceCategory: 'desktop' }]);
 });
 
 test('usage collection is public but its dashboard requires audit permission', async () => {

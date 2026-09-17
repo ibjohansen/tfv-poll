@@ -21,7 +21,7 @@ const cases = [
   ['surveys/[id]/results/export', 'GET', 'admin-survey-results', 'createAdminSurveyResultsExport', 200, { binary: true }],
   ['surveys/[id]/email', 'GET', 'survey-email', 'getSurveyEmailOverview', 200, { unauthorized: 403 }],
   ['surveys/[id]/email', 'POST', 'survey-email', 'sendSurveyTestEmail', 200, { body: { action: 'test', recipient: 'test@example.test' }, unauthorized: 403 }],
-  ['surveys/[id]/email', 'POST', 'survey-email', 'createSurveyEmailCampaign', 201, { body: { action: 'send' }, unauthorized: 403 }],
+  ['surveys/[id]/email', 'POST', 'survey-email', 'createSurveyEmailCampaign', 201, { body: { action: 'send', groupId: '71' }, unauthorized: 403 }],
   ['cms/pages', 'GET', 'cms-pages', 'getAdminCmsPages', 200],
   ['cms/pages', 'POST', 'cms-pages', 'createAdminCmsPage', 201],
   ['cms/pages/[id]', 'GET', 'cms-pages', 'getAdminCmsPage', 200],
@@ -154,6 +154,16 @@ test('email actions require a valid action and respect rate limits', async () =>
   state.limited = true;
   assert.equal((await route.POST(request('/api/admin/email', { method: 'POST', body: { action: 'send' } }), routeContext())).status, 429);
   assert.equal(calls.length, 0);
+});
+
+test('survey mailing forwards the selected email group to preview and campaign creation', async () => {
+  const { route, calls } = await setup('surveys/[id]/email');
+  await route.GET(request('/api/admin/surveys/test/email?page=2&groupId=71'), routeContext());
+  assert.deepEqual(plain(calls.at(-1).args), ['a'.repeat(32), '2', '71']);
+  await route.POST(request('/api/admin/surveys/test/email', {
+    method: 'POST', body: { action: 'send', groupId: '71' },
+  }), routeContext());
+  assert.deepEqual(plain(calls.at(-1).args), ['a'.repeat(32), { replaceCompleted: false, groupId: '71' }]);
 });
 
 test('malformed JSON and non-object bodies never initiate an admin mutation or full sync', async () => {

@@ -9,7 +9,7 @@ import { testAdmin, testAuthSecret, testOrigin, testTenant } from './environment
 // provider credentials, or authentication bypasses in application code.
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const directory = await mkdtemp(join(tmpdir(), 'tfv-browser-tests-'));
-const entries = ['app', 'components', 'lib', 'data', 'public', 'auth.js', 'proxy.js',
+const entries = ['app', 'components', 'lib', 'locales', 'data', 'public', 'auth.js', 'proxy.js',
   'package.json', 'package-lock.json', 'jsconfig.json', 'next.config.mjs', 'postcss.config.mjs', 'tailwind.config.js'];
 await Promise.all(entries.map((entry) => cp(join(root, entry), join(directory, entry), { recursive: true })));
 await mkdir(join(directory, 'app/admin/browser-test'), { recursive: true });

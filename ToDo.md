@@ -981,3 +981,10 @@ Eventuelle funn fra sikkerhetsgjennomgangen legges inn som egne P1- eller P2-sak
 - [x] Ordlistetest kontrollerer identiske, ikke-tomme nøkler for norsk og
   engelsk. Avgrensning for databaseinnhold, maskinkoder, e-post og eksport er
   dokumentert i `docs/internationalization.md`.
+
+### Undersøkelsesutsendelse
+
+- [x] Administrator må velge én e-postgruppe før en ny undersøkelsesutsendelse.
+  Valget lagres på kampanjen, og mottakerlisten viser kontaktperson,
+  hjemmelshaver og hoved-e-post før bekreftelse. Medlemsstatus,
+  gruppetilknytning og hoved-e-post kontrolleres på nytt rett før sending.

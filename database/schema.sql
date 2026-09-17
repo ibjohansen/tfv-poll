@@ -398,6 +398,10 @@ CREATE TABLE IF NOT EXISTS member_email_group_members (
   PRIMARY KEY (group_id, member_id)
 );
 CREATE INDEX IF NOT EXISTS member_email_group_members_member_idx ON member_email_group_members (member_id);
+-- Mottakergrunnlaget for en undersøkelsesutsendelse låses til én eksplisitt
+-- e-postgruppe. Eldre kampanjer uten gruppe beholdes for historikk.
+ALTER TABLE email_campaigns ADD COLUMN IF NOT EXISTS group_id BIGINT REFERENCES member_email_groups(id) ON DELETE RESTRICT;
+CREATE INDEX IF NOT EXISTS email_campaigns_group_idx ON email_campaigns (group_id) WHERE group_id IS NOT NULL;
 
 -- Tidsbegrenset e-postinnlogging for medlemmenes selvbetjening. Bare SHA-256-
 -- hash av den tilfeldige lenkehemmeligheten lagres i databasen.
@@ -768,7 +772,8 @@ CREATE OR REPLACE VIEW admin_activity_log AS
   SELECT 'audit:' || id::text AS id, table_name, row_id, operation, changed_by, before_value, after_value, changed_at FROM audit_log
   UNION ALL
   SELECT 'campaign:' || c.id || ':' || e.action, 'email_campaigns', c.id, 'INSERT', c.requested_by, NULL::jsonb,
-    jsonb_build_object('action', e.action, 'survey_id', c.survey_id, 'count', c.total_count, 'status', e.status,
+    jsonb_build_object('action', e.action, 'survey_id', c.survey_id, 'group_id', c.group_id,
+      'count', c.total_count, 'status', e.status,
       'sent_count', CASE WHEN e.action = 'campaign_finished' THEN c.sent_count ELSE NULL END,
       'failed_count', CASE WHEN e.action = 'campaign_finished' THEN c.failed_count ELSE NULL END), e.occurred_at
   FROM email_campaigns c CROSS JOIN LATERAL (VALUES

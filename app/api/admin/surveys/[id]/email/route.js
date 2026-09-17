@@ -4,13 +4,9 @@ import { createSurveyEmailCampaign, failPendingSurveyEmailCampaign, getSurveyEma
 import { dispatchSurveyEmailCampaign } from '@/lib/survey-email-background';
 import { isEmailRateLimited } from '@/lib/rate-limit';
 import { getRequestI18n } from '@/lib/i18n/request';
+import { getApplicationOrigin, isSameOriginRequest } from '@/lib/request-origin';
 
 export const runtime = 'nodejs';
-
-function sameOrigin(request) {
-  const origin = request.headers.get('origin');
-  return !origin || origin === request.nextUrl.origin;
-}
 
 function errorResponse(error, t) {
   const status = apiErrorStatus(error, 403);
@@ -28,14 +24,18 @@ function errorResponse(error, t) {
 export async function GET(request, { params }) {
   const { t } = getRequestI18n(request, 'backend.adminSurveys');
   try {
-    const overview = await getSurveyEmailOverview((await params).id, request.nextUrl.searchParams.get('page'));
+    const overview = await getSurveyEmailOverview(
+      (await params).id,
+      request.nextUrl.searchParams.get('page'),
+      request.nextUrl.searchParams.get('groupId'),
+    );
     return NextResponse.json({ ok: true, overview }, { headers: { 'Cache-Control': 'no-store, private' } });
   } catch (error) { return errorResponse(error, t); }
 }
 
 export async function POST(request, { params }) {
   const { t } = getRequestI18n(request, 'backend');
-  if (!sameOrigin(request)) return NextResponse.json({ ok: false, message: t('api.invalidRequest') }, { status: 403 });
+  if (!isSameOriginRequest(request)) return NextResponse.json({ ok: false, message: t('api.invalidRequest') }, { status: 403 });
   if (isEmailRateLimited(request)) return NextResponse.json({ ok: false, message: t('adminSurveys.emailRate') }, { status: 429 });
   const surveyId = (await params).id;
   try {
@@ -45,11 +45,13 @@ export async function POST(request, { params }) {
       return NextResponse.json({ ok: true, delivery }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
     if (!['send', 'resend'].includes(input.action)) return NextResponse.json({ ok: false, message: t('adminSurveys.invalidEmailAction') }, { status: 400 });
-    const result = await createSurveyEmailCampaign(surveyId, { replaceCompleted: input.action === 'resend' });
+    const result = await createSurveyEmailCampaign(surveyId, {
+      replaceCompleted: input.action === 'resend', groupId: input.groupId,
+    });
     let backgroundStarted = false;
     if (process.env.NODE_ENV === 'production' && ['pending', 'running', 'failed'].includes(result.campaign.status)) {
       try {
-        await dispatchSurveyEmailCampaign(result.campaign.id, request.nextUrl.origin);
+        await dispatchSurveyEmailCampaign(result.campaign.id, getApplicationOrigin(request));
         backgroundStarted = true;
       } catch (error) {
         console.error('Survey email background start failed', { campaignId: result.campaign.id, code: error.code, occurredAt: new Date().toISOString() });

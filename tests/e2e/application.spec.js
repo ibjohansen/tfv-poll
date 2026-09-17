@@ -176,14 +176,22 @@ test('newsletter requires saved groups and preview, supports test errors and can
 
 test('survey email panel keeps failed dispatch status and offers safe restart', async ({ page, context }) => {
   await authenticate(context);
-  const overview = { configured: true, bulk_enabled: true, survey: { can_send: true }, recipient_count: 2, missing_email_count: 0, campaign: null, deliveries: [], page: 1, pages: 1 };
+  const overview = { configured: true, bulk_enabled: true, survey: { can_send: true },
+    groups: [{ id: '71', name: 'Syntetisk e-postgruppe', recipient_count: 2 }], selected_group_id: null,
+    recipients: [{ id: '7001', name: 'Kari Kontakt', title_holder: 'Kari Hjemmelshaver', primary_contact_email: 'kari@example.invalid' },
+      { id: '7002', name: 'Ola Kontakt', title_holder: 'Ola Hjemmelshaver', primary_contact_email: 'ola@example.invalid' }],
+    recipient_count: 2, missing_email_count: 0, campaign: null, deliveries: [], page: 1, pages: 1 };
   await page.route(`**/api/admin/surveys/${surveyId}/email*`, (route) => {
     if (route.request().method() === 'GET') return route.fulfill({ json: { ok: true, overview } });
-    expect(route.request().postDataJSON().action).toBe('send');
+    expect(route.request().postDataJSON()).toEqual({ action: 'send', groupId: '71' });
     return route.fulfill({ status: 503, json: { ok: false, message: 'Bakgrunnsjobben kunne ikke startes.', campaign: { id: 'a'.repeat(32), status: 'failed', total_count: 2, sent_count: 0, failed_count: 0, suppressed_count: 0, delivered_count: 0, error_message: 'Oppstart ikke bekreftet.' } } });
   });
   await page.goto('/admin/browser-test');
   const section = page.getByRole('region', { name: 'Send undersøkelsen', exact: true });
+  await section.getByRole('combobox', { name: 'E-postgruppe' }).selectOption('71');
+  await expect(section.getByRole('table', { name: /Alle mottakere/ })).toContainText('Kari Kontakt');
+  await expect(section.getByRole('table', { name: /Alle mottakere/ })).toContainText('Kari Hjemmelshaver');
+  await expect(section.getByRole('table', { name: /Alle mottakere/ })).toContainText('kari@example.invalid');
   await section.getByRole('button', { name: 'Start utsendelse', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Start utsendelse' }).click();
   await expect(section.getByRole('alert').filter({ hasText: 'Oppstart ikke bekreftet' })).toBeVisible();

@@ -1129,9 +1129,10 @@ Utfør kontrollene i denne rekkefølgen:
   gamle skjemaet. Kontroller 409 uten lagret svar, ny lasting med tomme svar og
   riktig versjon/tekst i snapshot etter ny innsending. Gamle åpne skjemaer uten
   `questionVersion` må lastes på nytt etter deploy.
-- Velg **Utsendelse**, send først en testmail til en eksplisitt testadresse, og
-  kontroller MailerSend-statusen. Start ikke masseutsendelsen før domenekontrollen
-  nedenfor er fullført.
+- Velg **Utsendelse**, velg en syntetisk e-postgruppe og kontroller at alle
+  mottakere vises med kontaktperson, hjemmelshaver og hoved-e-post. Send først en
+  testmail til en eksplisitt testadresse og kontroller MailerSend-statusen. Start
+  ikke masseutsendelsen før gruppen og domenekontrollen nedenfor er kontrollert.
 - Opprett et CMS-utkast, last opp et lite testvedlegg, forhåndsvis, publiser og
   kontroller den offentlige visningen. Kontroller også at sideoversikten kan
   brukes uten horisontal rulling på mobil. Fjern testinnholdet etterpå.
@@ -1591,10 +1592,13 @@ Masseutsendelse er sperret både i grensesnittet og på serveren når
 innstilling er `false`; den skal ikke endres før masseutsendelse er uttrykkelig
 godkjent. Testmail til inntil to eksplisitte adresser er fortsatt tilgjengelig.
 
-Før utsendelse vises antall aktive medlemmer med gyldig primæradresse og antall
-som mangler gyldig adresse. Administrator må bekrefte det eksakte mottakertallet.
-Deretter opprettes én `email_campaigns`-rad og én `email_deliveries`-rad per
-mottaker i samme databasetransaksjon. Den unike kampanjeindeksen gjør at refresh,
+Før utsendelse må administrator velge én e-postgruppe. Ingen gruppe velges
+automatisk. Alle ordinære medlemmer i gruppen med gyldig hoved-e-post vises med
+kontaktperson, hjemmelshaver og hoved-e-post, sammen med antallet som mangler
+gyldig adresse. Administrator må bekrefte det eksakte mottakertallet.
+Deretter opprettes én `email_campaigns`-rad med den valgte gruppen og én
+`email_deliveries`-rad per mottaker i samme databasetransaksjon. Gruppemedlemskap,
+medlemsstatus og hoved-e-post kontrolleres på nytt rett før sending. Den unike kampanjeindeksen gjør at refresh,
 gjentatt request eller Netlify-retry ikke oppretter en ny utsendelse for samme
 survey.
 
@@ -1657,7 +1661,7 @@ e-postadressen slettes eller endres aldri automatisk i `members`.
 Kjør `npm run db:setup` med `DATABASE_URL_UNPOOLED` før versjonen deployes.
 Endringen oppretter additivt:
 
-- `email_campaigns` for idempotent jobbidentitet og summer
+- `email_campaigns` for idempotent jobbidentitet, valgt e-postgruppe og summer
 - `email_deliveries` for mottaker, type, emne, provider message ID og status
 - `email_webhook_events` for idempotente leveringshendelser
 - `email_suppressions` for adresser som ikke skal forsøkes sendt igjen

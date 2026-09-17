@@ -92,3 +92,43 @@ test('deadline yields before claiming a new email; testmail activity retains act
   assert.equal(events.length, 2); assert.ok(events.every((event) => event.changed_by === 'admin@example.test'));
   assert.equal(JSON.stringify(events).includes('synthetic-test@example.test'), false);
 });
+
+test('survey mailing previews and locks recipients to the selected email group', async () => {
+  const surveyId = randomUUID().replaceAll('-', '');
+  await db.sql`INSERT INTO surveys (id, title, is_open, ends_on) VALUES (${surveyId}, 'Grouped survey', TRUE, '2099-12-31')`;
+  const [group] = await db.sql`INSERT INTO member_email_groups (name) VALUES (${`Survey group ${randomUUID()}`}) RETURNING id`;
+  const members = [];
+  for (const values of [
+    ['Kari Kontakt', 'Kari Hjemmelshaver', 'kari@example.test'],
+    ['Ola Kontakt', 'Ola Hjemmelshaver', 'ola@example.test'],
+    ['Uten e-post', 'Uten Epostsen', null],
+  ]) {
+    const [member] = await db.sql`INSERT INTO members (h_number, primary_contact_name, title_holder, primary_contact_email)
+      VALUES (${`group-${randomUUID()}`}, ${values[0]}, ${values[1]}, ${values[2]}) RETURNING id`;
+    members.push(member);
+    await db.sql`INSERT INTO member_email_group_members (group_id, member_id) VALUES (${group.id}, ${member.id})`;
+  }
+  const sent = [];
+  const api = await service(async ({ to }) => { sent.push(to); return { messageId: randomUUID() }; });
+  const overview = await api.getSurveyEmailOverview(surveyId, 1, String(group.id));
+  assert.equal(overview.selected_group_id, String(group.id));
+  assert.equal(overview.recipient_count, 2);
+  assert.equal(overview.missing_email_count, 1);
+  assert.deepEqual(overview.recipients.map(({ name, title_holder, primary_contact_email }) => (
+    { name, title_holder, primary_contact_email }
+  )), [
+    { name: 'Kari Kontakt', title_holder: 'Kari Hjemmelshaver', primary_contact_email: 'kari@example.test' },
+    { name: 'Ola Kontakt', title_holder: 'Ola Hjemmelshaver', primary_contact_email: 'ola@example.test' },
+  ]);
+  const created = await api.createSurveyEmailCampaign(surveyId, { groupId: String(group.id) });
+  assert.equal(created.campaign.group_id, String(group.id));
+  assert.equal(created.campaign.total_count, 2);
+  assert.equal((await db.sql`SELECT id FROM email_deliveries WHERE campaign_id = ${created.campaign.id}`).length, 2);
+
+  await db.sql`DELETE FROM member_email_group_members WHERE group_id = ${group.id} AND member_id = ${members[1].id}`;
+  const completed = await api.processSurveyEmailCampaign(created.campaign.id, { delayMs: 0 });
+  assert.equal(completed.status, 'completed');
+  assert.deepEqual(sent, ['kari@example.test']);
+  const [removed] = await db.sql`SELECT failure_reason FROM email_deliveries WHERE campaign_id = ${created.campaign.id} AND member_id = ${members[1].id}`;
+  assert.equal(removed.failure_reason, 'SOURCE_DATA_CHANGED');
+});
