@@ -8,6 +8,7 @@ import * as memberUtils from '../../lib/member-self-service-utils.js';
 import * as emailUtils from '../../lib/survey-email-utils.js';
 import * as securityConfig from '../../lib/security-config.js';
 import * as securityEvents from '../../lib/security-events.js';
+import * as surveyPreview from '../../lib/survey-preview.js';
 import { normalizeEmail, MailerServiceError } from '../../lib/mailer-service.js';
 import { memberTestEnvironment as env } from '../helpers/member-service.mjs';
 
@@ -20,6 +21,7 @@ async function service(sendEmail, suppressionCheck = async () => []) {
     './admin-access.js': { requirePermission: async () => ({ email: 'admin@example.test' }) },
     './member-self-service-utils.js': memberUtils, './survey-email-utils.js': emailUtils,
     './security-config.js': securityConfig, './security-events.js': securityEvents,
+    './survey-preview.js': surveyPreview,
     './survey-email-background.js': { getSurveyEmailBackgroundStatus: () => 'ready' },
     './email-templates.js': { renderSurveyInvitationEmail: () => ({ subject: 'Synthetic', text: 'No actual send', html: '' }) },
     './mailer-service.js': { getMailerSendConfig: () => ({}), getMailerSendSuppressions: suppressionCheck,
@@ -113,6 +115,7 @@ test('deadline yields before claiming a new email; testmail activity retains act
   assert.equal(result.status, 'running');
   assert.equal((await db.sql`SELECT id FROM email_deliveries WHERE campaign_id = ${f.campaignId} AND status = 'pending'`).length, 3);
   await api.sendSurveyTestEmail(f.surveyId, 'synthetic-test@example.test');
+  assert.equal((await db.sql`SELECT id FROM survey_access_tokens WHERE survey_id = ${f.surveyId}`).length, 0);
   const events = await db.sql`SELECT * FROM admin_activity_log WHERE table_name = 'email_deliveries' AND after_value->>'survey_id' = ${f.surveyId}`;
   assert.equal(events.length, 2); assert.ok(events.every((event) => event.changed_by === 'admin@example.test'));
   assert.equal(JSON.stringify(events).includes('synthetic-test@example.test'), false);

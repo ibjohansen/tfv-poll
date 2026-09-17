@@ -42,3 +42,15 @@ Object.assign(surveys.email, {
   noNewRecipients: 'All selected recipients are already registered for mailing. No new invitations were created.',
 });
 Object.assign(surveys.form, { onePerRecipient: 'One independent response per invited email address.', notCounted: 'Another recipient has already submitted the effective response for this property. Your answers do not replace it. The primary email receives a receipt summarising both submissions.' });
+Object.assign(surveys.page, {
+  previewEyebrow: 'Preview', previewTitle: 'The survey cannot be previewed',
+  previewMessage: 'This is a test preview of “{title}”. You can try the entire form without saving responses or test submissions.',
+  previewUnavailable: 'The preview link is invalid, expired, or refers to an older question version. Send a new test email from the administration portal.',
+});
+Object.assign(surveys.form, {
+  previewPrivacy: 'Preview – nothing is saved.',
+  previewPrivacyHelp: 'The button below displays the confirmation locally in your browser and does not send answers to the server.',
+  previewSubmit: 'Test submission', previewReceived: 'Test completed', previewThanks: 'This is how the confirmation looks.',
+  previewSuccess: 'This was only a preview. No response or test submission has been saved.', previewAgain: 'Try the form again',
+});
+surveys.email.testHelp = 'Sends the same email template with a preview link that remains valid for 24 hours. No personal member link is created, and selections or test submissions are not saved. Enter one or two addresses separated by commas.';

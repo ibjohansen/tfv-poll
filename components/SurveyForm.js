@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { questionOptions } from '@/lib/survey-questions';
 import { useI18n } from '@/components/LocaleProvider';
 
-export default function SurveyForm({ mockToken, mockSurveyId, questions, questionVersion, singleResponsePerProperty = true }) {
+export default function SurveyForm({ mockToken, mockSurveyId, preview = false, questions, questionVersion, singleResponsePerProperty = true }) {
   const { t } = useI18n('surveys.form');
   const router = useRouter();
   const [answers, setAnswers] = useState(() => Object.fromEntries(questions.map(({ id }) => [id, ""])));
@@ -32,6 +32,11 @@ export default function SurveyForm({ mockToken, mockSurveyId, questions, questio
 
     if (!isComplete) {
       setErrorMessage(t('incomplete', {count: questions.length}));
+      return;
+    }
+
+    if (preview) {
+      setStatus('success');
       return;
     }
 
@@ -86,9 +91,13 @@ export default function SurveyForm({ mockToken, mockSurveyId, questions, questio
         <div className="success-icon" aria-hidden="true">
           ✓
         </div>
-        <p className="eyebrow">{t('received')}</p>
-        <h2>{t('thanks')}</h2>
-        <p>{t(accepted ? 'success' : 'notCounted')}</p>
+        <p className="eyebrow">{t(preview ? 'previewReceived' : 'received')}</p>
+        <h2>{t(preview ? 'previewThanks' : 'thanks')}</h2>
+        <p>{t(preview ? 'previewSuccess' : accepted ? 'success' : 'notCounted')}</p>
+        {preview && <button className="primary-button" type="button" onClick={() => {
+          setAnswers(Object.fromEntries(questions.map(({ id }) => [id, ''])));
+          setStatus('idle');
+        }}>{t('previewAgain')}</button>}
       </section>
     );
   }
@@ -168,15 +177,15 @@ export default function SurveyForm({ mockToken, mockSurveyId, questions, questio
 
       <div className="submit-row">
         <div>
-          <p className="privacy-note">{t(singleResponsePerProperty ? 'onePerProperty' : 'onePerRecipient')}</p>
-          <p className="privacy-subnote">{t('privacy')}</p>
+          <p className="privacy-note">{t(preview ? 'previewPrivacy' : singleResponsePerProperty ? 'onePerProperty' : 'onePerRecipient')}</p>
+          <p className="privacy-subnote">{t(preview ? 'previewPrivacyHelp' : 'privacy')}</p>
         </div>
         <button
           className="primary-button"
           type="submit"
           disabled={status === "submitting"}
         >
-          {status === "submitting" ? t('submitting') : t('submit')}
+          {status === "submitting" ? t('submitting') : t(preview ? 'previewSubmit' : 'submit')}
         </button>
       </div>
     </form>

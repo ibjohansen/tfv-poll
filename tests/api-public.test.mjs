@@ -234,14 +234,15 @@ test('private CMS files require admin access and downloads have safe headers', a
   assert.doesNotMatch(await failed.text(), /secret/);
 });
 
-test('survey attachments require a matching survey session or survey administrator', async () => {
-  let secret, file = null, storageCalls = 0, fail = false;
+test('survey attachments require a matching survey session, signed preview or survey administrator', async () => {
+  let secret, preview = null, file = null, storageCalls = 0, fail = false;
   const route = await loadModule('app/api/survey/files/[id]/route.js', {
     'next/headers': { cookies: async () => ({ get: () => secret ? { value: secret } : undefined }) },
     '@/lib/membership': {
       surveySessionCookieName: () => 'survey-session',
       getSurveyAccess: async () => ({ status: 'ready', survey: { id: 'c'.repeat(32) } }),
     },
+    '@/lib/survey-preview': { verifySurveyPreviewToken: () => preview },
     '@/lib/survey-files': {
       getMemberSurveyAttachment: async (id, surveyId) => surveyId === 'c'.repeat(32) ? file : null,
       getAdminSurveyAttachment: async () => { throw new Error('Unauthorized'); },
@@ -255,6 +256,11 @@ test('survey attachments require a matching survey session or survey administrat
   const get = () => route.GET(request('/api/survey/files/id?download=1'), routeContext());
   assert.equal((await get()).status, 404);
   assert.equal(storageCalls, 0);
+  preview = { surveyId: 'c'.repeat(32) };
+  file = { storage_key: 'private-preview-key', mime_type: 'application/pdf', size_bytes: 2, original_filename: 'Forhåndsvisning.pdf' };
+  const previewResponse = await route.GET(request('/api/survey/files/id?preview=signed'), routeContext());
+  assert.equal(previewResponse.status, 200);
+  preview = null;
   secret = 'a'.repeat(64);
   file = { storage_key: 'private-survey-key', mime_type: 'application/pdf', size_bytes: 2, original_filename: 'Bakgrunn\r\nX-Injected: true.pdf' };
   const response = await get();

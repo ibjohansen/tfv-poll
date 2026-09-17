@@ -42,3 +42,15 @@ Object.assign(surveys.email, {
   noNewRecipients: 'Alle valgte mottakere er allerede registrert for utsendelse. Ingen nye invitasjoner ble opprettet.',
 });
 Object.assign(surveys.form, { onePerRecipient: 'Én selvstendig besvarelse per invitert e-postadresse.', notCounted: 'En annen mottaker har allerede sendt inn det tellende svaret for tomten. Ditt svar erstatter ikke dette. Hoved-e-post får en kvittering som oppsummerer begge innsendingene.' });
+Object.assign(surveys.page, {
+  previewEyebrow: 'Forhåndsvisning', previewTitle: 'Undersøkelsen kan ikke forhåndsvises',
+  previewMessage: 'Dette er en testvisning av «{title}». Du kan prøve hele skjemaet uten at svar eller testinnsendinger lagres.',
+  previewUnavailable: 'Forhåndsvisningslenken er ugyldig, utløpt eller gjelder en eldre versjon av spørsmålene. Send en ny testmail fra administrasjonen.',
+});
+Object.assign(surveys.form, {
+  previewPrivacy: 'Forhåndsvisning – ingenting lagres.',
+  previewPrivacyHelp: 'Knappen nedenfor viser kvitteringssiden lokalt i nettleseren og sender ingen svar til serveren.',
+  previewSubmit: 'Test innsending', previewReceived: 'Test fullført', previewThanks: 'Slik ser kvitteringen ut.',
+  previewSuccess: 'Dette var bare en forhåndsvisning. Ingen svar eller testinnsending er lagret.', previewAgain: 'Prøv skjemaet på nytt',
+});
+surveys.email.testHelp = 'Sender samme e-postmal med en forhåndsvisningslenke som er gyldig i 24 timer. Ingen personlig medlemslenke opprettes, og valg eller testinnsendinger lagres ikke. Oppgi én eller to adresser, adskilt med komma.';

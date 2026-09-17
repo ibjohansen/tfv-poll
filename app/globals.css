@@ -569,11 +569,15 @@ h2 {
   margin-bottom: 10px;
 }
 
-.success-card > p:last-child {
+.success-card > p:not(.eyebrow) {
   max-width: 560px;
   margin-bottom: 0;
   color: var(--text-soft);
   line-height: 1.6;
+}
+
+.success-card .primary-button {
+  margin-top: 20px;
 }
 
 .success-icon {

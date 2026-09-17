@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { downloadCmsObject } from '@/lib/cms-storage';
 import { getSurveyAccess, surveySessionCookieName } from '@/lib/membership';
 import { getAdminSurveyAttachment, getMemberSurveyAttachment } from '@/lib/survey-files';
+import { verifySurveyPreviewToken } from '@/lib/survey-preview';
 
 export const runtime = 'nodejs';
 
@@ -14,12 +15,15 @@ export async function GET(request, { params }) {
   try {
     const { id } = await params;
     const secret = (await cookies()).get(surveySessionCookieName())?.value;
+    const preview = verifySurveyPreviewToken(request.nextUrl.searchParams.get('preview'));
     let file = null;
-    if (secret) {
+    if (preview) {
+      file = await getMemberSurveyAttachment(id, preview.surveyId);
+    } else if (secret) {
       const access = await getSurveyAccess(secret);
       if (access.survey?.id) file = await getMemberSurveyAttachment(id, access.survey.id);
     }
-    if (!file) file = await getAdminSurveyAttachment(id).catch(() => null);
+    if (!file && !preview) file = await getAdminSurveyAttachment(id).catch(() => null);
     if (!file) return new Response('Filen finnes ikke.', { status: 404, headers: { 'Cache-Control': 'private, no-store' } });
     const object = await downloadCmsObject(file.storage_key);
     if (!object.Body) throw new Error('Missing object body');

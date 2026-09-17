@@ -7,6 +7,7 @@ import SurveyForm from "@/components/SurveyForm";
 import { surveyDocuments, surveyLinkParameters } from "@/data/survey";
 import { isMockMode } from '@/lib/mock-store';
 import { getServerI18n } from '@/lib/i18n/server';
+import { getSurveyPreview } from '@/lib/survey-preview';
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -26,14 +27,23 @@ export default async function HomePage({ searchParams }) {
   const params = await searchParams;
   const memberToken = params[surveyLinkParameters.member];
   const requestedSurveyId = params[surveyLinkParameters.survey];
+  const previewToken = typeof params.preview === 'string' ? params.preview : null;
+  const isPreview = Boolean(previewToken);
   let access;
   try {
-    const sessionSecret = (await cookies()).get(surveySessionCookieName())?.value;
-    access = isMockMode() && memberToken
-      ? await getMockSurveyAccess(memberToken, requestedSurveyId)
-      : await getSurveyAccess(sessionSecret);
+    if (isPreview) {
+      const survey = await getSurveyPreview(previewToken);
+      access = survey
+        ? { status: 'ready', survey, message: t('previewMessage', { title: survey.title }) }
+        : { status: 'unavailable', message: t('previewUnavailable') };
+    } else {
+      const sessionSecret = (await cookies()).get(surveySessionCookieName())?.value;
+      access = isMockMode() && memberToken
+        ? await getMockSurveyAccess(memberToken, requestedSurveyId)
+        : await getSurveyAccess(sessionSecret);
+    }
   } catch {
-    access = { status: "unavailable", message: t('unavailable') };
+    access = { status: "unavailable", message: t(isPreview ? 'previewUnavailable' : 'unavailable') };
   }
   const documents = [...surveyDocuments, ...(access.survey?.attachments || [])];
   return (
@@ -50,7 +60,11 @@ export default async function HomePage({ searchParams }) {
           </div>
         </header>
 
-        <MemberInfo access={access} />
+        {isPreview ? <section className={`member-section${access.status !== 'ready' ? ' member-section-error' : ''}`} aria-labelledby="preview-heading">
+          <p className="eyebrow">{t('previewEyebrow')}</p>
+          <h2 id="preview-heading">{access.survey?.title || t('previewTitle')}</h2>
+          <p className="member-message" role="status">{access.message}</p>
+        </section> : <MemberInfo access={access} />}
 
         <section className="info-section" aria-labelledby="before-you-answer">
           <div className="section-heading">
@@ -104,7 +118,7 @@ export default async function HomePage({ searchParams }) {
             <p>{t('answerHelp')}</p>
           </div>
 
-          <SurveyForm key={`${access.survey.id}:${access.survey.question_version}`} singleResponsePerProperty={access.survey.single_response_per_property !== false} questionVersion={access.survey.question_version} mockToken={isMockMode() ? memberToken : undefined} mockSurveyId={isMockMode() ? requestedSurveyId : undefined} questions={access.survey.questions} />
+          <SurveyForm key={`${access.survey.id}:${access.survey.question_version}`} preview={isPreview} singleResponsePerProperty={access.survey.single_response_per_property !== false} questionVersion={access.survey.question_version} mockToken={isMockMode() ? memberToken : undefined} mockSurveyId={isMockMode() ? requestedSurveyId : undefined} questions={access.survey.questions} />
         </section>}
 
         <footer className="page-footer">

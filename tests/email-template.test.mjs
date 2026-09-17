@@ -22,6 +22,15 @@ test('survey invitation has responsive HTML, CTA, visible URL and equivalent pla
   assert.doesNotMatch(rendered.html, /<script|fonts\.googleapis/i);
 });
 
+test('survey test email links to a non-persisting preview', () => {
+  const surveyUrl = 'https://medlemsservice.turufjellvel.no/survey?preview=signed-token';
+  const rendered = renderSurveyInvitationEmail({ surveyTitle: 'Test', endsOn: '2026-12-31', surveyUrl, baseUrl: 'https://medlemsservice.turufjellvel.no', isTest: true });
+  assert.match(rendered.html, /Forhåndsvis undersøkelsen/);
+  assert.match(rendered.html, /testinnsending lagres ikke/);
+  assert.match(rendered.text, /forhåndsvisning/i);
+  assert.match(rendered.text, /preview=signed-token/);
+});
+
 test('member access and membership verification emails contain a visible 15-minute secret link', () => {
   const actionUrl = `https://medlemsservice.turufjellvel.no/api/member-access/verify?token=${'a'.repeat(64)}`;
   for (const rendered of [
