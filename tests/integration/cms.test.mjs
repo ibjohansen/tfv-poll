@@ -44,8 +44,14 @@ test('real audit triggers redact verification hashes and private storage keys on
   await db.sql`INSERT INTO cms_attachments (id, page_id, kind, title, original_filename, storage_key, mime_type, size_bytes, last_changed_by)
     VALUES (${fileId}, ${page.id}, 'attachment', 'Syntetisk', 'test.pdf', ${`private-fixture/${randomUUID()}`}, 'application/pdf', 42, 'editor@example.test')`;
   await db.sql`UPDATE cms_attachments SET storage_key = ${`private-fixture/${randomUUID()}`}, title = 'Rettet', last_changed_by = 'editor@example.test' WHERE id = ${fileId}`;
-  const events = await db.sql`SELECT before_value, after_value FROM audit_log WHERE row_id IN (${id}, ${fileId})`;
-  assert.equal(events.length, 3, 'a hash-only change is intentionally not an audit event');
+  const surveyId = randomUUID().replaceAll('-', '');
+  await db.sql`INSERT INTO surveys (id, title, ends_on) VALUES (${surveyId}, 'Syntetisk undersøkelse', '2099-12-31')`;
+  const surveyFileId = randomUUID().replaceAll('-', '');
+  await db.sql`INSERT INTO survey_attachments (id, survey_id, title, original_filename, storage_key, mime_type, size_bytes, last_changed_by)
+    VALUES (${surveyFileId}, ${surveyId}, 'Bakgrunn', 'bakgrunn.pdf', ${`private-survey-fixture/${randomUUID()}`}, 'application/pdf', 42, 'editor@example.test')`;
+  await db.sql`UPDATE survey_attachments SET storage_key = ${`private-survey-fixture/${randomUUID()}`}, title = 'Rettet bakgrunn', last_changed_by = 'editor@example.test' WHERE id = ${surveyFileId}`;
+  const events = await db.sql`SELECT before_value, after_value FROM audit_log WHERE row_id IN (${id}, ${fileId}, ${surveyFileId})`;
+  assert.equal(events.length, 5, 'a hash-only change is intentionally not an audit event');
   for (const event of events) for (const value of [event.before_value, event.after_value].filter(Boolean)) {
     assert.equal(Object.hasOwn(value, 'verification_token_hash'), false); assert.equal(Object.hasOwn(value, 'storage_key'), false);
   }

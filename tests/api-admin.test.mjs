@@ -22,6 +22,9 @@ const cases = [
   ['surveys/[id]/email', 'GET', 'survey-email', 'getSurveyEmailOverview', 200, { unauthorized: 403 }],
   ['surveys/[id]/email', 'POST', 'survey-email', 'sendSurveyTestEmail', 200, { body: { action: 'test', recipient: 'test@example.test' }, unauthorized: 403 }],
   ['surveys/[id]/email', 'POST', 'survey-email', 'createSurveyEmailCampaign', 201, { body: { action: 'send', groupId: '71' }, unauthorized: 403 }],
+  ['surveys/[id]/attachments', 'POST', 'survey-files', 'uploadAdminSurveyAttachment', 201, { file: true }],
+  ['surveys/[id]/attachments/[attachmentId]', 'PATCH', 'survey-files', 'updateAdminSurveyAttachment', 200],
+  ['surveys/[id]/attachments/[attachmentId]', 'DELETE', 'survey-files', 'deleteAdminSurveyAttachment', 200],
   ['cms/pages', 'GET', 'cms-pages', 'getAdminCmsPages', 200],
   ['cms/pages', 'POST', 'cms-pages', 'createAdminCmsPage', 201],
   ['cms/pages/[id]', 'GET', 'cms-pages', 'getAdminCmsPage', 200],
@@ -49,6 +52,7 @@ const exportsByModule = {
   'admin-surveys': ['getAdminSurveys', 'createAdminSurvey', 'updateAdminSurvey', 'deleteAdminSurvey'],
   'admin-survey-results': ['getAdminSurveyResults', 'createAdminSurveyResultsExport'],
   'survey-email': ['getSurveyEmailOverview', 'sendSurveyTestEmail', 'createSurveyEmailCampaign', 'failPendingSurveyEmailCampaign'],
+  'survey-files': ['uploadAdminSurveyAttachment', 'updateAdminSurveyAttachment', 'deleteAdminSurveyAttachment'],
   'cms-pages': ['getAdminCmsPages', 'createAdminCmsPage', 'getAdminCmsPage', 'updateAdminCmsPage', 'deleteAdminCmsPage', 'setAdminCmsPageStatus'],
   'cms-files': ['uploadAdminCmsFile', 'deleteAdminCmsFile', 'reorderAdminCmsAttachments', 'updateAdminCmsAttachment'],
   'matrikkel-sync': ['getMatrikkelRuns', 'getMatrikkelRun', 'getMatrikkelMemberOptions', 'createMatrikkelRun', 'failPendingMatrikkelRun', 'deleteMatrikkelRunLog', 'cancelMatrikkelRun', 'processMatrikkelRun', 'approveMatrikkelItem'],
@@ -94,7 +98,7 @@ for (const [path, method, module, operation, status, options = {}] of cases) {
     if (options.binary) {
       assert.match(response.headers.get('content-disposition'), /attachment;.*\.xlsx/);
       assert.equal(await response.text(), 'test workbook');
-    } else if (!['deleteAdminMember', 'deleteAdminSurvey', 'deleteAdminCmsPage', 'deleteAdminCmsFile', 'reorderAdminCmsAttachments'].includes(operation)) {
+    } else if (!['deleteAdminMember', 'deleteAdminSurvey', 'deleteAdminSurveyAttachment', 'deleteAdminCmsPage', 'deleteAdminCmsFile', 'reorderAdminCmsAttachments'].includes(operation)) {
       assert.match(await response.text(), /synthetic-result/);
     }
     if (path.includes('[id]')) assert.equal(calls.at(-1).args[0], 'a'.repeat(32));
@@ -139,8 +143,8 @@ test('admin write handlers with origin protection reject cross-site requests bef
   }
 });
 
-test('CMS upload size limits reject before reading form or uploading', async () => {
-  for (const path of ['cms/pages/[id]/image', 'cms/pages/[id]/attachments']) {
+test('file upload size limits reject before reading form or uploading', async () => {
+  for (const path of ['cms/pages/[id]/image', 'cms/pages/[id]/attachments', 'surveys/[id]/attachments']) {
     const { route, calls } = await setup(path);
     const response = await route.POST(request('/api/admin/upload', { method: 'POST', headers: { 'content-length': String(22 * 1024 * 1024) } }), routeContext());
     assert.equal(response.status, 413);
@@ -187,6 +191,8 @@ test('validation, missing entities and conflicts keep their HTTP semantics', asy
     ['members/[id]', 'PATCH', 'Member not found', 404],
     ['surveys/[id]', 'PATCH', 'Invalid survey', 400],
     ['surveys/[id]', 'DELETE', 'Survey not found', 404],
+    ['surveys/[id]/attachments', 'POST', 'Too many survey attachments', 409, { file: true }],
+    ['surveys/[id]/attachments/[attachmentId]', 'PATCH', 'Attachment not found', 404],
     ['cms/pages/[id]', 'PATCH', 'Invalid page', 400],
     ['cms/pages/[id]', 'PATCH', 'Page not found', 404],
     ['cms/pages/[id]/attachments', 'POST', 'Too many attachments', 409, { file: true }],

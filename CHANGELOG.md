@@ -2,6 +2,9 @@
 
 ## Ikke publisert
 
+- Private undersøkelsesvedlegg kan lastes opp, navngis og fjernes direkte i
+  administrasjonen, og er bare tilgjengelige med riktig surveyøkt eller
+  administratorrettighet.
 - Tilgjengelig bildekarusell på forsiden med automatisk mappeoppdagelse,
   fotografkreditering, pause ved hover/fokus og navigasjon med piler, tastatur og
   bildeindikatorer.

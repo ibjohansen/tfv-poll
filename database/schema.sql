@@ -260,6 +260,25 @@ CREATE UNIQUE INDEX IF NOT EXISTS cms_attachments_active_image_idx
 CREATE INDEX IF NOT EXISTS cms_attachments_page_order_idx
   ON cms_attachments (page_id, kind, sort_order, created_at) WHERE deleted_at IS NULL;
 
+-- Vedlegg til en undersøkelse lagres privat i Object Storage. Databasen
+-- inneholder bare metadata og den interne objekt-nøkkelen.
+CREATE TABLE IF NOT EXISTS survey_attachments (
+  id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
+  survey_id TEXT NOT NULL REFERENCES surveys(id) ON DELETE RESTRICT,
+  title TEXT NOT NULL CHECK (char_length(title) BETWEEN 1 AND 200),
+  original_filename TEXT NOT NULL CHECK (char_length(original_filename) BETWEEN 1 AND 255),
+  storage_key TEXT NOT NULL UNIQUE,
+  mime_type TEXT NOT NULL CHECK (char_length(mime_type) <= 150),
+  size_bytes BIGINT NOT NULL CHECK (size_bytes > 0 AND size_bytes <= 20971520),
+  sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ,
+  last_changed_by TEXT
+);
+CREATE INDEX IF NOT EXISTS survey_attachments_survey_order_idx
+  ON survey_attachments (survey_id, sort_order, created_at) WHERE deleted_at IS NULL;
+
 -- E-postkampanjer og leveringsstatus. E-postinnhold og personlige survey-lenker
 -- lagres ikke. Medlemsregisteret er fortsatt autoritativ kilde for adresser.
 CREATE TABLE IF NOT EXISTS email_campaigns (
@@ -660,6 +679,7 @@ ALTER TABLE surveys ADD COLUMN IF NOT EXISTS last_changed_by TEXT;
 ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS last_changed_by TEXT;
 ALTER TABLE cms_pages ADD COLUMN IF NOT EXISTS last_changed_by TEXT;
 ALTER TABLE cms_attachments ADD COLUMN IF NOT EXISTS last_changed_by TEXT;
+ALTER TABLE survey_attachments ADD COLUMN IF NOT EXISTS last_changed_by TEXT;
 
 CREATE TABLE IF NOT EXISTS audit_log (
   id BIGSERIAL PRIMARY KEY,
@@ -748,7 +768,7 @@ BEGIN
   ELSIF TG_TABLE_NAME = 'member_requests' THEN
     old_data := old_data - 'verification_token_hash';
     new_data := new_data - 'verification_token_hash';
-  ELSIF TG_TABLE_NAME = 'cms_attachments' THEN
+  ELSIF TG_TABLE_NAME IN ('cms_attachments', 'survey_attachments') THEN
     old_data := old_data - 'storage_key';
     new_data := new_data - 'storage_key';
   END IF;
@@ -836,6 +856,15 @@ FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
 DROP TRIGGER IF EXISTS survey_responses_audit_trigger ON survey_responses;
 CREATE TRIGGER survey_responses_audit_trigger
 AFTER INSERT OR UPDATE OR DELETE ON survey_responses
+FOR EACH ROW EXECUTE FUNCTION record_audit_change();
+
+DROP TRIGGER IF EXISTS survey_attachments_audit_context_trigger ON survey_attachments;
+CREATE TRIGGER survey_attachments_audit_context_trigger
+BEFORE INSERT OR UPDATE OR DELETE ON survey_attachments
+FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
+DROP TRIGGER IF EXISTS survey_attachments_audit_trigger ON survey_attachments;
+CREATE TRIGGER survey_attachments_audit_trigger
+AFTER INSERT OR UPDATE OR DELETE ON survey_attachments
 FOR EACH ROW EXECUTE FUNCTION record_audit_change();
 
 DROP TRIGGER IF EXISTS cms_pages_audit_context_trigger ON cms_pages;

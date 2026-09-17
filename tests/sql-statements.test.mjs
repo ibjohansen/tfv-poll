@@ -28,8 +28,8 @@ test('production schema contains complete audit triggers without sensitive value
   const contextTriggers = statements.filter((statement) => /CREATE TRIGGER \w+_audit_context_trigger/.test(statement));
 
   assert.ok(auditFunction);
-  assert.equal(auditTriggers.length, 7);
-  assert.equal(contextTriggers.length, 7);
+  assert.equal(auditTriggers.length, 8);
+  assert.equal(contextTriggers.length, 8);
   assert.match(auditFunction, /old_data := old_data - 'access_token'/);
   assert.match(auditFunction, /old_data := old_data - 'verification_token_hash'/);
   assert.match(auditFunction, /old_data := old_data - 'storage_key'/);
@@ -43,5 +43,7 @@ test('production schema contains complete audit triggers without sensitive value
   assert.match(schema, /member_access_tokens[\s\S]*consumed_at/);
   assert.match(schema, /turufjell_as_sharing_opt_out BOOLEAN NOT NULL DEFAULT FALSE/);
   assert.match(schema, /turufjell_as_sharing_opt_out_updated_at TIMESTAMPTZ/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS survey_attachments/);
+  assert.match(schema, /survey_attachments_audit_trigger/);
   assert.match(schema, /security_events_append_only_trigger/);
 });

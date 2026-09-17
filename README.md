@@ -90,7 +90,9 @@ Sertifikatkontrollen skal ikke deaktiveres.
 - De seks sist publiserte informasjonssidene vises automatisk på `/`.
 - Undersøkelsen ligger på `/survey`; invitasjonens engangskode utveksles via
   `/api/survey-access/verify` og fjernes straks fra adresselinjen.
-- Svar sendes til `/survey/api/responses`, og dokumenter ligger under `/survey/dokumenter/`.
+- Svar sendes til `/survey/api/responses`. Vedlegg som lastes opp på undersøkelsen
+  i admin, leveres tilgangskontrollert fra privat Object Storage. Eldre statiske
+  dokumenter kan fortsatt ligge under `/survey/dokumenter/`.
   Skjemaet sender vist `questionVersion`; endret spørsmålsversjon avvises med
   konflikt før lagring, og medlemmet må laste inn spørsmålene på nytt.
 - Andre sider og API-er krever autorisert innlogging som standard, også nye ruter.
@@ -143,7 +145,7 @@ flowchart TB
   auth["Auth.js\nMicrosoft Entra ID-integrasjon"]
   db[("Neon Postgres\nmembers · member_requests · surveys · responses · CMS")]
   storage[("Privat Neon Object Storage\ncms-assets")]
-  files["Statiske dokumenter\npublic/survey/dokumenter"]
+  files["Eldre statiske dokumenter\npublic/survey/dokumenter"]
   matrikkel["Kartverket\nAdresse-API, A5 og Matrikkel SOAP-API"]
   norgeskart["Kartverket Norgeskart\ninnbygd eiendomskart"]
   geodata["Kartverket / Geonorge / Overpass\nadresser, teiger, veier og stier"]
@@ -182,6 +184,7 @@ gang til.
 | --- | --- |
 | `app/survey/page.js` og `lib/membership.js` | Validerer den personlige lenken og henter kun medlemmet og undersøkelsen lenken gjelder. |
 | `app/survey/api/responses/route.js` | Validerer svar, lenke, origin og rategrense før svaret lagres. |
+| `app/api/survey/files/*` og `lib/survey-files.js` | Leverer undersøkelsesvedlegg fra privat lagring bare til riktig surveyøkt eller administrator. |
 | `app/admin/*` og `app/api/admin/*` | Viser og endrer medlemmer/undersøkelser etter Microsoft-innlogging. |
 | `app/api/member-access/*` og `lib/member-self-service.js` | Matcher medlem server-side, sender tidsbegrenset tilgangslenke, validerer den hash-lagrede hemmeligheten og tillater bare retting av kontaktfeltene. |
 | `app/api/membership-requests/*` | Tar imot ny innmelding, verifiserer oppgitt e-post og legger forespørselen i administrativ behandlingskø. |
@@ -301,7 +304,7 @@ sequenceDiagram
   B->>N: Lagrer utkast
   N->>N: Validerer tittel, slug, kategori og tekstlengder
   N->>D: Oppretter eller oppdaterer cms_pages
-  opt Bilde eller vedlegg
+  opt Bilde eller CMS-vedlegg
     B->>N: Laster opp fil
     N->>N: Kontrollerer størrelse, filtype og filsignatur
     N->>S: Lagrer fil med tilfeldig lagringsnøkkel
@@ -433,15 +436,35 @@ krever adminøkt. Sider og filmetadata mykslettes med `deleted_at`; vanlige
 spørringer henter dem aldri. Binærfilen beholdes i lagringsbøtten når redaktøren
 sletter den, slik at slettingen er reverserbar på datanivå.
 
-## Dokumenter
+## Undersøkelsesvedlegg
 
-Legg PDF-er eller andre filer i:
+For nye undersøkelser åpner administratoren undersøkelsen under
+`/admin/surveys` og bruker **Vedlegg** i innstillingsfanen. Flere filer kan
+velges samtidig. PDF, Office-dokumenter, ZIP og vanlige bildeformater støttes,
+med en grense på 20 MB per fil og 20 aktive vedlegg per undersøkelse.
+
+Binærfilene lagres i den private Object Storage-bøtten `cms-assets`, mens
+`survey_attachments` bare lagrer metadata og en intern lagringsnøkkel. En
+mottaker får kun laste ned vedlegg for undersøkelsen den aktive surveyøkten
+gjelder. Administrator kan åpne, endre visningsnavn og mykslette vedlegg.
+Lagringsnøkler og filinnhold tas ikke med i brukerloggen.
+
+Databasemigreringen og applikasjonsversjonen ble publisert i produksjon
+17. september 2026. Deploy `6aabcf7534ce877445bd1bb3` bestod lokale kontroller
+og offentlige røykprøver. Før funksjonen tas i ordinær bruk skal en innlogget
+administrator fortsatt laste opp og fjerne en ufarlig testfil og kontrollere
+nedlasting både med riktig surveyøkt og uten tilgang, som beskrevet i
+verifikasjonssjekklisten nedenfor.
+
+Den tidligere statiske løsningen beholdes for bakoverkompatibilitet. Eldre
+PDF-er eller andre filer kan ligge i:
 
 ```text
 public/survey/dokumenter/
 ```
 
-Registrer dem deretter i `data/survey.js` i arrayet `surveyDocuments`.
+Registrer dem i `data/survey.js` i arrayet `surveyDocuments`. Nye dokumenter bør
+lastes opp direkte på den aktuelle undersøkelsen i admin i stedet.
 
 Eksempel:
 
@@ -784,11 +807,13 @@ Kontroller etterpå at forventede kolonner, tabeller, indekser og triggere finne
 og at eksisterende data er beholdt. Bruk radantall og kontrollsummer uten å
 skrive medlemsopplysninger til logger eller eksportfiler. Se
 [migreringsstatus 15. september 2026](docs/database-migration-2026-09-15.md) og
-[migreringsstatus 16. september 2026](docs/database-migration-2026-09-16.md)
+[migreringsstatus 16. september 2026](docs/database-migration-2026-09-16.md), samt
+[migreringsstatus 17. september 2026](docs/database-migration-2026-09-17.md)
 for utført testing, bekreftede produksjonsmigreringer og gjenopprettingspunkter.
 
 Skjemaet oppretter også `audit_log` og triggere på `members`, `member_requests`,
-`surveys`, `survey_responses`, `cms_pages` og `cms_attachments`. Loggen starter
+`surveys`, `survey_responses`, `survey_attachments`, `cms_pages` og
+`cms_attachments`. Loggen starter
 når migreringen kjøres; den rekonstruerer ikke historikk fra tidligere
 endringer. Tilgangstoken, verifiseringshash og interne lagringsnøkler utelates.
 
@@ -809,8 +834,8 @@ Visx-graf med dag-, uke- eller månedsoppløsning, datatabell, tillatt sidetype 
 grov enhetskategori. Den viser ikke «unike besøk», sesjoner eller varighet,
 fordi slike tall ville krevd en varig identifikator og kunne blitt misvisende.
 Ingen ny miljøvariabel er nødvendig. Migreringen ble kjørt og verifisert i
-produksjon 16. september 2026. Den nye applikasjonsversjonen er ikke deployet
-som del av migreringen, så produksjonsinnsamlingen er ennå ikke aktivert.
+produksjon 16. september 2026. Applikasjonsversjonen ble publisert
+17. september 2026, og produksjonsinnsamlingen er dermed aktivert.
 
 Før publisering av worker-gjenopptaking må den additive migreringen kjøres:
 den legger til manglende reservasjon-/forsøkskolonner på eksisterende
@@ -1125,6 +1150,11 @@ Utfør kontrollene i denne rekkefølgen:
   ned en Excel-eksport. Eksporter også et utvalg av testmedlemmer. Kontroller at
   begge eksporter vises i brukerloggen med riktig administrator og antall poster,
   uten eksportinnhold eller personlige lenker i logghendelsen.
+- Åpne innstillingene for en syntetisk testundersøkelse, last opp et lite
+  PDF-vedlegg og endre visningsnavnet. Kontroller at vedlegget kan åpnes med en
+  personlig testlenke til akkurat denne undersøkelsen, men ikke med en økt for en
+  annen undersøkelse eller uten gyldig tilgang. Fjern testvedlegget etterpå og
+  kontroller at lagringsnøkkelen ikke vises i brukerloggen.
 - I isolert testmiljø: åpne survey, endre spørsmålstekst i admin og send fra det
   gamle skjemaet. Kontroller 409 uten lagret svar, ny lasting med tomme svar og
   riktig versjon/tekst i snapshot etter ny innsending. Gamle åpne skjemaer uten
@@ -1271,6 +1301,13 @@ besvarelse beholder også et snapshot av spørsmålstekstene som var aktive ved
 innsending. Eldre svar får beste tilgjengelige snapshot ved migreringen, siden
 tidligere spørsmålstekster ikke kan rekonstrueres. Tillatte svar er `ja`, `nei`
 og `usikker`.
+
+Administrator kan laste opp vedlegg direkte på en lagret undersøkelse.
+`survey_attachments` knytter metadata til undersøkelsen, mens filen ligger i
+privat Object Storage. Vedleggene vises bare når mottakeren har en gyldig økt
+for samme undersøkelse. Produksjonsmigreringen ble utført og verifisert
+17. september 2026. Kjør `npm run db:setup` med direkte databaseforbindelse før
+funksjonen tas i bruk i andre miljøer som mangler tabellen.
 
 Klikk på en undersøkelse i `/admin/surveys` og velg fanen **Resultater** for å
 se svarfordeling per spørsmål som kakediagram, antall og prosent. Dersom

@@ -7,5 +7,14 @@ const surveys = {
 };
 
 surveys.admin.questionVersionLabel = 'Question version';
+Object.assign(surveys.admin, {
+  attachments: 'Attachments', attachmentsHelp: 'Upload background documents that are available only to administrators and recipients of this survey.',
+  addAttachments: 'Add attachments', addAttachmentsHelp: 'Upload one or more documents to the survey.', uploadingAttachments: 'Uploading …',
+  attachmentUploadError: 'Could not upload {name}.', attachmentUploadedOne: '{count} attachment was uploaded.', attachmentUploadedMany: '{count} attachments were uploaded.', attachmentPartialUpload: '{count} attachments were uploaded before the error: ',
+  attachmentDisplayName: 'Display name', attachmentRenameError: 'Could not save the display name.', attachmentNameSaved: 'The display name was saved.',
+  openAttachment: 'Open', openAttachmentHelp: 'Open the attachment in a new tab.', saveAttachmentName: 'Save name', saveAttachmentNameHelp: 'Save the attachment display name.',
+  removeAttachment: 'Remove', removeAttachmentHelp: 'Remove the attachment from the survey.', attachmentRemoveError: 'Could not remove the attachment.', attachmentRemoved: 'The attachment was removed.',
+  removeAttachmentTitle: 'Remove the attachment “{title}”?', removeAttachmentDescription: 'The attachment will no longer be available to recipients.', noAttachments: 'No attachments have been uploaded.', file: 'File',
+});
 
 export default surveys;

@@ -1,12 +1,13 @@
 # ToDo
 
-Gjennomgått 14.–16. september 2026. Kvalitetsarbeidet nedenfor er implementert lokalt;
+Gjennomgått 14.–17. september 2026. Kvalitetsarbeidet nedenfor er implementert lokalt;
 ingen produksjonsdeploy, GitHub-push eller Entra-endring er kjørt.
 Databasemigreringene er testet på en isolert Neon-schema-only-gren og deretter
 kjørt i produksjon etter eksplisitt godkjenning. Gjenopprettingspunkter er
 opprettet, og eksisterende data er verifisert bevart; se migreringsstatus for
 [15. september](docs/database-migration-2026-09-15.md) og
-[16. september](docs/database-migration-2026-09-16.md).
+[16. september](docs/database-migration-2026-09-16.md), samt migreringen for
+[undersøkelsesvedlegg 17. september](docs/database-migration-2026-09-17.md).
 Se [kvalitetsgjennomgangen](docs/quality-review.md) for funn, testdekning,
 vurdering av brukerloggen og begrensninger. Uferdige produktoppgaver beholdes.
 
@@ -988,3 +989,21 @@ Eventuelle funn fra sikkerhetsgjennomgangen legges inn som egne P1- eller P2-sak
   Valget lagres på kampanjen, og mottakerlisten viser kontaktperson,
   hjemmelshaver og hoved-e-post før bekreftelse. Medlemsstatus,
   gruppetilknytning og hoved-e-post kontrolleres på nytt rett før sending.
+- [x] Administrator kan laste opp, navngi, åpne og fjerne private vedlegg direkte
+  på en lagret undersøkelse. Vedleggene er knyttet til undersøkelsen og kan bare
+  lastes ned med riktig surveyøkt eller administratorrettighet. Filtype,
+  filsignatur, størrelse og antall valideres server-side; metadata og audit
+  lagres i databasen, mens selve filen ligger i privat Object Storage.
+- [x] Additiv `survey_attachments`-migrering kjørt og verifisert i produksjon
+  17. september 2026 etter schema-only-test og nytt gjenopprettingspunkt; se
+  [migreringsstatus](docs/database-migration-2026-09-17.md).
+- [x] Lokalt produksjonsbygg og full `npm run check` bestod med 292 tester.
+- [x] Netlify-produksjonsdeploy `6aabcf7534ce877445bd1bb3` ble publisert
+  17. september 2026 med seks tilgjengelige funksjoner. Offentlige røykprøver
+  bekrefter 200 for forsiden og undersøkelsen, innloggingsvern for admin, privat
+  `no-store` på vedleggsnedlasting og 401 på uautentisert opplasting.
+- [ ] Utfør innlogget produksjonstest med en ufarlig testfil: last opp, endre
+  navn, åpne med riktig surveyøkt, avvis annen/ingen surveyøkt, og fjern filen.
+- [ ] Commit og push de godkjente kildekodeendringene. Den manuelle Netlify-
+  deployen er publisert, men en senere Git-basert deploy må bygges fra samme
+  commit for at produksjon og `main` fortsatt skal samsvare.

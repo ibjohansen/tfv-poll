@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import SurveyEmailPanel from '@/components/SurveyEmailPanel';
+import SurveyAttachments from '@/components/SurveyAttachments';
 import { useI18n } from '@/components/LocaleProvider';
 
 const blankQuestion = (number) => ({ id: `q${number}`, number, text: '' });
@@ -309,6 +310,8 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
                     </div>
                   ))}
                 </section>
+                {!selected.isNew && <SurveyAttachments key={selected.id} surveyId={selected.id} attachments={selected.attachments || []}
+                  disabled={selected.mock} onChange={(attachments) => setSelected((current) => ({ ...current, attachments }))} />}
                 {!selected.isNew && <dl className="admin-meta"><div><dt>{t('surveyId')}</dt><dd>{selected.id}</dd></div><div><dt>{t('responses')}</dt><dd>{selected.response_count}</dd></div><div><dt>{t('questionVersionLabel')}</dt><dd>{selected.question_version}</dd></div></dl>}
                 {message && <p className={saveState === 'error' ? 'form-error' : 'admin-success'} role="status">{message}</p>}
                 <button className="primary-button" type="submit" disabled={saving || selected.mock}>{saving ? t('saving') : selected.isNew ? t('create') : t('saveChanges')}</button>

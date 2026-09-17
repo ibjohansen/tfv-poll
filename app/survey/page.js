@@ -35,6 +35,7 @@ export default async function HomePage({ searchParams }) {
   } catch {
     access = { status: "unavailable", message: t('unavailable') };
   }
+  const documents = [...surveyDocuments, ...(access.survey?.attachments || [])];
   return (
     <main>
       <div className="page-shell">
@@ -60,24 +61,24 @@ export default async function HomePage({ searchParams }) {
             <p>{t('documentHelp')}</p>
           </div>
 
-          {surveyDocuments.length > 0 ? (
+          {documents.length > 0 ? (
             <div className="document-list">
-              {surveyDocuments.map((document) => (
+              {documents.map((document) => (
                 <a
                   className="document-card"
-                  href={document.href}
+                  href={document.href || document.url}
                   target="_blank"
                   rel="noreferrer"
-                  key={document.href}
+                  key={document.href || document.id}
                 >
                   <span className="document-icon">
                     <DocumentIcon />
                   </span>
                   <span className="document-copy">
                     <strong>{document.title}</strong>
-                    <span>{document.description}</span>
+                    <span>{document.description || document.original_filename}</span>
                   </span>
-                  <span className="document-meta">{document.meta}</span>
+                  <span className="document-meta">{document.meta || document.original_filename?.split('.').pop()?.toUpperCase()}</span>
                 </a>
               ))}
             </div>

@@ -226,6 +226,40 @@ test('private CMS files require admin access and downloads have safe headers', a
   assert.doesNotMatch(await failed.text(), /secret/);
 });
 
+test('survey attachments require a matching survey session or survey administrator', async () => {
+  let secret, file = null, storageCalls = 0, fail = false;
+  const route = await loadModule('app/api/survey/files/[id]/route.js', {
+    'next/headers': { cookies: async () => ({ get: () => secret ? { value: secret } : undefined }) },
+    '@/lib/membership': {
+      surveySessionCookieName: () => 'survey-session',
+      getSurveyAccess: async () => ({ status: 'ready', survey: { id: 'c'.repeat(32) } }),
+    },
+    '@/lib/survey-files': {
+      getMemberSurveyAttachment: async (id, surveyId) => surveyId === 'c'.repeat(32) ? file : null,
+      getAdminSurveyAttachment: async () => { throw new Error('Unauthorized'); },
+    },
+    '@/lib/cms-storage': { downloadCmsObject: async () => {
+      storageCalls++;
+      if (fail) throw new Error('secret storage key');
+      return { Body: { transformToByteArray: async () => new Uint8Array([1, 2]) } };
+    } },
+  });
+  const get = () => route.GET(request('/api/survey/files/id?download=1'), routeContext());
+  assert.equal((await get()).status, 404);
+  assert.equal(storageCalls, 0);
+  secret = 'a'.repeat(64);
+  file = { storage_key: 'private-survey-key', mime_type: 'application/pdf', size_bytes: 2, original_filename: 'Bakgrunn\r\nX-Injected: true.pdf' };
+  const response = await get();
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('cache-control'), /private, no-store/);
+  assert.equal(response.headers.get('x-injected'), null);
+  assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+  fail = true;
+  const failed = await get();
+  assert.equal(failed.status, 503);
+  assert.doesNotMatch(await failed.text(), /secret/);
+});
+
 test('webhook verifies real signatures, rejects oversized/malformed payloads and retries failed persistence', async () => {
   let writes = 0, fail = false;
   const signingSecret = 'synthetic-signing-secret';

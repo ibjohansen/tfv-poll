@@ -7,5 +7,14 @@ const surveys = {
 };
 
 surveys.admin.questionVersionLabel = 'Spørsmålsversjon';
+Object.assign(surveys.admin, {
+  attachments: 'Vedlegg', attachmentsHelp: 'Last opp bakgrunnsdokumenter som bare er tilgjengelige for administratorer og mottakere av denne undersøkelsen.',
+  addAttachments: 'Legg til vedlegg', addAttachmentsHelp: 'Last opp ett eller flere dokumenter til undersøkelsen.', uploadingAttachments: 'Laster opp …',
+  attachmentUploadError: 'Kunne ikke laste opp {name}.', attachmentUploadedOne: '{count} vedlegg er lastet opp.', attachmentUploadedMany: '{count} vedlegg er lastet opp.', attachmentPartialUpload: '{count} vedlegg ble lastet opp før feilen: ',
+  attachmentDisplayName: 'Visningsnavn', attachmentRenameError: 'Kunne ikke lagre visningsnavnet.', attachmentNameSaved: 'Visningsnavnet er lagret.',
+  openAttachment: 'Åpne', openAttachmentHelp: 'Åpne vedlegget i en ny fane.', saveAttachmentName: 'Lagre navn', saveAttachmentNameHelp: 'Lagre visningsnavnet for vedlegget.',
+  removeAttachment: 'Fjern', removeAttachmentHelp: 'Fjern vedlegget fra undersøkelsen.', attachmentRemoveError: 'Kunne ikke fjerne vedlegget.', attachmentRemoved: 'Vedlegget er fjernet.',
+  removeAttachmentTitle: 'Fjerne vedlegget «{title}»?', removeAttachmentDescription: 'Vedlegget blir ikke lenger tilgjengelig for mottakerne.', noAttachments: 'Ingen vedlegg er lastet opp.', file: 'Fil',
+});
 
 export default surveys;
