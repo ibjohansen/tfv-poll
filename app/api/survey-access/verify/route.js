@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { exchangeSurveyAccessToken, surveySessionCookieName, surveySessionCookieOptions } from '@/lib/membership';
+import { getApplicationOrigin } from '@/lib/request-origin';
 
 export const runtime = 'nodejs';
 
 export async function GET(request) {
-  const destination = new URL('/survey', request.nextUrl.origin);
+  const destination = new URL('/survey', getApplicationOrigin(request));
   let session = null;
   try { session = await exchangeSurveyAccessToken(request.nextUrl.searchParams.get('token')); }
   catch (error) {

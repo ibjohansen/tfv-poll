@@ -1,5 +1,17 @@
 # Endringslogg
 
+## Ikke publisert
+
+- Bekreftelseslenker for undersøkelser, medlemsinnsyn, e-postendring og
+  medlemsregistrering omdirigerer til det konfigurerte hoveddomenet. Dette
+  hindrer at Netlifys interne deploydomene skiller den sikre sesjonscookien fra
+  målsiden og feilaktig viser lenken som utløpt.
+- Språk velges bare manuelt av brukeren og lagres i cookie; nettleserens
+  `Accept-Language` påvirker ikke lenger grensesnittet.
+- De seks mottakerne i e-postgruppen «Styret 2026» har fått gjenopprettet
+  grendekoblingene sine i produksjonsregisteret. Endringen er revisjonslogget,
+  og det ble tatt et tidsbegrenset Neon-gjenopprettingspunkt først.
+
 ## Publisert 17. september 2026 – svaralternativer og mottakere
 
 - Migrering og 57 databaseintegrasjonstester verifisert på godkjent, midlertidig

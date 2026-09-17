@@ -9,7 +9,7 @@ import * as webhookUtils from '../lib/mailersend-webhook.js';
 
 const secret = 'a'.repeat(64);
 const methods = ['requestMemberAccess', 'verifyMemberAccess', 'verifyMemberEmailChange', 'createMembershipRequest', 'verifyMembershipRequest', 'getMemberSelfServiceProfile', 'getMemberSelfServiceExport', 'updateMemberSelfServiceProfile', 'requestMemberEmailChange', 'createOwnershipTransferRequest', 'revokeMemberSession'];
-async function memberRoute(path) {
+async function memberRoute(path, options = {}) {
   const state = { result: null, error: null, limited: false, sharedLimited: false, cookie: secret };
   const calls = [], callbacks = [];
   const route = await loadModule(`app/api/${path}/route.js`, {
@@ -26,6 +26,9 @@ async function memberRoute(path) {
     '@/lib/shared-rate-limit': {
       PUBLIC_BROWSER_COOKIE: 'public-browser', getPublicBrowserMarker: () => ({ value: 'synthetic-marker', created: true }),
       consumeMemberAccessLimits: async () => { if (state.sharedError) throw state.sharedError; return state.sharedLimited; },
+    },
+    '@/lib/request-origin': {
+      getApplicationOrigin: requestValue => options.applicationOrigin || new URL(requestValue.url).origin,
     },
   });
   return { route, state, calls, callbacks };
@@ -63,11 +66,13 @@ test('request origin, local/shared throttling and unavailable rate store prevent
 });
 
 test('access verification exchanges token for cookie, strips token and clears stale cookies on failure', async () => {
-  const { route, state, calls } = await memberRoute('member-access/verify');
+  const { route, state, calls } = await memberRoute('member-access/verify', {
+    applicationOrigin: 'https://medlemsservice.turufjellvel.no',
+  });
   state.result = { secret: 'b'.repeat(64), expires_at: new Date(Date.now() + 60000).toISOString() };
-  const response = await route.GET(request(`/api/member-access/verify?token=${secret}`));
+  const response = await route.GET(request(`https://internal-deploy.example/api/member-access/verify?token=${secret}`));
   assert.equal(response.status, 303);
-  assert.equal(response.headers.get('location'), 'https://example.test/mine-opplysninger');
+  assert.equal(response.headers.get('location'), 'https://medlemsservice.turufjellvel.no/mine-opplysninger');
   assert.match(response.headers.get('set-cookie'), /HttpOnly/);
   assert.match(response.headers.get('set-cookie'), /SameSite=lax/i);
   assert.doesNotMatch(response.headers.get('set-cookie'), new RegExp(secret));
@@ -87,10 +92,13 @@ test('membership and email verification redirects contain status only on success
     ['membership-requests/verify', 'membership', 'verified', true],
     ['member-access/email-change/verify', 'emailChange', 'completed', { stage: 'completed' }],
   ]) {
-    const { route, state } = await memberRoute(path);
+    const { route, state } = await memberRoute(path, {
+      applicationOrigin: 'https://medlemsservice.turufjellvel.no',
+    });
     state.result = value;
-    const ok = await route.GET(request(`/api/${path}?token=${secret}`));
+    const ok = await route.GET(request(`https://internal-deploy.example/api/${path}?token=${secret}`));
     assert.equal(ok.status, 303);
+    assert.equal(new URL(ok.headers.get('location')).origin, 'https://medlemsservice.turufjellvel.no');
     assert.equal(new URL(ok.headers.get('location')).searchParams.get(parameter), success);
     assert.doesNotMatch(ok.headers.get('location'), /token=/);
     for (const error of [null, new Error('private database error')]) {

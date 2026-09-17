@@ -92,11 +92,12 @@ test('survey verification removes token from URL and clears cookies after replay
   let session = { secret: 'b'.repeat(64), expires_at: new Date(Date.now() + 60000).toISOString() }, error;
   const route = await loadModule('app/api/survey-access/verify/route.js', {
     '@/lib/membership': { surveySessionCookieName, surveySessionCookieOptions, exchangeSurveyAccessToken: async () => { if (error) throw error; return session; } },
+    '@/lib/request-origin': { getApplicationOrigin: () => 'https://medlemsservice.turufjellvel.no' },
   });
-  const send = () => route.GET(request(`/api/survey-access/verify?token=${'a'.repeat(64)}`));
+  const send = () => route.GET(request(`https://internal-deploy.example/api/survey-access/verify?token=${'a'.repeat(64)}`));
   const ok = await send();
   assert.equal(ok.status, 303);
-  assert.equal(ok.headers.get('location'), 'https://example.test/survey');
+  assert.equal(ok.headers.get('location'), 'https://medlemsservice.turufjellvel.no/survey');
   assert.match(ok.headers.get('set-cookie'), /HttpOnly/);
   session = null;
   for (const cause of [null, new Error('secret')]) {

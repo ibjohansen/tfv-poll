@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyMembershipRequest } from '@/lib/member-self-service';
+import { getApplicationOrigin } from '@/lib/request-origin';
 
 export const runtime = 'nodejs';
 
@@ -9,7 +10,7 @@ export async function GET(request) {
   catch (error) {
     console.error('Membership verification failed', { code: error.code || error.cause?.code, occurredAt: new Date().toISOString() });
   }
-  const destination = new URL('/', request.nextUrl.origin);
+  const destination = new URL('/', getApplicationOrigin(request));
   destination.searchParams.set('membership', verified ? 'verified' : 'invalid');
   destination.hash = 'medlemsopplysninger';
   const response = NextResponse.redirect(destination, 303);
