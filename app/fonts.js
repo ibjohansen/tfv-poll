@@ -10,10 +10,3 @@ export const chap = localFont({
   fallback: ['Arial', 'sans-serif'],
   variable: '--font-chap',
 });
-
-export const fragmentSerif = localFont({
-  src: './fonts/PPFragment-SerifVariable.woff2',
-  display: 'swap',
-  fallback: ['Georgia', 'serif'],
-  variable: '--font-fragment-serif',
-});

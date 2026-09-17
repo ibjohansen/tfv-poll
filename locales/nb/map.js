@@ -2,7 +2,7 @@ const map = {
   public: {
     eyebrow: 'Utforsk området', title: 'Grender og eiendommer', unavailable: 'Kartet er midlertidig utilgjengelig.',
     introduction: 'Velg en grend for å se området og laste registrerte eiendommer. Eiendomsvisningen viser bare H-nummer, gårds- og bruksnummer og adresse – aldri navn eller kontaktopplysninger.',
-    chooseHamlet: 'Velg grend', showHamlet: 'Vis {name} i kartet', hideHamlet: 'Skjul {name} i kartet',
+    chooseHamlet: 'Velg grend', noHamletSelected: 'Ingen grend valgt', showHamlet: 'Vis {name} i kartet', hideHamlet: 'Skjul {name} i kartet',
     propertyToggleHelp: 'Vis eller skjul registrerte eiendommer i valgt grend', fetchProperties: 'Henter eiendommer …', showProperties: 'Vis eiendommer', hideProperties: 'Skjul eiendommer',
     buildingToggleHelp: 'Vis eller skjul detaljerte bygningsflater fra Kartverket', showBuildings: 'Vis bygninger', hideBuildings: 'Skjul bygninger', buildingsDefault: 'Bygningslaget er slått på.', buildingZoomHelp: 'Eiendomsgrenser vises fra Kartverket/Geonorge når gårds- og bruksnummeret gir et sikkert treff. Ellers vises det offisielle adressepunktet. Detaljerte bygninger vises automatisk når du zoomer inn tilstrekkelig.', buildingTileError: 'Bygningslaget kunne ikke lastes. Last siden på nytt for å prøve igjen.',
     enterFullscreen: 'Vis kartet i fullskjerm', exitFullscreen: 'Avslutt fullskjerm', fullscreenError: 'Kartet kunne ikke åpnes i fullskjerm.',

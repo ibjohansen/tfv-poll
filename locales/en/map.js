@@ -2,7 +2,7 @@ const map = {
   public: {
     eyebrow: 'Explore the area', title: 'Hamlets and properties', unavailable: 'The map is temporarily unavailable.',
     introduction: 'Select a hamlet to view the area and load its registered properties. The property view only shows the H-number, cadastral number and address – never names or contact details.',
-    chooseHamlet: 'Select hamlet', showHamlet: 'Show {name} on the map', hideHamlet: 'Hide {name} on the map',
+    chooseHamlet: 'Select hamlet', noHamletSelected: 'No hamlet selected', showHamlet: 'Show {name} on the map', hideHamlet: 'Hide {name} on the map',
     propertyToggleHelp: 'Show or hide registered properties in the selected hamlet', fetchProperties: 'Loading properties …', showProperties: 'Show properties', hideProperties: 'Hide properties',
     buildingToggleHelp: 'Show or hide detailed building footprints from Kartverket', showBuildings: 'Show buildings', hideBuildings: 'Hide buildings', buildingsDefault: 'The building layer is enabled.', buildingZoomHelp: 'Property boundaries from Kartverket/Geonorge are shown when the cadastral reference gives a certain match. Otherwise, the official address point is shown. Detailed buildings appear automatically when you zoom in sufficiently.', buildingTileError: 'The building layer could not be loaded. Reload the page to try again.',
     enterFullscreen: 'Show the map in full screen', exitFullscreen: 'Exit full screen', fullscreenError: 'The map could not enter full-screen mode.',

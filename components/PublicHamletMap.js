@@ -26,6 +26,7 @@ export default function PublicHamletMap({hamlets}) {
   const [error, setError] = useState('');
   const controllerRef = useRef(null);
   const mapMount = useRef(null);
+  const hamletMenuRef = useRef(null);
   const activeHamlet = useMemo(() => hamlets.find((hamlet) => hamlet.id === activeId) || null, [activeId, hamlets]);
 
   const loadProperties = useCallback(async (hamletId) => {
@@ -54,6 +55,14 @@ export default function PublicHamletMap({hamlets}) {
   }, [t]);
 
   useEffect(() => () => controllerRef.current?.abort(), []);
+  useEffect(() => {
+    function closeHamletMenu(event) {
+      const menu = hamletMenuRef.current;
+      if (menu?.open && !menu.contains(event.target)) menu.open = false;
+    }
+    document.addEventListener('pointerdown', closeHamletMenu);
+    return () => document.removeEventListener('pointerdown', closeHamletMenu);
+  }, []);
   useEffect(() => {
     if (mapReady || !mapMount.current) return undefined;
     if (!('IntersectionObserver' in window)) {
@@ -89,6 +98,12 @@ export default function PublicHamletMap({hamlets}) {
     loadProperties(hamlet.id);
   }, [activeId, loadProperties]);
 
+  function selectHamletFromMenu(hamlet) {
+    if (hamlet) selectHamlet(hamlet);
+    else if (activeHamlet) selectHamlet(activeHamlet);
+    if (hamletMenuRef.current) hamletMenuRef.current.open = false;
+  }
+
   function toggleProperties() {
     const next = !showProperties;
     setShowProperties(next);
@@ -114,6 +129,29 @@ export default function PublicHamletMap({hamlets}) {
                                        className={hamlet.id === hoveredHamletId ? 'is-map-hovered' : undefined}
                                        title={hamlet.id === activeId ? t('hideHamlet', {name: hamlet.name}) : t('showHamlet', {name: hamlet.name})}
                                        onClick={() => selectHamlet(hamlet)}>{hamlet.name}</button>)}
+    </div>
+    <div className="public-hamlet-select">
+      <span id="public-hamlet-select-label">{t('chooseHamlet')}</span>
+      <details ref={hamletMenuRef} onKeyDown={(event) => {
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        hamletMenuRef.current.open = false;
+        hamletMenuRef.current.querySelector('summary')?.focus();
+      }}>
+        <summary aria-labelledby="public-hamlet-select-label public-hamlet-current-value">
+          <span id="public-hamlet-current-value">{activeHamlet?.name || t('noHamletSelected')}</span>
+        </summary>
+        <div className="public-hamlet-select-options">
+          <button type="button" className={!activeHamlet ? 'is-selected' : undefined}
+                  aria-pressed={!activeHamlet} onClick={() => selectHamletFromMenu(null)}>
+            {t('noHamletSelected')}
+          </button>
+          {hamlets.map((hamlet) => <button key={hamlet.id} type="button"
+                                           className={hamlet.id === activeId ? 'is-selected' : undefined}
+                                           aria-pressed={hamlet.id === activeId}
+                                           onClick={() => selectHamletFromMenu(hamlet)}>{hamlet.name}</button>)}
+        </div>
+      </details>
     </div>
     <div ref={mapMount} className="public-hamlet-map-mount">
       {mapReady ? <PublicHamletMapView hamlets={hamlets} activeHamlet={activeHamlet} properties={showProperties ? properties : []}

@@ -51,7 +51,11 @@ export default function PublicHamletMapView({ hamlets, activeHamlet, properties,
 
   useEffect(() => { latestError.current = onError; }, [onError]);
   useEffect(() => {
-    const map = L.map(container.current, { scrollWheelZoom: false }).setView(latLng(TURUFJELL_CENTER), 14);
+    const map = L.map(container.current, {
+      scrollWheelZoom: false,
+      zoomSnap: 0,
+      zoomDelta: 0.5,
+    }).setView(latLng(TURUFJELL_CENTER), 14);
     mapRef.current = map;
     const tiles = L.tileLayer(BACKGROUND_MAP.url, { attribution: BACKGROUND_MAP.attribution, maxZoom: BACKGROUND_MAP.maxZoom }).addTo(map);
     let warned = false;
@@ -169,7 +173,10 @@ export default function PublicHamletMapView({ hamlets, activeHamlet, properties,
     if (geometry.type === 'Point') mapRef.current.setView(latLng(geometry.coordinates), 17);
     else {
       const bounds = L.geoJSON({ type: 'Feature', properties: {}, geometry }).getBounds();
-      if (bounds.isValid()) mapRef.current.fitBounds(bounds, { maxZoom: 16, padding: [32, 32] });
+      if (bounds.isValid()) mapRef.current.fitBounds(bounds, {
+        maxZoom: selectedGeometry ? 18 : 17,
+        padding: selectedGeometry ? [20, 20] : [8, 8],
+      });
     }
   }, [activeHamlet, selectedProperty]);
 

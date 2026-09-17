@@ -3,7 +3,7 @@ import { mtConfig } from "@material-tailwind/react";
 const materialTailwind = mtConfig({
   radius: "1rem",
   fonts: {
-    sans: "var(--font-fragment-serif), Georgia, serif",
+    sans: "var(--font-body-sans)",
   },
   colors: {
     background: "#EBEBDE",
@@ -43,7 +43,7 @@ const config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-fragment-serif)', 'Georgia', 'serif'],
+        sans: ['var(--font-body-sans)'],
         display: ['var(--font-chap)', 'Arial', 'sans-serif'],
       },
     },

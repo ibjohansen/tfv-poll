@@ -73,7 +73,7 @@ export default function HomeHeroCarousel({ images }) {
 
   return (
     <section
-      className="home-hero-carousel relative flex min-h-[clamp(26rem,60vh,46rem)] w-full items-end overflow-hidden bg-primary focus-visible:outline-3 focus-visible:outline-offset-[-3px] focus-visible:outline-white"
+      className="home-hero-carousel relative flex min-h-[clamp(26rem,60vh,46rem)] w-full items-end overflow-hidden focus-visible:outline-3 focus-visible:outline-offset-[-3px] focus-visible:outline-white"
       aria-roledescription={t('role')}
       aria-label={t('label')}
       tabIndex={0}
