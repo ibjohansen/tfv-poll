@@ -6,7 +6,6 @@ import { auth, signIn } from '@/auth';
 import { isAllowedAdmin, isAuthConfigured } from '@/lib/admin-policy';
 import landscape from '@/public/turufjell.jpeg';
 import BrandLogo from '@/components/BrandLogo';
-import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { getServerI18n } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
@@ -66,7 +65,7 @@ export default async function AdminLogin({ searchParams }) {
 
           <div className="rounded-3xl border border-foreground/15 bg-white p-7 shadow-xl shadow-[#493F39]/8 sm:p-10">
             <BrandLogo variant="stacked" decorative className="mb-8 h-auto w-32" />
-            <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-semibold tracking-[0.16em] text-primary uppercase">{t('eyebrow')}</p><h1 id="login-title" className="mt-3 text-3xl font-light tracking-tight text-foreground sm:text-4xl">{t('title')}</h1></div><LanguageSwitcher /></div>
+            <div><p className="text-xs font-semibold tracking-[0.16em] text-primary uppercase">{t('eyebrow')}</p><h1 id="login-title" className="mt-3 text-3xl font-light tracking-tight text-foreground sm:text-4xl">{t('title')}</h1></div>
             <p className="mt-4 text-[0.95rem] leading-6 text-[#6F645E]">{t('introduction')}</p>
 
             {params.error && (
