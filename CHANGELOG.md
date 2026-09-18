@@ -2,6 +2,10 @@
 
 ## Ikke publisert
 
+- Innsending av undersøkelsessvar kontrollerer nå den konfigurerte offentlige
+  adressen også bak Netlify-proxyen. Avviste nettleserforespørsler får en trygg
+  årsakskode og en forklarende feilmelding, og invitasjonsmailen anbefaler en
+  vanlig nettleser dersom mobilens e-postapp skaper problemer.
 - Personlige undersøkelseslenker kan nå åpnes på nytt for å opprette en ny
   kortvarig økt dersom den forrige utløp, frem til invitasjonen utløper,
   tilbakekalles eller et svar sendes inn.

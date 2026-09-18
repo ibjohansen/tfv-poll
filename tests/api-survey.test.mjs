@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModule, request } from './helpers/load-module.mjs';
 import { surveySessionCookieName, surveySessionCookieOptions } from '../lib/membership.js';
+import { getApplicationOrigin, isSameOriginRequest } from '../lib/request-origin.js';
 
-async function setup() {
+async function setup({ originValidator = isSameOriginRequest } = {}) {
   const state = { limited: false, status: 'ready', saved: true, accepted: true, questions: null, writes: [], mock: false, secret: 'a'.repeat(64), error: null };
   const access = async () => {
     if (state.error) throw state.error;
@@ -13,6 +14,7 @@ async function setup() {
     'next/headers': { cookies: async () => ({ get: () => state.secret ? { value: state.secret } : undefined }) },
     '@/lib/mock-store': { isMockMode: () => state.mock },
     '@/lib/rate-limit': { isRateLimited: () => state.limited },
+    '@/lib/request-origin': { getApplicationOrigin, isSameOriginRequest: originValidator },
     '@/lib/survey-email-background': { isSurveyEmailBackgroundConfigured: () => false, dispatchSurveyReceipts: () => { throw new Error('Unexpected email dispatch'); } },
     '@/lib/membership': {
       surveySessionCookieName, getSurveyAccess: access, getMockSurveyAccess: access,
@@ -54,7 +56,9 @@ test('survey API validates custom multiple choices and reports a later non-count
 test('survey origin, throttling, expired sessions, closed surveys and duplicates prevent writes', async () => {
   const { route, state } = await setup();
   const send = headers => route.POST(request('/survey/api/responses', { method: 'POST', headers, body: { questionVersion: 2, answers: { q1: 'ja', q2: 'nei' } } }));
-  assert.equal((await send({ origin: 'https://evil.test' })).status, 403);
+  const rejected = await send({ origin: 'https://evil.test' });
+  assert.equal(rejected.status, 403);
+  assert.equal((await rejected.json()).code, 'SURVEY_ORIGIN_REJECTED');
   state.limited = true;
   assert.equal((await send()).status, 429);
   state.limited = false;
@@ -69,6 +73,20 @@ test('survey origin, throttling, expired sessions, closed surveys and duplicates
   const response = await send();
   assert.equal(response.status, 500);
   assert.doesNotMatch(await response.text(), /secret|password/);
+});
+
+test('survey accepts the configured public origin behind a hosting proxy', async () => {
+  const publicOrigin = 'https://medlemsservice.turufjellvel.no';
+  const { route, state } = await setup({
+    originValidator: currentRequest => isSameOriginRequest(currentRequest, { AUTH_URL: publicOrigin }),
+  });
+  const response = await route.POST(request('https://internal-deploy.example/survey/api/responses', {
+    method: 'POST',
+    headers: { origin: publicOrigin, 'sec-fetch-site': 'same-origin' },
+    body: { questionVersion: 2, answers: { q1: 'ja', q2: 'nei' } },
+  }));
+  assert.equal(response.status, 201);
+  assert.equal(state.writes.length, 1);
 });
 
 test('survey honeypot reports success without persisting an answer', async () => {

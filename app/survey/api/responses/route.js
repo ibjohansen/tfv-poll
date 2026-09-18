@@ -9,17 +9,12 @@ import { isRateLimited } from '@/lib/rate-limit';
 import { getRequestI18n } from '@/lib/i18n/request';
 import { hasValidSurveyAnswers } from '@/lib/survey-questions';
 import { dispatchSurveyReceipts, isSurveyEmailBackgroundConfigured } from '@/lib/survey-email-background';
-import { getApplicationOrigin } from '@/lib/request-origin';
+import { getApplicationOrigin, isSameOriginRequest } from '@/lib/request-origin';
 
 export const runtime = 'nodejs';
 
 function reply(body, status) {
   return NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
-}
-
-function hasValidOrigin(request) {
-  const origin = request.headers.get('origin');
-  return !origin || origin === new URL(request.url).origin;
 }
 
 function accessErrorStatus(status) {
@@ -30,10 +25,21 @@ function accessErrorStatus(status) {
 
 export async function POST(request) {
   const { t } = getRequestI18n(request, 'backend');
-  if (!hasValidOrigin(request)) return reply({ ok: false, message: t('api.invalidRequest') }, 403);
+  if (!isSameOriginRequest(request)) {
+    const fetchSite = request.headers.get('sec-fetch-site');
+    console.warn('Survey response rejected by origin validation', {
+      code: 'SURVEY_ORIGIN_REJECTED',
+      fetchSite: ['same-origin', 'same-site', 'cross-site', 'none'].includes(fetchSite) ? fetchSite : fetchSite ? 'other' : 'missing',
+      originPresent: Boolean(request.headers.get('origin')),
+      occurredAt: new Date().toISOString(),
+    });
+    return reply({ ok: false, code: 'SURVEY_ORIGIN_REJECTED', message: t('survey.browserRejected') }, 403);
+  }
   if (isRateLimited(request)) return reply({ ok: false, message: t('api.tooManyRequests') }, 429);
   const body = await request.json().catch(() => null);
-  if (!body || typeof body !== 'object' || Array.isArray(body)) return reply({ ok: false, message: t('api.invalidRequest') }, 400);
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return reply({ ok: false, code: 'SURVEY_INVALID_BODY', message: t('api.invalidRequest') }, 400);
+  }
 
   try {
     const secret = (await cookies()).get(surveySessionCookieName())?.value;

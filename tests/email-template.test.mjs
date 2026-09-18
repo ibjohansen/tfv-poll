@@ -19,6 +19,8 @@ test('survey invitation has responsive HTML, CTA, visible URL and equivalent pla
   assert.match(rendered.text, /Torsdag 31\. desember 2026 kl\. 00:00/);
   assert.match(rendered.text, new RegExp(SYSTEM_EMAIL_FOOTER.replace('.', '\\.')));
   assert.match(rendered.text, /token=/);
+  assert.match(rendered.html, /særlig aktuelt på mobil.*e-postappen/);
+  assert.match(rendered.text, /vanlig nettleser som Safari, Chrome, Edge eller Firefox/);
   assert.doesNotMatch(rendered.html, /<script|fonts\.googleapis/i);
 });
 
