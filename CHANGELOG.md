@@ -2,6 +2,16 @@
 
 ## Ikke publisert
 
+- Kvitteringsstatusen for undersøkelser skiller nå feilede og undertrykte
+  leveranser og viser de berørte tomtene, mottakeradressene og trygge
+  årsaksforklaringer direkte i utsendelsespanelet.
+- Den planlagte overvåkingen oppretter nå én skrivebeskyttet matrikkelkontroll
+  den første i hver måned. Avvik og feil vises i oppgavelisten og må godkjennes
+  manuelt før medlemsregisteret endres.
+- Undersøkelsesutsendelser bruker nå 0,75 sekunders kontrollert intervall i
+  stedet for 6,1 sekunder. MailerSend-ratebegrensning og brukt dagskvote pauser
+  kampanjen uten å feilmerke mottakeren, og den planlagte overvåkingen
+  gjenopptar automatisk sendingen på leverandørens oppgitte tidspunkt.
 - Innsending av undersøkelsessvar kontrollerer nå den konfigurerte offentlige
   adressen også bak Netlify-proxyen. Avviste nettleserforespørsler får en trygg
   årsakskode og en forklarende feilmelding, og invitasjonsmailen anbefaler en

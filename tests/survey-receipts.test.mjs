@@ -90,7 +90,11 @@ test('watchdog isolates receipt errors from Matrikkel recovery and rejects non-p
   let recovered = 0, queried = 0;
   const api = await loadModule('netlify/functions/background-watchdog.mjs', {
     '../../lib/db.js': { getSql: () => async () => { queried++; throw new Error('private database failure'); } },
-    '../../lib/background-watchdog.js': { recoverStalledMatrikkelRuns: async () => { recovered++; return { result: 'idle' }; } },
+    '../../lib/background-watchdog.js': {
+      recoverDueSurveyEmailCampaigns: async () => ({ result: 'idle' }),
+      recoverStalledMatrikkelRuns: async () => { recovered++; return { result: 'idle' }; },
+      startDueMonthlyMatrikkelRun: async () => ({ result: 'idle' }),
+    },
     '../../lib/survey-email-background.js': { dispatchSurveyReceipts: async () => assert.fail('unexpected dispatch') },
   }, { process: { env: { APP_ENVIRONMENT: 'production' } } });
   await api.default({}, { deploy: { context: 'deploy-preview' } });

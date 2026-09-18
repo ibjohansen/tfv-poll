@@ -93,6 +93,49 @@ test('email workers exclude duplicate invocations, retain partial failure and ne
   assert.equal(activity.length, 3); assert.equal(new Set(activity.map((event) => event.id)).size, 3);
   assert.equal(JSON.stringify(activity.map((event) => event.after_value)).includes('@example.test'), false);
 });
+test('MailerSend throttling returns the claimed delivery to the queue and pauses the campaign', async () => {
+  const f = await fixture();
+  const retryAt = new Date(Date.now() + 60_000).toISOString();
+  let attempts = 0;
+  const api = await service(async () => {
+    attempts++;
+    throw new MailerServiceError('Rate limited', 'MAILERSEND_RATE_LIMIT', 429, { retryAt, providerStatus: 429 });
+  });
+  const result = await api.processSurveyEmailCampaign(f.campaignId, { delayMs: 0 });
+  assert.equal(attempts, 1);
+  assert.equal(result.status, 'pending');
+  assert.equal(result.error_message, 'MAILERSEND_RATE_LIMIT');
+  assert.equal(new Date(result.retry_at).toISOString(), retryAt);
+  const deliveries = await db.sql`SELECT status, failure_reason, processing_at, failed_at
+    FROM email_deliveries WHERE campaign_id = ${f.campaignId}`;
+  assert.ok(deliveries.every((delivery) => delivery.status === 'pending'));
+  assert.ok(deliveries.every((delivery) => !delivery.failure_reason && !delivery.processing_at && !delivery.failed_at));
+  const tokens = await db.sql`SELECT revoked_at FROM survey_access_tokens WHERE survey_id = ${f.surveyId}`;
+  assert.equal(tokens.length, 1);
+  assert.ok(tokens[0].revoked_at);
+});
+test('survey overview separates failed and suppressed receipts and exposes safe issue details', async () => {
+  const f = await fixture();
+  await db.sql`UPDATE members SET street_address = 'Syntetiskvegen 7' WHERE id = ${f.rows[0].memberId}`;
+  const [response] = await db.sql`INSERT INTO survey_responses
+    (member_id, survey_id, questions, answers, question_version, respondent_email)
+    VALUES (${f.rows[0].memberId}, ${f.surveyId}, '[]', '{}', 1, ${f.rows[0].email}) RETURNING id`;
+  for (const [status, reason] of [['failed', 'UPSTREAM'], ['suppressed', 'RECIPIENT_SUPPRESSED']]) {
+    await db.sql`INSERT INTO survey_response_receipts
+      (id, response_id, member_id, survey_id, recipient_email, submitted_by, accepted,
+        attempted_questions, attempted_answers, status, failure_reason)
+      VALUES (${randomUUID().replaceAll('-', '')}, ${response.id}, ${f.rows[0].memberId}, ${f.surveyId},
+        ${f.rows[0].email}, ${f.rows[0].email}, TRUE, '[]', '{}', ${status}, ${reason})`;
+  }
+  const api = await service(async () => assert.fail('Unexpected send'));
+  const overview = await api.getSurveyEmailOverview(f.surveyId);
+  assert.deepEqual(plain({ pending: overview.receipts.pending, sent: overview.receipts.sent,
+    failed: overview.receipts.failed, suppressed: overview.receipts.suppressed,
+  }), { pending: 0, sent: 0, failed: 1, suppressed: 1 });
+  assert.equal(overview.receipts.issues.length, 2);
+  assert.ok(overview.receipts.issues.every((issue) => issue.h_number && issue.street_address === 'Syntetiskvegen 7'
+    && issue.recipient_email === f.rows[0].email && issue.failure_reason));
+});
 test('expired processing is uncertain and not resent; source changes and suppression failure fail safely', async () => {
   const f = await fixture();
   await db.sql`UPDATE email_deliveries SET status = 'processing', processing_at = NOW() - INTERVAL '17 minutes' WHERE id = ${f.rows[0].id}`;

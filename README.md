@@ -754,6 +754,13 @@ Function. Grenderematch og survey-utsendelser kjøres på samme måte i egne bak
 Den planlagte Netlify-kjøringen av `background-watchdog` kontrollerer matrikkeljobber
 hvert femte minutt, bare når Netlify `CONTEXT` og `APP_ENVIRONMENT` er
 `production`. Den prøver høyst tre gjenopptakinger før synlig feilstatus.
+På den første kalenderdagen i hver måned, beregnet i `Europe/Oslo`, oppretter
+samme watchdog høyst én komplett matrikkelkontroll. En samtidig manuell kjøring
+utsetter oppstarten til neste femminuttersintervall samme dag. Den månedlige
+kontrollen endrer aldri medlemsregisteret automatisk: sikre endringer og usikre
+treff legges til manuell vurdering, mens en kontroll uten avvik avsluttes uten å
+opprette en oppgave. Fullførte kontroller med avvik og kontroller som feiler,
+vises i oppgavelisten med lenke til det detaljerte resultatet.
 Den bruker eksisterende `DATABASE_URL`, `MATRIKKEL_JOB_SECRET` og Netlifys `URL`.
 Ingen ny produksjonsvariabel skal opprettes. Funksjonen kan ikke startes via
 en offentlig URL; se [Netlify Scheduled Functions](https://docs.netlify.com/build/functions/scheduled-functions/).
@@ -1309,6 +1316,9 @@ Utfør kontrollene i denne rekkefølgen:
   kjøring. Test aldri ved å forstyrre en ekte pågående produksjonsjobb.
   I isolert miljø: simuler akseptert jobb uten oppstart og utløpt reservasjon;
   bekreft gjenopptaking, maksimalt tre forsøk og ingen doble medlemsoppdateringer.
+  Simuler også to samtidige kall den første i en måned: bare én månedskjøring
+  skal opprettes, snapshotet skal omfatte alle aktive tomter, og foreslåtte
+  endringer skal vises i oppgavelisten uten automatisk å endre medlemmet.
 - Kontroller grender/e-postgrupper med syntetiske tomter: tilordning, flytting,
   filtrering, antall medlemmer og unike adresser. Sletting av en gruppe skal
   beholde medlemsdata og logges med administratorens identitet.
@@ -1684,6 +1694,15 @@ tre kontrollerte gjenopptakinger før kjøringen får synlig feilstatus. Dette m
 likevel funksjonstestes etter deploy; en `202` bekrefter bare at Netlify tok imot
 oppdraget, ikke at behandlingen faktisk startet.
 
+Den samme planlagte funksjonen oppretter en idempotent full kontroll den første
+i hver måned. `matrikkel_sync_runs.scheduled_month` har en unik indeks for
+automatiske kjøringer, slik at overlappende scheduler-kall ikke kan opprette to
+kontroller for samme måned. Kjøringen bruker et komplett snapshot, men er en ren
+sammenligning: ingen medlemsfelter endres før et forslag godkjennes manuelt.
+Avvik og feil telles som én oppgave per månedskjøring i `/admin/inbox`. Når alle
+forslag er godkjent og det ikke finnes feil, forsvinner oppgaven automatisk;
+en gjennomgått feilkjøring kan skjules fra Matrikkel-loggen.
+
 Oppslaget bruker `street_address` som eneste søkenøkkel og kan bare skrive:
 
 | Kartverket/verdi | Medlemsfelt |
@@ -1786,13 +1805,21 @@ gruppe for leveransen kontrolleres på nytt rett før sending. Nye grupper eller
 enkelttomter kan legges til en pågående eller fullført kampanje uten å gjenta
 invitasjoner som allerede er registrert. Svarregelen låses etter første
 invitasjon/svar. Se [detaljer om mottakere og kvitteringer](docs/survey-options-and-recipients.md).
+Utsendelsespanelet skiller ventende, sendte, feilede og undertrykte
+hoved-e-postkvitteringer. Feilede og undertrykte kvitteringer vises med
+H-nummer, adresse, mottaker, status og en kontrollert årsaksforklaring. Rå
+leverandørsvar vises eller lagres ikke i panelet.
 Den unike kampanjeindeksen gjør at refresh,
 gjentatt request eller Netlify-retry ikke oppretter en ny utsendelse for samme
 survey.
 
 `survey-email-background` hevder én ventende levering atomisk og sender
-kontrollert med minst 6,1 sekunder mellom Email API-kall. Dette holder seg innen
-MailerSends dokumenterte lave rategrense uten ukontrollerte browser-kall. For
+kontrollert med minst 0,75 sekunder mellom Email API-kall. Sammen med tiden for
+selve kallet holder dette god margin til MailerSends dokumenterte grense for
+`POST /email`, uten ukontrollerte browser-kall. Ved HTTP 429 legges den hevde
+leveringen tilbake i køen uten å telle som feilet. Kampanjen lagrer leverandørens
+`Retry-After` eller tidspunktet for nullstilling av dagskvoten, og
+`background-watchdog` starter den automatisk igjen etter dette tidspunktet. For
 hver levering opprettes en ny, hashet invitasjonskode bundet til medlem,
 undersøkelse, mottakeradresse og miljø. Den rå koden brukes bare til invitasjons-URL-en og
 lagres eller logges ikke. Koden kan opprette en ny kortvarig økt når samme

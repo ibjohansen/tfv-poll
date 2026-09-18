@@ -74,6 +74,29 @@ test('provider failure is controlled and logs no token, body or survey URL', asy
   assert.match(logged, /example\.com/);
 });
 
+test('MailerSend rate limits expose a bounded retry time without becoming recipient failures', async () => {
+  const before = Date.now();
+  await assert.rejects(sendEmail({ to: 'member@example.com', subject: 'Test', text: 'Hei' }, {
+    env,
+    fetchImpl: async () => Response.json({ message: 'Too many requests #MS42903' }, {
+      status: 429, headers: { 'retry-after': '30' },
+    }),
+  }), (error) => error instanceof MailerServiceError
+    && error.code === 'MAILERSEND_RATE_LIMIT'
+    && error.status === 429
+    && Date.parse(error.retryAt) >= before + 30_000);
+
+  const reset = new Date(Date.now() + 3_600_000).toISOString();
+  await assert.rejects(sendEmail({ to: 'member@example.com', subject: 'Test', text: 'Hei' }, {
+    env,
+    fetchImpl: async () => Response.json({ message: 'Daily quota #MS42901' }, {
+      status: 429, headers: { 'x-apiquota-remaining': '0', 'x-apiquota-reset': reset },
+    }),
+  }), (error) => error instanceof MailerServiceError
+    && error.code === 'MAILERSEND_DAILY_QUOTA'
+    && error.retryAt === reset);
+});
+
 test('suppression lookup checks provider lists and domain block patterns', async () => {
   const suppressions = await getMailerSendSuppressions({ env, fetchImpl: async (url) => {
     if (url.includes('/blocklist?')) return Response.json({ data: [{ pattern: '.*@blocked.example' }] });

@@ -53,6 +53,19 @@ test('member comment stays with its update, appears in inbox and can be acknowle
   assert.equal(audit[1].after_value.comment, comment);
 });
 
+test('monthly Matrikkel deviations appear in the task list count until the run is hidden', async () => {
+  const before = await api.getAdminTaskCount();
+  const runId = randomUUID().replaceAll('-', '');
+  await db.sql`INSERT INTO matrikkel_sync_runs
+    (id, requested_by, status, run_type, scheduled_month, total_count, processed_count, unchanged_count, review_count)
+    VALUES (${runId}, 'system:monthly-matrikkel', 'completed', 'monthly', '2098-07-01', 10, 10, 8, 2)`;
+  const tasks = await api.getAdminMatrikkelTasks();
+  assert.equal(tasks.find((task) => task.id === runId).review_count, 2);
+  assert.equal(await api.getAdminTaskCount(), before + 1);
+  await db.sql`UPDATE matrikkel_sync_runs SET deleted_at = NOW() WHERE id = ${runId}`;
+  assert.equal(await api.getAdminTaskCount(), before);
+});
+
 test('member can change sharing reservation and the timestamp and profile history are retained', async () => {
   const f = await fixture();
   const session = await api.verifyMemberAccess(f.secret);

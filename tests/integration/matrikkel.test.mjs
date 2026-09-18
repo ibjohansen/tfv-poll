@@ -9,13 +9,13 @@ const db = createTestDatabase();
 before(async () => { await db.migrate(); });
 after(async () => { await db.close(); });
 
-async function fixture({ attempts = null, stale = false, lookup } = {}) {
+async function fixture({ attempts = null, stale = false, lookup, monthly = false } = {}) {
   const runId = randomUUID().replaceAll('-', '');
   const [member] = await db.sql`INSERT INTO members (h_number, street_address, cadastral_number, title_holder)
     VALUES (${`test-${randomUUID()}`}, 'Testvegen 7', '10/20', 'Syntetisk tidligere eier') RETURNING id`;
-  await db.sql`INSERT INTO matrikkel_sync_runs (id, requested_by, total_count, status, worker_token, worker_lease_expires_at)
+  await db.sql`INSERT INTO matrikkel_sync_runs (id, requested_by, total_count, status, worker_token, worker_lease_expires_at, run_type, scheduled_month)
     VALUES (${runId}, 'admin@example.test', 1, ${stale ? 'running' : 'pending'}, ${stale ? 'expired-worker' : null},
-      ${stale ? new Date(Date.now() - 60_000) : null})`;
+      ${stale ? new Date(Date.now() - 60_000) : null}, ${monthly ? 'monthly' : 'manual'}, ${monthly ? '2026-09-01' : null})`;
   await db.sql`INSERT INTO matrikkel_sync_backups (run_id, member_id, cadastral_number, title_holder)
     SELECT ${runId}, id, cadastral_number, title_holder FROM members WHERE id = ${member.id}`;
   if (attempts !== null) await db.sql`INSERT INTO matrikkel_sync_items (run_id, member_id, status, worker_token, attempt_count, previous_values)
@@ -70,6 +70,19 @@ test('expired processing work resumes once; completed work is never applied twic
   const audit = await db.sql`SELECT * FROM audit_log WHERE table_name = 'members' AND row_id = ${f.memberId} AND operation = 'UPDATE'`;
   assert.equal(audit.length, 1);
   assert.equal(audit[0].changed_by, 'admin@example.test');
+});
+
+test('monthly checks queue detected changes for manual approval without changing the member', async () => {
+  const f = await fixture({ monthly: true });
+  assert.equal((await f.api.processMatrikkelRun(f.runId)).status, 'completed');
+  const [beforeApproval] = await db.sql`SELECT title_holder FROM members WHERE id = ${f.memberId}`;
+  const [item] = await db.sql`SELECT status, message FROM matrikkel_sync_items WHERE run_id = ${f.runId}`;
+  assert.equal(beforeApproval.title_holder, 'Syntetisk tidligere eier');
+  assert.equal(item.status, 'review');
+  assert.match(item.message, /månedlige kontrollen/);
+  await f.api.approveMatrikkelItem(f.runId, f.memberId);
+  const [afterApproval] = await db.sql`SELECT title_holder FROM members WHERE id = ${f.memberId}`;
+  assert.equal(afterApproval.title_holder, 'Syntetisk ny eier');
 });
 
 test('a live lease excludes a duplicate invocation', async () => {

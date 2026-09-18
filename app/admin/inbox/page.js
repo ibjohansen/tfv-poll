@@ -1,8 +1,9 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
-import { isAllowedAdmin, isAuthConfigured } from '@/lib/admin-policy';
-import { getAdminMemberRequests } from '@/lib/member-self-service';
+import { isAllowedAdmin, isAllowedMatrikkelSync, isAuthConfigured } from '@/lib/admin-policy';
+import { getAdminMatrikkelTasks, getAdminMemberRequests } from '@/lib/member-self-service';
 import AdminMemberRequests from '@/components/AdminMemberRequests';
+import AdminMatrikkelTasks from '@/components/AdminMatrikkelTasks';
 import AdminModuleHeader from '@/components/AdminModuleHeader';
 import { getServerI18n } from '@/lib/i18n/server';
 
@@ -15,6 +16,8 @@ export default async function AdminInboxPage() {
   const session = await auth();
   if (!isAllowedAdmin(session?.user)) redirect('/admin/login');
   let requests;
-  try { requests = await getAdminMemberRequests(); } catch { requests = null; }
-  return <main className="admin-shell"><AdminModuleHeader active="inbox" title={t('admin.common.inbox')} email={session.user.email} pendingTaskCount={requests?.length} /><section className="admin-content">{requests ? <AdminMemberRequests initialRequests={requests} showEmpty /> : <p className="form-error" role="alert">{t('admin.pages.inboxUnavailable')}</p>}</section></main>;
+  let matrikkelTasks;
+  try { [requests, matrikkelTasks] = await Promise.all([getAdminMemberRequests(), getAdminMatrikkelTasks()]); } catch { requests = null; matrikkelTasks = null; }
+  const taskCount = requests && matrikkelTasks ? requests.length + matrikkelTasks.length : undefined;
+  return <main className="admin-shell"><AdminModuleHeader active="inbox" title={t('admin.common.inbox')} email={session.user.email} pendingTaskCount={taskCount} /><section className="admin-content">{requests && matrikkelTasks ? <><AdminMatrikkelTasks tasks={matrikkelTasks} canManage={isAllowedMatrikkelSync(session.user)} /><AdminMemberRequests initialRequests={requests} showEmpty={!matrikkelTasks.length} /></> : <p className="form-error" role="alert">{t('admin.pages.inboxUnavailable')}</p>}</section></main>;
 }

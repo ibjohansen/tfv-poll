@@ -77,12 +77,15 @@ export default function SurveyEmailPanel({ surveyId, adminEmail }) {
   if (state === 'loading' && !overview) return <p role="status">{t('loading')}</p>;
   if (!overview) return <p className="form-error" role="alert">{message || t('loadError')}</p>;
   const campaign = overview.campaign;
+  const retryAt = campaign?.retry_at ? Date.parse(campaign.retry_at) : NaN;
+  const automaticallyPaused = Number.isFinite(retryAt);
   const groups = overview.groups || [];
   const previewRecipients = overview.recipients || [];
   const progress = campaign?.total_count ? Math.round(((campaign.sent_count + campaign.failed_count + campaign.suppressed_count) / campaign.total_count) * 100) : 0;
   const canSelect = overview.configured && overview.background_configured && overview.bulk_enabled && overview.survey?.can_send && (groupId || selectedMembers.length) && overview.recipient_count > 0 && state !== 'loading';
   const canStart = canSelect && !campaign;
-  const canResume = overview.configured && overview.background_configured && overview.bulk_enabled && overview.survey?.can_send && ['pending', 'failed'].includes(campaign?.status);
+  const canResume = overview.configured && overview.background_configured && overview.bulk_enabled && overview.survey?.can_send
+    && !automaticallyPaused && ['pending', 'failed'].includes(campaign?.status);
   const canReplace = canSelect && campaign?.status === 'completed';
   const groupSelectionLocked = false;
   const backgroundMessage = t(overview.background_status === 'job_secret_missing' ? 'backgroundSecretMissing' : 'backgroundUnavailable');
@@ -133,7 +136,9 @@ export default function SurveyEmailPanel({ surveyId, adminEmail }) {
         <div className="survey-email-campaign-heading"><span className={`status-pill is-${campaign.status === 'completed' ? 'open' : 'closed'}`}>{t(`statuses.${campaign.status}`, {}, campaign.status)}</span><span>{t('processed', {count: progress})}</span></div>
         <div className="progress-track" aria-label={t('progress', {count: progress})}><span className="progress-value" style={{ width: `${progress}%` }} /></div>
         <dl className="survey-email-stats"><div><dt>{t('accepted')}</dt><dd>{campaign.sent_count}</dd></div><div><dt>{t('delivered')}</dt><dd>{campaign.delivered_count}</dd></div><div><dt>{t('failed')}</dt><dd>{campaign.failed_count}</dd></div><div><dt>{t('suppressed')}</dt><dd>{campaign.suppressed_count}</dd></div></dl>
-        {campaign.error_message && <p className="form-error" role="alert">{t('jobStopped', {message: campaign.error_message})}</p>}
+        {automaticallyPaused
+          ? <p className="survey-email-warning" role="status">{t('jobPaused', {time: new Date(retryAt).toLocaleString()})}</p>
+          : campaign.error_message && <p className="form-error" role="alert">{t('jobStopped', {message: campaign.error_message})}</p>}
         {['pending', 'failed'].includes(campaign.status) && <button className="admin-button" type="button" disabled={!canResume || Boolean(busy)} aria-describedby={blockedReason ? 'survey-email-blocked-reason' : undefined} onClick={() => { setSendAction('send'); setConfirmSend(true); }}>{t('restart')}</button>}
         <button className="primary-button" type="button" disabled={!canSelect || Boolean(busy)} onClick={() => { setSendAction('append'); setConfirmSend(true); }}>{t('addRecipients')}</button>
         {campaign.status === 'completed' && <button className="admin-button" type="button" disabled={!canReplace || Boolean(busy)} aria-describedby={blockedReason ? 'survey-email-blocked-reason' : undefined} onClick={() => { setSendAction('resend'); setConfirmSend(true); }}>{t('sendNewLinks')}</button>}
@@ -156,7 +161,9 @@ export default function SurveyEmailPanel({ surveyId, adminEmail }) {
       {overview.pages > 1 && <nav className="survey-email-pages" aria-label={t('deliveryPages')}><button className="admin-button" type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>{t('previous')}</button><span>{t('page', {page: overview.page, pages: overview.pages})}</span><button className="admin-button" type="button" disabled={page >= overview.pages} onClick={() => setPage((value) => value + 1)}>{t('next')}</button></nav>}
     </section>}
     {message && <p className={messageKind === 'success' ? 'admin-success' : 'form-error'} role="status">{message}</p>}
-    {overview.receipts && <section className="survey-email-card"><h4>{t('receipts')}</h4><p>{t('receiptCounts', overview.receipts)}</p></section>}
+    {overview.receipts && <section className="survey-email-card"><h4>{t('receipts')}</h4><p>{t('receiptCounts', overview.receipts)}</p>
+      {overview.receipts.issues?.length > 0 && <div className="admin-table-scroll"><table className="admin-table"><caption>{t('receiptIssuesCaption')}</caption><thead><tr><th scope="col">{t('member')}</th><th scope="col">{t('address')}</th><th scope="col">{t('recipientEmail')}</th><th scope="col">{t('status')}</th><th scope="col">{t('note')}</th></tr></thead><tbody>{overview.receipts.issues.map((issue) => <tr key={issue.id}><th scope="row">{issue.h_number || t('unknown')}</th><td>{issue.street_address || '—'}</td><td>{issue.recipient_email || '—'}</td><td>{t(`statuses.${issue.status}`, {}, issue.status)}</td><td>{t(`receiptReasons.${issue.failure_reason}`, {}, issue.failure_reason || t('unknown'))}</td></tr>)}</tbody></table></div>}
+    </section>}
     <ConfirmDialog open={confirmSend} eyebrow={t('confirmEyebrow')} destructive={false} title={t('confirmTitle', {count: sendAction === 'send' && campaign ? campaign.total_count : overview.recipient_count})} description={t(sendAction === 'resend' ? 'replaceDescription' : sendAction === 'append' ? 'appendDescription' : 'sendDescription')} confirmLabel={t('start')} busy={Boolean(busy)} onCancel={() => setConfirmSend(false)} onConfirm={() => post(sendAction, { groupId, memberIds: selectedMembers.map((member) => String(member.id)), includeOtherEmails, singleResponsePerProperty })} />
   </section>;
 }

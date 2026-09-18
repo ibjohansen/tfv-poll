@@ -9,10 +9,10 @@ function memberLabel(member, t) {
   return `${member.h_number} · ${member.street_address || t('addressMissing')}`;
 }
 
-export default function MatrikkelSyncPanel({ initialRuns, members = [], initialMemberId = '', initialMemberIds = [], configured, databaseReady }) {
+export default function MatrikkelSyncPanel({ initialRuns, members = [], initialMemberId = '', initialMemberIds = [], initialRunId = '', configured, databaseReady }) {
   const { t, formatLocale } = useI18n('members.matrikkel');
   const [runs, setRuns] = useState(initialRuns);
-  const [activeId, setActiveId] = useState(initialRuns.find((run) => ['pending', 'running'].includes(run.status))?.id || null);
+  const [activeId, setActiveId] = useState(initialRunId || initialRuns.find((run) => ['pending', 'running'].includes(run.status))?.id || null);
   const [active, setActive] = useState(null);
   const [confirm, setConfirm] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);

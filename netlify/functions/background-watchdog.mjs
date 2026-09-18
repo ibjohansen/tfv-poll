@@ -1,4 +1,4 @@
-import { recoverStalledMatrikkelRuns } from '../../lib/background-watchdog.js';
+import { recoverDueSurveyEmailCampaigns, recoverStalledMatrikkelRuns, startDueMonthlyMatrikkelRun } from '../../lib/background-watchdog.js';
 import { getSql } from '../../lib/db.js';
 import { dispatchSurveyReceipts } from '../../lib/survey-email-background.js';
 
@@ -15,6 +15,20 @@ export default async function handler(request, context) {
   } catch {
     failed = true;
     console.error('Survey receipt watchdog failed', { occurredAt: new Date().toISOString() });
+  }
+  try {
+    const result = await recoverDueSurveyEmailCampaigns(process.env.URL);
+    if (result.result !== 'idle') console.info('Survey email watchdog', result);
+  } catch {
+    console.error('Survey email watchdog failed', { occurredAt: new Date().toISOString() });
+    failed = true;
+  }
+  try {
+    const result = await startDueMonthlyMatrikkelRun(process.env.URL);
+    if (!['idle', 'not_configured'].includes(result.result)) console.info('Monthly Matrikkel watchdog', result);
+  } catch {
+    console.error('Monthly Matrikkel watchdog failed', { occurredAt: new Date().toISOString() });
+    failed = true;
   }
   try {
     const result = await recoverStalledMatrikkelRuns(process.env.URL);

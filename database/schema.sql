@@ -147,11 +147,22 @@ ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS worker_token TEXT;
 ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS worker_lease_expires_at TIMESTAMPTZ;
 ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS dispatch_attempts INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS last_dispatch_at TIMESTAMPTZ;
+ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS run_type TEXT NOT NULL DEFAULT 'manual';
+ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS scheduled_month DATE;
 ALTER TABLE matrikkel_sync_items ADD COLUMN IF NOT EXISTS worker_token TEXT;
 ALTER TABLE matrikkel_sync_items ADD COLUMN IF NOT EXISTS attempt_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE matrikkel_sync_runs DROP CONSTRAINT IF EXISTS matrikkel_sync_runs_status_check;
 ALTER TABLE matrikkel_sync_runs ADD CONSTRAINT matrikkel_sync_runs_status_check
   CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled'));
+ALTER TABLE matrikkel_sync_runs DROP CONSTRAINT IF EXISTS matrikkel_sync_runs_type_check;
+ALTER TABLE matrikkel_sync_runs ADD CONSTRAINT matrikkel_sync_runs_type_check
+  CHECK (run_type IN ('manual', 'monthly'));
+ALTER TABLE matrikkel_sync_runs DROP CONSTRAINT IF EXISTS matrikkel_sync_runs_schedule_check;
+ALTER TABLE matrikkel_sync_runs ADD CONSTRAINT matrikkel_sync_runs_schedule_check
+  CHECK ((run_type = 'monthly' AND scheduled_month IS NOT NULL)
+    OR (run_type = 'manual' AND scheduled_month IS NULL));
+CREATE UNIQUE INDEX IF NOT EXISTS matrikkel_sync_runs_monthly_idx
+  ON matrikkel_sync_runs (scheduled_month) WHERE run_type = 'monthly';
 
 ALTER TABLE surveys ADD COLUMN IF NOT EXISTS is_open BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE surveys ADD COLUMN IF NOT EXISTS ends_on DATE;
@@ -312,6 +323,9 @@ CREATE INDEX IF NOT EXISTS email_campaigns_created_at_idx
   ON email_campaigns (created_at DESC);
 ALTER TABLE email_campaigns ADD COLUMN IF NOT EXISTS worker_token TEXT;
 ALTER TABLE email_campaigns ADD COLUMN IF NOT EXISTS worker_lease_expires_at TIMESTAMPTZ;
+ALTER TABLE email_campaigns ADD COLUMN IF NOT EXISTS retry_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS email_campaigns_retry_idx ON email_campaigns (retry_at)
+  WHERE retry_at IS NOT NULL AND status IN ('pending', 'running', 'failed');
 
 CREATE TABLE IF NOT EXISTS email_deliveries (
   id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),

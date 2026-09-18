@@ -38,8 +38,19 @@ Object.assign(surveys.email, {
   policyLocked: 'Svarregelen er låst for denne undersøkelsen etter første utsendelse.', addRecipients: 'Legg til nye mottakere',
   appendDescription: 'Bare mottakere som ikke allerede er registrert for utsendelse i denne undersøkelsen legges til. Eksisterende svar og utsendelser beholdes.',
   recipientCaption: 'Mottakere i valgt gruppe og valgte enkelttomter. Øvrige e-postadresser tas bare med når dette er krysset av.', primaryEmail: 'Hoved-e-post', recipientEmail: 'Mottakeradresse',
-  receipts: 'Kvitteringer til hoved-e-post', receiptCounts: 'Venter: {pending} · Sendt: {sent} · Feilet/undertrykt: {failed}',
+  receipts: 'Kvitteringer til hoved-e-post', receiptCounts: 'Venter: {pending} · Sendt: {sent} · Feilet: {failed} · Undertrykt: {suppressed}',
+  receiptIssuesCaption: 'Kvitteringer som ikke ble sendt', address: 'Adresse',
+  receiptReasons: {
+    UPSTREAM: 'MailerSend avviste forespørselen eller kunne ikke nås. Eldre hendelser mangler mer detaljert status.',
+    MAILERSEND_DAILY_QUOTA: 'MailerSends dagskvote var brukt opp.',
+    MAILERSEND_RATE_LIMIT: 'MailerSend ba systemet redusere sendehastigheten.',
+    RECIPIENT_SUPPRESSED: 'Mottakeren er blokkert eller undertrykt hos MailerSend.',
+    PRIMARY_EMAIL_CHANGED_OR_MISSING: 'Hoved-e-post manglet eller var endret før kvitteringen ble sendt.',
+    UNCERTAIN_AFTER_INTERRUPTION: 'Jobben ble avbrutt mens leveringstilstanden var ukjent.',
+    SEND_FAILED: 'Kvitteringen kunne ikke sendes.',
+  },
   noNewRecipients: 'Alle valgte mottakere er allerede registrert for utsendelse. Ingen nye invitasjoner ble opprettet.',
+  jobPaused: 'MailerSend har midlertidig begrenset sendingen. Utsendelsen fortsetter automatisk etter {time}.',
 });
 Object.assign(surveys.form, { onePerRecipient: 'Én selvstendig besvarelse per invitert e-postadresse.', notCounted: 'En annen mottaker har allerede sendt inn det tellende svaret for tomten. Ditt svar erstatter ikke dette. Hoved-e-post får en kvittering som oppsummerer begge innsendingene.' });
 Object.assign(surveys.page, {

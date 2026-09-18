@@ -38,8 +38,19 @@ Object.assign(surveys.email, {
   policyLocked: 'The response rule is locked after the first mailing.', addRecipients: 'Add new recipients',
   appendDescription: 'Only recipients not already registered for mailing in this survey are added. Existing responses and deliveries are retained.',
   recipientCaption: 'Recipients from the selected group and individual properties. Additional emails are only included when checked.', primaryEmail: 'Primary email', recipientEmail: 'Recipient email',
-  receipts: 'Receipts to primary email', receiptCounts: 'Pending: {pending} · Sent: {sent} · Failed/suppressed: {failed}',
+  receipts: 'Receipts to primary email', receiptCounts: 'Pending: {pending} · Sent: {sent} · Failed: {failed} · Suppressed: {suppressed}',
+  receiptIssuesCaption: 'Receipts that were not sent', address: 'Address',
+  receiptReasons: {
+    UPSTREAM: 'MailerSend rejected the request or could not be reached. Older events do not contain a more detailed status.',
+    MAILERSEND_DAILY_QUOTA: 'The MailerSend daily quota had been exhausted.',
+    MAILERSEND_RATE_LIMIT: 'MailerSend asked the system to reduce its sending rate.',
+    RECIPIENT_SUPPRESSED: 'The recipient is blocked or suppressed by MailerSend.',
+    PRIMARY_EMAIL_CHANGED_OR_MISSING: 'The primary email was missing or had changed before the receipt was sent.',
+    UNCERTAIN_AFTER_INTERRUPTION: 'The job was interrupted while the delivery status was uncertain.',
+    SEND_FAILED: 'The receipt could not be sent.',
+  },
   noNewRecipients: 'All selected recipients are already registered for mailing. No new invitations were created.',
+  jobPaused: 'MailerSend has temporarily limited sending. The mailing will continue automatically after {time}.',
 });
 Object.assign(surveys.form, { onePerRecipient: 'One independent response per invited email address.', notCounted: 'Another recipient has already submitted the effective response for this property. Your answers do not replace it. The primary email receives a receipt summarising both submissions.' });
 Object.assign(surveys.page, {
