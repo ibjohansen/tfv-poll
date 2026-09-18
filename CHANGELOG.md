@@ -2,6 +2,12 @@
 
 ## Ikke publisert
 
+- Personlige undersøkelseslenker kan nå åpnes på nytt for å opprette en ny
+  kortvarig økt dersom den forrige utløp, frem til invitasjonen utløper,
+  tilbakekalles eller et svar sendes inn.
+- Undersøkelsessvar, kvitteringsutboks og sikkerhetshendelse lagres nå i samme
+  atomiske databaseoperasjon. Invitasjoner opplyser tydelig at første innsendte
+  besvarelse er tellende når undersøkelsen er begrenset til ett svar per tomt.
 - Bekreftelseslenker for undersøkelser, medlemsinnsyn, e-postendring og
   medlemsregistrering omdirigerer til det konfigurerte hoveddomenet. Dette
   hindrer at Netlifys interne deploydomene skiller den sikre sesjonscookien fra

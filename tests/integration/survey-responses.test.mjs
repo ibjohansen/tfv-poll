@@ -37,7 +37,14 @@ test('concurrent recipients produce one effective response and one primary recei
   const receipts = await db.sql`SELECT * FROM survey_response_receipts WHERE survey_id = ${f.surveyId}`;
   assert.equal(receipts.length, 2); assert.equal(receipts.filter((row) => row.accepted).length, 1);
   assert.ok(receipts.every((row) => row.recipient_email === f.emails[0] && row.response_id === rows[0].id));
+  const events = await db.sql`SELECT result, metadata FROM security_events
+    WHERE survey_id = ${f.surveyId} AND event_type = 'survey_response_submitted' ORDER BY id`;
+  assert.equal(events.length, 2);
+  assert.deepEqual(new Set(events.map((event) => event.result)), new Set(['accepted', 'already_answered']));
+  assert.ok(events.every((event) => event.metadata.environment === env.APP_ENVIRONMENT && event.metadata.audience === env.TOKEN_AUDIENCE));
   assert.equal((await submitSurveyResponse(f.sessions[0].secret, { q1: ['o2'] }, { sql: db.sql, env, questionVersion: 1 })).saved, false);
+  assert.equal((await db.sql`SELECT id FROM security_events
+    WHERE survey_id = ${f.surveyId} AND event_type = 'survey_response_submitted'`).length, 2);
 });
 
 test('late main-email submission is acknowledged but cannot replace the earlier secondary-email answer', async () => {
@@ -64,4 +71,27 @@ test('invalid multi-select values and changed versions cannot consume sessions o
   assert.equal((await submitSurveyResponse(session.secret, { q1: ['o1'] }, { sql: db.sql, env, questionVersion: 2 })).saved, false);
   assert.equal((await getSurveyAccess(session.secret, { sql: db.sql, env })).status, 'ready');
   assert.equal((await db.sql`SELECT id FROM survey_response_receipts WHERE survey_id = ${f.surveyId}`).length, 0);
+});
+
+test('an invitation can create a fresh session after the previous short-lived session expires', async () => {
+  const surveyId = id();
+  const email = `${id()}@example.test`;
+  const invitationSecret = createAccessSecret();
+  const [member] = await db.sql`INSERT INTO members (h_number, primary_contact_email)
+    VALUES (${id()}, ${email}) RETURNING id`;
+  await db.sql`INSERT INTO surveys (id, title, ends_on, questions)
+    VALUES (${surveyId}, 'Synthetic', '2099-12-31', ${JSON.stringify(questions)}::jsonb)`;
+  await db.sql`INSERT INTO survey_access_tokens (id, member_id, survey_id, recipient_email, token_hash, environment, audience, expires_at)
+    VALUES (${id()}, ${member.id}, ${surveyId}, ${email}, ${hashAccessSecret(invitationSecret)}, ${env.APP_ENVIRONMENT}, ${env.TOKEN_AUDIENCE}, NOW() + INTERVAL '1 day')`;
+
+  const first = await exchangeSurveyAccessToken(invitationSecret, { sql: db.sql, env });
+  await db.sql`UPDATE survey_sessions SET expires_at = NOW() - INTERVAL '1 second' WHERE session_token_hash = ${hashAccessSecret(first.secret)}`;
+  assert.equal((await getSurveyAccess(first.secret, { sql: db.sql, env })).status, 'not-found');
+
+  const second = await exchangeSurveyAccessToken(invitationSecret, { sql: db.sql, env });
+  assert.ok(second);
+  assert.notEqual(second.secret, first.secret);
+  assert.equal((await getSurveyAccess(second.secret, { sql: db.sql, env })).status, 'ready');
+  assert.equal((await submitSurveyResponse(second.secret, { q1: ['o1'] }, { sql: db.sql, env, questionVersion: 1 })).saved, true);
+  assert.equal(await exchangeSurveyAccessToken(invitationSecret, { sql: db.sql, env }), null);
 });

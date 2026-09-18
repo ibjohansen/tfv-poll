@@ -69,7 +69,10 @@ export async function POST(request) {
       maxAge: 0, path: '/', httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production',
     });
     return response;
-  } catch {
+  } catch (error) {
+    console.error('Survey response submission failed', {
+      code: error?.code || error?.cause?.code || 'UNKNOWN', occurredAt: new Date().toISOString(),
+    });
     return reply({ ok: false, message: t('survey.saveFailed') }, 500);
   }
 }

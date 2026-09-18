@@ -88,8 +88,10 @@ Sertifikatkontrollen skal ikke deaktiveres.
 - `/<slug>` viser en publisert informasjonsside. Utkast kan bare forhåndsvises
   fra administrasjonen.
 - De seks sist publiserte informasjonssidene vises automatisk på `/`.
-- Undersøkelsen ligger på `/survey`; invitasjonens engangskode utveksles via
-  `/api/survey-access/verify` og fjernes straks fra adresselinjen.
+- Undersøkelsen ligger på `/survey`; invitasjonens personlige kode utveksles via
+  `/api/survey-access/verify` og fjernes straks fra adresselinjen. Lenken kan
+  åpnes på nytt for å opprette en ny kortvarig økt frem til svar, tilbakekalling
+  eller utløp.
 - Svar sendes til `/survey/api/responses`. Vedlegg som lastes opp på undersøkelsen
   i admin, leveres tilgangskontrollert fra privat Object Storage. Eldre statiske
   dokumenter kan fortsatt ligge under `/survey/dokumenter/`.
@@ -221,9 +223,9 @@ sequenceDiagram
   participant A as Next.js
   participant D as Neon Postgres
 
-  M->>B: Åpner engangslenke med survey-token
+  M->>B: Åpner personlig invitasjonslenke
   B->>A: GET /api/survey-access/verify
-  A->>D: Konsumerer hashet token atomisk og oppretter kort surveyøkt
+  A->>D: Validerer hashet token og oppretter kort surveyøkt
   A-->>B: Setter HttpOnly-cookie og videresender til ren /survey-URL
   B->>A: GET /survey med surveyøkt
   A->>D: Henter åpen undersøkelse og kun nødvendige tomtefelt
@@ -1400,9 +1402,11 @@ Skriptet kan kjøres på en eksisterende database: gamle anonyme svar beholdes m
 
 Tabellen `members` har et internt løpenummer (`id`), men ingen global
 surveyhemmelighet. Hver invitasjon oppretter i stedet en tilfeldig 256-bits
-engangskode for nøyaktig én tomt, én undersøkelse og én mottakeradresse. Bare SHA-256-hashen
+kode for nøyaktig én tomt, én undersøkelse og én mottakeradresse. Bare SHA-256-hashen
 lagres i `survey_access_tokens`; koden er miljø- og audience-bundet og utveksles
-umiddelbart mot en separat, kortlivet surveyøkt.
+umiddelbart mot en separat, kortlivet surveyøkt. Invitasjonslenken kan åpnes på
+nytt dersom økten utløper, men slutter å virke etter svar, eksplisitt
+tilbakekalling, endret mottakerbinding eller kodens utløp.
 
 Etter overgang fra den gamle tokenmodellen kan en fullført kampanje arkiveres
 fra e-postpanelet med **Send nye sikre lenker**. Handlingen krever eksplisitt
@@ -1441,8 +1445,8 @@ Excel-eksporten inneholder både en aggregert oppsummering og et detaljark med
 én rad per spørsmål og besvarelse. Resultater og eksport er tilgjengelige både
 mens undersøkelsen er åpen og etter at sluttdatoen er passert.
 
-Manglende, ugyldig eller konsumert engangskode og allerede innsendt svar vises
-med en generell tilgangsmelding. Ved databasefeil vises en melding om at
+Manglende, ugyldig, tilbakekalt eller utløpt invitasjonskode og allerede
+innsendt svar vises med en generell tilgangsmelding. Ved databasefeil vises en melding om at
 registeret er utilgjengelig. Skjemaet er bare tilgjengelig med gyldig surveyøkt.
 API-et validerer samme tilgang på nytt. En unik databaseindeks på
 `(member_id, survey_id, response_key)` hindrer også dobbeltsvar ved samtidige
@@ -1789,9 +1793,11 @@ survey.
 `survey-email-background` hevder én ventende levering atomisk og sender
 kontrollert med minst 6,1 sekunder mellom Email API-kall. Dette holder seg innen
 MailerSends dokumenterte lave rategrense uten ukontrollerte browser-kall. For
-hver levering opprettes en ny, hashet engangskode bundet til medlem,
+hver levering opprettes en ny, hashet invitasjonskode bundet til medlem,
 undersøkelse, mottakeradresse og miljø. Den rå koden brukes bare til invitasjons-URL-en og
-lagres eller logges ikke.
+lagres eller logges ikke. Koden kan opprette en ny kortvarig økt når samme
+invitasjonslenke åpnes på nytt, men bare frem til svar, tilbakekalling eller
+utløp.
 Hvis en worker avbrytes etter at den har hevdet en melding, markeres den etter 15
 minutter som `UNCERTAIN_AFTER_INTERRUPTION` i stedet for automatisk å kunne
 dobbeltsendes. Administrator ser sendt, levert, feilet og undertrykt per medlem

@@ -51,7 +51,7 @@ test('mail selection defaults to primary email; extra emails are opt-in and dedu
 
 test('invitations disclose co-recipients and first-wins rule without adding tracking', () => {
   const email = renderSurveyInvitationEmail({ surveyTitle: 'Test', endsOn: '2099-01-01', surveyUrl: 'https://example.test/survey', baseUrl: 'https://example.test', propertyRecipients: ['main@example.test', 'other@example.test'] });
-  assert.match(email.text, /kun ETT svar/);
+  assert.match(email.text, /kun ett svar/i);
   assert.match(email.text, /main@example.test, other@example.test/);
   assert.match(email.html, /Den første innsendte/);
 });

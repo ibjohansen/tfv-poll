@@ -15,8 +15,9 @@ i små, reverserbare leveranser med eksplisitte sikkerhetstester før produksjon
 Følgende prinsipper gjelder for hele arbeidet:
 
 - Produksjonsdata skal aldri brukes til lokal utvikling eller automatiserte tester.
-- Alle hemmeligheter skal være engangshemmeligheter eller kortlivede sesjoner,
-  lagres som hash og være bundet til miljø og formål.
+- Alle hemmeligheter skal være engangshemmeligheter, kortlivede sesjoner eller
+  tidsbegrensede og snevert avgrensede invitasjonskoder. De lagres som hash og
+  bindes til miljø og formål.
 - Autorisasjon skal feile lukket når konfigurasjon eller rolle mangler.
 - Offentlige svar skal ikke avsløre om et medlem finnes.
 - Personopplysninger og interne notater skal bare returneres når de er nødvendige.
@@ -345,7 +346,10 @@ undersøkelsens slutt, og tokenet skal bare gi tilgang til én undersøkelse.
 
 1. Ved utsendelse opprettes ett token per medlem og undersøkelse; bare hash
    lagres.
-2. Tokenet byttes én gang mot en survey-session, og URL-en renses umiddelbart.
+2. Tokenet valideres mot medlem, undersøkelse, mottaker, miljø, utløp og
+   tilbakekalling før det oppretter en kortvarig survey-session. URL-en renses
+   umiddelbart. Samme invitasjonslenke kan opprette en ny økt dersom den forrige
+   utløper, men ikke etter innsendt svar, tilbakekalling eller tokenutløp.
 3. Survey-sessionen returnerer bare opplysninger som trengs for å bekrefte riktig
    tomt, normalt H-nummer og adresse. Kontaktperson, e-poster, hjemmelshaver og
    tinglysningsdato fjernes dersom de ikke er dokumentert nødvendige.
@@ -479,16 +483,18 @@ likevel brukes der det er tilgjengelig.
 
 ### Automatiserte tester
 
-- Enhets- og integrasjonstester for tokenhashing, audience, utløp, konsumering,
-  sesjonsrotasjon og tilbakekalling.
-- Parallelle databasetester som beviser at bare ett replayforsøk vinner.
+- Enhets- og integrasjonstester for tokenhashing, audience, utløp, kontrollert
+  gjenåpning av surveyinvitasjoner, sesjonsrotasjon og tilbakekalling.
+- Parallelle databasetester som beviser engangsbruk for medlemsinnlogging og
+  første-svar-regelen for survey.
 - Kontrakttest som sammenligner treff/ikke-treff-respons for status, felter og
   melding.
 - RBAC-matrise for alle roller, sider, API-er og serverfunksjoner.
 - Regresjonstest som sikrer at token, tokenhash, `internal_comment` og
   databasecredentials ikke finnes i klientprops, eksport, e-postlogg eller audit.
-- Surveytester for feil medlem, feil undersøkelse, feil miljø, utløpt token,
-  konsumert token, innsendt svar og samtidige svar.
+- Surveytester for feil medlem, feil undersøkelse, feil miljø, utløpt eller
+  tilbakekalt token, utløpt økt, gjenåpnet invitasjon, innsendt svar og samtidige
+  svar.
 - CSP-test mot produksjonsbygget og kontroll av sikkerhetsheadere.
 - Behold eksisterende tester for parametriserte SQL-kall, origin-kontroll,
   `HttpOnly`/`Secure`/`SameSite`, `no-store`, HSTS, `no-referrer`, `nosniff` og

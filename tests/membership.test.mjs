@@ -53,14 +53,20 @@ test('ended survey is rejected without exposing the member', async () => {
   assert.equal(access.member, undefined);
 });
 
-test('one-time survey token is consumed while creating a separate hashed session', async () => {
+test('valid survey invitation creates a separate hashed session and remains reusable until completion', async () => {
   const statements = [];
-  const sql = sqlMock([[{ member_id: '42', survey_id: 'b'.repeat(32), expires_at: '2099-01-01' }]], statements);
-  const session = await exchangeSurveyAccessToken(secret, { sql, env });
-  assert.equal(session.member_id, '42');
-  assert.match(session.secret, /^[a-f0-9]{64}$/);
-  assert.notEqual(session.secret, secret);
-  assert.match(statements.join('\n'), /consumed_at IS NULL/);
+  const row = { member_id: '42', survey_id: 'b'.repeat(32), expires_at: '2099-01-01' };
+  const sql = sqlMock([[row], [row]], statements);
+  const first = await exchangeSurveyAccessToken(secret, { sql, env });
+  const reopened = await exchangeSurveyAccessToken(secret, { sql, env });
+  assert.equal(first.member_id, '42');
+  assert.match(first.secret, /^[a-f0-9]{64}$/);
+  assert.match(reopened.secret, /^[a-f0-9]{64}$/);
+  assert.notEqual(first.secret, secret);
+  assert.notEqual(reopened.secret, first.secret);
+  assert.match(statements.join('\n'), /consumed_at = COALESCE\(t\.consumed_at, NOW\(\)\)/);
+  assert.doesNotMatch(statements.join('\n'), /t\.consumed_at IS NULL/);
+  assert.match(statements.join('\n'), /t\.answered_at IS NULL AND t\.revoked_at IS NULL AND t\.expires_at > NOW\(\)/);
   assert.match(statements.join('\n'), /session_token_hash/);
 });
 
@@ -88,8 +94,8 @@ test('response snapshot and version condition are part of the same insert statem
     const query = strings.join('?');
     queries.push({ query, values });
     if (query.includes('application_environment')) return [{ environment: 'development' }];
-    if (query.includes('INSERT INTO security_events')) return [];
     if (query.includes('INSERT INTO survey_responses')) return [{ id: '1', member_id: '42', survey_id: 'b'.repeat(32) }];
+    if (query.includes('INSERT INTO security_events')) return [];
     return [{ id: '42', survey_id: 'b'.repeat(32), is_open: true, ends_on: '2099-12-31', question_version: 2, questions: [{ id: 'q1', text: 'Spørsmål' }] }];
   };
   assert.equal((await submitSurveyResponse(secret, { q1: 'ja' }, { sql, env, questionVersion: 2 })).saved, true);
@@ -97,6 +103,7 @@ test('response snapshot and version condition are part of the same insert statem
   assert.match(insert.query, /respondent_email, id, question_version, questions/);
   assert.match(insert.query, /ON CONFLICT \(member_id, survey_id, response_key\) DO UPDATE SET response_key = EXCLUDED.response_key/);
   assert.match(insert.query, /INSERT INTO survey_response_receipts/);
+  assert.match(insert.query, /INSERT INTO security_events/);
   assert.match(insert.query, /AND s.question_version = \?/);
   assert.ok(insert.values.includes(2));
   assert.ok(insert.values.includes(JSON.stringify({ q1: 'ja' })));

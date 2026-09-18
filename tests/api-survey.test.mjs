@@ -88,7 +88,7 @@ test('survey rejects a stale version even when question IDs and answers remain v
   assert.equal(state.writes.length, 0);
 });
 
-test('survey verification removes token from URL and clears cookies after replay or error', async () => {
+test('survey verification removes token from URL and clears cookies after invalid access or error', async () => {
   let session = { secret: 'b'.repeat(64), expires_at: new Date(Date.now() + 60000).toISOString() }, error;
   const route = await loadModule('app/api/survey-access/verify/route.js', {
     '@/lib/membership': { surveySessionCookieName, surveySessionCookieOptions, exchangeSurveyAccessToken: async () => { if (error) throw error; return session; } },

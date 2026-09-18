@@ -513,7 +513,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS member_email_changes_one_pending_idx
   ON member_email_changes (member_id)
   WHERE status IN ('pending_old', 'pending_new');
 
--- Ett hashet engangstoken og én kortvarig sesjon per medlem/undersøkelse.
+-- En hashet invitasjonslenke kan opprette nye kortvarige sesjoner frem til
+-- svar, tilbakekalling eller utløp. Lenkehemmeligheten lagres aldri i databasen.
 CREATE TABLE IF NOT EXISTS survey_access_tokens (
   id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
   member_id BIGINT NOT NULL REFERENCES members(id) ON DELETE RESTRICT,

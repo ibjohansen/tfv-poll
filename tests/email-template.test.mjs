@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { formatNorwegianDateTime, renderMemberAccessEmail, renderMembershipVerificationEmail, renderSurveyInvitationEmail, SYSTEM_EMAIL_FOOTER } from '../lib/email-templates.js';
 import { buildSurveyUrl, isPastSurveyEnd, parseTestRecipients, selectCampaignRecipients } from '../lib/survey-email-utils.js';
 
-test('survey URL uses a one-time 256-bit token without exposing member or survey IDs', () => {
+test('survey URL uses a scoped 256-bit token without exposing member or survey IDs', () => {
   const url = buildSurveyUrl({ baseUrl: 'https://medlemsservice.turufjellvel.no', accessToken: 'a'.repeat(64), surveyId: 'b'.repeat(32) });
   assert.equal(url, `https://medlemsservice.turufjellvel.no/api/survey-access/verify?token=${'a'.repeat(64)}`);
   assert.throws(() => buildSurveyUrl({ baseUrl: 'https://example.test', accessToken: 'secret', surveyId: 'b'.repeat(32) }));
