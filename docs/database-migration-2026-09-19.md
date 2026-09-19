@@ -59,5 +59,18 @@ godkjenning.
 
 ## Etterfølgende deploy
 
-Applikasjonscommit og Netlify-verifikasjon føres inn her etter at deployen er
-ferdig.
+Commit `08eea36` ble pushet til `main` og publisert av Netlify 19. september
+2026 kl. 15:18 UTC. Deployen inneholder også CSP-rettelsen i `481c086`.
+GitHub Actions-jobben `quality` fullførte med status `success`.
+
+Etter publisering ble følgende verifisert:
+
+- Forsiden og innloggingssiden svarer 200 som dynamiske sider med
+  `private,no-cache,no-store`.
+- Alle script-nonce-verdier samsvarer med CSP-headeren; en isolert
+  nettleserkontroll fant ingen konsollfeil eller applikasjonsfeil.
+- Beskyttede adminsider videresender uinnloggede brukere til innlogging, og
+  admin-API-ene svarer 401 med `Cache-Control: no-store` uten gyldig sesjon.
+- Den persistente adminmenyen er verifisert i en isolert ende-til-ende-test.
+  Innlogget produksjonsnavigasjon ble ikke automatisert, fordi det ville krevd
+  å omgå den ordinære Microsoft Entra-innloggingen.
