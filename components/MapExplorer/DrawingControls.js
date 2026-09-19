@@ -1,9 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { useI18n } from '@/components/LocaleProvider';
 
 export default function DrawingControls({ vertices, drawing, editing, onStart, onFinish, onEdit, onDelete, onChange, disabled = false }) {
   const { t } = useI18n('map.admin.drawing');
+  const [longitude, setLongitude] = useState('9.495');
+  const [latitude, setLatitude] = useState('60.465');
   return <fieldset aria-label={t('area')} className="map-drawing-controls" disabled={disabled}>
     <legend>{t('polygon')}</legend>
     <div className="map-actions">
@@ -16,6 +19,10 @@ export default function DrawingControls({ vertices, drawing, editing, onStart, o
     <p className="muted">{t(drawing ? 'drawHelp' : editing ? 'editHelp' : 'help')}</p>
     {(drawing || editing) && <details><summary>{t('coordinates', {count: vertices.length})}</summary>
       <p>{t('coordinateHelp')}</p>
+      <div className="map-coordinate-add"><label>{t('longitude')}<input type="number" step="0.000001" value={longitude} onChange={(event) => setLongitude(event.target.value)} /></label>
+        <label>{t('latitude')}<input type="number" step="0.000001" value={latitude} onChange={(event) => setLatitude(event.target.value)} /></label>
+        <button type="button" className="admin-button" disabled={!Number.isFinite(Number(longitude)) || !Number.isFinite(Number(latitude))}
+          onClick={() => onChange([...vertices, [Number(longitude), Number(latitude)]])}>{t('addCoordinate')}</button></div>
       <ol className="map-coordinate-list">{vertices.map((point, index) => <li key={index}>
         {[0, 1].map((axis) => <label key={axis}>{t(axis ? 'latitude' : 'longitude')} {index + 1}
           <input type="number" step="0.000001" value={point[axis]} onChange={(event) => {

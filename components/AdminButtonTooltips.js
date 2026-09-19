@@ -23,16 +23,16 @@ export default function AdminButtonTooltips() {
       if (label) element.title = explanations.get(label) || t('general.tooltips.generic', {label});
     };
     const selector = 'button, a.admin-button, a.primary-button, label.admin-button';
-    const update = (root = document) => {
-      if (root.matches?.(selector)) addTooltip(root);
-      root.querySelectorAll?.(selector).forEach(addTooltip);
+    const handleInteraction = (event) => {
+      const element = event.target.closest?.(selector);
+      if (element) addTooltip(element);
     };
-    update();
-    const observer = new MutationObserver((entries) => entries.forEach((entry) => entry.addedNodes.forEach((node) => {
-      if (node.nodeType === Node.ELEMENT_NODE) update(node);
-    })));
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
+    document.addEventListener('pointerover', handleInteraction, true);
+    document.addEventListener('focusin', handleInteraction, true);
+    return () => {
+      document.removeEventListener('pointerover', handleInteraction, true);
+      document.removeEventListener('focusin', handleInteraction, true);
+    };
   }, [t]);
   return null;
 }

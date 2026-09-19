@@ -20,6 +20,8 @@ await cp(join(root, 'public/turufjell.jpeg'), join(directory, 'public/carousel/Ã
 await cp(join(root, 'public/turufjell.jpeg'), join(directory, 'public/carousel/Testfotograf_tf002.jpg'));
 await mkdir(join(directory, 'app/admin/browser-test'), { recursive: true });
 await cp(join(root, 'tests/e2e/fixture-page.jsx'), join(directory, 'app/admin/browser-test/page.js'));
+await mkdir(join(directory, 'app/admin/map-browser-test'), { recursive: true });
+await cp(join(root, 'tests/e2e/map-fixture-page.jsx'), join(directory, 'app/admin/map-browser-test/page.js'));
 await symlink(join(root, 'node_modules'), join(directory, 'node_modules'), 'dir');
 const child = spawn(process.execPath, [join(root, 'node_modules/next/dist/bin/next'), 'dev', '--webpack', '--hostname', '127.0.0.1', '--port', '4319'], {
   cwd: directory, stdio: 'inherit', env: {

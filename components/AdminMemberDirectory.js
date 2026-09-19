@@ -7,10 +7,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import MemberPropertyMap from '@/components/MemberPropertyMap';
 import { useI18n } from '@/components/LocaleProvider';
+import { MEMBER_CONTACT_FIELDS, MEMBER_OWNERSHIP_FIELDS, MEMBER_PROPERTY_FIELDS } from '@/lib/member-detail-sections';
 
-const propertyFields = [['h_number', true], ['cadastral_number', true], ['section_number', true]];
-const ownershipFields = [['title_holder', true, true], ['registration_date', true, true]];
-const contactFields = [['primary_contact_name'], ['primary_contact_email'], ['other_contact_emails'], ['admin_comment']];
+const propertyFields = MEMBER_PROPERTY_FIELDS;
+const ownershipFields = MEMBER_OWNERSHIP_FIELDS;
+const contactFields = MEMBER_CONTACT_FIELDS;
 
 function emptyToString(value) { return value || ''; }
 function displayLines(value) { return emptyToString(value).split(/\s*\/\s*/).join('\n'); }

@@ -23,6 +23,53 @@ const map = {
   },
 };
 
+Object.assign(map.admin, {
+  fetchingControl: 'Loading the required sources and comparing the register …',
+  controlReady: '{counts} were loaded and checked.{warning}',
+  confirmReplaceArea: 'The selected area and loaded results will be removed. Change the area?',
+  workflow: {
+    eyebrow: 'Map and register check', title: 'Choose one task',
+    introduction: 'The workspace only shows controls needed for the selected task. Switching tasks does not change member data.',
+    chooseTask: 'Choose task', registerTask: 'Check member register', hamletTask: 'Maintain hamlets',
+    draftPreserved: 'Unsaved hamlet changes are retained. Return to “Maintain hamlets” before leaving the page.',
+    registerSteps: 'Register check steps', hamletSteps: 'Hamlet maintenance steps',
+    step1: 'Select area', step2: 'Load sources', step3: 'Compare', step4: 'Review discrepancies',
+    hamletStep1: 'Select or create hamlet', hamletStep2: 'Draw or adjust boundary', hamletStep3: 'Review', hamletStep4: 'Save',
+    controls: 'Control panel', map: 'Map', areaChoice: '1. Select area', savedArea: 'Select saved hamlet',
+    recommended: 'Recommended – fastest and safest choice', customArea: 'Draw custom area', customAreaHelp: 'Use when the check does not follow a saved hamlet.',
+    selectedArea: 'Selected area', boundaryTools: 'Draw or adjust the hamlet boundary', sources: 'Sources and privacy',
+    controlAction: 'Check the register', readOnly: 'The check only reads and compares data. It never updates the member register.',
+    runControl: 'Check and show suggestions', chooseAreaFirst: 'Select a saved hamlet or complete a custom area first.',
+    supplementarySources: 'Additional map sources', supplementaryHelp: 'Roads and separate source extracts are optional and do not change the register.',
+    noResults: 'No results yet. Select an area and run the check.',
+  },
+  help: {
+    searchPolygon: 'The search polygon limits the sources being loaded. It is temporary and is not a property or hamlet boundary.',
+    hamletBoundary: 'The hamlet boundary is Turufjell Vel’s internal area division. It is not an official property boundary.',
+    sourcePrivacy: 'Kartverket receives the search area, but never member names, email addresses or other contact data. An address point is an official address location; a property parcel is registered geometry and not a boundary survey.',
+  },
+});
+Object.assign(map.admin.hamlets, {
+  selectTitle: 'Select saved hamlet', selectHelp: 'A saved hamlet is recommended because the check is then limited to known member links.',
+  selectLegend: 'Saved check area', selectedReviewed: 'Reviewed internal hamlet boundary', selectedDraft: 'Internal hamlet boundary requiring review',
+  useSelected: 'Use this hamlet',
+});
+Object.assign(map.admin.object, { memberRecord: 'Linked register record' });
+Object.assign(map.admin.memberDetails, {
+  cadastralProposal: 'Suggestion from the Cadastre', cadastralProposalHelp: 'The next step opens a separate, confirmed check. You will see the address, cadastral number and title holder that may change before anything is updated.',
+  reviewCadastralUpdate: 'Review cadastral update suggestion', emailGroups: 'Email groups', noEmailGroups: 'Not linked to an email group.',
+});
+Object.assign(map.admin.results, {
+  eyebrow: 'Check result', summary: 'Register check summary', followUpFilter: 'Follow-up need',
+  categories: { followUp: 'Needs follow-up', possible: 'Possible matches', missingRegister: 'Missing from register', noDeviation: 'No discrepancy' },
+  queueUnprocessed: 'Not reviewed', queueDeferred: 'Deferred', queueHandled: 'Handled', queueFor: 'Work status for {item}',
+  comparisonSource: 'Kartverket and Turufjell Vel', internalSource: 'Turufjell Vel internal register', noDifference: 'No difference found.',
+  confidence: { MATCH: 'High – unambiguous match', MISSING_IN_REGISTER: 'High – found only at Kartverket', MISSING_IN_MAP_DATA: 'Low – location or source needs review', POSSIBLE_MATCH: 'Medium – several candidates', CONFLICT: 'Low – sources disagree' },
+  actions: { MATCH: 'No action needed', MISSING_IN_REGISTER: 'Assess whether to add the property', MISSING_IN_MAP_DATA: 'Check address and cadastral data', POSSIBLE_MATCH: 'Select the right candidate manually', CONFLICT: 'Compare sources before updating', UNKNOWN: 'Find the correct location before concluding' },
+});
+Object.assign(map.admin.results.columns, { plot: 'Property / register record', difference: 'Difference', confidence: 'Confidence', nextAction: 'Next action', queue: 'Work queue' });
+map.admin.drawing.addCoordinate = 'Add coordinate point';
+
 map.admin.requestFailed = 'The map request failed. Please try again.';
 map.admin.hamlets.saveError = 'Could not save the hamlet.';
 map.backend = {

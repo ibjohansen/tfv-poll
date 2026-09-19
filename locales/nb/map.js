@@ -23,6 +23,54 @@ const map = {
   },
 };
 
+Object.assign(map.admin, {
+  fetchingControl: 'Henter nødvendige kilder og sammenligner registeret …',
+  controlReady: '{counts} er hentet og kontrollert.{warning}',
+  confirmReplaceArea: 'Valgt område og hentede resultater blir fjernet. Vil du endre området?',
+  workflow: {
+    eyebrow: 'Kart og registerkontroll', title: 'Velg én oppgave',
+    introduction: 'Arbeidsflaten viser bare kontrollene som trengs for oppgaven du velger. Bytte av oppgave endrer ikke medlemsdata.',
+    chooseTask: 'Velg oppgave', registerTask: 'Kontroller medlemsregister', hamletTask: 'Vedlikehold grender',
+    draftPreserved: 'Ulagrede grendeendringer er beholdt. Gå tilbake til «Vedlikehold grender» før du forlater siden.',
+    registerSteps: 'Steg for registerkontroll', hamletSteps: 'Steg for grendevedlikehold',
+    step1: 'Velg område', step2: 'Hent kilder', step3: 'Sammenlign', step4: 'Behandle avvik',
+    hamletStep1: 'Velg eller opprett grend', hamletStep2: 'Tegn eller juster grense', hamletStep3: 'Kontroller', hamletStep4: 'Lagre',
+    controls: 'Kontrollpanel', map: 'Kartflate', areaChoice: '1. Velg område', savedArea: 'Velg lagret grend',
+    recommended: 'Anbefalt – raskeste og sikreste valg', customArea: 'Tegn egendefinert område',
+    customAreaHelp: 'Brukes når kontrollen ikke følger en lagret grend.', selectedArea: 'Valgt område',
+    boundaryTools: 'Tegn eller juster grendegrensen', sources: 'Kilder og personvern',
+    controlAction: 'Kontroller registeret', readOnly: 'Kontrollen leser og sammenligner data. Den oppdaterer aldri medlemsregisteret.',
+    runControl: 'Kontroller og vis forslag', chooseAreaFirst: 'Velg en lagret grend eller fullfør et egendefinert område først.',
+    supplementarySources: 'Flere kartkilder', supplementaryHelp: 'Veier og separate kildeuttrekk er valgfrie og endrer ikke registeret.',
+    noResults: 'Ingen resultater ennå. Velg et område og kjør kontrollen.',
+  },
+  help: {
+    searchPolygon: 'Søkepolygonet avgrenser hvilke kilder som hentes. Det er midlertidig og er ikke en eiendoms- eller grendegrense.',
+    hamletBoundary: 'Grendegrensen er Turufjell Vels interne områdeinndeling. Den er ikke en offisiell eiendomsgrense.',
+    sourcePrivacy: 'Kartverket mottar søkeområdet, men aldri medlemsnavn, e-post eller andre kontaktopplysninger. Adressepunkt viser en offisiell adresseplassering; eiendomsteig viser registrert geometri og er ikke grensepåvisning.',
+  },
+});
+Object.assign(map.admin.hamlets, {
+  selectTitle: 'Velg lagret grend', selectHelp: 'En lagret grend er anbefalt fordi kontrollen da avgrenses til kjente medlemstilknytninger.',
+  selectLegend: 'Lagret kontrollområde', selectedReviewed: 'Kontrollert intern grendegrense', selectedDraft: 'Intern grendegrense som må kontrolleres',
+  useSelected: 'Bruk denne grenden',
+});
+Object.assign(map.admin.object, { memberRecord: 'Tilknyttet registerpost' });
+Object.assign(map.admin.memberDetails, {
+  cadastralProposal: 'Forslag fra Matrikkelen', cadastralProposalHelp: 'Neste steg åpner en egen, bekreftet kontroll. Du får se adresse, matrikkelnummer og hjemmelshaver som kan endres før noe oppdateres.',
+  reviewCadastralUpdate: 'Kontroller forslag til matrikkeloppdatering', emailGroups: 'E-postgrupper', noEmailGroups: 'Ikke tilknyttet en e-postgruppe.',
+});
+Object.assign(map.admin.results, {
+  eyebrow: 'Kontrollresultat', summary: 'Oppsummering av registerkontroll', followUpFilter: 'Oppfølgingsbehov',
+  categories: { followUp: 'Må følges opp', possible: 'Mulige treff', missingRegister: 'Mangler i register', noDeviation: 'Ingen avvik' },
+  queueUnprocessed: 'Ikke behandlet', queueDeferred: 'Utsatt', queueHandled: 'Behandlet', queueFor: 'Arbeidsstatus for {item}',
+  comparisonSource: 'Kartverket og Turufjell Vel', internalSource: 'Turufjell Vels interne register', noDifference: 'Ingen forskjell funnet.',
+  confidence: { MATCH: 'Høy – entydig treff', MISSING_IN_REGISTER: 'Høy – bare funnet hos Kartverket', MISSING_IN_MAP_DATA: 'Lav – plassering eller kilde må kontrolleres', POSSIBLE_MATCH: 'Middels – flere kandidater', CONFLICT: 'Lav – kildene er uenige' },
+  actions: { MATCH: 'Ingen handling nødvendig', MISSING_IN_REGISTER: 'Vurder om tomten skal registreres', MISSING_IN_MAP_DATA: 'Kontroller adresse og matrikkeldata', POSSIBLE_MATCH: 'Velg riktig kandidat manuelt', CONFLICT: 'Sammenlign kildene før oppdatering', UNKNOWN: 'Finn riktig plassering før konklusjon' },
+});
+Object.assign(map.admin.results.columns, { plot: 'Tomt / registerpost', difference: 'Forskjell', confidence: 'Sikkerhet', nextAction: 'Neste handling', queue: 'Arbeidskø' });
+map.admin.drawing.addCoordinate = 'Legg til koordinatpunkt';
+
 map.admin.requestFailed = 'Kartforespørselen mislyktes. Prøv igjen.';
 map.admin.hamlets.saveError = 'Kunne ikke lagre grenden.';
 map.backend = {

@@ -7,7 +7,7 @@ import { useI18n } from '@/components/LocaleProvider';
 
 const geometryKey = (polygon) => polygon ? JSON.stringify(polygon.geometry) : '';
 
-const HamletControls = forwardRef(function HamletControls({ polygon, editing, drawing, onUse, onList, onBusy, children }, ref) {
+const HamletControls = forwardRef(function HamletControls({ polygon, editing, drawing, onUse, onList, onBusy, onDirty, mode = 'maintain' }, ref) {
   const { t, locale } = useI18n('map.admin.hamlets');
   const [hamlets, setHamlets] = useState([]);
   const [chosen, setChosen] = useState('');
@@ -24,8 +24,10 @@ const HamletControls = forwardRef(function HamletControls({ polygon, editing, dr
   const saveRequest = useRef(null);
   const key = geometryKey(polygon);
   const reviewed = Boolean(key && key === reviewedFor);
-  const dirty = Boolean(key !== geometryKey(current?.polygon) || name !== (current?.name || '')
-    || reviewed !== Boolean(current?.reviewed) || drawing || editing);
+  const dirty = Boolean((creating || current) && (key !== geometryKey(current?.polygon) || name !== (current?.name || '')
+    || reviewed !== Boolean(current?.reviewed) || drawing || editing));
+
+  useEffect(() => { onDirty?.(dirty); }, [dirty, onDirty]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -81,13 +83,12 @@ const HamletControls = forwardRef(function HamletControls({ polygon, editing, dr
     } finally { if (!controller.signal.aborted) { setSaving(false); onBusy(false); } }
   }
 
-  return <section className="map-hamlet-controls" aria-labelledby="map-hamlets-heading">
-    <h2 id="map-hamlets-heading">{t('title')}</h2>
-    <p>{t('help')}</p>
-    <div className="map-hamlet-workspace">
-      <div className="map-hamlet-editor">
+  return <section className={`map-hamlet-controls is-${mode}`} aria-labelledby="map-hamlets-heading">
+    <h2 id="map-hamlets-heading">{t(mode === 'select' ? 'selectTitle' : 'title')}</h2>
+    <p>{t(mode === 'select' ? 'selectHelp' : 'help')}</p>
+    <div className="map-hamlet-editor">
         <fieldset disabled={saving}>
-          <legend>{t('legend')}</legend>
+          <legend>{t(mode === 'select' ? 'selectLegend' : 'legend')}</legend>
           <div className="select-action-row">
             <label>{t('saved')}<Select value={chosen} onChange={(event) => {
               const hamlet = hamlets.find((item) => item.id === event.target.value);
@@ -96,10 +97,10 @@ const HamletControls = forwardRef(function HamletControls({ polygon, editing, dr
               <option value="">{t('choose')}</option>
               {hamlets.map((h) => <option key={h.id} value={h.id}>{h.name}{!h.polygon ? ` · ${t('noPolygon')}` : h.reviewed ? '' : ` · ${t('reviewNeeded')}`}</option>)}
             </Select></label>
-            <button type="button" className="admin-button" onClick={() => load(null)}>{t('new')}</button>
+            {mode === 'maintain' && <button type="button" className="admin-button" onClick={() => load(null)}>{t('new')}</button>}
           </div>
           <button type="button" className="admin-button map-hamlet-reload" disabled={loading} onClick={() => { setError(''); setLoading(true); setReload((n) => n + 1); }}>{t('reload')}</button>
-          {(creating || current) && <><label>{t('name')}<input value={name} onChange={(event) => setName(event.target.value)} maxLength={100} placeholder={t('name')} /></label>
+          {mode === 'maintain' && (creating || current) && <><label>{t('name')}<input value={name} onChange={(event) => setName(event.target.value)} maxLength={100} placeholder={t('name')} /></label>
             <label className="map-hamlet-review"><input type="checkbox" checked={reviewed} disabled={!polygon || editing || drawing}
               onChange={(event) => setReviewedFor(event.target.checked ? key : '')} /> {t('checked')}</label>
             <p className="map-warning">{t(reviewed ? 'reviewed' : 'draft')}</p>
@@ -109,12 +110,12 @@ const HamletControls = forwardRef(function HamletControls({ polygon, editing, dr
               <button type="button" className="admin-button" disabled={!current?.polygon || !loaded || loading} onClick={() => save('clear')}>{t('clear')}</button>
             </div></>}
         </fieldset>
-        {current && <p className="muted">{t('editing', {name: current.name, version: current.version, state: t(dirty ? 'dirty' : 'stored')})}</p>}
+        {mode === 'select' && current?.polygon && <div className="map-area-card"><strong>{current.name}</strong><span>{t(current.reviewed ? 'selectedReviewed' : 'selectedDraft')}</span>
+          <button type="button" className="admin-button" onClick={() => onUse(current)}>{t('useSelected')}</button></div>}
+        {mode === 'maintain' && current && <p className="muted">{t('editing', {name: current.name, version: current.version, state: t(dirty ? 'dirty' : 'stored')})}</p>}
         {loading && <p role="status">{t('loading')}</p>}
         {error && <p className="error-message" role="alert">{error}</p>}
         {notice && <p role="status">{notice}</p>}
-      </div>
-      <div className="map-hamlet-map">{children}</div>
     </div>
   </section>;
 });
