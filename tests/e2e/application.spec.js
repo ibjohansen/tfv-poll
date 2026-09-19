@@ -36,8 +36,24 @@ test('shared select supports keyboard, ordinary form values, reset and language 
   await expect(page.getByRole('combobox', { name: 'Språk', exact: true })).toContainText('Norsk');
   const map = page.locator('.public-hamlet-map-mount');
   await map.scrollIntoViewIfNeeded();
+  await page.getByRole('button', { name: 'Åpne kart' }).click();
   await expect(page.getByTitle('Zoom inn')).toBeVisible();
   await expect(page.getByTitle('Zoom ut')).toBeVisible();
+});
+
+test('public map sends no Kartverket tile requests until the user opens it', async ({ page, context }) => {
+  const tileRequests = [];
+  page.on('request', (request) => {
+    if (new URL(request.url()).hostname === 'cache.kartverket.no') tileRequests.push(request.url());
+  });
+  await authenticate(context);
+  await page.goto('/admin/browser-test');
+  await page.locator('.public-hamlet-map-mount').scrollIntoViewIfNeeded();
+  await page.waitForTimeout(500);
+  expect(tileRequests).toHaveLength(0);
+  await page.getByRole('button', { name: 'Åpne kart' }).click();
+  await expect(page.getByTitle('Zoom inn')).toBeVisible();
+  await expect.poll(() => tileRequests.length).toBeGreaterThan(0);
 });
 
 test('custom multiple choices submit arrays and explain a non-counted later response', async ({ page, context }) => {
@@ -101,15 +117,15 @@ test('public pageviews send only coarse anonymous dimensions and usage dashboard
   await expect(carousel).toBeVisible();
   await expect.poll(() => carousel.getByRole('img').evaluate((image) => image.complete && image.naturalWidth > 0)).toBe(true);
   await expect(carousel.getByText(/^Foto: /)).toBeVisible();
-  await carousel.getByRole('button', { name: 'Pause automatisk bildebytte' }).click();
+  await carousel.getByRole('button', { name: 'Start automatisk bildebytte' }).click();
   await carousel.getByRole('button', { name: /^Bilde 1 av / }).click();
   await expect(carousel.getByRole('button', { name: /^Bilde 1 av / })).toHaveAttribute('aria-current', 'true');
   await carousel.focus();
   await carousel.press('ArrowRight');
   await expect(carousel.getByRole('button', { name: /^Bilde 2 av / })).toHaveAttribute('aria-current', 'true');
   const expectedDevice = page.viewportSize().width < 768 ? 'mobile' : page.viewportSize().width < 1100 ? 'tablet' : 'desktop';
-  await expect.poll(() => payload).toEqual({ pageType: 'home', deviceCategory: expectedDevice });
-  expect(Object.keys(payload).sort()).toEqual(['deviceCategory', 'pageType']);
+  await expect.poll(() => payload).toMatchObject({ events: [{ pageType: 'home', deviceCategory: expectedDevice }] });
+  expect(Object.keys(payload).sort()).toEqual(['events', 'webVitals']);
 
   await authenticate(context);
   await page.goto('/admin/usage');

@@ -4,10 +4,8 @@ import Select from "@/components/Select";
 import AutoFilterForm from '@/components/AutoFilterForm';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import RichTextEditor from '@/components/RichTextEditor';
 import { cmsCategories, createSlug, isValidCmsSlug, normalizeSlugInput } from '@/lib/cms-validation';
 import { fileTypeLabel, formatFileSize } from '@/lib/file-format';
 import { useI18n } from '@/components/LocaleProvider';
@@ -50,7 +48,9 @@ const pageKey = (page, status = page?.status) => page ? JSON.stringify(pagePaylo
 
 export default function CmsPageDirectory({ pages, search, storageConfigured }) {
   const { t, formatLocale } = useI18n('cms.admin');
-  const router = useRouter();
+  const [pageRows, setPageRows] = useState(pages);
+  const [RichTextEditor, setRichTextEditor] = useState(null);
+  const editorPromise = useRef(null);
   const [selected, setSelected] = useState(null);
   const [slugEdited, setSlugEdited] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -58,15 +58,28 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
   const [saveState, setSaveState] = useState('idle');
   const [savedPageKey, setSavedPageKey] = useState('');
   const latestPageKey = useRef('');
+  const saveController = useRef(null);
+  const saveRequest = useRef(0);
   const [message, setMessage] = useState('');
   const [listMessage, setListMessage] = useState('');
   const [deleteCandidate, setDeleteCandidate] = useState(null);
+
+  const upsertPageRow = useCallback((page) => {
+    setPageRows((current) => [page, ...current.filter(({ id }) => id !== page.id)]);
+  }, []);
+
+  const loadEditor = useCallback(async () => {
+    editorPromise.current ||= import('@/components/RichTextEditor');
+    const editorModule = await editorPromise.current;
+    setRichTextEditor(() => editorModule.default);
+  }, []);
 
   function update(name, value) {
     setSelected((current) => ({ ...current, [name]: value }));
   }
 
   function newPage() {
+    void loadEditor().catch(() => setMessage(t('loadError')));
     setSelected({ ...emptyPage, isNew: true });
     setSlugEdited(false);
     setMessage('');
@@ -80,7 +93,7 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
       const response = await fetch('/api/admin/cms/pages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'copy', sourceId: selected.id }), signal: AbortSignal.timeout(60000) });
       const body = await response.json();
       if (!response.ok || !body.ok) throw new Error(body.message || t('saveError'));
-      setSelected(body.page); setSlugEdited(true); setSavedPageKey(pageKey(body.page)); setSaveState('saved'); setMessage(t('copied')); router.refresh();
+      setSelected(body.page); setSlugEdited(true); setSavedPageKey(pageKey(body.page)); setSaveState('saved'); setMessage(t('copied')); upsertPageRow(body.page);
     } catch (error) { setMessage(error.message || t('saveError')); }
     finally { setBusy(false); }
   }
@@ -90,7 +103,7 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
     setMessage('');
     setListMessage('');
     try {
-      const response = await fetch(`/api/admin/cms/pages/${summary.id}`);
+      const [response] = await Promise.all([fetch(`/api/admin/cms/pages/${summary.id}`), loadEditor()]);
       const body = await response.json();
       if (!response.ok || !body.ok) throw new Error(body.message || t('loadError'));
       setSelected(body.page);
@@ -105,6 +118,10 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
   }
 
   const persistPage = useCallback(async (page, requestedStatus, wasNew) => {
+    saveController.current?.abort();
+    const controller = new AbortController();
+    saveController.current = controller;
+    const request = ++saveRequest.current;
     setBusy(true);
     setSaveState('saving');
     setMessage('');
@@ -113,22 +130,26 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
         method: wasNew ? 'POST' : 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(pagePayload(page, requestedStatus)),
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)]),
       });
       const body = await response.json();
+      if (request !== saveRequest.current) return;
       if (!response.ok || !body.ok) throw new Error(body.message || t('saveError'));
       setSavedPageKey(pageKey(body.page));
       setSelected((current) => latestPageKey.current === pageKey(page, requestedStatus) ? body.page : current);
       setSlugEdited(true);
       setSaveState(latestPageKey.current === pageKey(page, requestedStatus) ? 'saved' : 'dirty');
       setMessage(wasNew ? t(requestedStatus === 'published' ? 'savedPublished' : 'draftCreated') : '');
-      router.refresh();
+      upsertPageRow(body.page);
     } catch (error) {
+      if (controller.signal.aborted || request !== saveRequest.current) return;
       setMessage(error.message);
       setSaveState('error');
     } finally {
-      setBusy(false);
+      if (request === saveRequest.current) { saveController.current = null; setBusy(false); }
     }
-  }, [router, t]);
+  }, [t, upsertPageRow]);
+  useEffect(() => () => saveController.current?.abort(), []);
 
   async function save(event) {
     event.preventDefault();
@@ -163,7 +184,7 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
     setSavedPageKey(pageKey(body.page));
     setSaveState('saved');
     setSlugEdited(true);
-    router.refresh();
+    upsertPageRow(body.page);
     return { page: body.page, created: true };
   }
 
@@ -179,7 +200,7 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
       const body = await response.json();
       if (!response.ok || !body.ok) throw new Error(body.message || t('statusError'));
       setListMessage(t(status === 'published' ? 'publishedNotice' : 'unpublishedNotice'));
-      router.refresh();
+      upsertPageRow(body.page);
     } catch (error) {
       setListMessage(error.message);
     }
@@ -202,7 +223,6 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
       if (!response.ok || !body.ok) throw new Error(body.message || t('imageUploadError'));
       setSelected((current) => ({ ...(current?.id === persisted.page.id ? current : persisted.page), image: body.image }));
       setMessage(t('imageUploaded', {draft: createdDraft ? t('draftPrefix') : ''}));
-      router.refresh();
     } catch (error) {
       setMessage(`${createdDraft ? t('draftButPrefix') : ''}${error.message}`);
     } finally {
@@ -236,14 +256,12 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
         return { ...page, attachments: [...page.attachments, ...uploaded] };
       });
       setMessage(t('attachmentsUploaded', {draft: createdDraft ? t('draftPrefix') : '', count: uploaded.length}));
-      router.refresh();
     } catch (error) {
       if (uploaded.length && persistedPage) {
         setSelected((current) => {
           const page = current?.id === persistedPage.id ? current : persistedPage;
           return { ...page, attachments: [...page.attachments, ...uploaded] };
         });
-        router.refresh();
       }
       const partial = uploaded.length ? t('partialUpload', {count: uploaded.length}) : '';
       setMessage(`${createdDraft ? t('draftPrefix') : ''}${partial}${error.message}`);
@@ -263,8 +281,8 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
       });
       const body = await response.json();
       if (!response.ok || !body.ok) throw new Error(body.message || t('renameError'));
+      setSelected((current) => ({ ...current, attachments: current.attachments.map((item) => item.id === body.attachment?.id ? body.attachment : item) }));
       setMessage(t('nameSaved'));
-      router.refresh();
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -287,7 +305,6 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
       });
       const body = await response.json();
       if (!response.ok || !body.ok) throw new Error(body.message || t('orderError'));
-      router.refresh();
     } catch (error) {
       setSelected((current) => ({ ...current, attachments: original }));
       setMessage(error.message);
@@ -306,6 +323,7 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
         const body = await response.json();
         if (!response.ok || !body.ok) throw new Error(body.message || t('deletePageError'));
         if (selected?.id === candidate.page.id) setSelected(null);
+        setPageRows((current) => current.filter(({ id }) => id !== candidate.page.id));
         setListMessage(t('pageDeleted'));
       } else if (candidate.type === 'image') {
         const response = await fetch(`/api/admin/cms/pages/${selected.id}/image`, {
@@ -324,7 +342,6 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
         setSelected((current) => ({ ...current, attachments: current.attachments.filter(({ id }) => id !== candidate.file.id) }));
         setMessage(t('attachmentRemoved'));
       }
-      router.refresh();
     } catch (error) {
       if (candidate.type === 'page') setListMessage(error.message);
       else setMessage(error.message);
@@ -358,15 +375,15 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
         <table className="admin-table cms-page-table">
           <caption>{t('tableCaption')}</caption>
           <thead><tr><th scope="col">{t('title')}</th><th scope="col">{t('category')}</th><th scope="col">{t('status')}</th><th scope="col">{t('modified')}</th><th scope="col">{t('published')}</th><th scope="col">{t('actions')}</th></tr></thead>
-          <tbody>{pages.map((page) => <tr key={page.id}><th scope="row"><button className="cms-title-button" type="button" onClick={() => editPage(page)}>{page.title}</button><small>/{page.slug}</small></th><td data-label={t('category')}>{t(`categories.${page.category}`, {}, page.category)}</td><td data-label={t('status')}><span className={`status-pill ${page.status === 'published' ? 'is-open' : 'is-closed'}`}>{page.status === 'published' ? t('published') : t('draft')}</span></td><td data-label={t('modified')}>{formatDate(page.updated_at, formatLocale)}</td><td data-label={t('published')}>{formatDate(page.published_at, formatLocale)}</td><td data-label={t('actions')}><div className="cms-row-actions"><button type="button" onClick={() => editPage(page)}>{t('edit')}</button><Link href={`/admin/web/preview/${page.id}`} target="_blank">{t('preview')}</Link><button type="button" onClick={() => changeStatus(page)}>{page.status === 'published' ? t('unpublish') : t('publish')}</button><button className="is-danger" type="button" onClick={() => setDeleteCandidate({ type: 'page', page })}>{t('delete')}</button></div></td></tr>)}</tbody>
+          <tbody>{pageRows.map((page) => <tr key={page.id}><th scope="row"><button className="cms-title-button" type="button" onClick={() => editPage(page)}>{page.title}</button><small>/{page.slug}</small></th><td data-label={t('category')}>{t(`categories.${page.category}`, {}, page.category)}</td><td data-label={t('status')}><span className={`status-pill ${page.status === 'published' ? 'is-open' : 'is-closed'}`}>{page.status === 'published' ? t('published') : t('draft')}</span></td><td data-label={t('modified')}>{formatDate(page.updated_at, formatLocale)}</td><td data-label={t('published')}>{formatDate(page.published_at, formatLocale)}</td><td data-label={t('actions')}><div className="cms-row-actions"><button type="button" onClick={() => editPage(page)}>{t('edit')}</button><Link href={`/admin/web/preview/${page.id}`} target="_blank">{t('preview')}</Link><button type="button" onClick={() => changeStatus(page)}>{page.status === 'published' ? t('unpublish') : t('publish')}</button><button className="is-danger" type="button" onClick={() => setDeleteCandidate({ type: 'page', page })}>{t('delete')}</button></div></td></tr>)}</tbody>
         </table>
-        {!pages.length && <div className="cms-empty"><strong>{t('noneFound')}</strong><p>{t('noneHelp')}</p></div>}
+        {!pageRows.length && <div className="cms-empty"><strong>{t('noneFound')}</strong><p>{t('noneHelp')}</p></div>}
       </div>
 
       <aside className={`admin-detail-panel cms-editor${selected ? ' is-open' : ''}`} aria-hidden={!selected} aria-label={t('editPage')}>
         {selected?.id && <button className="admin-button" type="button" disabled={busy || displayedSaveState !== 'saved'} onClick={copyPage}>{t('copy')}</button>}
         <div className="admin-detail-header"><div><p className="eyebrow">{selected?.isNew ? t('newPage') : t('website')}</p><h2>{selected?.isNew ? t('createPage') : selected?.title}</h2>{!selected?.isNew && <span className={`admin-save-status is-${displayedSaveState}`} role="status">{t(`saveStates.${displayedSaveState}`)}</span>}</div><button className="admin-button" type="button" onClick={() => setSelected(null)} disabled={busy}>{t('close')}</button></div>
-        {selected && <CmsEditorForm page={selected} busy={busy} message={message} storageConfigured={storageConfigured} t={t} formatLocale={formatLocale} onUpdate={update} onTitleChange={(title) => setSelected((current) => ({ ...current, title, slug: slugEdited ? current.slug : createSlug(title) }))} onSlugChange={(value) => { setSlugEdited(true); update('slug', normalizeSlugInput(value)); }} onSave={save} onUploadImage={uploadImage} onUploadAttachments={uploadAttachments} onRenameAttachment={renameAttachment} onMoveAttachment={moveAttachment} onDelete={setDeleteCandidate} />}
+        {selected && <CmsEditorForm RichTextEditor={RichTextEditor} page={selected} busy={busy} message={message} storageConfigured={storageConfigured} t={t} formatLocale={formatLocale} onUpdate={update} onTitleChange={(title) => setSelected((current) => ({ ...current, title, slug: slugEdited ? current.slug : createSlug(title) }))} onSlugChange={(value) => { setSlugEdited(true); update('slug', normalizeSlugInput(value)); }} onSave={save} onUploadImage={uploadImage} onUploadAttachments={uploadAttachments} onRenameAttachment={renameAttachment} onMoveAttachment={moveAttachment} onDelete={setDeleteCandidate} />}
       </aside>
 
       <ConfirmDialog open={Boolean(deleteCandidate)} title={confirmTitle} description={deleteCandidate?.type === 'page' ? t('deletePageDescription') : t('removeDescription')} confirmLabel={deleteCandidate?.type === 'page' ? t('deletePage') : t('remove')} busy={busy} onCancel={() => setDeleteCandidate(null)} onConfirm={confirmDelete} />
@@ -374,7 +391,7 @@ export default function CmsPageDirectory({ pages, search, storageConfigured }) {
   );
 }
 
-function CmsEditorForm({ page, busy, message, storageConfigured, t, formatLocale, onUpdate, onTitleChange, onSlugChange, onSave, onUploadImage, onUploadAttachments, onRenameAttachment, onMoveAttachment, onDelete }) {
+function CmsEditorForm({ RichTextEditor, page, busy, message, storageConfigured, t, formatLocale, onUpdate, onTitleChange, onSlugChange, onSave, onUploadImage, onUploadAttachments, onRenameAttachment, onMoveAttachment, onDelete }) {
   const canUpload = Boolean(storageConfigured && (page.id || (page.title.trim() && isValidCmsSlug(page.slug))));
   return (
     <form className="cms-editor-form" onSubmit={onSave}>
@@ -384,7 +401,8 @@ function CmsEditorForm({ page, busy, message, storageConfigured, t, formatLocale
         <label>URL <span aria-hidden="true">*</span><div className="cms-slug-field"><span>/</span><input value={page.slug} maxLength={100} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" required onChange={(event) => onSlugChange(event.target.value)} /></div><small>{t('slugHelp')}</small></label>
         <label>{t('category')} <span aria-hidden="true">*</span><Select value={page.category} onChange={(event) => onUpdate('category', event.target.value)}>{cmsCategories.map((category) => <option key={category} value={category}>{t(`categories.${category}`, {}, category)}</option>)}</Select></label>
         <label>{t('intro')}<textarea value={page.intro || ''} maxLength={500} rows={4} onChange={(event) => onUpdate('intro', event.target.value)} /><small>{t('introHelp', {count: (page.intro || '').length})}</small></label>
-        <RichTextEditor key={page.id || 'new'} value={page.body_rich_text} plainText={page.body || ''} onChange={(value) => onUpdate('body_rich_text', value)} disabled={busy} />
+        {RichTextEditor ? <RichTextEditor key={page.id || 'new'} value={page.body_rich_text} plainText={page.body || ''} onChange={(value) => onUpdate('body_rich_text', value)} disabled={busy} />
+          : <p className="admin-count" role="status">{t('loading')}</p>}
       </fieldset>
 
       <section className="cms-editor-section" aria-labelledby="cms-image-title">

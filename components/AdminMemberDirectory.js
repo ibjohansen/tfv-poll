@@ -4,7 +4,6 @@ import Select from "@/components/Select";
 import Link from 'next/link';
 import AutoFilterForm from '@/components/AutoFilterForm';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import MemberPropertyMap from '@/components/MemberPropertyMap';
 import { useI18n } from '@/components/LocaleProvider';
@@ -51,7 +50,6 @@ function payloadKey(form) {
 
 export default function AdminMemberDirectory({ data, surveys, search, sort, direction, incompleteContact, hasComment = false, initialSelected = null, membershipStatus = '', hamletId = '', groupId = '', turufjellAsSharing = '', groups = [], canMatrikkelSync = false }) {
   const { t } = useI18n('members.adminDirectory');
-  const router = useRouter();
   const [selected, setSelected] = useState(initialSelected);
   const [form, setForm] = useState(() => initialSelected ? formFromMember(initialSelected) : null);
   const [message, setMessage] = useState('');
@@ -76,7 +74,8 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
   const [saveState, setSaveState] = useState(initialSelected ? 'saved' : 'idle');
   const savedPayload = useRef(initialSelected ? payloadKey(formFromMember(initialSelected)) : '');
   const formVersion = useRef(0);
-  const savingRef = useRef(false);
+  const saveController = useRef(null);
+  const saveRequest = useRef(0);
   const sentinel = useRef(null);
   const exportCancelButton = useRef(null);
   const detailCloseButton = useRef(null);
@@ -133,11 +132,15 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
   const close = () => { setSelected(null); setForm(null); setGroupMessage(null); setNewToken(''); };
   const updateForm = (name, value) => { formVersion.current += 1; setForm((current) => ({ ...current, [name]: value })); };
   const persistForm = useCallback(async (payload, version, wasNew, memberId) => {
-    if (savingRef.current) return false;
-    savingRef.current = true; setSaving(true); setSaveState('saving'); setMessage('');
+    saveController.current?.abort();
+    const controller = new AbortController();
+    saveController.current = controller;
+    const request = ++saveRequest.current;
+    setSaving(true); setSaveState('saving'); setMessage('');
     try {
-      const response = await fetch(wasNew ? '/api/admin/members' : `/api/admin/members/${memberId}`, { method: wasNew ? 'POST' : 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(20_000) });
+      const response = await fetch(wasNew ? '/api/admin/members' : `/api/admin/members/${memberId}`, { method: wasNew ? 'POST' : 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)]) });
       const body = await response.json();
+      if (request !== saveRequest.current) return false;
       if (!response.ok || !body.ok) { setMessage(body.message || t('saveError')); setSaveState('error'); return false; }
       const returnedForm = formFromMember(body.member);
       savedPayload.current = payloadKey(returnedForm);
@@ -149,11 +152,16 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
         ? t('createdHamlet', {name: body.member.hamlet_name})
         : body.member.street_address ? t('createdNoHamlet')
           : t('createdNeedsAddress') : '');
-      router.refresh();
       return true;
-    } catch { setMessage(t('serverError')); setSaveState('error'); return false; }
-    finally { savingRef.current = false; setSaving(false); }
-  }, [router, t, updateMembers]);
+    } catch (error) {
+      if (controller.signal.aborted || request !== saveRequest.current) return false;
+      setMessage(t('serverError')); setSaveState('error'); return false;
+    }
+    finally {
+      if (request === saveRequest.current) { saveController.current = null; setSaving(false); }
+    }
+  }, [t, updateMembers]);
+  useEffect(() => () => saveController.current?.abort(), []);
   async function save(event) {
     event.preventDefault();
     await persistForm(payloadFromForm(form), formVersion.current, Boolean(selected.isNew), selected.id);
@@ -175,7 +183,7 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
       const body = await response.json().catch(() => ({}));
       if (!response.ok || !body.ok) { setConfirmDelete(false); setMessage(body.message || t('deleteError')); return; }
       updateMembers((current) => current.filter((item) => String(item.id) !== String(selected.id)));
-      setConfirmDelete(false); close(); router.refresh();
+      setConfirmDelete(false); close();
     } catch {
       setConfirmDelete(false); setMessage(t('deleteServerError'));
     } finally { setDeleting(false); }
@@ -215,7 +223,6 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
         ? action === 'add' ? t('hamletAssigned', {name: group.name}) : t('hamletRemoved')
         : action === 'add' ? t('groupAdded', { count: body.group?.changed_count ?? 0, name: group.name }) : t('groupRemoved', { name: group.name });
       setGroupMessage({ type: 'success', text });
-      router.refresh();
       return true;
     } catch (error) {
       setGroupMessage({ type: 'error', text: error.message || t('groupSaveError') });

@@ -6,6 +6,7 @@ import { getRequestI18n } from '@/lib/i18n/request';
 export const runtime = 'nodejs';
 
 export async function GET(request, { params }) {
+  const startedAt = Date.now();
   const { locale, t: backendT } = getRequestI18n(request, 'backend');
   const { t: mapT } = getRequestI18n(request, 'map.backend');
   if (request.headers.get('sec-fetch-site') === 'cross-site') {
@@ -19,7 +20,7 @@ export async function GET(request, { params }) {
     const signal = AbortSignal.any([request.signal, AbortSignal.timeout(25_000)]);
     const data = await getPublicHamletProperties((await params).id, { signal, locale, t: mapT });
     return Response.json({ ok: true, ...data }, {
-      headers: { 'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=300' },
+      headers: { 'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=300', 'Server-Timing': `map_lookup;dur=${(Date.now() - startedAt).toFixed(1)}` },
     });
   } catch (error) {
     const status = error instanceof MapError ? error.status : 500;

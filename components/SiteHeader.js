@@ -1,10 +1,12 @@
+'use client';
+
 import Link from 'next/link';
 import BrandLogo from '@/components/BrandLogo';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
-import { getServerI18n } from '@/lib/i18n/server';
+import { useI18n } from '@/components/LocaleProvider';
 
-export default async function SiteHeader() {
-  const { t } = await getServerI18n('general.navigation');
+export default function SiteHeader() {
+  const { t } = useI18n('general.navigation');
   return (
     <>
       <a className="skip-link" href="#main-content">{t('skipToContent')}</a>

@@ -27,7 +27,7 @@ export default function HomeHeroCarousel({ images }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [hasFocusWithin, setHasFocusWithin] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
+  const [isPaused, setIsPaused] = useState(true);
   const [visible, setVisible] = useState(true);
   const container = useRef(null);
   const imageCount = images.length;

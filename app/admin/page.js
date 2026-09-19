@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { auth } from '@/auth';
 import { isAllowedAdmin, isAuthConfigured } from '@/lib/admin-policy';
+import { getAdminSession } from '@/lib/admin-access';
 import { getAdminTaskCount } from '@/lib/member-self-service';
 import AdminModuleHeader, { adminModules, ModuleIcon } from '@/components/AdminModuleHeader';
 import { getServerI18n } from '@/lib/i18n/server';
@@ -14,7 +14,7 @@ export const generateMetadata = () => adminPageMetadata('overview');
 export default async function AdminPage() {
   const { t } = await getServerI18n();
   if (!isAuthConfigured()) redirect('/admin/login');
-  const session = await auth();
+  const session = await getAdminSession();
   if (!isAllowedAdmin(session?.user)) redirect('/admin/login');
   let taskCount = 0;
   try { taskCount = await getAdminTaskCount(); } catch { /* Header and tile remain usable without a count. */ }

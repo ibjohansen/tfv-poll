@@ -41,27 +41,39 @@ function responseWithCsp(response, csp) {
   return response;
 }
 
+function withTiming(response, name, startedAt) {
+  response.headers.append('Server-Timing', `${name};dur=${Math.max(0, Date.now() - startedAt).toFixed(1)}`);
+  return response;
+}
+
 export async function proxy(request) {
+  const proxyStartedAt = Date.now();
   const { t } = getRequestI18n(request, 'backend.api');
   const requestedLocale = normalizeLocale(request.nextUrl.searchParams.get('lang'));
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const csp = contentSecurityPolicy(nonce);
-  if (isPublicPath(request.nextUrl.pathname)) return nextWithCsp(request, nonce, csp, requestedLocale);
+  if (isPublicPath(request.nextUrl.pathname)) return withTiming(nextWithCsp(request, nonce, csp, requestedLocale), 'proxy', proxyStartedAt);
+  const authStartedAt = Date.now();
   const session = isAuthConfigured() ? await auth() : null;
+  const authDuration = Date.now() - authStartedAt;
   if (isAllowedAdmin(session?.user)) {
     const permission = permissionForPath(request.nextUrl.pathname);
-    if (adminPermissions(session.user).has(permission)) return nextWithCsp(request, nonce, csp, requestedLocale);
+    if (adminPermissions(session.user).has(permission)) {
+      const response = nextWithCsp(request, nonce, csp, requestedLocale);
+      response.headers.append('Server-Timing', `auth;dur=${authDuration.toFixed(1)}`);
+      return withTiming(response, 'proxy', proxyStartedAt);
+    }
     if (request.nextUrl.pathname.startsWith('/api/')) {
       console.warn('Security event', { event: 'admin_access_denied', result: 'forbidden', area: permission, occurredAt: new Date().toISOString() });
-      return responseWithCsp(NextResponse.json({ message: t('forbidden') }, { status: 403, headers: { 'Cache-Control': 'no-store' } }), csp);
+      return withTiming(responseWithCsp(NextResponse.json({ message: t('forbidden') }, { status: 403, headers: { 'Cache-Control': 'no-store', 'Server-Timing': `auth;dur=${authDuration.toFixed(1)}` } }), csp), 'proxy', proxyStartedAt);
     }
-    return responseWithCsp(NextResponse.redirect(new URL('/admin', request.url)), csp);
+    return withTiming(responseWithCsp(NextResponse.redirect(new URL('/admin', request.url), { headers: { 'Server-Timing': `auth;dur=${authDuration.toFixed(1)}` } }), csp), 'proxy', proxyStartedAt);
   }
   if (request.nextUrl.pathname.startsWith('/api/')) {
     console.warn('Security event', { event: 'admin_access_denied', result: 'unauthorized', area: permissionForPath(request.nextUrl.pathname), occurredAt: new Date().toISOString() });
-    return responseWithCsp(NextResponse.json({ message: t('unauthorized') }, { status: 401, headers: { 'Cache-Control': 'no-store' } }), csp);
+    return withTiming(responseWithCsp(NextResponse.json({ message: t('unauthorized') }, { status: 401, headers: { 'Cache-Control': 'no-store', 'Server-Timing': `auth;dur=${authDuration.toFixed(1)}` } }), csp), 'proxy', proxyStartedAt);
   }
-  return responseWithCsp(NextResponse.redirect(new URL('/admin/login', request.url)), csp);
+  return withTiming(responseWithCsp(NextResponse.redirect(new URL('/admin/login', request.url), { headers: { 'Server-Timing': `auth;dur=${authDuration.toFixed(1)}` } }), csp), 'proxy', proxyStartedAt);
 }
 
 export const config = {

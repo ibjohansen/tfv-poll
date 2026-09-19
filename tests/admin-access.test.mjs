@@ -12,6 +12,7 @@ test('server permission guards enforce actual tenant, allowlist and role policy'
   };
   let user;
   const api = await loadModule('lib/admin-access.js', {
+    react: { cache: (callback) => callback },
     '../auth.js': { auth: async () => ({ user }) },
     './admin-policy.js': Object.fromEntries(['adminPermissions', 'isAllowedAdmin', 'isAllowedMatrikkelSync', 'isAuthConfigured'].map(name => [name,
       name === 'isAuthConfigured' ? () => policy[name](env) : identity => policy[name](identity, env),

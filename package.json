@@ -21,7 +21,9 @@
     "hamlets:assign": "node --use-system-ca --env-file=.env.local scripts/assign-member-hamlets.mjs",
     "test": "node --experimental-vm-modules --test tests/*.test.mjs",
     "test:integration": "node --experimental-vm-modules --test --test-concurrency=1 tests/integration/*.test.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:performance": "node scripts/performance-budget.mjs",
+    "images:carousel": "node scripts/optimize-carousel.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1128.0",
@@ -50,12 +52,14 @@
     "react-dom": "19.2.0"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.3.5",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.3.3",
     "eslint": "^9.0.0",
     "eslint-config-next": "16.3.4",
     "pg": "^8.23.0",
     "postcss": "^8.5.28",
+    "sharp": "^0.35.4",
     "tailwindcss": "^4.3.3"
   },
   "overrides": {

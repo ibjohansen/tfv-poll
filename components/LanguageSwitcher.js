@@ -2,14 +2,17 @@
 
 import Select from "@/components/Select";
 import { usePathname } from 'next/navigation';
-import { useI18n } from './LocaleProvider';
+import { rememberLocale, useI18n } from './LocaleProvider';
 
 export default function LanguageSwitcher() {
   const { locale, t } = useI18n('general.language');
   const pathname = usePathname();
 
   function change(event) {
-    if (event.target.value !== locale) event.currentTarget.form.requestSubmit();
+    if (event.target.value !== locale) {
+      rememberLocale(event.target.value);
+      event.currentTarget.form.requestSubmit();
+    }
   }
 
   if (pathname === '/admin/login') return null;

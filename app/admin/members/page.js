@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import { auth } from '@/auth';
 import { isAllowedAdmin, isAllowedMatrikkelSync, isAuthConfigured } from '@/lib/admin-policy';
+import { getAdminSession } from '@/lib/admin-access';
 import { getAdminMemberById, getAdminMembers } from '@/lib/admin-members';
 import { getAdminSurveys } from '@/lib/admin-surveys';
 import AdminMemberDirectory from '@/components/AdminMemberDirectory';
@@ -16,7 +16,7 @@ export const generateMetadata = () => adminPageMetadata('members');
 export default async function AdminMembersPage({ searchParams }) {
   const { t } = await getServerI18n();
   if (!isAuthConfigured()) redirect('/admin/login');
-  const session = await auth();
+  const session = await getAdminSession();
   if (!isAllowedAdmin(session?.user)) redirect('/admin/login');
   const params = await searchParams;
   const search = typeof params.q === 'string' ? params.q.trim().slice(0, 200) : '';

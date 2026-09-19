@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { auth } from '@/auth';
+import { getAdminSession } from '@/lib/admin-access';
 import { isAllowedAdmin, isAuthConfigured } from '@/lib/admin-policy';
 import { getAdminSurveys } from '@/lib/admin-surveys';
 import AdminSurveyDirectory from '@/components/AdminSurveyDirectory';
@@ -14,7 +14,7 @@ export const generateMetadata = () => adminPageMetadata('surveys');
 export default async function AdminSurveysPage({ searchParams }) {
   const { t } = await getServerI18n();
   if (!isAuthConfigured()) redirect('/admin/login');
-  const session = await auth();
+  const session = await getAdminSession();
   if (!isAllowedAdmin(session?.user)) redirect('/admin/login');
   const params = await searchParams;
   const sort = ['title', 'is_open', 'ends_on', 'response_count', 'question_version'].includes(params.sort) ? params.sort : 'title';

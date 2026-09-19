@@ -72,6 +72,27 @@ test('sharing reservation defaults off, records its change and can be filtered',
   assert.equal(events.at(-1).after_value.turufjell_as_sharing_opt_out, true);
 });
 
+test('indexed member search keeps Norwegian text, SPG H-numbers and literal wildcard characters searchable', async () => {
+  const key = randomUUID();
+  const member = await admin.createAdminMember({
+    h_number: `SPG H 987 ${key}`,
+    cadastral_number: '32/481',
+    section_number: '7',
+    street_address: `Øvre Åsveg ${key}`,
+    title_holder: 'Sæter og Sønn',
+    primary_contact_name: 'Åse Ødegård',
+    primary_contact_email: `${key}@example.test`,
+    other_contact_emails: [`blåbær-${key}@example.test`],
+    admin_comment: `Kontrollert 100% ${key}`,
+    membership_status: 'exempt',
+    turufjell_as_sharing_opt_out: true,
+  });
+  for (const search of ['SPG H 987', '32/481', 'Øvre Åsveg', 'Sæter', 'Åse Ødegård', `blåbær-${key}`, '100%']) {
+    const result = await directory.getAdminMembers(search, 1, 'h_number', 'asc', false, true, { membershipStatus: 'exempt', turufjellAsSharing: 'opted_out' });
+    assert.ok(result.members.some(({ id }) => String(id) === String(member.id)), search);
+  }
+});
+
 async function surveyFixture() {
   const member = await admin.createAdminMember({ h_number: `survey-test-${randomUUID()}`, primary_contact_email: `${randomUUID()}@example.test`, other_contact_emails: [] });
   const surveyId = randomUUID().replaceAll('-', '');

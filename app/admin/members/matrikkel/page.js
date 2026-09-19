@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { auth } from '@/auth';
+import { getAdminSession } from '@/lib/admin-access';
 import { isAllowedMatrikkelSync, isAuthConfigured } from '@/lib/admin-policy';
 import { getMatrikkelMemberOptions, getMatrikkelRun, getMatrikkelRuns, isMatrikkelConfigured } from '@/lib/matrikkel-sync';
 import AdminModuleHeader from '@/components/AdminModuleHeader';
@@ -14,7 +14,7 @@ export const generateMetadata = () => adminPageMetadata('matrikkel');
 export default async function MatrikkelSyncPage({ searchParams }) {
   const { t } = await getServerI18n('admin.pages');
   if (!isAuthConfigured()) redirect('/admin/login');
-  const session = await auth();
+  const session = await getAdminSession();
   if (!isAllowedMatrikkelSync(session?.user)) redirect('/admin');
   const params = await searchParams;
   const requestedMemberId = /^[1-9][0-9]{0,15}$/.test(params?.member || '') ? params.member : '';

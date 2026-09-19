@@ -1,6 +1,5 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import Select from '@/components/Select';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useI18n} from '@/components/LocaleProvider';
@@ -10,23 +9,18 @@ function MapLoading() {
   return <div className="public-hamlet-map-loading" role="status">{t('loading')}</div>;
 }
 
-const PublicHamletMapView = dynamic(() => import('./PublicHamletMapView'), {
-  ssr: false,
-  loading: MapLoading,
-});
-
 export default function PublicHamletMap({hamlets}) {
   const {t} = useI18n('map.public');
   const [activeId, setActiveId] = useState('');
   const [showProperties, setShowProperties] = useState(false);
   const [hoveredHamletId, setHoveredHamletId] = useState('');
   const [mapReady, setMapReady] = useState(false);
+  const [MapView, setMapView] = useState(null);
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const controllerRef = useRef(null);
-  const mapMount = useRef(null);
   const activeHamlet = useMemo(() => hamlets.find((hamlet) => hamlet.id === activeId) || null, [activeId, hamlets]);
 
   const loadProperties = useCallback(async (hamletId) => {
@@ -55,20 +49,6 @@ export default function PublicHamletMap({hamlets}) {
   }, [t]);
 
   useEffect(() => () => controllerRef.current?.abort(), []);
-  useEffect(() => {
-    if (mapReady || !mapMount.current) return undefined;
-    if (!('IntersectionObserver' in window)) {
-      const timer = window.setTimeout(() => setMapReady(true), 0);
-      return () => window.clearTimeout(timer);
-    }
-    const observer = new IntersectionObserver(([entry]) => {
-      if (!entry.isIntersecting) return;
-      setMapReady(true);
-      observer.disconnect();
-    }, {rootMargin: '400px 0px'});
-    observer.observe(mapMount.current);
-    return () => observer.disconnect();
-  }, [mapReady]);
 
   const selectHamlet = useCallback((hamlet) => {
     if (hamlet.id === activeId) {
@@ -108,6 +88,18 @@ export default function PublicHamletMap({hamlets}) {
     }
   }
 
+  async function openMap() {
+    setMapReady(true);
+    setError('');
+    try {
+      const mapModule = await import('./PublicHamletMapView');
+      setMapView(() => mapModule.default);
+    } catch {
+      setMapReady(false);
+      setError(t('tileError'));
+    }
+  }
+
   if (!hamlets.length) return <section className="public-hamlet-section" aria-labelledby="public-map-title">
     <div className="public-hamlet-heading"><p className="eyebrow">{t('turufjell')}</p><h2 id="public-map-title">{t('title')}</h2><p>{t('unavailable')}</p></div>
   </section>;
@@ -129,11 +121,14 @@ export default function PublicHamletMap({hamlets}) {
         {hamlets.map((hamlet) => <option key={hamlet.id} value={hamlet.id}>{hamlet.name}</option>)}
       </Select>
     </div>
-    <div ref={mapMount} className="public-hamlet-map-mount">
-      {mapReady ? <PublicHamletMapView hamlets={hamlets} activeHamlet={activeHamlet} properties={showProperties ? properties : []}
+    <div className="public-hamlet-map-mount">
+      {MapView ? <MapView hamlets={hamlets} activeHamlet={activeHamlet} properties={showProperties ? properties : []}
                          selectedProperty={selectedProperty} onSelectHamlet={selectHamlet}
                          onSelectProperty={setSelectedProperty} onHoverHamlet={setHoveredHamletId}
-                         onError={setError}/> : <MapLoading />}
+                         onError={setError}/> : mapReady ? <MapLoading /> : <div className="public-hamlet-map-consent">
+        <p>{t('mapDeferred')}</p>
+        <button type="button" className="public-property-toggle" onClick={openMap}>{t('openMap')}</button>
+      </div>}
     </div>
     <div className="public-hamlet-actions">
       <button className="public-property-toggle" type="button" aria-pressed={showProperties}
@@ -179,7 +174,7 @@ export default function PublicHamletMap({hamlets}) {
           </tr>)}</tbody>
         </table>
       </div>}
-    <p className="public-map-layer-help">{t('buildingZoomHelp')}</p>
-    <p className="public-map-source">{t('source')}</p>
+    {mapReady && <><p className="public-map-layer-help">{t('buildingZoomHelp')}</p>
+      <p className="public-map-source">{t('source')}</p></>}
   </section>;
 }

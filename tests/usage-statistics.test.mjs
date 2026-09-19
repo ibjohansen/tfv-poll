@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import {
-  deviceCategoryForWidth, normalizeUsageEvent, normalizeUsagePeriod, pageTypeForPath,
+  deviceCategoryForWidth, normalizeUsageBatch, normalizeUsageEvent, normalizeUsagePeriod, pageTypeForPath,
 } from '../lib/usage-metrics.js';
 import * as usageMetrics from '../lib/usage-metrics.js';
 import { loadModule, plain, request } from './helpers/load-module.mjs';
@@ -37,26 +37,34 @@ test('usage input only accepts fixed aggregate dimensions and periods', () => {
   assert.equal(normalizeUsagePeriod('365'), 365);
   assert.equal(normalizeUsagePeriod('all'), 'all');
   assert.throws(() => normalizeUsagePeriod('31'), /Invalid usage period/);
+  assert.deepEqual(normalizeUsageBatch({ events: [{ pageType: 'article', deviceCategory: 'tablet' }], webVitals: [{ name: 'LCP', value: 1234.5678, rating: 'good', deviceCategory: 'tablet' }] }), {
+    events: [{ pageType: 'article', deviceCategory: 'tablet' }],
+    webVitals: [{ name: 'LCP', value: 1234.568, rating: 'good', deviceCategory: 'tablet' }],
+  });
+  assert.throws(() => normalizeUsageBatch({ events: [], webVitals: [{ name: 'FID', value: 4, rating: 'good', deviceCategory: 'mobile' }] }), /Invalid web vital/);
 });
 
 test('pageview endpoint requires same origin and exposes no storage error details', async () => {
   const calls = [];
   const route = await loadModule('app/api/usage/pageview/route.js', {
-    '@/lib/usage-statistics': { recordUsagePageView: async (value) => calls.push(value) },
-    '@/lib/usage-metrics': { normalizeUsageEvent },
+    '@/lib/usage-statistics': { recordUsagePageView: async (value) => calls.push(value), recordUsageBatch: async (value) => calls.push(value) },
+    '@/lib/usage-metrics': { normalizeUsageEvent, normalizeUsageBatch },
   });
   const headers = { origin: 'https://example.test', 'sec-fetch-site': 'same-origin' };
   const accepted = await route.POST(request('/api/usage/pageview', { method: 'POST', headers, body: { pageType: 'home', deviceCategory: 'mobile' } }));
   assert.equal(accepted.status, 204);
   assert.deepEqual(calls, [{ pageType: 'home', deviceCategory: 'mobile' }]);
+  const batch = { events: [{ pageType: 'article', deviceCategory: 'desktop' }], webVitals: [{ name: 'CLS', value: 0.01, rating: 'good', deviceCategory: 'desktop' }] };
+  assert.equal((await route.POST(request('/api/usage/pageview', { method: 'POST', headers, body: batch }))).status, 204);
+  assert.deepEqual(calls[1], batch);
   assert.equal((await route.POST(request('/api/usage/pageview', { method: 'POST', headers: { origin: 'https://evil.test' }, body: {} }))).status, 403);
 
   const invalid = await route.POST(request('/api/usage/pageview', { method: 'POST', headers, body: { pageType: 'home', deviceCategory: 'mobile', url: '/member-link' } }));
   assert.equal(invalid.status, 400);
 
   const failedRoute = await loadModule('app/api/usage/pageview/route.js', {
-    '@/lib/usage-statistics': { recordUsagePageView: async () => { throw new Error('DATABASE_URL=secret'); } },
-    '@/lib/usage-metrics': { normalizeUsageEvent },
+    '@/lib/usage-statistics': { recordUsagePageView: async () => { throw new Error('DATABASE_URL=secret'); }, recordUsageBatch: async () => {} },
+    '@/lib/usage-metrics': { normalizeUsageEvent, normalizeUsageBatch },
   });
   const failed = await failedRoute.POST(request('/api/usage/pageview', { method: 'POST', headers, body: { pageType: 'home', deviceCategory: 'desktop' } }));
   assert.equal(failed.status, 503);
@@ -67,8 +75,8 @@ test('pageview endpoint accepts the configured public origin behind Netlify prox
   const calls = [];
   const publicOrigin = 'https://medlemsservice.turufjellvel.no';
   const route = await loadModule('app/api/usage/pageview/route.js', {
-    '@/lib/usage-statistics': { recordUsagePageView: async (value) => calls.push(value) },
-    '@/lib/usage-metrics': { normalizeUsageEvent },
+    '@/lib/usage-statistics': { recordUsagePageView: async (value) => calls.push(value), recordUsageBatch: async (value) => calls.push(value) },
+    '@/lib/usage-metrics': { normalizeUsageEvent, normalizeUsageBatch },
     '@/lib/request-origin': {
       isSameOriginRequest: (requestValue) => isSameOriginRequest(requestValue, { AUTH_URL: publicOrigin }),
     },
@@ -124,8 +132,8 @@ test('usage service writes one aggregate dimension pair and returns normalized t
     './usage-metrics.js': usageMetrics,
   });
   await service.recordUsagePageView({ pageType: 'home', deviceCategory: 'desktop' });
-  assert.deepEqual(plain(queries[0].values), ['home', 'desktop']);
-  assert.match(queries[0].query, /ON CONFLICT[\s\S]*views = usage_daily_stats\.views \+ 1/);
+  assert.deepEqual(plain(queries[0].values), ['[{"page_type":"home","device_category":"desktop"}]', '[]']);
+  assert.match(queries[0].query, /ON CONFLICT[\s\S]*views = usage_daily_stats\.views \+ EXCLUDED\.views/);
   assert.doesNotMatch(queries[0].query, /ip_address|user_agent|referrer|visitor|session/i);
   const result = await service.getUsageStatistics({ days: 7 });
   assert.deepEqual(permissions, ['audit']);

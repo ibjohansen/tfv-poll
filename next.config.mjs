@@ -1,3 +1,4 @@
+import bundleAnalyzer from '@next/bundle-analyzer';
 import { isAuthConfigured } from './lib/admin-policy.js';
 import { getSecurityContext } from './lib/security-config.js';
 
@@ -19,11 +20,14 @@ const securityHeaders = [
 
 const nextConfig = {
   images: {
-    minimumCacheTTL: 3600,
+    minimumCacheTTL: 604800,
   },
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }];
+    return [
+      { source: '/:path*', headers: securityHeaders },
+      { source: '/carousel/optimized/:path*', headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }] },
+    ];
   },
 };
 
-export default nextConfig;
+export default bundleAnalyzer({ enabled: process.env.ANALYZE === 'true' })(nextConfig);

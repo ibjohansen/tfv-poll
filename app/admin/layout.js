@@ -1,12 +1,13 @@
 import SiteHeader from '@/components/SiteHeader';
 import AdminButtonTooltips from '@/components/AdminButtonTooltips';
+import RequestLocaleProvider from '@/components/RequestLocaleProvider';
 
 export default function AdminLayout({ children }) {
   return (
-    <div className="admin-layout">
+    <RequestLocaleProvider><div className="admin-layout">
       <AdminButtonTooltips />
       <SiteHeader />
       {children}
-    </div>
+    </div></RequestLocaleProvider>
   );
 }

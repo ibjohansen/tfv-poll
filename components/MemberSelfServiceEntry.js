@@ -1,6 +1,7 @@
 'use client';
 
 import {useState} from 'react';
+import {useSearchParams} from 'next/navigation';
 import {useI18n} from '@/components/LocaleProvider';
 
 const emptyMembership = {
@@ -8,8 +9,10 @@ const emptyMembership = {
     primary_contact_email: '', other_contact_emails: '',
 };
 
-export default function MemberSelfServiceEntry({membershipStatus = ''}) {
+export default function MemberSelfServiceEntry() {
     const {t} = useI18n('members.entry');
+    const searchParams = useSearchParams();
+    const membershipStatus = String(searchParams.get('membership') || '');
     const [mode, setMode] = useState('access');
     const [identifier, setIdentifier] = useState('');
     const [membership, setMembership] = useState(emptyMembership);

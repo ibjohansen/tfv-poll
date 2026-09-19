@@ -714,13 +714,16 @@ uten en egen filterknapp. Kartets eiendomstooltip viser H-nummer, adresse og
 gårds-/bruksnummer på tre rader. Se [ikonoversikten](docs/icons.md) for
 plasseringen av de eksisterende SVG-ikonene og lenker til ikonkataloger.
 
-Bildene lazy-loades som standard. Det første synlige karusellbildet prioriteres
-fortsatt for å unngå tregere førstegangsvisning; øvrige karusellbilder monteres
-først ved bildebytte. Automatisk bytte pauses også utenfor skjermen. Filnavn med
+Bildene lazy-loades som standard. `npm run images:carousel` lager de versjonerte
+WebP-kildene i `public/carousel/optimized`; kjør kommandoen når kildebildene
+endres. Det første synlige karusellbildet prioriteres fortsatt for å unngå tregere
+førstegangsvisning; øvrige karusellbilder monteres først ved bildebytte.
+Automatisk bytte er pauset som standard og kan startes av brukeren. Filnavn med
 nullutfylling, eksempelvis `_tf001`, og `_tf000` støttes.
 
 Forsidens CMS-oppslag og grendeliste mellomlagres i fem minutter og invalideres
-ved redigering. Next.js-optimaliserte bilder mellomlagres i minst én time;
+ved redigering. Next.js-optimaliserte bilder mellomlagres i minst én uke, mens
+de versjonerte karusellkildene har ett års immutable nettleser-cache;
 offentlige CMS-filer bruker ETag slik at uendrede filer ikke lastes på nytt fra
 objektlageret ved revalidering.
 
@@ -869,18 +872,30 @@ skrive medlemsopplysninger til logger eller eksportfiler. Se
 [migreringsstatus 17. september 2026](docs/database-migration-2026-09-17.md)
 for utført testing, bekreftede produksjonsmigreringer og gjenopprettingspunkter.
 
+Medlemssøket krever `pg_trgm`, den genererte kolonnen
+`members.search_document` og den partielle GIN-indeksen
+`members_search_document_trgm_idx`. Disse opprettes i riktig, idempotent
+rekkefølge av `database/schema.sql`. Før applikasjonsversjonen publiseres skal
+indeksen finnes og en personverntrygg `EXPLAIN (ANALYZE, BUFFERS)` på grenen
+bekrefte bitmap-indekssøk. Produksjonsmigreringen krever fortsatt eksplisitt
+godkjenning og direkte `DATABASE_URL_UNPOOLED`; denne kodeendringen kjører den
+ikke automatisk.
+
 Skjemaet oppretter også `audit_log` og triggere på `members`, `member_requests`,
 `surveys`, `survey_responses`, `survey_attachments`, `cms_pages` og
 `cms_attachments`. Loggen starter
 når migreringen kjøres; den rekonstruerer ikke historikk fra tidligere
 endringer. Tilgangstoken, verifiseringshash og interne lagringsnøkler utelates.
 
-Skjemaet oppretter i tillegg `usage_daily_stats` for egenhostet, anonym
-bruksstatistikk. Nettleseren sender bare en tillatt sidetype og én grov
-enhetskategori til `POST /api/usage/pageview`. API-et aksepterer bare
+Skjemaet oppretter i tillegg `usage_daily_stats` og
+`usage_web_vitals_daily` for egenhostet, anonym bruks- og ytelsesstatistikk.
+Nettleseren køer sidevisninger og LCP/INP/CLS i inntil fem sekunder og sender
+én liten batch med bare tillatt sidetype, målenavn/verdi/vurdering og grov
+enhetskategori til `POST /api/usage/pageview`. En batch blir én databasespørring,
+mot tidligere én databasespørring per sidevisning. API-et aksepterer bare
 same-origin-kall, og senderen bruker `credentials: omit`. Det lagres aldri rå
 URL eller query, IP-adresse, cookie, bruker-/besøks-ID, user-agent, referrer,
-navigasjonsforløp eller enkeltstående hendelsestidspunkt. `Do Not Track` blir
+navigasjonsforløp, målings-ID eller enkeltstående hendelsestidspunkt. `Do Not Track` blir
 respektert. Radene er dagsaggregater i norsk tid. Fordi de ikke inneholder
 besøksidentifikatorer eller rå hendelser, beholdes aggregatene som historisk
 statistikk uten automatisk sletting. En eventuell senere slettejobb skal være

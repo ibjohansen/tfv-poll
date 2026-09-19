@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import { auth } from '@/auth';
 import { isAllowedAdmin, isAllowedMatrikkelSync, isAuthConfigured } from '@/lib/admin-policy';
+import { getAdminSession } from '@/lib/admin-access';
 import { getAdminMatrikkelTasks, getAdminMemberRequests } from '@/lib/member-self-service';
 import AdminMemberRequests from '@/components/AdminMemberRequests';
 import AdminMatrikkelTasks from '@/components/AdminMatrikkelTasks';
@@ -15,7 +15,7 @@ export const generateMetadata = () => adminPageMetadata('inbox');
 export default async function AdminInboxPage() {
   const { t } = await getServerI18n();
   if (!isAuthConfigured()) redirect('/admin/login');
-  const session = await auth();
+  const session = await getAdminSession();
   if (!isAllowedAdmin(session?.user)) redirect('/admin/login');
   let requests;
   let matrikkelTasks;

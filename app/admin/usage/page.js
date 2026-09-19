@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { auth } from '@/auth';
+import { getAdminSession } from '@/lib/admin-access';
 import AdminModuleHeader from '@/components/AdminModuleHeader';
 import AdminUsageStatistics from '@/components/AdminUsageStatistics';
 import { isAllowedAdmin, isAuthConfigured } from '@/lib/admin-policy';
@@ -15,7 +15,7 @@ export const generateMetadata = () => adminPageMetadata('usage');
 export default async function AdminUsagePage({ searchParams }) {
   const { t } = await getServerI18n();
   if (!isAuthConfigured()) redirect('/admin/login');
-  const session = await auth();
+  const session = await getAdminSession();
   if (!isAllowedAdmin(session?.user)) redirect('/admin/login');
   const params = await searchParams;
   let data;

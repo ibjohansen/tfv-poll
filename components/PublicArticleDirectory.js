@@ -54,6 +54,14 @@ export default function PublicArticleDirectory({ pages, initialPage = null }) {
   }, []);
 
   useEffect(() => {
+    if (initialPage) return;
+    const slug = new URL(window.location.href).searchParams.get('article');
+    if (!slug) return;
+    const timer = window.setTimeout(() => openArticle(slug, false), 0);
+    return () => window.clearTimeout(timer);
+  }, [initialPage, openArticle]);
+
+  useEffect(() => {
     function onPopState() {
       const slug = new URL(window.location.href).searchParams.get('article');
       if (slug) openArticle(slug, false);

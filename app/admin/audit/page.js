@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { auth } from '@/auth';
+import { getAdminSession } from '@/lib/admin-access';
 import AdminAuditLog from '@/components/AdminAuditLog';
 import AdminModuleHeader from '@/components/AdminModuleHeader';
 import { getAdminAuditLog, getAuditedTables } from '@/lib/admin-audit';
@@ -16,7 +16,7 @@ export const generateMetadata = () => adminPageMetadata('audit');
 export default async function AdminAuditPage({ searchParams }) {
   const { t } = await getServerI18n();
   if (!isAuthConfigured()) redirect('/admin/login');
-  const session = await auth();
+  const session = await getAdminSession();
   if (!isAllowedAdmin(session?.user)) redirect('/admin/login');
   const params = await searchParams;
   const tables = getAuditedTables();

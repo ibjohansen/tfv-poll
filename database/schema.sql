@@ -87,6 +87,26 @@ DROP INDEX IF EXISTS members_known_h_number_idx;
 CREATE UNIQUE INDEX IF NOT EXISTS members_known_h_number_idx
   ON members (h_number) WHERE h_number <> 'N/A' AND deleted_at IS NULL;
 
+-- Én vedlikeholdsfri søkerepresentasjon gjør fritekstsøk indeksérbart. Kjør
+-- utvidelsen og kolonnen før indeksen ved produksjonsmigrering; alle stegene er
+-- idempotente og kan verifiseres på en Neon-gren først.
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE OR REPLACE FUNCTION build_member_search_document(
+  h_number TEXT, cadastral_number TEXT, section_number TEXT, street_address TEXT,
+  title_holder TEXT, primary_contact_name TEXT, primary_contact_email TEXT,
+  other_contact_emails TEXT[], admin_comment TEXT
+) RETURNS TEXT
+LANGUAGE SQL IMMUTABLE PARALLEL SAFE
+RETURN lower(concat_ws(' ', h_number, cadastral_number, section_number, street_address,
+  title_holder, primary_contact_name, primary_contact_email,
+  array_to_string(other_contact_emails, ' '), admin_comment));
+ALTER TABLE members ADD COLUMN IF NOT EXISTS search_document TEXT
+  GENERATED ALWAYS AS (build_member_search_document(h_number, cadastral_number, section_number,
+    street_address, title_holder, primary_contact_name, primary_contact_email,
+    other_contact_emails, admin_comment)) STORED;
+CREATE INDEX IF NOT EXISTS members_search_document_trgm_idx
+  ON members USING GIN (search_document gin_trgm_ops) WHERE deleted_at IS NULL;
+
 -- Kjøringer mot Kartverkets Matrikkel-API. Hver kjøring tar et komplett
 -- øyeblikksbilde av feltene den har lov til å endre før første oppslag.
 CREATE TABLE IF NOT EXISTS matrikkel_sync_runs (
@@ -707,6 +727,19 @@ CREATE TABLE IF NOT EXISTS usage_daily_stats (
   views BIGINT NOT NULL DEFAULT 0 CHECK (views >= 0),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (day, page_type, device_category)
+);
+
+-- Web Vitals lagres kun som dagsaggregater med grov enhetskategori. Ingen
+-- side-URL, IP, brukeragent, bruker-ID eller målings-ID beholdes.
+CREATE TABLE IF NOT EXISTS usage_web_vitals_daily (
+  day DATE NOT NULL,
+  metric_name TEXT NOT NULL CHECK (metric_name IN ('LCP', 'INP', 'CLS')),
+  rating TEXT NOT NULL CHECK (rating IN ('good', 'needs-improvement', 'poor')),
+  device_category TEXT NOT NULL CHECK (device_category IN ('mobile', 'tablet', 'desktop', 'unknown')),
+  samples BIGINT NOT NULL DEFAULT 0 CHECK (samples >= 0),
+  value_sum DOUBLE PRECISION NOT NULL DEFAULT 0 CHECK (value_sum >= 0),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (day, metric_name, rating, device_category)
 );
 
 CREATE OR REPLACE FUNCTION protect_security_events()
