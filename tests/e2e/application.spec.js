@@ -15,6 +15,20 @@ async function authenticate(context, roles = ['TFV.MemberAdmin', 'TFV.SurveyAdmi
   await context.addCookies([{ name, value, url: testOrigin, httpOnly: true, sameSite: 'Lax' }]);
 }
 
+test('admin navigation keeps the shared menu mounted', async ({ page, context }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'The desktop sidebar is the stable shell under test.');
+  await authenticate(context);
+  await page.goto('/admin/browser-test');
+  const sidebar = page.locator('.admin-sidebar');
+  await sidebar.evaluate((element) => { element.dataset.persistenceMarker = 'mounted-once'; });
+
+  await sidebar.locator('a[href="/admin/members"]').click();
+
+  await expect(page).toHaveURL(/\/admin\/members$/);
+  await expect(sidebar).toHaveAttribute('data-persistence-marker', 'mounted-once');
+  await expect(sidebar.locator('a[href="/admin/members"]')).toHaveAttribute('aria-current', 'page');
+});
+
 test('shared select supports keyboard, ordinary form values, reset and language round-trip', async ({ page, context }) => {
   await authenticate(context); await page.goto('/admin/browser-test');
   const form = page.getByRole('form', { name: 'Test av nedtrekksliste' });

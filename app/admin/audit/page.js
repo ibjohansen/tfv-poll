@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getAdminSession } from '@/lib/admin-access';
 import AdminAuditLog from '@/components/AdminAuditLog';
-import AdminModuleHeader from '@/components/AdminModuleHeader';
 import { getAdminAuditLog, getAuditedTables } from '@/lib/admin-audit';
 import { isAllowedAdmin, isAuthConfigured } from '@/lib/admin-policy';
 import { normalizeAuditFilters } from '@/lib/audit-filters';
@@ -36,5 +35,5 @@ export default async function AdminAuditPage({ searchParams }) {
     filterError = error.message.startsWith('Invalid audit date');
     data = null;
   }
-  return <main className="admin-shell"><AdminModuleHeader active="audit" title={t('admin.common.audit')} email={session.user.email} /><section className="admin-content">{data ? <AdminAuditLog data={data} filters={filters} tables={tables} /> : <p className="form-error" role="alert">{filterError ? <>{t('admin.pages.invalidDates')} <Link href="/admin/audit">{t('admin.pages.resetFilters')}</Link>.</> : t('admin.pages.auditUnavailable')}</p>}</section></main>;
+  return <section className="admin-content">{data ? <AdminAuditLog data={data} filters={filters} tables={tables} /> : <p className="form-error" role="alert">{filterError ? <>{t('admin.pages.invalidDates')} <Link href="/admin/audit">{t('admin.pages.resetFilters')}</Link>.</> : t('admin.pages.auditUnavailable')}</p>}</section>;
 }

@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { isAllowedAdmin, isAuthConfigured } from '@/lib/admin-policy';
 import { getAdminSession } from '@/lib/admin-access';
 import { getAdminTaskCount } from '@/lib/member-self-service';
-import AdminModuleHeader, { adminModules, ModuleIcon } from '@/components/AdminModuleHeader';
+import { ModuleIcon } from '@/components/AdminNavigation';
+import { adminModules } from '@/lib/admin-navigation';
 import { getServerI18n } from '@/lib/i18n/server';
 import { adminPageMetadata } from '@/lib/page-metadata';
 
@@ -19,5 +20,5 @@ export default async function AdminPage() {
   let taskCount = 0;
   try { taskCount = await getAdminTaskCount(); } catch { /* Header and tile remain usable without a count. */ }
   const modules = adminModules.filter(({ key }) => key !== 'overview');
-  return <main className="admin-shell"><AdminModuleHeader active="overview" title={t('admin.common.memberService')} email={session.user.email} pendingTaskCount={taskCount} /><section className="admin-content"><section className="admin-module-grid" aria-label={t('admin.common.modules')}>{modules.map((module) => <Link href={module.href} className="admin-module-card" key={module.key}><div className="admin-module-title"><h2>{t(`admin.common.${module.key}`)}</h2>{module.key === 'inbox' && taskCount > 0 && <span className="admin-task-count">{t(taskCount === 1 ? 'admin.home.pendingOne' : 'admin.home.pendingMany', {count: taskCount})}</span>}</div><p>{t(`admin.home.descriptions.${module.key}`)}</p><span className="module-link"><span>{t('admin.common.open')}</span><ModuleIcon name={module.icon} /></span></Link>)}</section></section></main>;
+  return <section className="admin-content"><section className="admin-module-grid" aria-label={t('admin.common.modules')}>{modules.map((module) => <Link href={module.href} className="admin-module-card" key={module.key}><div className="admin-module-title"><h2>{t(`admin.common.${module.key}`)}</h2>{module.key === 'inbox' && taskCount > 0 && <span className="admin-task-count">{t(taskCount === 1 ? 'admin.home.pendingOne' : 'admin.home.pendingMany', {count: taskCount})}</span>}</div><p>{t(`admin.home.descriptions.${module.key}`)}</p><span className="module-link"><span>{t('admin.common.open')}</span><ModuleIcon name={module.icon} /></span></Link>)}</section></section>;
 }

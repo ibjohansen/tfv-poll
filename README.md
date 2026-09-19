@@ -902,9 +902,10 @@ følger [Neons anbefaling for pooling og migrering](https://neon.com/docs/connec
 Kontroller etterpå at forventede kolonner, tabeller, indekser og triggere finnes,
 og at eksisterende data er beholdt. Bruk radantall og kontrollsummer uten å
 skrive medlemsopplysninger til logger eller eksportfiler. Se
-[migreringsstatus 15. september 2026](docs/database-migration-2026-09-15.md) og
-[migreringsstatus 16. september 2026](docs/database-migration-2026-09-16.md), samt
-[migreringsstatus 17. september 2026](docs/database-migration-2026-09-17.md)
+[migreringsstatus 15. september 2026](docs/database-migration-2026-09-15.md),
+[migreringsstatus 16. september 2026](docs/database-migration-2026-09-16.md),
+[migreringsstatus 17. september 2026](docs/database-migration-2026-09-17.md) og
+[migreringsstatus 19. september 2026](docs/database-migration-2026-09-19.md)
 for utført testing, bekreftede produksjonsmigreringer og gjenopprettingspunkter.
 
 For CMS-revisjoner skal den additive migreringen kjøres før kodeversjonen

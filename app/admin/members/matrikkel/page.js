@@ -2,9 +2,7 @@ import { redirect } from 'next/navigation';
 import { getAdminSession } from '@/lib/admin-access';
 import { isAllowedMatrikkelSync, isAuthConfigured } from '@/lib/admin-policy';
 import { getMatrikkelMemberOptions, getMatrikkelRun, getMatrikkelRuns, isMatrikkelConfigured } from '@/lib/matrikkel-sync';
-import AdminModuleHeader from '@/components/AdminModuleHeader';
 import MatrikkelSyncPanel from '@/components/MatrikkelSyncPanel';
-import { getServerI18n } from '@/lib/i18n/server';
 import { adminPageMetadata } from '@/lib/page-metadata';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +10,6 @@ export const runtime = 'nodejs';
 export const generateMetadata = () => adminPageMetadata('matrikkel');
 
 export default async function MatrikkelSyncPage({ searchParams }) {
-  const { t } = await getServerI18n('admin.pages');
   if (!isAuthConfigured()) redirect('/admin/login');
   const session = await getAdminSession();
   if (!isAllowedMatrikkelSync(session?.user)) redirect('/admin');
@@ -33,5 +30,5 @@ export default async function MatrikkelSyncPage({ searchParams }) {
   const initialMemberId = members.some((member) => member.id === requestedMemberId) ? requestedMemberId : '';
   const initialMemberIds = [...new Set(requestedMemberIds)].filter((id) => members.some((member) => member.id === id));
   const initialRunId = runs.some((run) => run.id === requestedRunId) ? requestedRunId : '';
-  return <main className="admin-shell"><AdminModuleHeader active="matrikkel" title={t('updateCadastral')} email={session.user.email} /><section className="admin-content"><MatrikkelSyncPanel initialRuns={runs} members={members} initialMemberId={initialMemberId} initialMemberIds={initialMemberIds} initialRunId={initialRunId} configured={isMatrikkelConfigured()} databaseReady={databaseReady} /></section></main>;
+  return <section className="admin-content"><MatrikkelSyncPanel initialRuns={runs} members={members} initialMemberId={initialMemberId} initialMemberIds={initialMemberIds} initialRunId={initialRunId} configured={isMatrikkelConfigured()} databaseReady={databaseReady} /></section>;
 }

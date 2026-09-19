@@ -10,7 +10,7 @@ Oppgi ikonnavn og hvor det skal brukes; vi kan gjenbruke SVG uten en ny pakke.
 
 | Plassering | Kode |
 | --- | --- |
-| Administrasjonsmeny og oversiktskort | `components/AdminModuleHeader.js`, `ModuleIcon` |
+| Administrasjonsmeny og oversiktskort | `components/AdminNavigation.js`, `ModuleIcon` |
 | Karusellpiler og pause | `components/HomeHeroCarousel.js` |
 | Språkvelger | `components/LanguageSwitcher.js` |
 | Meny på forsiden | `components/SiteMenu.js` |

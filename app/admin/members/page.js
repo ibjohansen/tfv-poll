@@ -4,7 +4,6 @@ import { getAdminSession } from '@/lib/admin-access';
 import { getAdminMemberById, getAdminMembers } from '@/lib/admin-members';
 import { getAdminSurveys } from '@/lib/admin-surveys';
 import AdminMemberDirectory from '@/components/AdminMemberDirectory';
-import AdminModuleHeader from '@/components/AdminModuleHeader';
 import { getMemberGroups } from '@/lib/member-groups';
 import { getServerI18n } from '@/lib/i18n/server';
 import { adminPageMetadata } from '@/lib/page-metadata';
@@ -37,5 +36,5 @@ export default async function AdminMembersPage({ searchParams }) {
   let initialSelected;
   let groups;
   try { [data, surveys, initialSelected, groups] = await Promise.all([getAdminMembers(search, 1, sort, direction, incompleteContact, hasComment, { membershipStatus, hamletId, groupId, turufjellAsSharing }), getAdminSurveys(), selectedId ? getAdminMemberById(selectedId) : null, getMemberGroups()]); } catch { data = null; }
-  return <main className="admin-shell"><AdminModuleHeader active="members" title={t('admin.common.members')} email={session.user.email} /><section className="admin-content">{!data ? <p className="form-error" role="alert">{t('admin.pages.membersUnavailable')}</p> : <AdminMemberDirectory key={directoryKey} data={data} surveys={surveys} search={search} sort={sort} direction={direction} incompleteContact={incompleteContact} hasComment={hasComment} initialSelected={initialSelected} membershipStatus={membershipStatus} hamletId={hamletId} groupId={groupId} turufjellAsSharing={turufjellAsSharing} groups={groups} canMatrikkelSync={isAllowedMatrikkelSync(session.user)} />}</section></main>;
+  return <section className="admin-content">{!data ? <p className="form-error" role="alert">{t('admin.pages.membersUnavailable')}</p> : <AdminMemberDirectory key={directoryKey} data={data} surveys={surveys} search={search} sort={sort} direction={direction} incompleteContact={incompleteContact} hasComment={hasComment} initialSelected={initialSelected} membershipStatus={membershipStatus} hamletId={hamletId} groupId={groupId} turufjellAsSharing={turufjellAsSharing} groups={groups} canMatrikkelSync={isAllowedMatrikkelSync(session.user)} />}</section>;
 }

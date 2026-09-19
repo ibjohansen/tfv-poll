@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getAdminSession } from '@/lib/admin-access';
-import AdminModuleHeader from '@/components/AdminModuleHeader';
 import AdminUsageStatistics from '@/components/AdminUsageStatistics';
 import { isAllowedAdmin, isAuthConfigured } from '@/lib/admin-policy';
 import { getUsageStatistics } from '@/lib/usage-statistics';
@@ -29,5 +28,5 @@ export default async function AdminUsagePage({ searchParams }) {
       code: error?.code || error?.cause?.code || undefined,
     });
   }
-  return <main className="admin-shell"><AdminModuleHeader active="usage" title={t('admin.common.usage')} email={session.user.email} /><section className="admin-content">{data ? <AdminUsageStatistics data={data} /> : <p className="form-error" role="alert">{invalidPeriod ? <>{t('admin.pages.invalidPeriod')} <Link href="/admin/usage">{t('admin.pages.show30Days')}</Link>.</> : t('admin.pages.usageUnavailable')}</p>}</section></main>;
+  return <section className="admin-content">{data ? <AdminUsageStatistics data={data} /> : <p className="form-error" role="alert">{invalidPeriod ? <>{t('admin.pages.invalidPeriod')} <Link href="/admin/usage">{t('admin.pages.show30Days')}</Link>.</> : t('admin.pages.usageUnavailable')}</p>}</section>;
 }
