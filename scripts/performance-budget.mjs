@@ -36,6 +36,7 @@ async function measure(page, path) {
   let requests = 0;
   let kartverketRequests = 0;
   let failedResponses = 0;
+  const cspMessages = [];
   const javaScriptBodies = [];
   const onRequest = (request) => {
     const url = new URL(request.url());
@@ -49,9 +50,13 @@ async function measure(page, path) {
       javaScriptBodies.push(response.body().then((body) => body.byteLength).catch(() => 0));
     }
   };
+  const onConsole = (message) => {
+    if (/content security policy|violates the following/i.test(message.text())) cspMessages.push(message.text());
+  };
   page.on('request', onRequest);
   page.on('response', onResponse);
-  await page.goto(`${origin}${path}`, { waitUntil: 'networkidle' });
+  page.on('console', onConsole);
+  const documentResponse = await page.goto(`${origin}${path}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(300);
   const timing = await page.evaluate(() => {
     const navigation = performance.getEntriesByType('navigation')[0];
@@ -62,6 +67,7 @@ async function measure(page, path) {
   });
   page.off('request', onRequest);
   page.off('response', onResponse);
+  page.off('console', onConsole);
   const responseJavaScript = (await Promise.all(javaScriptBodies)).reduce((total, size) => total + size, 0);
   const documentJavaScript = await page.evaluate(async () => {
     const sources = [...new Set([...document.scripts].map((script) => script.src).filter(Boolean))];
@@ -70,7 +76,20 @@ async function measure(page, path) {
     }));
     return sizes.reduce((total, size) => total + size, 0);
   });
-  return { ...timing, clientJavaScript: Math.max(timing.clientJavaScript, responseJavaScript, documentJavaScript), requests, kartverketRequests, failedResponses };
+  const csp = documentResponse?.headers()['content-security-policy'] || '';
+  const nonce = csp.match(/'nonce-([^']+)'/)?.[1] || '';
+  const nonceMismatches = await page.evaluate((expectedNonce) => [...document.scripts]
+    .filter((script) => script.src || script.textContent?.trim())
+    .filter((script) => script.nonce !== expectedNonce).length, nonce);
+  return {
+    ...timing,
+    clientJavaScript: Math.max(timing.clientJavaScript, responseJavaScript, documentJavaScript),
+    requests,
+    kartverketRequests,
+    failedResponses,
+    cspViolations: cspMessages.length,
+    nonceMismatches: nonce ? nonceMismatches : 1,
+  };
 }
 
 function enforce(label, result, budget) {
@@ -96,10 +115,11 @@ try {
   });
   const results = {};
   for (const [label, path] of [['home-cold', '/'], ['home-warm', '/'], ['members', '/admin/members'], ['web', '/admin/web'], ['web-editor', '/admin/web/new']]) results[label] = await measure(page, path);
-  enforce('home-warm', results['home-warm'], { ttfb: 500, lcp: 1500, clientJavaScript: 900_000, requests: 45, kartverketRequests: 0, failedResponses: 0 });
-  enforce('members', results.members, { ttfb: 1500, clientJavaScript: 1_200_000, requests: 50, failedResponses: 0 });
-  enforce('web', results.web, { ttfb: 1500, clientJavaScript: 900_000, requests: 45, failedResponses: 0 });
-  enforce('web-editor', results['web-editor'], { ttfb: 1500, clientJavaScript: 1_400_000, requests: 50, failedResponses: 0 });
+  enforce('home-cold', results['home-cold'], { cspViolations: 0, nonceMismatches: 0 });
+  enforce('home-warm', results['home-warm'], { ttfb: 500, lcp: 1500, clientJavaScript: 900_000, requests: 45, kartverketRequests: 0, failedResponses: 0, cspViolations: 0, nonceMismatches: 0 });
+  enforce('members', results.members, { ttfb: 1500, clientJavaScript: 1_200_000, requests: 50, failedResponses: 0, cspViolations: 0, nonceMismatches: 0 });
+  enforce('web', results.web, { ttfb: 1500, clientJavaScript: 900_000, requests: 45, failedResponses: 0, cspViolations: 0, nonceMismatches: 0 });
+  enforce('web-editor', results['web-editor'], { ttfb: 1500, clientJavaScript: 1_400_000, requests: 50, failedResponses: 0, cspViolations: 0, nonceMismatches: 0 });
   console.log(JSON.stringify(results, null, 2));
 } finally {
   await browser?.close();

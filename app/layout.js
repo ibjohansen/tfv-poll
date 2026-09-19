@@ -1,5 +1,6 @@
 import "./globals.css";
 import { Suspense } from 'react';
+import { connection } from 'next/server';
 import { chap } from './fonts';
 import UsageTracker from '@/components/UsageTracker';
 import LocaleProvider from '@/components/LocaleProvider';
@@ -18,7 +19,11 @@ export function generateMetadata() {
   };
 }
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  // A request nonce can only be attached to Next's framework and hydration
+  // scripts during request-time rendering. Keeping this at the root prevents a
+  // static child route from being served with a fresh, non-matching CSP nonce.
+  await connection();
   const messages = getDictionary(DEFAULT_LOCALE);
   return (
     <html lang={DEFAULT_LOCALE} className={chap.variable} suppressHydrationWarning>

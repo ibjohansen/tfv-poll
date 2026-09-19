@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { loadModule } from './helpers/load-module.mjs';
 
-test('public shell stays independent of request auth, headers and cookies', async () => {
+test('public shell stays independent of auth while waiting for the CSP nonce request', async () => {
   const [layout, page, cookies] = await Promise.all([
     readFile(new URL('../app/layout.js', import.meta.url), 'utf8'),
     readFile(new URL('../app/page.js', import.meta.url), 'utf8'),
@@ -12,6 +12,7 @@ test('public shell stays independent of request auth, headers and cookies', asyn
   for (const source of [layout, page, cookies]) {
     assert.doesNotMatch(source, /\bauth\s*\(|\bheaders\s*\(|\bcookies\s*\(|getServerI18n/);
   }
+  assert.match(layout, /await connection\(\)/);
 });
 
 test('public map requires an explicit action before mounting its dynamic map view', async () => {

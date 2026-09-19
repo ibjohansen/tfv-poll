@@ -84,10 +84,12 @@ Start med cachebart offentlig skall og utsatt kart. De angriper henholdsvis de m
 Alle tiltakene over er implementert og kontrollert uten produksjonsdeploy eller
   produksjonsmigrering:
 
-- `/` er nå statisk med fem minutters revalidering, og
-  `/informasjonskapsler` er statisk. Rotlayouten leser ikke lenger request-data
-  eller Auth.js. Språk lagres lokalt for det statiske skallet, mens dynamiske
-  ruter får en request-avgrenset språkprovider.
+- `/` og `/informasjonskapsler` ble først gjort statiske, men denne delen ble
+  korrigert samme dag etter produksjonsverifikasjon: request-nonce-basert CSP er
+  ikke kompatibel med statisk/ISR-generert Next.js-HTML. Rotlayouten venter nå
+  på requesten slik at alle framework- og hydration-scripts får samme nonce som
+  CSP-headeren. Offentlige dataoppslag beholder fem minutters cache, forsiden
+  gjør fortsatt ingen Auth.js-oppslag, og språktilstanden er fortsatt lokal.
 - Det offentlige kartet viser velger, forklaring og tabellflyt før kartet åpnes.
   Kartkomponenten importeres fra klikkhandlingen. Playwright og Chrome-nettverk
   bekrefter null kall til `cache.kartverket.no` før «Åpne kart».
@@ -123,7 +125,8 @@ Alle tiltakene over er implementert og kontrollert uten produksjonsdeploy eller
 - `Server-Timing` viser proxy/auth, databasebatch og kartoppslag. CI kjører en
   produksjonsbuildmåling med budsjetter for varm TTFB, LCP, klient-JS og
   requestantall på `/`, `/admin/members` og `/admin/web`. Kald og varm forside
-  rapporteres separat.
+  rapporteres separat. Målingen avviser nå også enhver CSP-konsollfeil eller et
+  script uten headerens nonce.
 
 Lokal produksjonsmåling etter tiltakene ga 18 requests på forsiden, 635 kB
 ukomprimert initial klient-JavaScript, kald TTFB/LCP på 24/160 ms og varm
@@ -131,3 +134,7 @@ TTFB/LCP på 8/40 ms uten nettverksstruping. Målingen registrerte ingen lokale
 HTTP-feil eller kartkall. En separat Chrome DevTools-sporing av lokal
 utviklingsserver målte LCP 146 ms, TTFB 69 ms og CLS 0,00. Tallene er kun
 regresjonsgrunnlag; Netlify-produksjon skal måles separat etter godkjent deploy.
+
+Etter CSP-korreksjonen målte den samme lokale produksjonskontrollen 20 requests,
+581 522 byte rå klient-JavaScript og kald/varm TTFB på 26/16 ms. Alle målte
+ruter hadde null CSP-konsollfeil og null script-elementer med feil nonce.

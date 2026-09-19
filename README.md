@@ -717,6 +717,12 @@ bildekildene. Sørg for passende delt/WAF-rate-limit på kartrutene ved
 produksjonsbruk; den lokale 20/minutt-grensen er bare per-instans.
 Se [kartmodulens datakilder, begrensninger og bruk](docs/map-explorer.md).
 
+HTML-ruter rendres ved request-tid fordi den strenge CSP-en bruker en ny nonce
+per request. Next.js kan ikke legge denne nonce-en på scripts i statisk eller
+ISR-generert HTML. Offentlige databaseoppslag og karusellmetadata er fortsatt
+cachet separat, og forsiden gjør ingen Auth.js-oppslag. Ikke gjør rotlayouten
+statisk uten samtidig å erstatte nonce-policyen med en testet hash/SRI-løsning.
+
 Forsiden viser kontrollerte grendepolygoner fra `member_hamlets`. Den offentlige
 GET-ruten `/api/map/hamlets/[id]/properties` laster eiendommer først når en grend
 velges. Ingen grend er valgt ved innlasting, og samme grendeknapp slår valget av
@@ -1167,6 +1173,10 @@ URI i Entra oppdateres. Utløs en ny deploy etter endringen.
    `public-member-rate-limit` er oppdaget og aktivert i deployloggen.
 6. Kontroller at den publiserte deployen bruker committen som var godkjent i
    GitHub Actions.
+7. Åpne forsiden og `/informasjonskapsler` i en ny nettleserøkt. Kontroller at
+   CSP-headerens nonce finnes på alle script-elementer og at konsollen ikke har
+   «violates Content Security Policy». Nettleserens melding om utsatt lasting av
+   lazy-loadede bilder er informativ og er ikke en CSP-feil.
 
 Etter at GitHub-repositoriet er koblet til Netlify, utløser senere pushes til
 `main` normalt en ny produksjonsdeploy.
