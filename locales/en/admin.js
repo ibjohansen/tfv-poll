@@ -17,7 +17,8 @@ const admin = {
     logout: 'Log out',
     openMenu: 'Open the administration menu',
     navigation: 'Member services modules',
-    pendingTasks: '{count} pending tasks'
+    pendingTasks: '{count} pending tasks',
+    contentStarts: 'Main content starts here'
   },
   home: {
     pendingOne: '{count} pending',

@@ -5,9 +5,11 @@ import { getAdminSurveys } from '@/lib/admin-surveys';
 import AdminSurveyDirectory from '@/components/AdminSurveyDirectory';
 import AdminModuleHeader from '@/components/AdminModuleHeader';
 import { getServerI18n } from '@/lib/i18n/server';
+import { adminPageMetadata } from '@/lib/page-metadata';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+export const generateMetadata = () => adminPageMetadata('surveys');
 
 export default async function AdminSurveysPage({ searchParams }) {
   const { t } = await getServerI18n();

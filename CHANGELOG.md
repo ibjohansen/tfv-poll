@@ -2,6 +2,10 @@
 
 ## Ikke publisert
 
+- De sju prioriterte UU-funnene er rettet lokalt: tydeligere kontrast og
+  tastaturfokus, felles hoppelenke, rutespesifikke sidetitler, komplett
+  fokusstyring i artikkeldialogen, norske Leaflet-kontroller og konkrete,
+  fokuserte feilmeldinger for ubesvarte undersøkelsesspørsmål.
 - Kvitteringsstatusen for undersøkelser skiller nå feilede og undertrykte
   leveranser og viser de berørte tomtene, mottakeradressene og trygge
   årsaksforklaringer direkte i utsendelsespanelet.

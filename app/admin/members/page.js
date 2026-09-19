@@ -7,9 +7,11 @@ import AdminMemberDirectory from '@/components/AdminMemberDirectory';
 import AdminModuleHeader from '@/components/AdminModuleHeader';
 import { getMemberGroups } from '@/lib/member-groups';
 import { getServerI18n } from '@/lib/i18n/server';
+import { adminPageMetadata } from '@/lib/page-metadata';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+export const generateMetadata = () => adminPageMetadata('members');
 
 export default async function AdminMembersPage({ searchParams }) {
   const { t } = await getServerI18n();

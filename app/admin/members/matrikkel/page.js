@@ -5,9 +5,11 @@ import { getMatrikkelMemberOptions, getMatrikkelRun, getMatrikkelRuns, isMatrikk
 import AdminModuleHeader from '@/components/AdminModuleHeader';
 import MatrikkelSyncPanel from '@/components/MatrikkelSyncPanel';
 import { getServerI18n } from '@/lib/i18n/server';
+import { adminPageMetadata } from '@/lib/page-metadata';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+export const generateMetadata = () => adminPageMetadata('matrikkel');
 
 export default async function MatrikkelSyncPage({ searchParams }) {
   const { t } = await getServerI18n('admin.pages');

@@ -65,9 +65,8 @@ export default async function HomePage({ searchParams }) {
   }
   return (
     <div className="brand-public-home min-h-dvh bg-background text-foreground">
-      <a className="fixed top-3 left-3 z-50 -translate-y-24 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-foreground shadow-lg transition-transform focus:translate-y-0 focus:outline-2 focus:outline-offset-2 focus:outline-primary" href="#main-content">{t('general.navigation.skipToContent')}</a>
       <SiteHeader />
-      <main id="main-content">
+      <main id="main-content" tabIndex={-1}>
         <HomeHeroCarousel images={carouselImages.length ? carouselImages : [{
           id: 'fallback',
           src: '/turufjell.jpeg',

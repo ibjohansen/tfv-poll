@@ -4,9 +4,11 @@ import { getMemberGroups } from '@/lib/member-groups';
 import AdminModuleHeader from '@/components/AdminModuleHeader';
 import AdminMemberGroups from '@/components/AdminMemberGroups';
 import { getServerI18n } from '@/lib/i18n/server';
+import { adminPageMetadata } from '@/lib/page-metadata';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const generateMetadata = () => adminPageMetadata('groups');
 export default async function MemberGroupsPage() {
   const { t } = await getServerI18n();
   let user;

@@ -22,6 +22,9 @@ export default function PublicArticleDirectory({ pages, initialPage = null }) {
   const [loadingSlug, setLoadingSlug] = useState('');
   const [error, setError] = useState('');
   const closeButton = useRef(null);
+  const dialog = useRef(null);
+  const articleHeading = useRef(null);
+  const opener = useRef(null);
   const requestNumber = useRef(0);
 
   const openArticle = useCallback(async (slug, updateHistory = true) => {
@@ -63,15 +66,41 @@ export default function PublicArticleDirectory({ pages, initialPage = null }) {
   useEffect(() => {
     if (!selected) return undefined;
     const previousOverflow = document.body.style.overflow;
+    const fallbackTarget = articleHeading.current;
     document.body.style.overflow = 'hidden';
     closeButton.current?.focus();
     function onKeyDown(event) {
-      if (event.key === 'Escape') closeArticle();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeArticle();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = [...(dialog.current?.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ) || [])].filter((element) => !element.hasAttribute('hidden') && element.getAttribute('aria-hidden') !== 'true');
+      if (!focusable.length) {
+        event.preventDefault();
+        closeButton.current?.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
     document.addEventListener('keydown', onKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', onKeyDown);
+      const returnTarget = opener.current?.isConnected ? opener.current : fallbackTarget;
+      window.requestAnimationFrame(() => returnTarget?.focus());
+      opener.current = null;
     };
   }, [closeArticle, selected]);
 
@@ -81,7 +110,7 @@ export default function PublicArticleDirectory({ pages, initialPage = null }) {
         <div className="mx-auto w-full max-w-7xl">
           <p className="text-xs font-semibold tracking-[0.16em] text-primary uppercase">{t('eyebrow')}</p>
           <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <h2 id="pages-title" className="text-3xl font-light tracking-[-0.025em] text-foreground sm:text-4xl">{t('title')}</h2>
+            <h2 ref={articleHeading} id="pages-title" tabIndex={-1} className="text-3xl font-light tracking-[-0.025em] text-foreground sm:text-4xl">{t('title')}</h2>
             <p className="max-w-lg text-sm leading-6 text-[#6F645E]">{t('introduction')}</p>
           </div>
           {error && <p className="mt-8 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{error}</p>}
@@ -92,7 +121,7 @@ export default function PublicArticleDirectory({ pages, initialPage = null }) {
               </div>
               <div className="flex flex-1 flex-col pt-5">
                 <div className="flex items-center gap-3 text-xs"><p className="font-semibold tracking-[0.1em] text-primary uppercase">{categoryLabel(page.category, {}, page.category)}</p><span className="size-1 rounded-full bg-primary/30" aria-hidden="true" /><time className="text-[#6F645E]" dateTime={dateTimeValue(page.published_at)}>{formatDate(page.published_at)}</time></div>
-                <h3 className="mt-3 text-xl leading-7 font-light tracking-[-0.015em] text-foreground"><Link className="outline-none after:absolute after:inset-0 focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary" href={`/?article=${encodeURIComponent(page.slug)}`} onClick={(event) => { event.preventDefault(); openArticle(page.slug); }}>{page.title}</Link></h3>
+                <h3 className="mt-3 text-xl leading-7 font-light tracking-[-0.015em] text-foreground"><Link className="outline-none after:absolute after:inset-0 focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary" href={`/?article=${encodeURIComponent(page.slug)}`} onClick={(event) => { event.preventDefault(); opener.current = event.currentTarget; openArticle(page.slug); }}>{page.title}</Link></h3>
                 {page.intro && <p className="mt-3 line-clamp-3 text-sm leading-6 text-[#6F645E]">{page.intro}</p>}
                 <span className="relative mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary">{loadingSlug === page.slug ? t('opening') : t('open')} <span className="transition-transform group-hover:translate-x-1" aria-hidden="true">→</span></span>
               </div>
@@ -101,8 +130,8 @@ export default function PublicArticleDirectory({ pages, initialPage = null }) {
         </div>
       </section>
 
-      <button className={`public-article-backdrop${selected ? ' is-visible' : ''}`} type="button" aria-label={t('close')} tabIndex={selected ? 0 : -1} onClick={closeArticle} />
-      <aside className={`public-article-panel${selected ? ' is-open' : ''}`} aria-hidden={!selected} role="dialog" aria-modal="true" aria-labelledby={selected ? 'public-article-panel-title' : undefined}>
+      <button className={`public-article-backdrop${selected ? ' is-visible' : ''}`} type="button" aria-label={t('close')} tabIndex={-1} onClick={closeArticle} />
+      <aside ref={dialog} className={`public-article-panel${selected ? ' is-open' : ''}`} aria-hidden={!selected} role="dialog" aria-modal="true" aria-labelledby={selected ? 'public-article-panel-title' : undefined}>
         {selected && <><header className="public-article-panel-header"><div><p>{t('label')}</p><strong id="public-article-panel-title">{selected.title}</strong></div><button ref={closeButton} type="button" onClick={closeArticle}>{t('closeShort')} <span aria-hidden="true">×</span></button></header><div className="public-article-panel-content"><CmsPageView page={selected} /></div></>}
       </aside>
     </>

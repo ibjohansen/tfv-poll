@@ -5,9 +5,11 @@ import { getNewsletters } from '@/lib/newsletters';
 import AdminModuleHeader from '@/components/AdminModuleHeader';
 import AdminNewsletters from '@/components/AdminNewsletters';
 import { getServerI18n } from '@/lib/i18n/server';
+import { adminPageMetadata } from '@/lib/page-metadata';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const generateMetadata = () => adminPageMetadata('newsletters');
 export default async function NewslettersPage() {
   const { t } = await getServerI18n();
   let user;

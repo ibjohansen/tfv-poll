@@ -7,9 +7,11 @@ import { getAdminAuditLog, getAuditedTables } from '@/lib/admin-audit';
 import { isAllowedAdmin, isAuthConfigured } from '@/lib/admin-policy';
 import { normalizeAuditFilters } from '@/lib/audit-filters';
 import { getServerI18n } from '@/lib/i18n/server';
+import { adminPageMetadata } from '@/lib/page-metadata';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+export const generateMetadata = () => adminPageMetadata('audit');
 
 export default async function AdminAuditPage({ searchParams }) {
   const { t } = await getServerI18n();

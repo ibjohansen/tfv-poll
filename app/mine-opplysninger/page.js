@@ -22,7 +22,7 @@ export default async function MemberProfilePage({ searchParams }) {
   try { profile = await getMemberSelfServiceProfile(secret, params?.member); } catch { profile = null; }
   const invalid = params?.status === 'invalid';
   const emailChange = params?.emailChange;
-  return <div className="member-profile-page"><SiteHeader /><main className="member-profile-main">
+  return <div className="member-profile-page"><SiteHeader /><main id="main-content" className="member-profile-main" tabIndex={-1}>
     <header className="member-profile-hero"><p className="eyebrow">{t('eyebrow')}</p><h1>{t('title')}</h1><p>{t('introduction')}</p></header>
     {emailChange === 'completed' && <p className="admin-success" role="status">{t('emailCompleted')}</p>}
     {emailChange === 'old-confirmed' && <p className="admin-success" role="status">{t('oldConfirmed')}</p>}

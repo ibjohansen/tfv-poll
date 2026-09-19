@@ -12,6 +12,11 @@ import { getSurveyPreview } from '@/lib/survey-preview';
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+export async function generateMetadata() {
+  const { t } = await getServerI18n('surveys.page');
+  return { title: t('metadata'), robots: { index: false, follow: false } };
+}
+
 function DocumentIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">

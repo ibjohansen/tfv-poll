@@ -33,7 +33,7 @@ export default async function AdminLogin({ searchParams }) {
   if (configured && isAllowedAdmin((await auth())?.user)) redirect('/admin');
   const params = await searchParams;
   return (
-    <main className="admin-login-page grid min-h-dvh bg-background lg:grid-cols-[minmax(0,1.05fr)_minmax(32rem,0.95fr)]">
+    <main id="main-content" className="admin-login-page grid min-h-dvh bg-background lg:grid-cols-[minmax(0,1.05fr)_minmax(32rem,0.95fr)]" tabIndex={-1}>
       <section className="relative hidden min-h-dvh overflow-hidden bg-primary lg:block" aria-label="Turufjell">
         <div className="absolute inset-x-0 top-0 h-[68%] overflow-hidden">
           <Image

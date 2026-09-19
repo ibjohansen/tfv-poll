@@ -6,9 +6,11 @@ import AdminUsageStatistics from '@/components/AdminUsageStatistics';
 import { isAllowedAdmin, isAuthConfigured } from '@/lib/admin-policy';
 import { getUsageStatistics } from '@/lib/usage-statistics';
 import { getServerI18n } from '@/lib/i18n/server';
+import { adminPageMetadata } from '@/lib/page-metadata';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+export const generateMetadata = () => adminPageMetadata('usage');
 
 export default async function AdminUsagePage({ searchParams }) {
   const { t } = await getServerI18n();

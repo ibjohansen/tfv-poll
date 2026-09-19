@@ -5,7 +5,7 @@ const map = {
     chooseHamlet: 'Velg grend', noHamletSelected: 'Ingen grend valgt', showHamlet: 'Vis {name} i kartet', hideHamlet: 'Skjul {name} i kartet',
     propertyToggleHelp: 'Vis eller skjul registrerte eiendommer i valgt grend', fetchProperties: 'Henter eiendommer …', showProperties: 'Vis eiendommer', hideProperties: 'Skjul eiendommer',
     buildingToggleHelp: 'Vis eller skjul detaljerte bygningsflater fra Kartverket', showBuildings: 'Vis bygninger', hideBuildings: 'Skjul bygninger', buildingsDefault: 'Bygningslaget er slått på.', buildingZoomHelp: 'Eiendomsgrenser vises fra Kartverket/Geonorge når gårds- og bruksnummeret gir et sikkert treff. Ellers vises det offisielle adressepunktet. Detaljerte bygninger vises automatisk når du zoomer inn tilstrekkelig.', buildingTileError: 'Bygningslaget kunne ikke lastes. Last siden på nytt for å prøve igjen.',
-    enterFullscreen: 'Vis kartet i fullskjerm', exitFullscreen: 'Avslutt fullskjerm', fullscreenError: 'Kartet kunne ikke åpnes i fullskjerm.',
+    zoomIn: 'Zoom inn', zoomOut: 'Zoom ut', enterFullscreen: 'Vis kartet i fullskjerm', exitFullscreen: 'Avslutt fullskjerm', fullscreenError: 'Kartet kunne ikke åpnes i fullskjerm.',
     loadError: 'Kunne ikke hente eiendommene.', timeout: 'Kartoppslaget tok for lang tid. Prøv igjen.', retryTitle: 'Prøv eiendomsoppslaget på nytt',
     summary: '{count} registrerte eiendommer i {name}.', selected: 'Valgt: {value}.', noGeometry: 'Eiendommer uten kartgeometri vises bare i listen.',
     region: 'Eiendommer i {name}', caption: 'Registrerte eiendommer i {name}', hNumber: 'H-nummer', cadastral: 'Gårds- og bruksnummer', address: 'Adresse', showInMap: 'Vis eiendommen i kartet', notRegistered: 'Ikke registrert', retry: 'Prøv igjen',

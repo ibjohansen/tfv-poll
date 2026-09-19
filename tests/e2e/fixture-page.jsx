@@ -10,6 +10,8 @@ import AdminUsageStatistics from '@/components/AdminUsageStatistics';
 import MatrikkelSyncPanel from '@/components/MatrikkelSyncPanel';
 import SurveyForm from '@/components/SurveyForm';
 import Select from '@/components/Select';
+import PublicArticleDirectory from '@/components/PublicArticleDirectory';
+import PublicHamletMap from '@/components/PublicHamletMap';
 import { surveyId } from '@/data/survey';
 
 export default async function BrowserFixtures() {
@@ -17,6 +19,15 @@ export default async function BrowserFixtures() {
   const member = { id: '7001', h_number: 'H-SYNTHETIC-1', street_address: 'Testvegen 1', cadastral_number: '10/7001',
     primary_contact_name: 'Syntetisk kontakt', primary_contact_email: 'fixture@example.invalid', other_contact_emails: [] };
   return <main className="admin-main"><h1>Isolerte komponenttester</h1>
+    <PublicArticleDirectory pages={[{
+      id: '7201', slug: 'syntetisk-artikkel', category: 'aktuelt', title: 'Syntetisk artikkel',
+      intro: 'Artikkel brukt til isolert tastaturtest.', published_at: '2026-09-19T10:00:00Z', image: null,
+    }]} />
+    <PublicHamletMap hamlets={[{
+      id: '7401', name: 'Syntetisk grend', polygon: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[
+        [9.48, 60.42], [9.49, 60.42], [9.49, 60.43], [9.48, 60.42],
+      ]] } },
+    }]} />
     <section aria-label="Test av flervalg"><SurveyForm questionVersion={4} questions={[
       { id: 'q1', number: 1, text: 'Velg aktiviteter', multiple: true, options: [{ value: 'ski', label: 'Skitur' }, { value: 'walk', label: 'Fottur' }] },
       { id: 'q2', number: 2, text: 'Ønsker du mer informasjon?' },

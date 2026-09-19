@@ -4,10 +4,11 @@
 
 De 35 norske minimumskravene for privat/frivillig sektor er vurdert og lagt inn
 som en konkret arbeidsliste i [UU-sjekklisten](docs/uu-checklist.md). Gjennomgangen
-fant sju sannsynlige avvik og ni krav som trenger bredere manuell test.
+fant sju konkrete P0-funn og ni krav som trenger bredere manuell test.
 
-- [ ] Rett de sju P0-funnene: kontrast, hoppelenke, sidetitler, modal fokus,
-  språkvelgerfokus, Leaflet-språk og identifikasjon av surveyfeil.
+- [x] Rett de sju P0-funnene lokalt: kontrast, hoppelenke, sidetitler, modal
+  fokus, språkvelgerfokus, Leaflet-språk og identifikasjon av surveyfeil.
+- [ ] Deploy og verifiser de sju rettelsene i produksjon.
 - [ ] Gjennomfør P1-testene med tastatur, VoiceOver/NVDA, 200 prosent tekst,
   kontrastmåling, innloggede flyter og reelt CMS-innhold.
 - [ ] Oppdater statusen for hvert av de 35 kravene etter retting og regresjonstest.

@@ -57,5 +57,6 @@ export default async function AdminModuleHeader({ active, title, email, pendingT
       <p className="eyebrow">Turufjell Vel</p>
       <h1>{title}</h1>
     </header>
+    <span id="main-content" className="visually-hidden" tabIndex={-1}>{t('contentStarts')}</span>
   </>;
 }

@@ -18,7 +18,10 @@ test('shared select supports keyboard, ordinary form values, reset and language 
   await authenticate(context); await page.goto('/admin/browser-test');
   const form = page.getByRole('form', { name: 'Test av nedtrekksliste' });
   const select = form.getByRole('combobox', { name: 'Farge' });
-  await select.focus(); await select.press('Enter'); await select.press('ArrowDown'); await select.press('Enter');
+  await select.focus();
+  await expect(select).toHaveCSS('outline-style', 'solid');
+  await expect(select).toHaveCSS('outline-width', '3px');
+  await select.press('Enter'); await select.press('ArrowDown'); await select.press('Enter');
   await expect(select).toContainText('Rød');
   expect(await form.evaluate((element) => new FormData(element).get('color'))).toBe('red');
   await form.getByRole('button', { name: 'Tilbakestill valg' }).click();
@@ -31,23 +34,55 @@ test('shared select supports keyboard, ordinary form values, reset and language 
   await page.getByRole('combobox', { name: 'Language', exact: true }).click();
   await page.getByRole('option', { name: 'Norsk', exact: true }).click();
   await expect(page.getByRole('combobox', { name: 'Språk', exact: true })).toContainText('Norsk');
+  const map = page.locator('.public-hamlet-map-mount');
+  await map.scrollIntoViewIfNeeded();
+  await expect(page.getByTitle('Zoom inn')).toBeVisible();
+  await expect(page.getByTitle('Zoom ut')).toBeVisible();
 });
 
 test('custom multiple choices submit arrays and explain a non-counted later response', async ({ page, context }) => {
   await authenticate(context); await page.goto('/admin/browser-test');
   const form = page.getByRole('region', { name: 'Test av flervalg' });
+  await form.getByRole('button', { name: /Send/ }).click();
+  await expect(form.getByRole('alert')).toContainText('markerte spørsmålene');
+  await expect(form.locator('.question-card.is-invalid')).toHaveCount(2);
+  await expect(form.getByRole('checkbox').first()).toBeFocused();
+  await expect(form.getByRole('checkbox').first()).toHaveAttribute('aria-invalid', 'true');
   let payload;
   await page.route('**/survey/api/responses', (route) => {
     payload = route.request().postDataJSON();
     return route.fulfill({ status: 201, json: { ok: true, accepted: false } });
   });
   await form.getByText('Skitur', { exact: true }).click();
+  await expect(form.locator('.question-card.is-invalid')).toHaveCount(1);
   await form.getByText('Fottur', { exact: true }).click();
   await form.getByText('Vet ikke', { exact: true }).click();
   await form.getByRole('button', { name: /Send/ }).click();
   await expect.poll(() => payload?.answers).toEqual({ q1: ['ski', 'walk'], q2: 'usikker' });
   await expect(form).toContainText('Ditt svar erstatter ikke dette');
   await expect(form.getByRole('checkbox')).toHaveCount(0);
+});
+
+test('article dialog traps focus and restores it to the article link', async ({ page, context }) => {
+  await authenticate(context);
+  await page.route('**/api/cms/pages/syntetisk-artikkel', (route) => route.fulfill({ json: { ok: true, page: {
+    id: '7201', slug: 'syntetisk-artikkel', category: 'aktuelt', title: 'Syntetisk artikkel',
+    intro: 'Artikkel brukt til isolert tastaturtest.', body: 'Syntetisk brødtekst.', published_at: '2026-09-19T10:00:00Z',
+    image: null, attachments: [{ id: '7301', title: 'Syntetisk vedlegg', url: '/syntetisk.pdf', mime_type: 'application/pdf', original_filename: 'syntetisk.pdf', size_bytes: 1000 }],
+  } } }));
+  await page.goto('/admin/browser-test');
+  const opener = page.getByRole('link', { name: 'Syntetisk artikkel' });
+  await opener.click();
+  const dialog = page.getByRole('dialog', { name: 'Syntetisk artikkel' });
+  const close = dialog.getByRole('button', { name: /Lukk/ });
+  await expect(close).toBeFocused();
+  const attachment = dialog.getByRole('link', { name: /Syntetisk vedlegg/ });
+  await attachment.focus();
+  await page.keyboard.press('Tab');
+  await expect(close).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(opener).toBeFocused();
 });
 
 test('public pageviews send only coarse anonymous dimensions and usage dashboard requires audit access', async ({ page, context }) => {
@@ -58,6 +93,10 @@ test('public pageviews send only coarse anonymous dimensions and usage dashboard
     return route.fulfill({ status: 204, body: '' });
   });
   await page.goto('/');
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('link', { name: 'Hopp til innhold' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#main-content')).toBeFocused();
   const carousel = page.getByRole('region', { name: 'Bilder fra Turufjell' });
   await expect(carousel).toBeVisible();
   await expect.poll(() => carousel.getByRole('img').evaluate((image) => image.complete && image.naturalWidth > 0)).toBe(true);
@@ -74,6 +113,7 @@ test('public pageviews send only coarse anonymous dimensions and usage dashboard
 
   await authenticate(context);
   await page.goto('/admin/usage');
+  await expect(page).toHaveTitle('Bruksstatistikk | Medlemsservice');
   await expect(page.getByRole('heading', { name: 'Bruksstatistikk', exact: true })).toBeVisible();
   await expect(page.getByText(/IP-adresser, cookies, bruker-ID-er/)).toBeVisible();
 
@@ -290,10 +330,13 @@ test('expired member access shows recovery and no member information', async ({ 
 
 test('survey validates all answers and recovers from version conflict', async ({ page }) => {
   await page.goto(`/survey?klm=${'1'.repeat(32)}&xyz=${surveyId}`);
+  await expect(page).toHaveTitle('Medlemsundersøkelse | Turufjell Vel');
   await expect(page.getByRole('heading', { name: 'Din vurdering' })).toBeVisible();
   const submit = page.getByRole('button', { name: /Send inn/ });
   await submit.click();
-  await expect(page.getByText(/Svar på alle 4 spørsmål/)).toBeVisible();
+  await expect(page.getByText(/Svar på de markerte spørsmålene/)).toBeVisible();
+  await expect(page.locator('.question-card.is-invalid')).toHaveCount(4);
+  await expect(page.getByRole('radio', { name: 'Ja', exact: true }).first()).toBeFocused();
   for (const radio of await page.getByRole('radio', { name: 'Ja', exact: true }).all()) { await radio.focus(); await radio.press('Space'); }
   await page.route('**/survey/api/responses', (route) => route.fulfill({ status: 409, json: { ok: false, code: 'SURVEY_CHANGED', message: 'Spørsmålene er endret. Last inn på nytt.' } }));
   await submit.click();
@@ -491,7 +534,7 @@ test('CMS editor supports keyboard formatting, persists structured content and r
   await expect(editor).toHaveAttribute('contenteditable', 'true');
 });
 
-test('group creation, selection, counts and safe deletion are wired to the protected API', async ({ page, context }) => {
+test('group creation, counts, member-directory link and safe deletion are wired to the protected API', async ({ page, context }) => {
   await authenticate(context);
   const group = { id: '12', name: 'Syntetisk grend', kind: 'hamlet', plot_count: 2, member_count: 2, email_count: 1 };
   const calls = [];
@@ -504,11 +547,8 @@ test('group creation, selection, counts and safe deletion are wired to the prote
   await page.getByLabel('Navn', { exact: true }).fill(group.name);
   await page.getByRole('button', { name: 'Opprett', exact: true }).click();
   await expect(page.getByRole('heading', { name: group.name })).toBeVisible();
-  await page.getByRole('searchbox').fill('Test');
-  await page.getByLabel(/Velg alle .* treff/).check();
-  await page.getByRole('button', { name: 'Legg til / flytt valgte' }).click();
-  await expect(page.getByRole('status').filter({ hasText: '2 tomter behandlet' })).toBeVisible();
-  expect(calls.at(-1).allMatching).toBe(true);
+  await expect(page.getByRole('link', { name: 'Vis tilknyttede tomter i registeret' })).toHaveAttribute('href', '/admin/members?hamlet=12');
+  expect(calls).toEqual([{ kind: 'hamlet', action: 'create', name: group.name }]);
   await page.getByRole('button', { name: 'Slett grupperingen' }).click();
   await expect(page.getByRole('alertdialog')).toContainText('Ingen medlemsdata slettes');
   await page.getByRole('button', { name: 'Avbryt', exact: true }).click();

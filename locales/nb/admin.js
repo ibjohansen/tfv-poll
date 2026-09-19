@@ -17,7 +17,8 @@ const admin = {
     logout: 'Logg ut',
     openMenu: 'Åpne administrasjonsmenyen',
     navigation: 'Moduler i Medlemsservice',
-    pendingTasks: '{count} ubehandlede oppgaver'
+    pendingTasks: '{count} ubehandlede oppgaver',
+    contentStarts: 'Hovedinnholdet starter her'
   },
   home: {
     pendingOne: '{count} ubehandlet',

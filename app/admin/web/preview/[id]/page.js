@@ -17,7 +17,7 @@ export default async function CmsPreviewPage({ params }) {
   }
   if (!page) notFound();
   return (
-    <main className="cms-preview-page">
+    <main id="main-content" className="cms-preview-page" tabIndex={-1}>
       <div className="cms-preview-bar"><div><strong>{t('title')}</strong><span>{page.status === 'published' ? t('published') : t('draft')}</span></div><Link href="/admin/web">{t('back')}</Link></div>
       <div className="cms-public-main"><CmsPageView page={page} preview /></div>
     </main>

@@ -55,8 +55,11 @@ export default function PublicHamletMapView({ hamlets, activeHamlet, properties,
       scrollWheelZoom: false,
       zoomSnap: 0,
       zoomDelta: 0.5,
+      zoomControl: false,
     }).setView(latLng(TURUFJELL_CENTER), 14);
     mapRef.current = map;
+    L.control.zoom({ zoomInTitle: t('zoomIn'), zoomOutTitle: t('zoomOut') }).addTo(map);
+    map.attributionControl.setPrefix(false);
     const tiles = L.tileLayer(BACKGROUND_MAP.url, { attribution: BACKGROUND_MAP.attribution, maxZoom: BACKGROUND_MAP.maxZoom }).addTo(map);
     let warned = false;
     tiles.on('tileerror', () => {

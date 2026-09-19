@@ -6,9 +6,11 @@ import CmsPageDirectory from '@/components/CmsPageDirectory';
 import { getAdminCmsPages } from '@/lib/cms-pages';
 import { isCmsStorageConfigured } from '@/lib/cms-storage';
 import { getServerI18n } from '@/lib/i18n/server';
+import { adminPageMetadata } from '@/lib/page-metadata';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+export const generateMetadata = () => adminPageMetadata('web');
 
 export default async function AdminWebPage({ searchParams }) {
   const { t } = await getServerI18n();
