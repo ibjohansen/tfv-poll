@@ -110,8 +110,9 @@ test('map workspace separates register checks from keyboard-accessible hamlet ma
   await expect(workspace.getByRole('button', { name: 'Kontroller medlemsregister' })).toHaveAttribute('aria-pressed', 'true');
   const hamletSelect = workspace.getByRole('combobox', { name: 'Lagret grend' });
   await hamletSelect.click(); await page.getByRole('option', { name: 'Syntetisk grend' }).click();
-  await workspace.getByRole('button', { name: 'Kontroller og vis forslag' }).click();
   await expect(workspace.getByRole('button', { name: /Må følges opp/ })).toContainText('1');
+  await expect(workspace.locator('.map-layer-menu')).toHaveCount(0);
+  await expect(workspace.getByRole('button', { name: /Hent (adresser|veier og stier|eiendomsgrenser)/ })).toHaveCount(0);
   await expect(workspace.getByText('Kontrollen leser og sammenligner data. Den oppdaterer aldri medlemsregisteret.')).toBeVisible();
   await workspace.getByRole('button', { name: /Må følges opp/ }).click();
   const queueStatus = workspace.getByRole('combobox', { name: 'Arbeidsstatus for H392' });
@@ -119,9 +120,9 @@ test('map workspace separates register checks from keyboard-accessible hamlet ma
   await workspace.getByRole('button', { name: 'H392' }).click();
   const objectDetails = workspace.locator('.map-main-panel').getByRole('region', { name: 'Valgt kartobjekt' });
   await expect(objectDetails).toContainText('Lav – kildene er uenige');
-  await expect(objectDetails.getByRole('heading', { name: 'Matrikkeldata' })).toBeVisible();
+  await expect(objectDetails.getByRole('heading', { name: 'Offisiell matrikkeldata' })).toBeVisible();
   await expect(objectDetails).toContainText('10/701');
-  await expect(objectDetails.getByRole('heading', { name: 'Kontaktinformasjon' })).toBeVisible();
+  await expect(objectDetails.getByRole('heading', { name: 'Kontaktinformasjon fra medlemsregisteret' })).toBeVisible();
   await expect(objectDetails).toContainText('Syntetisk kontakt');
   await expect(objectDetails).toContainText('kart@example.invalid');
   await objectDetails.getByRole('button', { name: 'Åpne H392' }).click();
@@ -503,17 +504,19 @@ test('map draws, edits and deletes a polygon without external services', async (
   for (const [x, y] of [[0.35, 0.35], [0.65, 0.35], [0.5, 0.65]]) await map.click({ position: { x: box.width * x, y: box.height * y } });
   await page.getByRole('button', { name: 'Fullfør polygon' }).click();
   await page.route('**/api/admin/map/search', (route) => {
-    expect(route.request().postDataJSON().datatype).toBe('properties');
+    const datatype = route.request().postDataJSON().datatype;
+    if (datatype === 'comparison') return route.fulfill({ json: { complete: true, fetchedAt: '2026-09-15T12:00:00Z', warnings: [], addresses: [], comparison: {
+      officialCount: 0, registerCount: 0, counts: {}, unlocatedRows: [], rows: [],
+    } } });
+    if (datatype === 'roads') return route.fulfill({ json: { complete: true, fetchedAt: '2026-09-15T12:00:00Z', warnings: [], roads: [] } });
     return route.fulfill({ json: { complete: true, fetchedAt: '2026-09-15T12:00:00Z', warnings: [], boundaries: [{
       id: 'synthetic-teig', kind: 'boundary', name: '10/7001', references: [{ municipalityNumber: '3320', gnr: 10, bnr: 7001 }], source: 'Kartverket / Geonorge', accuracy: 'Gult', disputed: false, multipleProperties: false,
       feature: { type: 'Feature', properties: { source: 'Kartverket / Geonorge' }, geometry: { type: 'Polygon', coordinates: [[[9.494,60.464],[9.496,60.464],[9.495,60.466],[9.494,60.464]]] } },
     }] } });
   });
-  await page.getByText('Flere kartkilder', { exact: true }).click();
-  await page.getByRole('button', { name: 'Hent eiendomsgrenser' }).click();
+  await page.getByRole('button', { name: 'Kontroller og vis forslag' }).click();
   await page.getByRole('button', { name: 'Teiger og grenser' }).click();
-  await page.locator('details.map-layer-menu > summary').click();
-  await expect(page.getByRole('checkbox', { name: 'Eiendommer', exact: true })).toBeChecked();
+  await expect(page.locator('.map-layer-menu')).toHaveCount(0);
   await page.getByRole('button', { name: '10/7001', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Valgt kartobjekt' })).toContainText('ikke grensepåvisning');
   await expect(page.getByRole('button', { name: 'Rediger polygon' })).toBeVisible();
@@ -541,6 +544,7 @@ test('hamlet polygons persist across reload, mark edited boundaries as drafts an
   await page.route('**/api/admin/map/search', (route) => {
     const datatype = route.request().postDataJSON().datatype;
     if (datatype === 'properties') return route.fulfill({ json: { complete: true, fetchedAt: '2026-09-15T12:00:00Z', warnings: [], boundaries: [] } });
+    if (datatype === 'roads') return route.fulfill({ json: { complete: true, fetchedAt: '2026-09-15T12:00:00Z', warnings: [], roads: [] } });
     const address = { id: 'synthetic-address', kind: 'address', address: 'Testvegen 1', addressName: 'Testvegen', houseNumber: 1,
       gnr: 10, bnr: 7001, fnr: null, snr: null, postalCode: '3539', postalPlace: 'FLÅ', latitude: 60.465, longitude: 9.495, source: 'Kartverket',
       feature: { type: 'Feature', id: 'synthetic-address', properties: {}, geometry: { type: 'Point', coordinates: [9.495, 60.465] } } };
@@ -606,9 +610,7 @@ test('hamlet polygons persist across reload, mark edited boundaries as drafts an
   await expect(editor.getByLabel('Navn på grend')).toHaveValue('Slåtta Øst');
   await expect(editor.getByRole('checkbox')).toBeChecked();
   await expect(page.getByRole('button', { name: 'Koble register til valgt grend' })).toHaveCount(0);
-  await page.locator('details.map-layer-menu > summary').click();
-  await page.getByRole('checkbox', { name: 'Grendegrenser', exact: true }).uncheck();
-  await page.getByRole('checkbox', { name: 'Grendegrenser', exact: true }).check();
+  await expect(page.locator('.map-layer-menu')).toHaveCount(0);
   await page.getByRole('button', { name: 'Rediger polygon', exact: true }).click();
   await page.getByText(/Koordinater og tilgjengelig polygonredigering/).click();
   const longitude = page.getByRole('spinbutton', { name: 'Lengdegrad 1', exact: true });
@@ -761,23 +763,28 @@ test('map prevents edits during fetch and discards late cancelled results', asyn
   const box = await map.boundingBox();
   for (const [x, y] of [[0.35, 0.35], [0.65, 0.35], [0.5, 0.65]]) await map.click({ position: { x: box.width * x, y: box.height * y } });
   await page.getByRole('button', { name: 'Fullfør polygon' }).click();
-  await page.getByText('Flere kartkilder', { exact: true }).click();
   const pending = [];
   await page.route('**/api/admin/map/search', (route) => { pending.push(route); });
-  await page.getByRole('button', { name: 'Hent adresser' }).click();
+  await page.getByRole('button', { name: 'Kontroller og vis forslag' }).click();
+  await expect.poll(() => pending.length).toBe(3);
   await expect(page.getByText('Henter og behandler data …')).toBeVisible();
   await page.getByRole('button', { name: 'Avbryt', exact: true }).click();
   await expect(page.getByText('Forespørselen er avbrutt.')).toBeVisible();
-  await page.getByRole('button', { name: 'Hent adresser' }).click();
-  await expect.poll(() => pending.length).toBe(2);
+  await page.getByRole('button', { name: 'Kontroller og vis forslag' }).click();
+  await expect.poll(() => pending.length).toBe(6);
   await expect(page.getByRole('button', { name: 'Rediger polygon' })).toBeDisabled();
   await page.getByRole('button', { name: 'Avbryt', exact: true }).click();
   await page.getByRole('button', { name: 'Rediger polygon' }).click();
-  const result = { complete: true, addresses: [{ id: 'test-point', addressName: 'Testvegen', houseNumber: 2, houseLetter: null, latitude: 60.442, longitude: 9.47, source: 'Kartverket', gnr: 10, bnr: 1 }], warnings: [] };
-  for (const route of pending) await route.fulfill({ json: result }).catch(() => {});
+  const address = { id: 'test-point', addressName: 'Testvegen', houseNumber: 2, houseLetter: null, latitude: 60.442, longitude: 9.47, source: 'Kartverket', gnr: 10, bnr: 1 };
+  const resultFor = (route) => route.request().postDataJSON().datatype === 'properties'
+    ? { complete: true, boundaries: [], warnings: [] }
+    : route.request().postDataJSON().datatype === 'roads'
+      ? { complete: true, roads: [], warnings: [] }
+      : { complete: true, addresses: [address], comparison: { officialCount: 1, registerCount: 0, counts: {}, unlocatedRows: [], rows: [] }, warnings: [] };
+  for (const route of pending) await route.fulfill({ json: resultFor(route) }).catch(() => {});
   await page.getByRole('button', { name: 'Fullfør polygon', exact: true }).click();
   await page.unroute('**/api/admin/map/search');
-  await page.route('**/api/admin/map/search', (route) => route.fulfill({ json: result }));
-  await page.getByRole('button', { name: 'Hent adresser' }).click();
-  await expect(page.getByText('1 offisielle adresser hentet.')).toBeVisible();
+  await page.route('**/api/admin/map/search', (route) => route.fulfill({ json: resultFor(route) }));
+  await page.getByRole('button', { name: 'Kontroller og vis forslag' }).click();
+  await expect(page.getByText(/1 adresser .* 0 eiendommer .* 0 veigrupper er hentet og kontrollert/)).toBeVisible();
 });

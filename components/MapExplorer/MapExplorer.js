@@ -13,6 +13,10 @@ import HamletControls from './HamletControls';
 import MapMemberDetails from './MapMemberDetails';
 import { useI18n } from '@/components/LocaleProvider';
 
+const FIXED_MAP_LAYERS = Object.freeze({
+  addresses: true, roads: false, register: false, boundaries: true, hamlets: true, buildings: false,
+});
+
 function MapLoading() {
   const { t } = useI18n('map.admin');
   return <p role="status">{t('loading')}</p>;
@@ -24,7 +28,6 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
   const { t: backendT } = useI18n('map.backend');
   const [state, dispatch] = useReducer(mapWorkflowReducer, undefined, createMapWorkflowState);
   const [vertices, setVertices] = useState([]);
-  const [layers, setLayers] = useState({ addresses: true, roads: true, register: false, boundaries: false, hamlets: true, buildings: false });
   const [hamlets, setHamlets] = useState([]);
   const [hamletBusy, setHamletBusy] = useState(false);
   const [hamletDirty, setHamletDirty] = useState(false);
@@ -62,48 +65,26 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
     return { controller, requestId, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(35_000)]) };
   }
 
-  async function runSource(datatype) {
-    if (!state.area || state.editMode) return;
-    const request = beginRequest(datatype);
-    try {
-      const result = await (await requestMap('search', {
-        polygon: state.area.polygon, datatype, includeBoundaries: Boolean(state.data.properties),
-      }, request.signal, t('requestFailed'))).json();
-      if (requestRef.current?.requestId !== request.requestId) return;
-      const nextData = datatype === 'properties' ? { ...state.data, properties: result, comparison: null }
-        : datatype === 'roads' ? { ...state.data, roads: result }
-        : { ...state.data, addresses: result, comparison: datatype === 'comparison' ? result.comparison : null };
-      if (datatype === 'properties') setLayers((previous) => ({ ...previous, boundaries: true }));
-      const count = datatype === 'properties' ? result.boundaries.length : datatype === 'roads' ? result.roads.length : result.addresses.length;
-      const type = t(datatype === 'properties' ? 'parcels' : datatype === 'roads' ? 'roadGroups' : 'officialAddresses');
-      dispatch({ type: 'fetch-succeeded', requestId: request.requestId, data: nextData,
-        notice: t('fetched', {count, type, mock: result.mockRegister ? t('mock') : ''}) });
-    } catch (failure) {
-      if (requestRef.current?.requestId !== request.requestId || request.controller.signal.aborted) return;
-      dispatch({ type: 'fetch-failed', requestId: request.requestId,
-        error: request.signal.aborted ? t('timeout') : failure.message, retry: datatype });
-    } finally {
-      if (requestRef.current?.requestId === request.requestId) requestRef.current = null;
-    }
-  }
-
-  async function runRegisterControl() {
-    if (!state.area || state.editMode) return;
+  async function runRegisterControl(area = state.area, hamlet = state.activeHamlet) {
+    if (!area || state.editMode) return;
     const request = beginRequest('comparison', t('fetchingControl'));
-    const body = { polygon: state.area.polygon, includeBoundaries: true };
+    const body = { polygon: area.polygon, includeBoundaries: true };
     try {
-      const [addressResult, propertyResult] = await Promise.allSettled([
-        requestMap('search', { ...body, datatype: 'comparison', hamletId: state.activeHamlet?.id }, request.signal, t('requestFailed')).then((response) => response.json()),
+      const [addressResult, propertyResult, roadResult] = await Promise.allSettled([
+        requestMap('search', { ...body, datatype: 'comparison', hamletId: hamlet?.id }, request.signal, t('requestFailed')).then((response) => response.json()),
         requestMap('search', { ...body, datatype: 'properties' }, request.signal, t('requestFailed')).then((response) => response.json()),
+        requestMap('search', { ...body, datatype: 'roads' }, request.signal, t('requestFailed')).then((response) => response.json()),
       ]);
       if (requestRef.current?.requestId !== request.requestId) return;
-      if (addressResult.status === 'rejected' && propertyResult.status === 'rejected') throw addressResult.reason;
+      if ([addressResult, propertyResult, roadResult].every(({ status }) => status === 'rejected')) throw addressResult.reason;
       const addresses = addressResult.status === 'fulfilled' ? addressResult.value : null;
       const properties = propertyResult.status === 'fulfilled' ? propertyResult.value : null;
-      const nextData = { addresses, properties, roads: state.data.roads, comparison: addresses?.comparison || null };
-      setLayers((previous) => ({ ...previous, addresses: Boolean(addresses), boundaries: Boolean(properties), register: Boolean(addresses?.comparison) }));
-      const counts = [addresses && `${addresses.addresses.length} ${t('addresses')}`, properties && `${properties.boundaries.length} ${t('properties')}`].filter(Boolean).join(' / ');
-      const warning = addressResult.status === 'rejected' ? ` ${t('addressesFailed')}` : propertyResult.status === 'rejected' ? ` ${t('propertiesFailed')}` : '';
+      const roads = roadResult.status === 'fulfilled' ? roadResult.value : null;
+      const nextData = { addresses, properties, roads, comparison: addresses?.comparison || null };
+      const counts = [addresses && `${addresses.addresses.length} ${t('addresses')}`, properties && `${properties.boundaries.length} ${t('properties')}`,
+        roads && `${roads.roads.length} ${t('roadGroups')}`].filter(Boolean).join(' / ');
+      const warning = [addressResult.status === 'rejected' && t('addressesFailed'), propertyResult.status === 'rejected' && t('propertiesFailed'),
+        roadResult.status === 'rejected' && t('roadsFailed')].filter(Boolean).map((message) => ` ${message}`).join('');
       dispatch({ type: 'fetch-succeeded', requestId: request.requestId, data: nextData, notice: t('controlReady', {counts, warning}) });
     } catch (failure) {
       if (requestRef.current?.requestId !== request.requestId || request.controller.signal.aborted) return;
@@ -123,13 +104,16 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
     }
   }
 
-  const useHamlet = useCallback((hamlet) => {
+  function useHamlet(hamlet) {
     abortRequest();
     const next = hamlet?.polygon ? validatePolygon(hamlet.polygon) : null;
     setVertices(next ? next.polygon.geometry.coordinates[0].slice(0, -1) : []);
     if (!next) dispatch({ type: 'area-cleared' });
-    else dispatch({ type: 'area-ready', area: next, hamlet });
-  }, [abortRequest]);
+    else {
+      dispatch({ type: 'area-ready', area: next, hamlet });
+      if (state.task === MAP_TASKS.REGISTER) runRegisterControl(next, hamlet);
+    }
+  }
 
   const selectObject = useCallback((item) => {
     if (item.kind === 'hamlet') hamletControlsRef.current?.loadById(String(item.id).replace(/^hamlet:/, ''));
@@ -214,18 +198,12 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
 
       <section className="map-main-panel" aria-label={t('workflow.map')}>
         <div className="map-canvas-shell">
-          <MapView vertices={vertices} drawing={drawing} editing={editing} onVerticesChange={changeVertices} layers={layers} selected={state.selected} onSelect={selectObject} onError={(error) => dispatch({ type: 'error-set', error })} hamlets={hamlets}
+          <MapView vertices={vertices} drawing={drawing} editing={editing} onVerticesChange={changeVertices} layers={FIXED_MAP_LAYERS} selected={state.selected} onSelect={selectObject} onError={(error) => dispatch({ type: 'error-set', error })} hamlets={hamlets}
             addresses={state.data.addresses?.addresses || []} roads={state.data.roads?.roads || []} boundaries={state.data.properties?.boundaries || []}
-            registerPoints={(state.data.comparison?.rows || []).filter((row) => row.status === 'MATCH').map((row) => ({
-              ...row.officialAddresses[0], id: `register-point:${row.register.id}`, kind: 'register', memberId: row.register.id,
-              name: row.register.hNumber, source: t('registerPoint'),
-            }))} />
-          <details className="map-layer-menu"><summary>{t('layers')}</summary><fieldset><legend className="visually-hidden">{t('layers')}</legend>{[['addresses', t('layerAddresses')], ['roads', t('layerRoads')], ['register', t('layerRegister')], ['boundaries', t('layerProperties')], ['hamlets', t('layerHamlets')], ['buildings', t('layerBuildings')]].map(([key, label]) =>
-            <label key={key}><input type="checkbox" checked={layers[key]} onChange={(event) => setLayers({ ...layers, [key]: event.target.checked })} /> {label}</label>)}</fieldset></details>
+          />
         </div>
         {state.selected && !state.selectedMemberId && <ObjectDetails key={state.selected.id} selected={state.selected} comparison={state.data.comparison}
           onClose={() => dispatch({ type: 'object-closed' })} onSelect={selectObject} onOpenMember={openMember} />}
-        {layers.buildings && <p className="map-source-note" role="status">{t('buildingZoomHelp')}</p>}
         <details className="map-source-details"><summary>{t('workflow.sources')}</summary><p className="map-source-note">{t('source')} <a href="https://www.kartverket.no/api-og-data/eiendomsdata/brukarrettleiing-adresse-api" target="_blank" rel="noreferrer">© Kartverket (CC BY 4.0)</a>.
           {' '}{t('roadsSource')} <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors (ODbL)</a>. {t('internalSource')}</p>
           {state.data.properties && <p className="map-source-note">{t('boundarySource', {date: new Date(state.data.properties.fetchedAt).toLocaleString(formatLocale)})}</p>}
@@ -237,14 +215,9 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
         <h2 id="map-control-action-title">{t('workflow.controlAction')}</h2><p>{t('workflow.readOnly')}</p>
         <button type="button" className="primary-button" disabled={!canRun} aria-describedby={!state.area ? 'map-control-disabled-help' : undefined} onClick={runRegisterControl}>{t('workflow.runControl')}</button>
         {!state.area && <p id="map-control-disabled-help" className="muted">{t('workflow.chooseAreaFirst')}</p>}
-        <details><summary>{t('workflow.supplementarySources')}</summary><p>{t('workflow.supplementaryHelp')}</p><div className="map-actions">
-          <button type="button" className="admin-button" disabled={!canRun} onClick={() => runSource('addresses')}>{t('fetchAddresses')}</button>
-          <button type="button" className="admin-button" disabled={!canRun} onClick={() => runSource('roads')}>{t('fetchRoads')}</button>
-          <button type="button" className="admin-button" disabled={!canRun} onClick={() => runSource('properties')}>{t('fetchBoundaries')}</button>
-        </div></details>
         {state.busy && <div className="map-inline-status"><span role="status">{t('processing')}</span><button type="button" className="admin-button" onClick={cancelRequest}>{t('cancel')}</button></div>}
         {state.error && <p className="error-message" role="alert">{state.error}</p>}
-        {state.retry && <button type="button" className="admin-button" disabled={Boolean(state.busy)} onClick={() => state.retry === 'control' ? runRegisterControl() : runSource(state.retry)}>{t('retry')}</button>}
+        {state.retry && <button type="button" className="admin-button" disabled={Boolean(state.busy)} onClick={() => runRegisterControl()}>{t('retry')}</button>}
         {state.notice && <p role="status">{state.notice}</p>}
       </section>}
 

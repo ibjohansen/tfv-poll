@@ -110,8 +110,7 @@ const HamletControls = forwardRef(function HamletControls({ polygon, editing, dr
               <button type="button" className="admin-button" disabled={!current?.polygon || !loaded || loading} onClick={() => save('clear')}>{t('clear')}</button>
             </div></>}
         </fieldset>
-        {mode === 'select' && current?.polygon && <div className="map-area-card"><strong>{current.name}</strong><span>{t(current.reviewed ? 'selectedReviewed' : 'selectedDraft')}</span>
-          <button type="button" className="admin-button" onClick={() => onUse(current)}>{t('useSelected')}</button></div>}
+        {mode === 'select' && current?.polygon && <div className="map-area-card"><strong>{current.name}</strong><span>{t(current.reviewed ? 'selectedReviewed' : 'selectedDraft')}</span></div>}
         {mode === 'maintain' && current && <p className="muted">{t('editing', {name: current.name, version: current.version, state: t(dirty ? 'dirty' : 'stored')})}</p>}
         {loading && <p role="status">{t('loading')}</p>}
         {error && <p className="error-message" role="alert">{error}</p>}
