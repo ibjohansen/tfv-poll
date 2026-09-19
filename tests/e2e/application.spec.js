@@ -117,8 +117,13 @@ test('map workspace separates register checks from keyboard-accessible hamlet ma
   const queueStatus = workspace.getByRole('combobox', { name: 'Arbeidsstatus for H392' });
   await queueStatus.click(); await page.getByRole('option', { name: 'Utsatt' }).click();
   await workspace.getByRole('button', { name: 'H392' }).click();
-  const objectDetails = page.getByRole('region', { name: 'Valgt kartobjekt' });
+  const objectDetails = workspace.locator('.map-main-panel').getByRole('region', { name: 'Valgt kartobjekt' });
   await expect(objectDetails).toContainText('Lav – kildene er uenige');
+  await expect(objectDetails.getByRole('heading', { name: 'Matrikkeldata' })).toBeVisible();
+  await expect(objectDetails).toContainText('10/701');
+  await expect(objectDetails.getByRole('heading', { name: 'Kontaktinformasjon' })).toBeVisible();
+  await expect(objectDetails).toContainText('Syntetisk kontakt');
+  await expect(objectDetails).toContainText('kart@example.invalid');
   await objectDetails.getByRole('button', { name: 'Åpne H392' }).click();
   const memberDetails = page.getByRole('complementary', { name: 'Medlemsdetaljer fra kartet' });
   await expect(memberDetails.getByRole('link', { name: 'Kontroller forslag til matrikkeloppdatering' })).toHaveAttribute('href', '/admin/members/matrikkel?member=701');

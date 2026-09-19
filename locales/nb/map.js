@@ -56,6 +56,10 @@ Object.assign(map.admin.hamlets, {
   useSelected: 'Bruk denne grenden',
 });
 Object.assign(map.admin.object, { memberRecord: 'Tilknyttet registerpost' });
+Object.assign(map.admin.object, {
+  loadingMember: 'Laster matrikkel- og kontaktinformasjon fra medlemsregisteret …',
+  memberLoadError: 'Matrikkel- og kontaktinformasjonen kunne ikke lastes. Du kan fortsatt åpne registerposten.',
+});
 Object.assign(map.admin.memberDetails, {
   cadastralProposal: 'Forslag fra Matrikkelen', cadastralProposalHelp: 'Neste steg åpner en egen, bekreftet kontroll. Du får se adresse, matrikkelnummer og hjemmelshaver som kan endres før noe oppdateres.',
   reviewCadastralUpdate: 'Kontroller forslag til matrikkeloppdatering', emailGroups: 'E-postgrupper', noEmailGroups: 'Ikke tilknyttet en e-postgruppe.',

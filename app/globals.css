@@ -72,6 +72,12 @@
 .map-object-details { border: 1px solid #c7b9a9; background: #fff; border-radius: 10px; padding: 1rem; }
 .map-object-details dl { display: grid; grid-template-columns: minmax(100px, 1fr) 2fr; gap: .4rem 1rem; }
 .map-object-details h2, .map-object-details h3 { font-weight: 600; }
+.map-selected-members { display: grid; gap: .75rem; margin-top: 1rem; }
+.map-selected-member { display: grid; gap: .75rem; padding: .85rem; border: 1px solid #e0d9cf; border-radius: 9px; background: #f8f6f2; }
+.map-selected-member-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.map-selected-member-grid > div { min-width: 0; }
+.map-selected-member-grid h4 { margin: 0 0 .55rem; font-weight: 700; }
+.map-selected-member-grid dd { overflow-wrap: anywhere; }
 .map-register-detail { margin-top: .75rem; border-top: 1px solid #e0d9cf; padding-top: .75rem; }
 .map-warning { border-left: 3px solid #a97526; padding: .5rem .75rem; background: #faf5e9; }
 .map-explorer .muted { font-size: .85rem; color: #665950; }
@@ -132,6 +138,7 @@
   .map-explorer-canvas { min-height: 360px; height: 52vh; }
   .map-actions .admin-button { min-height: 44px; }
   .map-object-details dl { grid-template-columns: 1fr; }
+  .map-selected-member-grid { grid-template-columns: 1fr; }
   .map-workflow-header, .map-task-switch { align-items: stretch; flex-direction: column; }
   .map-task-switch .admin-button { width: 100%; }
   .map-stepper { grid-template-columns: 1fr 1fr; }

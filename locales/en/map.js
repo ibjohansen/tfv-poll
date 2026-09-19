@@ -55,6 +55,10 @@ Object.assign(map.admin.hamlets, {
   useSelected: 'Use this hamlet',
 });
 Object.assign(map.admin.object, { memberRecord: 'Linked register record' });
+Object.assign(map.admin.object, {
+  loadingMember: 'Loading cadastral and contact information from the member register …',
+  memberLoadError: 'The cadastral and contact information could not be loaded. You can still open the register record.',
+});
 Object.assign(map.admin.memberDetails, {
   cadastralProposal: 'Suggestion from the Cadastre', cadastralProposalHelp: 'The next step opens a separate, confirmed check. You will see the address, cadastral number and title holder that may change before anything is updated.',
   reviewCadastralUpdate: 'Review cadastral update suggestion', emailGroups: 'Email groups', noEmailGroups: 'Not linked to an email group.',

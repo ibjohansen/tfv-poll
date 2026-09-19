@@ -223,6 +223,8 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
           <details className="map-layer-menu"><summary>{t('layers')}</summary><fieldset><legend className="visually-hidden">{t('layers')}</legend>{[['addresses', t('layerAddresses')], ['roads', t('layerRoads')], ['register', t('layerRegister')], ['boundaries', t('layerProperties')], ['hamlets', t('layerHamlets')], ['buildings', t('layerBuildings')]].map(([key, label]) =>
             <label key={key}><input type="checkbox" checked={layers[key]} onChange={(event) => setLayers({ ...layers, [key]: event.target.checked })} /> {label}</label>)}</fieldset></details>
         </div>
+        {state.selected && !state.selectedMemberId && <ObjectDetails key={state.selected.id} selected={state.selected} comparison={state.data.comparison}
+          onClose={() => dispatch({ type: 'object-closed' })} onSelect={selectObject} onOpenMember={openMember} />}
         {layers.buildings && <p className="map-source-note" role="status">{t('buildingZoomHelp')}</p>}
         <details className="map-source-details"><summary>{t('workflow.sources')}</summary><p className="map-source-note">{t('source')} <a href="https://www.kartverket.no/api-og-data/eiendomsdata/brukarrettleiing-adresse-api" target="_blank" rel="noreferrer">© Kartverket (CC BY 4.0)</a>.
           {' '}{t('roadsSource')} <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors (ODbL)</a>. {t('internalSource')}</p>
@@ -256,8 +258,6 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
       </section>
     </div>
 
-    {state.selected && !state.selectedMemberId && <ObjectDetails selected={state.selected} comparison={state.data.comparison}
-      onClose={() => dispatch({ type: 'object-closed' })} onSelect={selectObject} onOpenMember={openMember} />}
     {state.selectedMemberId && <MapMemberDetails key={state.selectedMemberId} memberId={state.selectedMemberId}
       canMatrikkelSync={canMatrikkelSync} onClose={closeMember} />}
   </div>;
