@@ -36,6 +36,7 @@ This is a small production-oriented member administration application for Turufj
 - When adding or renaming an environment variable, route, background function or infrastructure service, update the production procedure and verification checklist in README.md in the same change.
 
 ## Before committing changes
+- Always create a commit message, use this when instructed to commit
 - Run `npm run check`.
 - Run `npm audit` when dependencies or the lockfile change.
 - Confirm `git diff --check` passes and verify that no local secrets or generated exports are staged.
