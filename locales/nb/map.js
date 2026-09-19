@@ -9,7 +9,7 @@ const map = {
     loadError: 'Kunne ikke hente eiendommene.', timeout: 'Kartoppslaget tok for lang tid. Prøv igjen.', retryTitle: 'Prøv eiendomsoppslaget på nytt',
     summary: '{count} registrerte eiendommer i {name}.', selected: 'Valgt: {value}.', noGeometry: 'Eiendommer uten kartgeometri vises bare i listen.',
     region: 'Eiendommer i {name}', caption: 'Registrerte eiendommer i {name}', hNumber: 'H-nummer', cadastral: 'Gårds- og bruksnummer', address: 'Adresse', showInMap: 'Vis eiendommen i kartet', notRegistered: 'Ikke registrert', retry: 'Prøv igjen',
-    source: 'Grendegrenser: Turufjell Vel. Eiendomsgrenser: Kartverket/Geonorge. Adressekoordinater og bakgrunnskart: Kartverket.', loading: 'Laster kart …', openMap: 'Åpne kart', mapDeferred: 'Kartet og Kartverkets bakgrunnsfliser lastes først når du åpner kartet. Du kan velge grend og bruke eiendomslisten uten kart.', turufjell: 'Turufjell', tileError: 'Bakgrunnskartet kunne ikke lastes. Prøv igjen senere.', canvasLabel: 'Kart over grender og registrerte eiendommer på Turufjell',
+    source: 'Grendegrenser: Turufjell Vel. Eiendomsgrenser: Kartverket/Geonorge. Adressekoordinater og bakgrunnskart: Kartverket.', loading: 'Laster kart …', turufjell: 'Turufjell', tileError: 'Bakgrunnskartet kunne ikke lastes. Prøv igjen senere.', canvasLabel: 'Kart over grender og registrerte eiendommer på Turufjell',
   },
   admin: {
     tileError: 'Bakgrunnskartet kunne ikke lastes. Last siden på nytt for å prøve igjen.', vertexTitle: 'Polygonpunkt {number}. Kan også endres i koordinatlisten.', canvasLabel: 'Kart over Turufjell. Polygonet kan også redigeres med koordinatfeltene.', addCenterPoint: 'Legg til punkt i kartsenter (kartet flyttes med piltastene)', unnamed: 'Uten navn', draftLabel: 'utkast',

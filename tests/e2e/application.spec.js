@@ -52,12 +52,11 @@ test('shared select supports keyboard, ordinary form values, reset and language 
   await page.waitForLoadState('networkidle');
   const map = page.locator('.public-hamlet-map-mount');
   await map.scrollIntoViewIfNeeded();
-  await page.getByRole('button', { name: 'Åpne kart' }).click();
   await expect(page.getByTitle('Zoom inn')).toBeVisible();
   await expect(page.getByTitle('Zoom ut')).toBeVisible();
 });
 
-test('public map sends no Kartverket tile requests until the user opens it', async ({ page, context }) => {
+test('public map loads automatically and requests Kartverket tiles', async ({ page, context }) => {
   const tileRequests = [];
   page.on('request', (request) => {
     if (new URL(request.url()).hostname === 'cache.kartverket.no') tileRequests.push(request.url());
@@ -65,9 +64,6 @@ test('public map sends no Kartverket tile requests until the user opens it', asy
   await authenticate(context);
   await page.goto('/admin/browser-test');
   await page.locator('.public-hamlet-map-mount').scrollIntoViewIfNeeded();
-  await page.waitForTimeout(500);
-  expect(tileRequests).toHaveLength(0);
-  await page.getByRole('button', { name: 'Åpne kart' }).click();
   await expect(page.getByTitle('Zoom inn')).toBeVisible();
   await expect.poll(() => tileRequests.length).toBeGreaterThan(0);
 });

@@ -15,11 +15,12 @@ test('public shell stays independent of auth while waiting for the CSP nonce req
   assert.match(layout, /await connection\(\)/);
 });
 
-test('public map requires an explicit action before mounting its dynamic map view', async () => {
+test('public map mounts automatically while keeping Leaflet in a dynamic client bundle', async () => {
   const source = await readFile(new URL('../components/PublicHamletMap.js', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /IntersectionObserver/);
-  assert.match(source, /onClick=\{openMap\}/);
-  assert.match(source, /await import\('\.\/PublicHamletMapView'\)/);
+  assert.doesNotMatch(source, /onClick=\{openMap\}/);
+  assert.match(source, /dynamic\(\(\) => import\('\.\/PublicHamletMapView'\)/);
+  assert.match(source, /ssr:\s*false/);
 });
 
 test('admin session lookup is shared by permission checks in one request', async () => {

@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Select from '@/components/Select';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useI18n} from '@/components/LocaleProvider';
@@ -9,13 +10,16 @@ function MapLoading() {
   return <div className="public-hamlet-map-loading" role="status">{t('loading')}</div>;
 }
 
+const PublicHamletMapView = dynamic(() => import('./PublicHamletMapView'), {
+  loading: MapLoading,
+  ssr: false,
+});
+
 export default function PublicHamletMap({hamlets}) {
   const {t} = useI18n('map.public');
   const [activeId, setActiveId] = useState('');
   const [showProperties, setShowProperties] = useState(false);
   const [hoveredHamletId, setHoveredHamletId] = useState('');
-  const [mapReady, setMapReady] = useState(false);
-  const [MapView, setMapView] = useState(null);
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -88,18 +92,6 @@ export default function PublicHamletMap({hamlets}) {
     }
   }
 
-  async function openMap() {
-    setMapReady(true);
-    setError('');
-    try {
-      const mapModule = await import('./PublicHamletMapView');
-      setMapView(() => mapModule.default);
-    } catch {
-      setMapReady(false);
-      setError(t('tileError'));
-    }
-  }
-
   if (!hamlets.length) return <section className="public-hamlet-section" aria-labelledby="public-map-title">
     <div className="public-hamlet-heading"><p className="eyebrow">{t('turufjell')}</p><h2 id="public-map-title">{t('title')}</h2><p>{t('unavailable')}</p></div>
   </section>;
@@ -122,13 +114,10 @@ export default function PublicHamletMap({hamlets}) {
       </Select>
     </div>
     <div className="public-hamlet-map-mount">
-      {MapView ? <MapView hamlets={hamlets} activeHamlet={activeHamlet} properties={showProperties ? properties : []}
-                         selectedProperty={selectedProperty} onSelectHamlet={selectHamlet}
-                         onSelectProperty={setSelectedProperty} onHoverHamlet={setHoveredHamletId}
-                         onError={setError}/> : mapReady ? <MapLoading /> : <div className="public-hamlet-map-consent">
-        <p>{t('mapDeferred')}</p>
-        <button type="button" className="public-property-toggle" onClick={openMap}>{t('openMap')}</button>
-      </div>}
+      <PublicHamletMapView hamlets={hamlets} activeHamlet={activeHamlet} properties={showProperties ? properties : []}
+                           selectedProperty={selectedProperty} onSelectHamlet={selectHamlet}
+                           onSelectProperty={setSelectedProperty} onHoverHamlet={setHoveredHamletId}
+                           onError={setError}/>
     </div>
     <div className="public-hamlet-actions">
       <button className="public-property-toggle" type="button" aria-pressed={showProperties}
@@ -174,7 +163,7 @@ export default function PublicHamletMap({hamlets}) {
           </tr>)}</tbody>
         </table>
       </div>}
-    {mapReady && <><p className="public-map-layer-help">{t('buildingZoomHelp')}</p>
-      <p className="public-map-source">{t('source')}</p></>}
+    <p className="public-map-layer-help">{t('buildingZoomHelp')}</p>
+    <p className="public-map-source">{t('source')}</p>
   </section>;
 }
