@@ -1827,6 +1827,51 @@ input, textarea, select { caret-color: var(--accent); }
   margin-bottom: 24px;
 }
 
+.cms-directory-filters { align-items: end; flex-wrap: wrap; }
+.cms-directory-filters label { display: grid; min-width: 145px; gap: 6px; color: #52525b; font-size: 11px; font-weight: 650; }
+.cms-directory-filters label:first-child { flex: 1 1 260px; }
+.cms-directory-filters input, .cms-directory-filters select { min-height: 42px; padding: 8px 10px; border: 1px solid #d4d4d8; border-radius: 9px; background: #fff; }
+.cms-directory-filters .primary-button { text-decoration: none; }
+
+.cms-editor-page { display: grid; width: min(100%, 960px); margin: 0 auto; gap: 26px; }
+.cms-editor-page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.cms-editor-page-header h1 { margin: 4px 0 8px; font-size: clamp(26px, 4vw, 42px); }
+.cms-editor-page .cms-editor-form { gap: 0; border: 1px solid #e4e4e7; border-radius: 14px; background: #fff; }
+.cms-editor-page .cms-editor-form fieldset { position: relative; z-index: 0; gap: 0; }
+.cms-editor-page .cms-editor-section { padding: 28px; border-top: 1px solid #e4e4e7; }
+.cms-editor-page .cms-editor-section:first-child { border-top: 0; }
+.cms-editor-page .cms-editor-section h2, .cms-history h2, .cms-conflict h2 { margin: 0; color: #27272a; font-size: 18px; font-weight: 600; }
+.cms-checkbox { display: flex !important; align-items: center; grid-template-columns: auto 1fr; }
+.cms-checkbox input { width: auto; min-height: auto; }
+.cms-file-pickers { display: flex; flex-wrap: wrap; gap: 10px; }
+.cms-upload-progress, .cms-quality-list, .cms-history ul, .cms-media-dialog ul { display: grid; margin: 0; padding: 0; gap: 8px; list-style: none; }
+.cms-upload-progress li, .cms-quality-list li { padding: 10px 12px; border-radius: 8px; background: #f4f4f5; font-size: 12px; }
+.cms-upload-progress button, .cms-quality-list button { margin-left: 8px; border: 0; background: transparent; color: var(--accent); cursor: pointer; text-align: left; }
+.cms-quality-list .is-error { border-left: 3px solid #b91c1c; background: #fef2f2; }
+.cms-quality-list .is-warning { border-left: 3px solid #d97706; background: #fffbeb; }
+.cms-editor-message { margin: 0; padding: 14px 28px; border-top: 1px solid #e4e4e7; background: #fafafa; font-size: 13px; }
+.cms-editor-page .cms-editor-actions { position: sticky; z-index: 50; isolation: isolate; top: 0; bottom: auto; display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 16px 28px; border-bottom: 1px solid #d4d4d8; background: rgba(255,255,255,.96); box-shadow: 0 6px 18px rgba(24,24,27,.06); pointer-events: auto; backdrop-filter: blur(12px); }
+.cms-conflict { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 18px; border: 1px solid #fbbf24; border-radius: 12px; background: #fffbeb; }
+.cms-conflict p { flex: 1 1 100%; margin: 0; }
+.cms-history { display: grid; gap: 14px; padding: 24px; border: 1px solid #e4e4e7; border-radius: 12px; }
+.cms-history li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #eee; font-size: 12px; }
+.cms-media-dialog { position: fixed; z-index: 100; inset: 0; display: grid; padding: 20px; place-items: center; background: rgba(9,9,11,.55); }
+.cms-media-dialog > div { overflow: auto; width: min(100%, 760px); max-height: 90dvh; padding: 24px; border-radius: 14px; background: #fff; }
+.cms-media-dialog header, .cms-media-dialog li { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.cms-media-dialog li { padding: 12px 0; border-top: 1px solid #eee; }
+.cms-media-dialog li span { display: grid; flex: 1; gap: 4px; }
+.cms-media-dialog small { color: #71717a; }
+.cms-media-filters { display: grid; grid-template-columns: minmax(180px, 1fr) 140px 150px auto; align-items: end; gap: 10px; margin: 18px 0; }
+.cms-media-filters label { display: grid; gap: 5px; color: #52525b; font-size: 11px; font-weight: 650; }
+.cms-media-filters input, .cms-media-filters select { min-height: 40px; padding: 7px 9px; border: 1px solid #d4d4d8; border-radius: 8px; }
+.cms-preview-widths { position: sticky; z-index: 19; top: 54px; display: flex; justify-content: center; gap: 6px; padding: 8px; border-bottom: 1px solid #e4e4e7; background: #fafafa; }
+.cms-preview-widths button { padding: 6px 10px; border: 1px solid #d4d4d8; border-radius: 7px; background: #fff; cursor: pointer; }
+.cms-preview-widths button[aria-pressed="true"] { border-color: #27272a; background: #27272a; color: #fff; }
+.cms-preview-viewport { min-height: calc(100dvh - 108px); margin: 0 auto; background: #fff; transition: max-width 160ms ease; }
+.cms-preview-viewport.is-mobile { max-width: 390px; box-shadow: 0 0 0 1px #e4e4e7; }
+.cms-preview-viewport.is-tablet { max-width: 768px; box-shadow: 0 0 0 1px #e4e4e7; }
+.cms-preview-viewport.is-desktop { max-width: 1440px; }
+
 .cms-search {
   flex: 1 1 440px;
   max-width: 560px;
@@ -1862,6 +1907,17 @@ input, textarea, select { caret-color: var(--accent); }
   font-size: 14px;
   font-weight: 400;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, .025);
+}
+
+.cms-editor-form input.visually-hidden {
+  position: absolute;
+  width: 1px;
+  min-height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip-path: inset(50%);
 }
 
 .cms-search input:focus,
@@ -2229,6 +2285,20 @@ input, textarea, select { caret-color: var(--accent); }
   .cms-attachment-editor .cms-file-actions { grid-column: 1; }
   .cms-public-main { padding-right: 18px; padding-left: 18px; }
   .cms-preview-bar { align-items: flex-start; padding: 11px 16px; }
+  .cms-editor-page-header { flex-direction: column; }
+  .cms-editor-page-header > .admin-button { width: 100%; }
+  .cms-editor-page .cms-editor-section { padding: 22px 16px; }
+  .cms-editor-page .cms-editor-actions { top: 0; margin: 0; padding: 14px 16px; }
+  .cms-editor-page .cms-editor-actions > * { flex: 1 1 135px; text-align: center; }
+  .cms-directory-filters > * { width: 100%; }
+  .cms-preview-widths { display: none; }
+  .cms-media-filters { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 340px) {
+  .cms-editor-page .cms-editor-section { padding-right: 12px; padding-left: 12px; }
+  .cms-rich-toolbar { gap: 5px; }
+  .cms-rich-toolbar .admin-button { padding: 7px; font-size: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

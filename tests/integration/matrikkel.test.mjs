@@ -9,13 +9,18 @@ const db = createTestDatabase();
 before(async () => { await db.migrate(); });
 after(async () => { await db.close(); });
 
+function syntheticMonth() {
+  const value = Number.parseInt(randomUUID().slice(0, 8), 16);
+  return `${2100 + (value % 2900)}-${String(1 + (value % 12)).padStart(2, '0')}-01`;
+}
+
 async function fixture({ attempts = null, stale = false, lookup, monthly = false } = {}) {
   const runId = randomUUID().replaceAll('-', '');
   const [member] = await db.sql`INSERT INTO members (h_number, street_address, cadastral_number, title_holder)
     VALUES (${`test-${randomUUID()}`}, 'Testvegen 7', '10/20', 'Syntetisk tidligere eier') RETURNING id`;
   await db.sql`INSERT INTO matrikkel_sync_runs (id, requested_by, total_count, status, worker_token, worker_lease_expires_at, run_type, scheduled_month)
     VALUES (${runId}, 'admin@example.test', 1, ${stale ? 'running' : 'pending'}, ${stale ? 'expired-worker' : null},
-      ${stale ? new Date(Date.now() - 60_000) : null}, ${monthly ? 'monthly' : 'manual'}, ${monthly ? '2026-09-01' : null})`;
+      ${stale ? new Date(Date.now() - 60_000) : null}, ${monthly ? 'monthly' : 'manual'}, ${monthly ? syntheticMonth() : null})`;
   await db.sql`INSERT INTO matrikkel_sync_backups (run_id, member_id, cadastral_number, title_holder)
     SELECT ${runId}, id, cadastral_number, title_holder FROM members WHERE id = ${member.id}`;
   if (attempts !== null) await db.sql`INSERT INTO matrikkel_sync_items (run_id, member_id, status, worker_token, attempt_count, previous_values)

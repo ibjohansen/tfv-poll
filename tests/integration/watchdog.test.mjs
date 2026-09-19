@@ -47,12 +47,18 @@ test('watchdog does not steal live reservations or restart cancelled jobs', asyn
   }
 });
 
-test('watchdog dispatches one due MailerSend retry and defers a rejected dispatch', async () => {
+test('watchdog dispatches one due MailerSend retry and defers a rejected dispatch', async (t) => {
+  // A previous interrupted run may have left this test's deliberately deferred
+  // synthetic campaign due. Neutralize only fixtures carrying its exact title.
+  await db.sql`UPDATE email_campaigns campaign SET retry_at = NULL
+    FROM surveys survey
+    WHERE survey.id = campaign.survey_id AND survey.title = 'Retry test' AND campaign.retry_at IS NOT NULL`;
   const surveyId = randomUUID().replaceAll('-', '');
   const campaignId = randomUUID().replaceAll('-', '');
   await db.sql`INSERT INTO surveys (id, title, ends_on) VALUES (${surveyId}, 'Retry test', '2099-12-31')`;
   await db.sql`INSERT INTO email_campaigns (id, survey_id, requested_by, retry_at, error_message)
     VALUES (${campaignId}, ${surveyId}, 'admin@example.test', NOW() - INTERVAL '1 minute', 'MAILERSEND_RATE_LIMIT')`;
+  t.after(async () => { await db.sql`UPDATE email_campaigns SET retry_at = NULL WHERE id = ${campaignId}`; });
   const [member] = await db.sql`INSERT INTO members (h_number, primary_contact_email)
     VALUES (${randomUUID()}, 'retry@example.test') RETURNING id`;
   await db.sql`INSERT INTO email_deliveries (id, campaign_id, member_id, survey_id, recipient_email, email_type, subject)
@@ -93,8 +99,12 @@ test('monthly Matrikkel scheduler runs once on the first Oslo calendar day and s
     './matrikkel-background.js': { dispatchMatrikkelRun: async () => { dispatches++; } },
     './survey-email-background.js': { dispatchSurveyEmailCampaign: async () => assert.fail('Unexpected survey dispatch') },
   });
+  const monthSeed = Number.parseInt(randomUUID().slice(0, 8), 16);
+  const year = 3000 + (monthSeed % 2000);
+  const month = String(1 + (monthSeed % 12)).padStart(2, '0');
+  const scheduledMonth = `${year}-${month}-01`;
   const options = {
-    now: new Date('2026-10-01T04:00:00Z'),
+    now: new Date(`${scheduledMonth}T04:00:00Z`),
     env: { API_MATRIKKEL_BASE_URL: 'https://example.test', API_MATRIKKEL_USR: 'synthetic', API_MATRIKKEL_PWD: 'synthetic' },
   };
   let run;
@@ -106,11 +116,11 @@ test('monthly Matrikkel scheduler runs once on the first Oslo calendar day and s
     assert.equal(results.filter((result) => result.result === 'accepted').length, 1);
     assert.equal(dispatches, 1);
     [run] = await db.sql`SELECT id, run_type, scheduled_month, total_count FROM matrikkel_sync_runs
-      WHERE run_type = 'monthly' AND scheduled_month = '2026-10-01'`;
+      WHERE run_type = 'monthly' AND scheduled_month = ${scheduledMonth}`;
     assert.equal(run.run_type, 'monthly');
     const [backup] = await db.sql`SELECT COUNT(*)::int AS count FROM matrikkel_sync_backups WHERE run_id = ${run.id}`;
     assert.equal(backup.count, run.total_count);
-    const outsideSchedule = await api.startDueMonthlyMatrikkelRun('https://example.test', { ...options, now: new Date('2026-11-02T04:00:00Z') });
+    const outsideSchedule = await api.startDueMonthlyMatrikkelRun('https://example.test', { ...options, now: new Date(`${year}-${month}-02T04:00:00Z`) });
     assert.equal(outsideSchedule.result, 'idle');
   } finally {
     if (run) await db.sql`UPDATE matrikkel_sync_runs SET status = 'cancelled' WHERE id = ${run.id}`;

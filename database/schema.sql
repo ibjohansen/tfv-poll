@@ -274,6 +274,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS cms_pages_active_slug_idx
   ON cms_pages (slug) WHERE deleted_at IS NULL;
 ALTER TABLE cms_pages ADD COLUMN IF NOT EXISTS body_rich_text JSONB
   CHECK (body_rich_text IS NULL OR (jsonb_typeof(body_rich_text) = 'object' AND octet_length(body_rich_text::text) <= 1000000));
+ALTER TABLE cms_pages ADD COLUMN IF NOT EXISTS body_schema_version INTEGER NOT NULL DEFAULT 1
+  CHECK (body_schema_version > 0);
+ALTER TABLE cms_pages ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1
+  CHECK (version > 0);
+ALTER TABLE cms_pages ADD COLUMN IF NOT EXISTS published_revision INTEGER
+  CHECK (published_revision IS NULL OR published_revision > 0);
+ALTER TABLE cms_pages ADD COLUMN IF NOT EXISTS image_decorative BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS cms_pages_public_idx
   ON cms_pages (published_at DESC) WHERE status = 'published' AND deleted_at IS NULL;
 
@@ -296,6 +303,59 @@ CREATE UNIQUE INDEX IF NOT EXISTS cms_attachments_active_image_idx
   ON cms_attachments (page_id) WHERE kind = 'image' AND deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS cms_attachments_page_order_idx
   ON cms_attachments (page_id, kind, sort_order, created_at) WHERE deleted_at IS NULL;
+ALTER TABLE cms_attachments ADD COLUMN IF NOT EXISTS thumbnail_storage_key TEXT;
+ALTER TABLE cms_attachments ADD COLUMN IF NOT EXISTS thumbnail_size_bytes BIGINT
+  CHECK (thumbnail_size_bytes IS NULL OR thumbnail_size_bytes > 0);
+
+-- Hver eksplisitte lagring, publisering, statusendring og gjenoppretting får
+-- et komplett redaksjonelt snapshot. published_revision peker på innholdet som
+-- faktisk er offentlig, slik at et nyere utkast ikke endrer en publisert side.
+CREATE TABLE IF NOT EXISTS cms_page_revisions (
+  page_id TEXT NOT NULL REFERENCES cms_pages(id) ON DELETE RESTRICT,
+  revision_number INTEGER NOT NULL CHECK (revision_number > 0),
+  snapshot JSONB NOT NULL CHECK (jsonb_typeof(snapshot) = 'object' AND octet_length(snapshot::text) <= 1500000),
+  revision_status TEXT NOT NULL CHECK (revision_status IN ('draft', 'published', 'unpublished', 'restored', 'archived')),
+  override_reason TEXT CHECK (override_reason IS NULL OR char_length(override_reason) <= 1000),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_by TEXT NOT NULL,
+  PRIMARY KEY (page_id, revision_number)
+);
+CREATE INDEX IF NOT EXISTS cms_page_revisions_history_idx
+  ON cms_page_revisions (page_id, revision_number DESC);
+
+INSERT INTO cms_page_revisions (page_id, revision_number, snapshot, revision_status, created_by)
+SELECT p.id, 1,
+  jsonb_build_object(
+    'schemaVersion', 1,
+    'title', p.title,
+    'slug', p.slug,
+    'intro', p.intro,
+    'body', p.body,
+    'bodyRichText', p.body_rich_text,
+    'bodySchemaVersion', p.body_schema_version,
+    'category', p.category,
+    'imageAlt', p.image_alt,
+    'imageCaption', p.image_caption,
+    'imageDecorative', p.image_decorative,
+    'files', COALESCE((
+      SELECT jsonb_agg(jsonb_build_object(
+        'id', a.id, 'kind', a.kind, 'title', a.title,
+        'originalFilename', a.original_filename, 'mimeType', a.mime_type,
+        'sizeBytes', a.size_bytes, 'sortOrder', a.sort_order,
+        'thumbnailStorageKey', a.thumbnail_storage_key
+      ) ORDER BY a.kind DESC, a.sort_order, a.created_at, a.id)
+      FROM cms_attachments a
+      WHERE a.page_id = p.id AND a.deleted_at IS NULL
+    ), '[]'::jsonb)
+  ),
+  CASE WHEN p.status = 'published' THEN 'published' ELSE 'draft' END,
+  'schema-migration'
+FROM cms_pages p
+ON CONFLICT (page_id, revision_number) DO NOTHING;
+
+UPDATE cms_pages
+SET published_revision = 1
+WHERE status = 'published' AND published_revision IS NULL;
 
 -- Vedlegg til en undersøkelse lagres privat i Object Storage. Databasen
 -- inneholder bare metadata og den interne objekt-nøkkelen.
@@ -465,9 +525,14 @@ ALTER TABLE email_campaigns ADD COLUMN IF NOT EXISTS group_id BIGINT REFERENCES 
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'email_deliveries' AND column_name = 'source_group_id') THEN
     ALTER TABLE email_deliveries ADD COLUMN source_group_id BIGINT;
-    UPDATE email_deliveries d SET source_group_id = c.group_id FROM email_campaigns c WHERE c.id = d.campaign_id;
   END IF;
 END $$;
+-- Backfill is intentionally outside the column guard. A schema-only Neon branch
+-- can already contain the column before legacy fixture rows are introduced, and
+-- repeated production migrations must repair any older campaign rows safely.
+UPDATE email_deliveries d SET source_group_id = c.group_id
+FROM email_campaigns c
+WHERE d.source_group_id IS NULL AND c.id = d.campaign_id AND c.group_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS email_campaigns_group_idx ON email_campaigns (group_id) WHERE group_id IS NOT NULL;
 
 -- Tidsbegrenset e-postinnlogging for medlemmenes selvbetjening. Bare SHA-256-

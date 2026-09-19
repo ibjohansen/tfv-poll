@@ -5,6 +5,7 @@ import * as crypto from 'node:crypto';
 import { createTestDatabase } from '../helpers/postgres.mjs';
 import { loadModule } from '../helpers/load-module.mjs';
 import * as validation from '../../lib/cms-validation.js';
+import * as quality from '../../lib/cms-quality.js';
 import * as richText from '../../lib/rich-text.js';
 import { copyContentFiles } from '../../lib/content-copy.js';
 
@@ -15,7 +16,7 @@ before(async () => {
   api = await loadModule('lib/cms-pages.js', {
     'node:crypto': crypto, './db.js': { getSql: () => db.sql }, './mock-store.js': { isMockMode: () => false },
     './admin-access.js': { requirePermission: async () => ({ email: 'editor@example.test' }) },
-    './cms-validation.js': validation, './rich-text.js': richText,
+    './cms-validation.js': validation, './cms-quality.js': quality, './rich-text.js': richText,
     './public-content-cache.js': { revalidatePublicCmsContent: () => {} },
     './content-copy.js': { copyContentFiles: (files, prefix, persist) => copyContentFiles(files, prefix, persist, {
       downloadCmsObject: async () => ({ Body: { transformToByteArray: async () => new Uint8Array([1, 2]) } }), uploadCmsObject: async () => {}, deleteCmsObject: async () => {},
@@ -24,7 +25,7 @@ before(async () => {
 });
 
 test('copying a published article creates an independent unpublished draft', async () => {
-  const original = await api.createAdminCmsPage({ title: 'Original', slug: `test-${randomUUID()}`, category: 'Nyheter', status: 'published', body: 'Original body' });
+  const original = await api.createAdminCmsPage({ title: 'Original', slug: `test-${randomUUID()}`, category: 'Nyheter', status: 'published', body: 'Original body', overrideReason: 'Publiseres uten ingress i denne testen.' });
   const fileId = randomUUID().replaceAll('-', '');
   await db.sql`INSERT INTO cms_attachments (id, page_id, kind, title, original_filename, storage_key, mime_type, size_bytes)
     VALUES (${fileId}, ${original.id}, 'image', 'Foto', 'test.jpg', ${`synthetic/${fileId}`}, 'image/jpeg', 2)`;
@@ -45,12 +46,24 @@ test('CMS roundtrips legacy text and sanitized rich text without changing public
   assert.equal(page.body, input.body); assert.equal(page.body_rich_text, null);
   assert.equal(await api.getPublishedCmsPage(input.slug), null);
   const rich = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Trygg tekst', marks: [{ type: 'bold' }, { type: 'link', attrs: { href: 'javascript:alert(1)' } }] }] }] };
-  const updated = await api.updateAdminCmsPage(page.id, { ...input, status: 'published', bodyRichText: rich });
+  const updated = await api.updateAdminCmsPage(page.id, { ...input, status: 'published', bodyRichText: rich, expectedVersion: page.version, overrideReason: 'Publiseres uten ingress i denne testen.' });
   assert.equal(updated.body, 'Trygg tekst');
   assert.deepEqual(updated.body_rich_text.content[0].content[0].marks, [{ type: 'bold' }]);
   assert.equal((await api.getPublishedCmsPage(input.slug)).body, 'Trygg tekst');
   const audit = await db.sql`SELECT changed_by FROM audit_log WHERE table_name = 'cms_pages' AND row_id = ${page.id}`;
   assert.equal(audit.length, 2); assert.ok(audit.every((event) => event.changed_by === 'editor@example.test'));
+});
+
+test('CMS revisions protect newer edits and keep an unfinished draft out of public content', async () => {
+  const slug = `test-${randomUUID()}`;
+  const created = await api.createAdminCmsPage({ title: 'Første', slug, intro: 'Ingress', category: 'Nyheter', status: 'published', body: 'Publisert tekst' });
+  const draft = await api.updateAdminCmsPage(created.id, { title: 'Ny kladd', slug, intro: 'Ingress', category: 'Nyheter', status: 'draft', body: 'Ikke publisert', expectedVersion: created.version });
+  assert.equal((await api.getPublishedCmsPage(slug)).title, 'Første');
+  await assert.rejects(api.updateAdminCmsPage(created.id, { title: 'Gammel fane', slug, intro: 'Ingress', category: 'Nyheter', status: 'draft', expectedVersion: created.version }), (error) => error.code === 'CMS_VERSION_CONFLICT');
+  const restored = await api.restoreAdminCmsPageRevision(created.id, 1, { expectedVersion: draft.version });
+  assert.equal(restored.title, 'Første');
+  const revisions = await api.getAdminCmsPageRevisions(created.id);
+  assert.deepEqual(revisions.map(({ revision_number }) => revision_number), [3, 2, 1]);
 });
 
 test('real audit triggers redact verification hashes and private storage keys on insert and update', async () => {

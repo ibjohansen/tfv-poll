@@ -418,25 +418,47 @@ DATABASE_URL_UNPOOLED=postgresql://...
 
 ## Strukturert CMS
 
-CMS-et ligger på `/admin/web`. Oversikten har tittelsøk og viser tittel,
-kategori, status, endringsdato, publiseringsdato og handlinger. Redigering skjer
-i et panel fra høyre. En side består av:
+CMS-et ligger på `/admin/web`. Oversikten har søk, status- og kategorifilter,
+sortering og stabile redigeringslenker. Redigering skjer på `/admin/web/[id]`,
+slik at tilbakeknappen og en delt URL beholder listekonteksten. På mobil brukes
+hele skjermen. En side består av:
 
 - obligatorisk tittel og automatisk foreslått URL-slug
 - kategori, valgfri ingress og valgfri hovedtekst
 - valgfritt hovedbilde med alt-tekst og bildetekst
 - inntil 20 vedlegg med visningsnavn og redigerbar rekkefølge
-- status `Utkast` eller `Publisert`, samt opprettet-, endret- og publisertdato
+- status `Utkast`, `Publisert` eller arkivert, samt full versjonshistorikk
 
-Tekst lagres uten HTML eller Markdown. Tomme linjer og linjeskift gjøres til
-avsnitt i den offentlige visningen. Hovedbilder støtter JPG, PNG og WebP opp til
+Lagring er eksplisitt; skriving starter ingen bakgrunnskall. Hver lagring bruker
+optimistisk versjonskontroll og oppretter en komplett revisjon. Ved konflikt kan
+redaktøren hente serverversjonen eller kopiere sitt lokale utkast. En publisert
+revisjon vises offentlig til en nyere kladd eksplisitt publiseres. Historiske
+revisjoner kan gjenopprettes som en ny revisjon. Planlagt publisering er med
+hensikt ikke tilbudt uten en pålitelig jobbmekanisme.
+
+Tekst lagres som et strengt sanert JSON-tre uten HTML, Markdown, egendefinerte
+stiler eller vilkårlige noder. Redaktøren har avsnitt, overskriftsnivå 2–3,
+lister, sitat, fet/kursiv og sikre lenker. Publisering kjører kvalitetskontroll
+for blant annet ingress, alt-tekst, overskriftsnivåer, lenketekst og dokumentnavn.
+Feil blokkerer; advarsler krever en redaksjonell begrunnelse.
+
+Hovedbilder støtter JPG, PNG og WebP opp til
 10 MB. Vedlegg støtter PDF, DOC/DOCX, XLS/XLSX, PPT/PPTX, ZIP, JPG, PNG, WebP og
 GIF opp til 20 MB per fil. Filinnhold kontrolleres mot filendelsen før opplasting.
+Opplastinger kjører maksimalt tre samtidig og kan prøves på nytt enkeltvis.
+Bilder får en servergenerert WebP-miniatyr. Mediebiblioteket søker på navn og
+side, filtrerer type/dato og kopierer private objekter ved gjenbruk; interne
+lagringsnøkler sendes aldri til nettleseren.
 
 Publiserte sider vises på `/<slug>` og på forsiden. Forhåndsvisning av utkast
 krever adminøkt. Sider og filmetadata mykslettes med `deleted_at`; vanlige
 spørringer henter dem aldri. Binærfilen beholdes i lagringsbøtten når redaktøren
 sletter den, slik at slettingen er reverserbar på datanivå.
+
+Løsningen bruker bevisst eksisterende React-state og servervalidering. React
+Hook Form, Zod og et drag-and-drop-bibliotek er ikke lagt til fordi de fire
+seksjonene og knappbasert filrekkefølge ikke forsvarer ekstra klientkode eller
+en parallell valideringsmodell.
 
 ## Undersøkelsesvedlegg
 
@@ -548,6 +570,10 @@ kan brukes med `scripts/test-neon-branch.mjs` når lokal Postgres mangler:
 ```bash
 node --use-system-ca scripts/test-neon-branch.mjs \
   --project <prosjekt-id> --branch <godkjent-testgren-id> --host <direkte-endepunkt>
+# Målrettet feilsøking kan avgrenses til én fil med --test cms.test.mjs.
+# CMS-rollback og påfølgende full skjema-reapply på den samme bevoktede grenen:
+node --use-system-ca scripts/test-cms-rollback.mjs \
+  --project <prosjekt-id> --branch <godkjent-testgren-id> --host <direkte-endepunkt>
 ```
 
 Opprett grenen separat med `--schema-only` og et kort automatisk utløp. Kjøreren
@@ -561,6 +587,9 @@ og `TEST_NEON_RUN_ID` gis bare til underprosessen, aldri til Netlify.
 `.env.local` lastes eller endres ikke, og eksterne e-post-/lagringskall erstattes.
 Ingen deploy eller produksjonsmigrering inngår i kommandoen. Se
 [godkjent testkjøring 17. september](docs/database-test-survey-options-2026-09-17.md).
+Rollback-kjøreren krever i tillegg integrasjonstestmarkøren og avviser derfor en
+ny eller ubevoktet gren. Den destruktive rollback-filen er ikke en
+produksjonsprosedyre.
 
 Ved den særskilt godkjente survey-migreringen brukes
 `scripts/release-survey-schema.mjs` med eksplisitt vert, miljø, handling og
@@ -871,6 +900,16 @@ skrive medlemsopplysninger til logger eller eksportfiler. Se
 [migreringsstatus 16. september 2026](docs/database-migration-2026-09-16.md), samt
 [migreringsstatus 17. september 2026](docs/database-migration-2026-09-17.md)
 for utført testing, bekreftede produksjonsmigreringer og gjenopprettingspunkter.
+
+For CMS-revisjoner skal den additive migreringen kjøres før kodeversjonen
+publiseres. Kontroller spesielt `cms_page_revisions`, `cms_pages.version`,
+`cms_pages.published_revision`, `cms_pages.image_decorative` og miniatyrkolonnene
+på `cms_attachments`. `database/cms-improvement-rollback.sql` er kun til øvelse
+på en kortlivet testgren før løsningen tas i bruk; den sletter historikk og skal
+aldri kjøres i produksjon etter at redaktører har begynt å lagre revisjoner.
+Gammel applikasjonskode tåler de additive kolonnene, så trygg rekkefølge er:
+snapshot/gjenopprettingspunkt, skjema, verifikasjon, deretter Netlify-deploy.
+Ved applikasjonsfeil beholdes skjemaet og forrige deploy reaktiveres.
 
 Medlemssøket krever `pg_trgm`, den genererte kolonnen
 `members.search_document` og den partielle GIN-indeksen
@@ -1198,6 +1237,13 @@ Utfør kontrollene i denne rekkefølgen:
   beviser bare mottatt invokasjon, ikke at hemmeligheten ble godtatt eller at
   en kampanje ble behandlet.
 - Åpne `/` og kontroller toppbilde, publiserte artikler og artikkelpanelet.
+- Åpne `/admin/web` og kontroller søk, status/kategori/sortering og direkte URL
+  til editoren. Lagre to revisjoner, verifiser at en upublisert kladd ikke endrer
+  offentlig side, fremprovoser en konflikt i to faner og gjenopprett en eldre
+  revisjon. Kjør kvalitetskontrollen, last opp flere filer, prøv retry og gjenbruk
+  fra mediebiblioteket. Kontroller mobilbredde 320 px, tastaturflyt, forhåndsvisning
+  i tre bredder og at arkivert side gir 404 offentlig. Uten adminøkt skal
+  `/admin/web`, editor, media- og revisjons-API svare med innlogging/401.
 - Kontroller favicon i lys/mørk nettleserflate, og at `/icon` og `/apple-icon`
   gir PNG uten innlogging. Kontroller også i Safari/Firefox før endelig godkjenning.
 - Med syntetisk testtomt: bytt mellom ordinært medlem og unntak, kontroller

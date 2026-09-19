@@ -31,6 +31,10 @@ const cases = [
   ['cms/pages/[id]', 'PATCH', 'cms-pages', 'updateAdminCmsPage', 200],
   ['cms/pages/[id]', 'DELETE', 'cms-pages', 'deleteAdminCmsPage', 200],
   ['cms/pages/[id]/status', 'PATCH', 'cms-pages', 'setAdminCmsPageStatus', 200],
+  ['cms/pages/[id]/revisions', 'GET', 'cms-pages', 'getAdminCmsPageRevisions', 200],
+  ['cms/pages/[id]/revisions/[revision]/restore', 'POST', 'cms-pages', 'restoreAdminCmsPageRevision', 200],
+  ['cms/media', 'GET', 'cms-files', 'getAdminCmsMedia', 200, { value: [], noMarker: true }],
+  ['cms/media', 'POST', 'cms-files', 'reuseAdminCmsFile', 201],
   ['cms/pages/[id]/image', 'POST', 'cms-files', 'uploadAdminCmsFile', 201, { file: true }],
   ['cms/pages/[id]/image', 'DELETE', 'cms-files', 'deleteAdminCmsFile', 200],
   ['cms/pages/[id]/attachments', 'POST', 'cms-files', 'uploadAdminCmsFile', 201, { file: true }],
@@ -53,14 +57,14 @@ const exportsByModule = {
   'admin-survey-results': ['getAdminSurveyResults', 'createAdminSurveyResultsExport'],
   'survey-email': ['getSurveyEmailOverview', 'findSurveyRecipientProperties', 'sendSurveyTestEmail', 'createSurveyEmailCampaign', 'failPendingSurveyEmailCampaign'],
   'survey-files': ['uploadAdminSurveyAttachment', 'updateAdminSurveyAttachment', 'deleteAdminSurveyAttachment'],
-  'cms-pages': ['getAdminCmsPages', 'createAdminCmsPage', 'copyAdminCmsPage', 'getAdminCmsPage', 'updateAdminCmsPage', 'deleteAdminCmsPage', 'setAdminCmsPageStatus'],
-  'cms-files': ['uploadAdminCmsFile', 'deleteAdminCmsFile', 'reorderAdminCmsAttachments', 'updateAdminCmsAttachment'],
+  'cms-pages': ['getAdminCmsPages', 'createAdminCmsPage', 'copyAdminCmsPage', 'getAdminCmsPage', 'updateAdminCmsPage', 'deleteAdminCmsPage', 'setAdminCmsPageStatus', 'getAdminCmsPageRevisions', 'restoreAdminCmsPageRevision'],
+  'cms-files': ['uploadAdminCmsFile', 'deleteAdminCmsFile', 'reorderAdminCmsAttachments', 'updateAdminCmsAttachment', 'getAdminCmsMedia', 'reuseAdminCmsFile'],
   'matrikkel-sync': ['getMatrikkelRuns', 'getMatrikkelRun', 'getMatrikkelMemberOptions', 'createMatrikkelRun', 'failPendingMatrikkelRun', 'deleteMatrikkelRunLog', 'cancelMatrikkelRun', 'processMatrikkelRun', 'approveMatrikkelItem'],
 };
 
-async function setup(path, overrides = {}) {
+async function setup(path, overrides = {}, value) {
   const calls = [];
-  const state = { error: null, limited: false, value: { id: 'a'.repeat(32), marker: 'synthetic-result', buffer: Buffer.from('test workbook'), campaign: { id: 'a'.repeat(32) } } };
+  const state = { error: null, limited: false, value: value ?? { id: 'a'.repeat(32), marker: 'synthetic-result', buffer: Buffer.from('test workbook'), campaign: { id: 'a'.repeat(32) } } };
   const dependencies = Object.fromEntries(Object.entries(exportsByModule).map(([module, names]) => [
     `@/lib/${module}`, Object.fromEntries(names.map((name) => [name, async (...args) => {
       calls.push({ name, args });
@@ -93,7 +97,7 @@ function makeRequest(path, method, options = {}, extra = {}) {
 
 for (const [path, method, module, operation, status, options = {}] of cases) {
   test(`${method} /api/admin/${path} (${operation}): success, permissions and safe failures`, async () => {
-    const { route, state, calls } = await setup(path);
+    const { route, state, calls } = await setup(path, {}, options.value);
     const response = await route[method](makeRequest(path, method, options), routeContext());
     assert.equal(response.status, status);
     assert.equal(calls.at(-1).name, operation, `Expected ${module} service`);
@@ -101,7 +105,7 @@ for (const [path, method, module, operation, status, options = {}] of cases) {
     if (options.binary) {
       assert.match(response.headers.get('content-disposition'), /attachment;.*\.xlsx/);
       assert.equal(await response.text(), 'test workbook');
-    } else if (!['deleteAdminMember', 'deleteAdminSurvey', 'deleteAdminSurveyAttachment', 'deleteAdminCmsPage', 'deleteAdminCmsFile', 'reorderAdminCmsAttachments'].includes(operation)) {
+    } else if (!options.noMarker && !['deleteAdminMember', 'deleteAdminSurvey', 'deleteAdminSurveyAttachment', 'deleteAdminCmsPage', 'deleteAdminCmsFile', 'reorderAdminCmsAttachments'].includes(operation)) {
       assert.match(await response.text(), /synthetic-result/);
     }
     if (path.includes('[id]')) assert.equal(calls.at(-1).args[0], 'a'.repeat(32));
@@ -239,4 +243,31 @@ test('validation, missing entities and conflicts keep their HTTP semantics', asy
     const response = await route[method](makeRequest(path, method, options), routeContext());
     assert.equal(response.status, expected, message);
   }
+});
+
+test('CMS write contracts expose version conflicts and publication findings safely', async () => {
+  const { route, state } = await setup('cms/pages/[id]');
+  state.error = Object.assign(new Error('Page version conflict'), { code: 'CMS_VERSION_CONFLICT' });
+  let response = await route.PATCH(makeRequest('cms/pages/[id]', 'PATCH'), routeContext());
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).conflict, true);
+
+  state.error = Object.assign(new Error('Page is not ready to publish'), { code: 'CMS_PUBLICATION_QUALITY', details: { findings: [{ code: 'missingImageAlt', severity: 'error' }] } });
+  response = await route.PATCH(makeRequest('cms/pages/[id]', 'PATCH'), routeContext());
+  assert.equal(response.status, 422);
+  assert.deepEqual((await response.json()).findings, [{ code: 'missingImageAlt', severity: 'error' }]);
+});
+
+test('CMS media responses expose thumbnail URLs without private storage keys', async () => {
+  const id = 'c'.repeat(32);
+  const { route } = await setup('cms/media', {}, [{
+    id,
+    title: 'Syntetisk bilde',
+    thumbnail_storage_key: 'private/pages/secret-thumbnail.webp',
+  }]);
+  const response = await route.GET(request('/api/admin/cms/media'));
+  const body = await response.json();
+  assert.equal(body.media[0].thumbnail_url, `/api/cms/files/${id}?variant=thumbnail`);
+  assert.equal(Object.hasOwn(body.media[0], 'thumbnail_storage_key'), false);
+  assert.doesNotMatch(JSON.stringify(body), /private\/pages|secret-thumbnail/);
 });

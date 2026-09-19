@@ -87,6 +87,9 @@ test('indexed member search keeps Norwegian text, SPG H-numbers and literal wild
     membership_status: 'exempt',
     turufjell_as_sharing_opt_out: true,
   });
+  // title_holder is registry-owned and therefore deliberately not accepted by
+  // createAdminMember; seed it as the registry import would before testing it.
+  await db.sql`UPDATE members SET title_holder = 'Sæter og Sønn' WHERE id = ${member.id}`;
   for (const search of ['SPG H 987', '32/481', 'Øvre Åsveg', 'Sæter', 'Åse Ødegård', `blåbær-${key}`, '100%']) {
     const result = await directory.getAdminMembers(search, 1, 'h_number', 'asc', false, true, { membershipStatus: 'exempt', turufjellAsSharing: 'opted_out' });
     assert.ok(result.members.some(({ id }) => String(id) === String(member.id)), search);

@@ -15,8 +15,9 @@ function publicEtag(file) {
 export async function GET(request, { params }) {
   try {
     const { id } = await params;
-    let file = await getPublicCmsFile(id);
-    if (!file) file = await getAdminCmsFile(id).catch(() => null);
+    const variant = request.nextUrl.searchParams.get('variant') === 'thumbnail' ? 'thumbnail' : '';
+    let file = await getPublicCmsFile(id, variant);
+    if (!file) file = await getAdminCmsFile(id, variant).catch(() => null);
     if (!file) return new Response('Filen finnes ikke.', { status: 404, headers: { 'Cache-Control': 'no-store' } });
     const etag = file.is_public ? publicEtag(file) : null;
     if (etag && request.headers.get('if-none-match')?.split(',').map((value) => value.trim()).includes(etag)) {
@@ -32,7 +33,7 @@ export async function GET(request, { params }) {
       headers: {
         'Content-Type': file.mime_type,
         'Content-Length': String(file.size_bytes),
-        'Content-Disposition': contentDisposition(file.original_filename, request.nextUrl.searchParams.get('download') === '1'),
+        'Content-Disposition': contentDisposition(variant ? `${file.original_filename}.webp` : file.original_filename, request.nextUrl.searchParams.get('download') === '1'),
         'Cache-Control': file.is_public ? 'public, max-age=300, s-maxage=300, stale-while-revalidate=60, must-revalidate' : 'private, no-store',
         ...(etag ? { ETag: etag } : {}),
         'X-Content-Type-Options': 'nosniff',

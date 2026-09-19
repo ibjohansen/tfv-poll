@@ -10,7 +10,9 @@ import { Client } from 'pg';
 import { testDatabaseUrl } from '../tests/helpers/postgres.mjs';
 
 const exec = promisify(execFile);
-const { values } = parseArgs({ options: { project: { type: 'string' }, branch: { type: 'string' }, host: { type: 'string' } } });
+const { values } = parseArgs({ options: {
+  project: { type: 'string' }, branch: { type: 'string' }, host: { type: 'string' }, test: { type: 'string' },
+} });
 const id = () => randomUUID().replaceAll('-', '');
 let client;
 let connectionString;
@@ -94,7 +96,11 @@ async function main() {
   const env = Object.fromEntries(['PATH', 'SYSTEMROOT', 'TMPDIR', 'NODE_EXTRA_CA_CERTS'].filter((key) => process.env[key]).map((key) => [key, process.env[key]]));
   Object.assign(env, guard, { TEST_DATABASE_URL: connectionString, NODE_ENV: 'test', APP_ENVIRONMENT: 'development',
     DATABASE_URL: '', DATABASE_URL_UNPOOLED: '', MAILERSEND_ENABLED: 'false', MAILERSEND_BULK_ENABLED: 'false' });
-  const tests = (await readdir(new URL('../tests/integration/', import.meta.url))).filter((file) => file.endsWith('.test.mjs')).sort().map((file) => `tests/integration/${file}`);
+  if (values.test) assert.match(values.test, /^[a-z0-9-]+\.test\.mjs$/, 'Invalid integration test filename.');
+  const tests = (await readdir(new URL('../tests/integration/', import.meta.url)))
+    .filter((file) => file.endsWith('.test.mjs') && (!values.test || file === values.test))
+    .sort().map((file) => `tests/integration/${file}`);
+  assert.ok(tests.length, 'No matching integration tests.');
   const status = await new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ['--use-system-ca', '--experimental-vm-modules', '--test', '--test-concurrency=1', ...tests], { env, stdio: 'inherit', cwd: new URL('../', import.meta.url) });
     child.on('error', reject); child.on('exit', (code) => resolve(code ?? 1));

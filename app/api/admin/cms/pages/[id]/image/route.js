@@ -22,7 +22,7 @@ export async function POST(request, { params }) {
   try {
     const form = await request.formData();
     const image = await uploadAdminCmsFile((await params).id, form.get('file'), 'image');
-    return response({ ok: true, image }, 201);
+    return response({ ok: true, image, pageVersion: image.page_version }, 201);
   } catch (error) {
     console.error('CMS image upload failed', { code: error.code || error.cause?.code, message: error.message });
     return uploadError(error, t);
@@ -34,8 +34,8 @@ export async function DELETE(request, { params }) {
   if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return response({ ok: false, message: t('api.invalidRequest') }, 403);
   try {
     const { imageId } = await readJsonObject(request);
-    await deleteAdminCmsFile((await params).id, imageId, 'image');
-    return response({ ok: true });
+    const result = await deleteAdminCmsFile((await params).id, imageId, 'image');
+    return response({ ok: true, pageVersion: result.page_version });
   } catch (error) {
     const status = apiErrorStatus(error);
     return response({ ok: false, message: t(status === 404 ? 'adminCms.imageMissing' : 'adminCms.removeImage') }, status);

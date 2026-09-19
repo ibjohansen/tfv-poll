@@ -635,25 +635,85 @@ test('member entry validates input and displays rate-limit recovery without disc
 
 test('CMS editor supports keyboard formatting, persists structured content and reports save failures', async ({ page, context }) => {
   await authenticate(context);
-  await page.goto('/admin/web');
-  await page.getByRole('button', { name: /Ny side|Opprett side/ }).first().click();
-  const panel = page.getByRole('complementary', { name: 'Rediger nettside' });
-  await panel.getByRole('textbox', { name: /^Tittel/ }).fill('Syntetisk artikkel');
-  const editor = panel.getByRole('textbox', { name: 'Hovedtekst', exact: true });
+  await page.goto('/admin/web/new');
+  const editorPage = page.locator('.cms-editor-page');
+  await editorPage.getByRole('textbox', { name: /^Tittel/ }).fill('Syntetisk artikkel');
+  const editor = editorPage.getByRole('textbox', { name: 'Hovedtekst', exact: true });
   await expect(editor).toBeVisible();
   await editor.fill('Trygg artikkeltekst');
   await editor.press('ControlOrMeta+a');
-  await panel.getByRole('button', { name: 'Fet', exact: true }).click();
+  await editorPage.getByRole('button', { name: 'Fet', exact: true }).click();
   await expect(editor.locator('strong')).toHaveText('Trygg artikkeltekst');
   let payload;
   await page.route('**/api/admin/cms/pages', (route) => {
     payload = route.request().postDataJSON();
     return route.fulfill({ status: 503, json: { ok: false, message: 'Kunne ikke lagre siden. Prøv igjen senere.' } });
   });
-  await panel.getByRole('button', { name: /Lagre utkast/ }).click();
-  await expect(panel.getByText('Kunne ikke lagre siden. Prøv igjen senere.')).toBeVisible();
+  await editorPage.getByRole('button', { name: /Lagre utkast/ }).click();
+  await expect(editorPage.getByText('Kunne ikke lagre siden. Prøv igjen senere.')).toBeVisible();
   expect(payload.bodyRichText.content[0].content[0].marks).toContainEqual({ type: 'bold' });
   await expect(editor).toHaveAttribute('contenteditable', 'true');
+});
+
+test('CMS uses explicit saves, uploads with progress, publishes and handles a stale editor safely', async ({ page, context }) => {
+  await authenticate(context);
+  await page.setViewportSize({ width: 320, height: 800 });
+  const id = 'c'.repeat(32);
+  let version = 1;
+  let saveCalls = 0;
+  let conflictNext = false;
+  const base = { id, title: 'Syntetisk side', slug: 'syntetisk-side', intro: 'Kort ingress.', body: '', body_rich_text: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hovedtekst' }] }] }, category: 'Nyheter', image_alt: 'Fjell i kveldssol', image_caption: '', image_decorative: false, status: 'draft', version, image: null, attachments: [], created_at: new Date().toISOString(), updated_at: new Date().toISOString(), published_at: null };
+  await page.route('**/api/admin/cms/pages', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    saveCalls++;
+    const input = route.request().postDataJSON();
+    return route.fulfill({ status: 201, json: { ok: true, page: { ...base, ...input, body_rich_text: input.bodyRichText, version } } });
+  });
+  await page.route(`**/api/admin/cms/pages/${id}/revisions`, (route) => route.fulfill({ json: { ok: true, revisions: [{ revision_number: 1, revision_status: 'draft', created_at: new Date().toISOString() }] } }));
+  await page.route(`**/api/admin/cms/pages/${id}/image`, async (route) => route.fulfill({ status: 201, json: { ok: true, pageVersion: ++version, image: { id: 'd'.repeat(32), kind: 'image', title: 'Fjell', original_filename: 'fjell.png', mime_type: 'image/png', size_bytes: 8, url: '/icon.png', thumbnail_url: '/icon.png' } } }));
+  await page.route(`**/api/admin/cms/pages/${id}/attachments`, async (route) => route.fulfill({ status: 201, json: { ok: true, pageVersion: ++version, attachment: { id: 'e'.repeat(32), kind: 'attachment', title: 'Referat', original_filename: 'referat.pdf', mime_type: 'application/pdf', size_bytes: 8, url: '/api/cms/files/test' } } }));
+  await page.goto('/admin/web/new');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  const editorPage = page.locator('.cms-editor-page');
+  await editorPage.getByLabel(/^Tittel/).fill(base.title);
+  await editorPage.getByLabel('Ingress').fill(base.intro);
+  await editorPage.getByRole('textbox', { name: 'Hovedtekst', exact: true }).fill('Hovedtekst');
+  await page.waitForTimeout(1200);
+  expect(saveCalls).toBe(0);
+  await editorPage.getByRole('button', { name: 'Lagre utkast' }).click();
+  await expect(editorPage.getByText(/Lagret/)).toBeVisible();
+  expect(saveCalls).toBe(1);
+  await editorPage.locator('input[type="file"][accept*="jpg"]').setInputFiles({ name: 'fjell.png', mimeType: 'image/png', buffer: Buffer.from('synthetic') });
+  await expect(editorPage.getByText('fjell.png: Ferdig')).toBeVisible();
+  await editorPage.getByLabel('Alt-tekst').fill(base.image_alt);
+  await editorPage.locator('input[type="file"][multiple]').setInputFiles({ name: 'referat.pdf', mimeType: 'application/pdf', buffer: Buffer.from('synthetic') });
+  await expect(editorPage.getByText('referat.pdf: Ferdig')).toBeVisible();
+  await page.route(`**/api/admin/cms/pages/${id}`, async (route) => {
+    saveCalls++;
+    const input = route.request().postDataJSON();
+    if (conflictNext) {
+      conflictNext = false;
+      return route.fulfill({ status: 409, json: { ok: false, conflict: true, message: 'Siden er endret i en annen fane.', currentPage: { ...base, title: 'Serverversjon', status: 'published', version: ++version } } });
+    }
+    return route.fulfill({ json: { ok: true, page: { ...base, ...input, body_rich_text: input.bodyRichText, status: 'published', version: ++version, published_revision: version, image: { id: 'd'.repeat(32), original_filename: 'fjell.png', mime_type: 'image/png', size_bytes: 8, url: '/icon.png' }, attachments: [{ id: 'e'.repeat(32), title: 'Referat', original_filename: 'referat.pdf', mime_type: 'application/pdf', size_bytes: 8, url: '/api/cms/files/test' }] } } });
+  });
+  await page.route(`**/api/admin/cms/pages/${id}/revisions/1/restore`, (route) => route.fulfill({ json: { ok: true, page: { ...base, title: 'Gjenopprettet', version: ++version, status: 'published' } } }));
+  await page.route(`**/api/admin/cms/pages/${id}/status`, (route) => route.fulfill({ json: { ok: true, page: { ...base, title: 'Gjenopprettet', version: ++version, status: 'draft' } } }));
+  await editorPage.getByRole('button', { name: 'Publiser', exact: true }).click();
+  await expect(editorPage.getByText('Siden er publisert.')).toBeVisible();
+  await expect(editorPage.getByRole('link', { name: 'Forhåndsvis' })).toBeVisible();
+  expect(saveCalls).toBe(2);
+  await editorPage.getByLabel('Ingress').fill('Min lokale endring');
+  conflictNext = true;
+  await editorPage.getByRole('button', { name: 'Lagre utkast' }).click();
+  await expect(editorPage.getByRole('heading', { name: 'Nyere versjon finnes' })).toBeVisible();
+  await editorPage.getByRole('button', { name: 'Last inn serverversjonen' }).click();
+  await expect(editorPage.getByRole('heading', { name: 'Serverversjon' })).toBeVisible();
+  page.once('dialog', (dialog) => dialog.accept());
+  await editorPage.getByRole('button', { name: 'Gjenopprett' }).click();
+  await expect(editorPage.getByText(/Revisjon 1 er gjenopprettet/)).toBeVisible();
+  await editorPage.getByRole('button', { name: 'Avpubliser' }).click();
+  await expect(editorPage.getByText('Siden er avpublisert.')).toBeVisible();
 });
 
 test('group creation, counts, member-directory link and safe deletion are wired to the protected API', async ({ page, context }) => {

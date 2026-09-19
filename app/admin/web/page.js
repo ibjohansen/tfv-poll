@@ -17,8 +17,14 @@ export default async function AdminWebPage({ searchParams }) {
   if (!isAuthConfigured()) redirect('/admin/login');
   const session = await getAdminSession();
   if (!isAllowedAdmin(session?.user)) redirect('/admin/login');
-  const search = String((await searchParams).search || '').slice(0, 120);
+  const raw = await searchParams;
+  const filters = {
+    search: String(raw.search || '').slice(0, 120),
+    status: ['active', 'draft', 'published', 'archived'].includes(raw.status) ? raw.status : 'active',
+    category: String(raw.category || ''),
+    sort: ['updated-desc', 'updated-asc', 'title-asc', 'title-desc'].includes(raw.sort) ? raw.sort : 'updated-desc',
+  };
   let pages;
-  try { pages = await getAdminCmsPages(search); } catch { pages = null; }
-  return <main className="admin-shell"><AdminModuleHeader active="web" title={t('admin.pages.websites')} email={session.user.email} /><section className="admin-content">{pages ? <CmsPageDirectory key={search} pages={pages} search={search} storageConfigured={isCmsStorageConfigured()} /> : <p className="form-error" role="alert">{t('admin.pages.cmsUnavailable')}</p>}</section></main>;
+  try { pages = await getAdminCmsPages(filters); } catch { pages = null; }
+  return <main className="admin-shell"><AdminModuleHeader active="web" title={t('admin.pages.websites')} email={session.user.email} /><section className="admin-content">{pages ? <CmsPageDirectory key={JSON.stringify(filters)} pages={pages} filters={filters} storageConfigured={isCmsStorageConfigured()} /> : <p className="form-error" role="alert">{t('admin.pages.cmsUnavailable')}</p>}</section></main>;
 }

@@ -95,10 +95,11 @@ try {
     }).observe({ type: 'largest-contentful-paint', buffered: true });
   });
   const results = {};
-  for (const [label, path] of [['home-cold', '/'], ['home-warm', '/'], ['members', '/admin/members'], ['web', '/admin/web']]) results[label] = await measure(page, path);
+  for (const [label, path] of [['home-cold', '/'], ['home-warm', '/'], ['members', '/admin/members'], ['web', '/admin/web'], ['web-editor', '/admin/web/new']]) results[label] = await measure(page, path);
   enforce('home-warm', results['home-warm'], { ttfb: 500, lcp: 1500, clientJavaScript: 900_000, requests: 45, kartverketRequests: 0, failedResponses: 0 });
   enforce('members', results.members, { ttfb: 1500, clientJavaScript: 1_200_000, requests: 50, failedResponses: 0 });
   enforce('web', results.web, { ttfb: 1500, clientJavaScript: 900_000, requests: 45, failedResponses: 0 });
+  enforce('web-editor', results['web-editor'], { ttfb: 1500, clientJavaScript: 1_400_000, requests: 50, failedResponses: 0 });
   console.log(JSON.stringify(results, null, 2));
 } finally {
   await browser?.close();

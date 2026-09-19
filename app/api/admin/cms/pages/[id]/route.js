@@ -12,6 +12,9 @@ function statusFor(error) {
   if (error.message === 'Unauthorized') return 401;
   if (error.message === 'Page not found') return 404;
   if ((error.code || error.cause?.code) === '23505') return 409;
+  if (error.code === 'CMS_VERSION_CONFLICT') return 409;
+  if (error.code === 'CMS_VERSION_REQUIRED') return 428;
+  if (error.code === 'CMS_PUBLICATION_QUALITY') return 422;
   return apiErrorStatus(error, 400);
 }
 
@@ -38,7 +41,12 @@ export async function PATCH(request, { params }) {
   try {
     return response({ ok: true, page: await updateAdminCmsPage((await params).id, await readJsonObject(request)) });
   } catch (error) {
-    console.error('CMS page update failed', { id: (await params).id, code: error.code || error.cause?.code, message: error.message });
+    const id = (await params).id;
+    console.error('CMS page update failed', { id, code: error.code || error.cause?.code, message: error.message });
+    if (error.code === 'CMS_VERSION_CONFLICT') {
+      return response({ ok: false, conflict: true, message: 'Siden er endret i en annen fane.', currentPage: await getAdminCmsPage(id).catch(() => null) }, 409);
+    }
+    if (error.code === 'CMS_PUBLICATION_QUALITY') return response({ ok: false, message: 'Kvalitetskontrollen må løses før publisering.', ...error.details }, 422);
     return response({ ok: false, message: messageFor(error, (key) => t(`adminCms.${key}`)) }, statusFor(error));
   }
 }

@@ -56,9 +56,11 @@ test('member comment stays with its update, appears in inbox and can be acknowle
 test('monthly Matrikkel deviations appear in the task list count until the run is hidden', async () => {
   const before = await api.getAdminTaskCount();
   const runId = randomUUID().replaceAll('-', '');
+  const monthSeed = Number.parseInt(runId.slice(0, 8), 16);
+  const scheduledMonth = `${6000 + (monthSeed % 2900)}-${String(1 + (monthSeed % 12)).padStart(2, '0')}-01`;
   await db.sql`INSERT INTO matrikkel_sync_runs
     (id, requested_by, status, run_type, scheduled_month, total_count, processed_count, unchanged_count, review_count)
-    VALUES (${runId}, 'system:monthly-matrikkel', 'completed', 'monthly', '2098-07-01', 10, 10, 8, 2)`;
+    VALUES (${runId}, 'system:monthly-matrikkel', 'completed', 'monthly', ${scheduledMonth}, 10, 10, 8, 2)`;
   const tasks = await api.getAdminMatrikkelTasks();
   assert.equal(tasks.find((task) => task.id === runId).review_count, 2);
   assert.equal(await api.getAdminTaskCount(), before + 1);

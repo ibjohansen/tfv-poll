@@ -14,7 +14,8 @@ export async function PATCH(request, { params }) {
   try {
     const route = await params;
     const { title } = await readJsonObject(request);
-    return response({ ok: true, attachment: await updateAdminCmsAttachment(route.id, route.attachmentId, title) });
+    const attachment = await updateAdminCmsAttachment(route.id, route.attachmentId, title);
+    return response({ ok: true, attachment, pageVersion: attachment.page_version });
   } catch (error) {
     const status = apiErrorStatus(error);
     return response({ ok: false, message: t(status === 404 ? 'adminCms.attachmentMissing' : 'adminCms.attachmentName') }, status);
@@ -26,8 +27,8 @@ export async function DELETE(request, { params }) {
   if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return response({ ok: false, message: t('api.invalidRequest') }, 403);
   try {
     const route = await params;
-    await deleteAdminCmsFile(route.id, route.attachmentId);
-    return response({ ok: true });
+    const result = await deleteAdminCmsFile(route.id, route.attachmentId);
+    return response({ ok: true, pageVersion: result.page_version });
   } catch (error) {
     const status = apiErrorStatus(error);
     return response({ ok: false, message: t(status === 404 ? 'adminCms.attachmentMissing' : 'adminCms.removeAttachment') }, status);

@@ -15,7 +15,7 @@ export async function POST(request, { params }) {
   try {
     const form = await request.formData();
     const attachment = await uploadAdminCmsFile((await params).id, form.get('file'), 'attachment');
-    return response({ ok: true, attachment }, 201);
+    return response({ ok: true, attachment, pageVersion: attachment.page_version }, 201);
   } catch (error) {
     console.error('CMS attachment upload failed', { code: error.code || error.cause?.code, message: error.message });
     if (error.message === 'Unauthorized') return response({ ok: false, message: t('adminCms.login') }, 401);
@@ -30,8 +30,8 @@ export async function PATCH(request, { params }) {
   if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return response({ ok: false, message: t('api.invalidRequest') }, 403);
   try {
     const { ids } = await readJsonObject(request);
-    await reorderAdminCmsAttachments((await params).id, ids);
-    return response({ ok: true });
+    const result = await reorderAdminCmsAttachments((await params).id, ids);
+    return response({ ok: true, pageVersion: result.page_version });
   } catch (error) {
     const status = apiErrorStatus(error);
     return response({ ok: false, message: t('adminCms.attachmentOrder') }, status);

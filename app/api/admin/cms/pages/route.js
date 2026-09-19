@@ -13,13 +13,14 @@ function errorResponse(error, t) {
   if (error.message === 'Unauthorized') return response({ ok: false, message: t('login') }, 401);
   if (code === '23505') return response({ ok: false, message: t('duplicateUrl') }, 409);
   if (error.message === 'Mock data cannot be changed') return response({ ok: false, message: t('mock') }, 409);
+  if (code === 'CMS_PUBLICATION_QUALITY') return response({ ok: false, message: 'Kvalitetskontrollen må løses før publisering.', ...error.details }, 422);
   return response({ ok: false, message: t('check') }, apiErrorStatus(error, 400));
 }
 
 export async function GET(request) {
   const { t } = getRequestI18n(request, 'backend.adminCms');
   try {
-    const pages = await getAdminCmsPages(request.nextUrl.searchParams.get('search') || '');
+    const pages = await getAdminCmsPages(Object.fromEntries(request.nextUrl.searchParams));
     return response({ ok: true, pages });
   } catch (error) {
     console.error('CMS page list failed', { code: error.code || error.cause?.code, message: error.message });

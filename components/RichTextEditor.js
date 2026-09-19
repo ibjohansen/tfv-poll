@@ -25,23 +25,29 @@ export default function RichTextEditor({ value, plainText = '', onChange, disabl
     bold: current.isActive('bold'), italic: current.isActive('italic'), paragraph: current.isActive('paragraph'),
     heading2: current.isActive('heading', { level: 2 }), heading3: current.isActive('heading', { level: 3 }),
     bulletList: current.isActive('bulletList'), orderedList: current.isActive('orderedList'), blockquote: current.isActive('blockquote'),
+    characters: current.getText().length,
   } : {} });
   // Toggling editability is not a content change. Tiptap otherwise emits an
   // update and marks a successfully saved newsletter dirty again.
   useEffect(() => { editor?.setEditable(!disabled, false); }, [editor, disabled]);
+  useEffect(() => {
+    if (!editor) return;
+    const next = value || textToRichText(plainText);
+    if (JSON.stringify(editor.getJSON()) !== JSON.stringify(next)) editor.commands.setContent(next, { emitUpdate: false });
+  }, [editor, plainText, value]);
   const buttons = [
-    [t('paragraph'), 'paragraph', () => editor.chain().focus().setParagraph().run()],
-    [t('heading2'), 'heading2', () => editor.chain().focus().toggleHeading({ level: 2 }).run()],
-    [t('heading3'), 'heading3', () => editor.chain().focus().toggleHeading({ level: 3 }).run()],
-    [t('bold'), 'bold', () => editor.chain().focus().toggleBold().run()],
-    [t('italic'), 'italic', () => editor.chain().focus().toggleItalic().run()],
+    [t('paragraph'), 'paragraph', () => editor.chain().focus().setParagraph().run(), 'Ctrl+Alt+0'],
+    [t('heading2'), 'heading2', () => editor.chain().focus().toggleHeading({ level: 2 }).run(), 'Ctrl+Alt+2'],
+    [t('heading3'), 'heading3', () => editor.chain().focus().toggleHeading({ level: 3 }).run(), 'Ctrl+Alt+3'],
+    [t('bold'), 'bold', () => editor.chain().focus().toggleBold().run(), 'Ctrl+B'],
+    [t('italic'), 'italic', () => editor.chain().focus().toggleItalic().run(), 'Ctrl+I'],
     [t('bulletList'), 'bulletList', () => editor.chain().focus().toggleBulletList().run()],
     [t('orderedList'), 'orderedList', () => editor.chain().focus().toggleOrderedList().run()],
     [t('quote'), 'blockquote', () => editor.chain().focus().toggleBlockquote().run()],
   ];
   return <div className="cms-rich-editor">
     <span>{t('mainText')}</span><div className="cms-rich-toolbar" role="group" aria-label={t('formatting')}>
-      {buttons.map(([label, key, action]) => <button className="admin-button" key={key} type="button" aria-pressed={Boolean(state?.[key])} disabled={disabled || !editor} onClick={action}>{label}</button>)}
+      {buttons.map(([label, key, action, shortcut]) => <button className="admin-button" key={key} type="button" title={shortcut ? `${label} (${shortcut})` : label} aria-pressed={Boolean(state?.[key])} disabled={disabled || !editor} onClick={action}>{label}</button>)}
       <button type="button" className="admin-button" disabled={disabled || !editor} onClick={() => editor.chain().focus().undo().run()}>{t('undo')}</button>
       <button type="button" className="admin-button" disabled={disabled || !editor} onClick={() => editor.chain().focus().redo().run()}>{t('redo')}</button>
     </div><EditorContent editor={editor} />
@@ -53,7 +59,7 @@ export default function RichTextEditor({ value, plainText = '', onChange, disabl
         editor.chain().focus().setLink({ href }).run(); setMessage(t('linkAdded')); setLink('');
       }}>{t('addLink')}</button>
       <button className="admin-button" type="button" disabled={disabled || !editor} onClick={() => editor.chain().focus().extendMarkRange('link').unsetLink().run()}>{t('removeLink')}</button>
-    </div><small>{t('help')}</small>
+    </div><small>{t('help')} {state?.characters || 0}/100 000 tegn.</small>
     {message && <p role="status">{message}</p>}
   </div>;
 }
