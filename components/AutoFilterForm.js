@@ -3,8 +3,11 @@
 import { useEffect, useRef, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
-// Some existing server pages key the results component by the query. Preserve
-// the user's text focus across that remount, but never steal focus after a click.
+const SEARCH_DEBOUNCE_MS = 600;
+
+// Some server-rendered result forms are intentionally remounted when the URL
+// catches up. Preserve text focus across that remount, but never steal focus
+// after a click.
 let pendingFocus = null;
 
 export default function AutoFilterForm({ action, children, className }) {
@@ -37,11 +40,11 @@ export default function AutoFilterForm({ action, children, className }) {
     startTransition(() => router.replace(href, { scroll: false }));
   }
   return <form action={action} className={className} aria-busy={pending} onSubmit={(event) => { event.preventDefault(); apply(event.currentTarget); }}
-    onCompositionStart={() => clearTimeout(timer.current)} onCompositionEnd={(event) => { const form = event.currentTarget; timer.current = setTimeout(() => apply(form), 300); }} onChange={(event) => {
+    onCompositionStart={() => clearTimeout(timer.current)} onCompositionEnd={(event) => { const form = event.currentTarget; timer.current = setTimeout(() => apply(form), SEARCH_DEBOUNCE_MS); }} onChange={(event) => {
       clearTimeout(timer.current);
       if (event.nativeEvent.isComposing) return;
       const form = event.currentTarget;
-      if (['text', 'search'].includes(event.target.type)) timer.current = setTimeout(() => apply(form), 300);
+      if (['text', 'search'].includes(event.target.type)) timer.current = setTimeout(() => apply(form), SEARCH_DEBOUNCE_MS);
       else apply(form);
     }}>{children}</form>;
 }

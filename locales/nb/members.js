@@ -27,6 +27,9 @@ members.requests.reviewCodes = {
 members.matrikkel.hNumberLabel = 'H-nummer';
 members.adminDirectory.saveStates.idle = '—';
 Object.assign(members.adminDirectory, {
+  cadastralData: 'Matrikkeldata',
+  contactInformation: 'Kontaktinformasjon',
+  statusAndAffiliations: 'Medlemsstatus, reservasjon og tilknytninger',
   groups: 'Administrer grupper',
   tableCaption: 'Velg tomter med avkrysningsboksene for eksport, matrikkeloppdatering eller tilordning til e-postgruppe. Velg en rad for å se og redigere medlemsopplysninger.',
   selectAction: 'Velg for eksport, matrikkeloppdatering eller e-postgruppe',

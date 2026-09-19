@@ -79,20 +79,29 @@ export default function MapMemberDetails({ memberId, canMatrikkelSync = false, o
     {loading && <p role="status">{t('loading')}</p>}
     {error && <p className="form-error" role="alert">{error}</p>}
     {form && <form className="admin-detail-form" onSubmit={(event) => { event.preventDefault(); save(payload(form)); }}>
-      <div className="map-actions"><Link className="admin-button" href={`/admin/members?member=${encodeURIComponent(memberId)}`}>{t('openRegister')}</Link>
-        {canMatrikkelSync && <Link className="admin-button" href={`/admin/members/matrikkel?member=${encodeURIComponent(memberId)}`}>{t('updateCadastral')}</Link>}</div>
-      <label>{t('membershipStatus')}<Select value={form.membership_status || 'member'} onChange={(event) => update('membership_status', event.target.value)}><option value="member">{t('regularMember')}</option><option value="exempt">{t('exempt')}</option></Select></label>
-      <label className="admin-checkbox"><input type="checkbox" checked={Boolean(form.turufjell_as_sharing_opt_out)} onChange={(event) => update('turufjell_as_sharing_opt_out', event.target.checked)} /> {t('sharingOptOut')}</label>
-      <div className="admin-detail-field-grid is-property">{propertyFields.map((name) => <div className="admin-detail-field" key={name}><label>{t(`fields.${name}`)}<input value={form[name] || ''} readOnly /></label></div>)}</div>
-      <div className="admin-detail-field"><label>{t('streetAddress')}<input value={form.street_address || ''} readOnly /></label></div>
-      <div className="admin-detail-field-grid is-ownership"><div className="admin-detail-field"><label>{t('titleHolder')}<textarea value={(form.title_holder || '').split(/\s*\/\s*/).join('\n')} rows="3" readOnly /></label></div>
-        <div className="admin-detail-field"><label>{t('registrationDate')}<textarea value={(form.registration_date || '').split(/\s*\/\s*/).join('\n')} rows="3" readOnly /></label></div></div>
-      {!form.title_holder && <p className="map-warning">{t('noOwner')}</p>}
-      {form.street_address && <MemberPropertyMap streetAddress={form.street_address} />}
-      {member.hamlet_name && <p><strong>{t('hamlet')}:</strong> {member.hamlet_name}</p>}
-      {contactFields.map((name) => <div className="admin-detail-field" key={name}><label>{t(`fields.${name}`)}{['other_contact_emails', 'admin_comment'].includes(name)
-        ? <textarea value={form[name] || ''} onChange={(event) => update(name, event.target.value)} rows={name === 'admin_comment' ? 5 : 3} />
-        : <input value={form[name] || ''} onChange={(event) => update(name, event.target.value)} />}</label></div>)}
+      <div className="map-actions"><Link className="admin-button" href={`/admin/members?member=${encodeURIComponent(memberId)}`}>{t('openRegister')}</Link></div>
+      <section className="admin-detail-section" aria-labelledby="map-member-cadastral-title">
+        <div className="admin-section-header"><h3 id="map-member-cadastral-title">{t('cadastralData')}</h3></div>
+        <div className="admin-detail-field-grid is-property">{propertyFields.map((name) => <div className="admin-detail-field" key={name}><label>{t(`fields.${name}`)}<input value={form[name] || ''} readOnly /></label></div>)}</div>
+        <div className="admin-detail-field"><label>{t('streetAddress')}<input value={form.street_address || ''} readOnly /></label></div>
+        <div className="admin-detail-field-grid is-ownership"><div className="admin-detail-field"><label>{t('titleHolder')}<textarea value={(form.title_holder || '').split(/\s*\/\s*/).join('\n')} rows="3" readOnly /></label></div>
+          <div className="admin-detail-field"><label>{t('registrationDate')}<textarea value={(form.registration_date || '').split(/\s*\/\s*/).join('\n')} rows="3" readOnly /></label></div></div>
+        {!form.title_holder && <p className="map-warning">{t('noOwner')}</p>}
+        {form.street_address && <MemberPropertyMap streetAddress={form.street_address} />}
+        {canMatrikkelSync && <Link className="admin-button admin-detail-section-action" href={`/admin/members/matrikkel?member=${encodeURIComponent(memberId)}`}>{t('updateCadastral')}</Link>}
+      </section>
+      <section className="admin-detail-section" aria-labelledby="map-member-contact-title">
+        <div className="admin-section-header"><h3 id="map-member-contact-title">{t('contactInformation')}</h3></div>
+        {contactFields.map((name) => <div className="admin-detail-field" key={name}><label>{t(`fields.${name}`)}{['other_contact_emails', 'admin_comment'].includes(name)
+          ? <textarea value={form[name] || ''} onChange={(event) => update(name, event.target.value)} rows={name === 'admin_comment' ? 5 : 3} />
+          : <input value={form[name] || ''} onChange={(event) => update(name, event.target.value)} />}</label></div>)}
+      </section>
+      <section className="admin-detail-section" aria-labelledby="map-member-affiliations-title">
+        <div className="admin-section-header"><h3 id="map-member-affiliations-title">{t('statusAndAffiliations')}</h3></div>
+        <label>{t('membershipStatus')}<Select value={form.membership_status || 'member'} onChange={(event) => update('membership_status', event.target.value)}><option value="member">{t('regularMember')}</option><option value="exempt">{t('exempt')}</option></Select></label>
+        <label className="admin-checkbox"><input type="checkbox" checked={Boolean(form.turufjell_as_sharing_opt_out)} onChange={(event) => update('turufjell_as_sharing_opt_out', event.target.checked)} /> {t('sharingOptOut')}</label>
+        {member.hamlet_name && <p><strong>{t('hamlet')}:</strong> {member.hamlet_name}</p>}
+      </section>
       <button className="primary-button" type="submit" disabled={saveState === 'saving'}>{saveState === 'saving' ? t('saving') : t('saveNow')}</button>
     </form>}
   </aside>;

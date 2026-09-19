@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { chap } from './fonts';
 import UsageTracker from '@/components/UsageTracker';
 import LocaleProvider from '@/components/LocaleProvider';
+import CookieNotice from '@/components/CookieNotice';
 import { getServerI18n } from '@/lib/i18n/server';
 
 export async function generateMetadata() {
@@ -19,7 +20,7 @@ export default async function RootLayout({ children }) {
   const { locale, messages } = await getServerI18n();
   return (
     <html lang={locale} className={chap.variable}>
-      <body><LocaleProvider locale={locale} messages={messages}><Suspense fallback={null}><UsageTracker /></Suspense>{children}</LocaleProvider></body>
+      <body><LocaleProvider locale={locale} messages={messages}><Suspense fallback={null}><UsageTracker /></Suspense>{children}<CookieNotice /></LocaleProvider></body>
     </html>
   );
 }

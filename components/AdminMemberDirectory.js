@@ -56,8 +56,8 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
   const [form, setForm] = useState(() => initialSelected ? formFromMember(initialSelected) : null);
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
-  const [members, setMembers] = useState(data.members);
-  const [page, setPage] = useState(1);
+  const resultKey = JSON.stringify([search, sort, direction, incompleteContact, hasComment, membershipStatus, hamletId, groupId, turufjellAsSharing]);
+  const [memberResult, setMemberResult] = useState(() => ({ key: resultKey, members: data.members, page: 1 }));
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [newToken, setNewToken] = useState('');
@@ -92,6 +92,12 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
   const activeFilters = useMemo(() => ({ ...(incompleteContact ? { contact: 'incomplete' } : {}), ...(hasComment ? { comment: 'present' } : {}), ...(membershipStatus ? { membership: membershipStatus } : {}), ...(hamletId ? { hamlet: hamletId } : {}), ...(groupId ? { group: groupId } : {}), ...(turufjellAsSharing ? { sharing: turufjellAsSharing } : {}) }), [hasComment, incompleteContact, membershipStatus, hamletId, groupId, turufjellAsSharing]);
   const sortHref = (column) => `/admin/members?${new URLSearchParams({ q: search, sort: column, dir: sort === column && direction === 'asc' ? 'desc' : 'asc', ...activeFilters })}`;
   const sortLabel = (column, label) => `${label}${sort === column ? direction === 'asc' ? ' ↑' : ' ↓' : ''}`;
+  const currentResult = memberResult.key === resultKey ? memberResult : { key: resultKey, members: data.members, page: 1 };
+  const { members, page } = currentResult;
+  const updateMembers = useCallback((change) => setMemberResult((current) => {
+    const base = current.key === resultKey ? current : { key: resultKey, members: data.members, page: 1 };
+    return { ...base, members: typeof change === 'function' ? change(base.members) : change };
+  }), [data.members, resultKey]);
   const hasMore = members.length < data.total;
   useEffect(() => {
     const target = sentinel.current;
@@ -105,14 +111,16 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
         const response = await fetch(`/api/admin/members?${query}`);
         const next = await response.json();
         if (!response.ok) throw new Error(next.message);
-        setMembers((current) => [...current, ...next.members]);
-        setPage((current) => current + 1);
+        setMemberResult((current) => {
+          const base = current.key === resultKey ? current : { key: resultKey, members: data.members, page: 1 };
+          return { ...base, members: [...base.members, ...next.members], page: base.page + 1 };
+        });
       } catch (error) { setLoadError(error.message || t('loadMoreError')); }
       finally { setLoadingMore(false); }
     }, { rootMargin: '240px' });
     observer.observe(target);
     return () => observer.disconnect();
-  }, [activeFilters, direction, hasMore, loadingMore, page, search, sort, t]);
+  }, [activeFilters, data.members, direction, hasMore, loadingMore, page, resultKey, search, sort, t]);
   useEffect(() => {
     if (!exportOpen) return undefined;
     exportCancelButton.current?.focus();
@@ -133,7 +141,7 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
       if (!response.ok || !body.ok) { setMessage(body.message || t('saveError')); setSaveState('error'); return false; }
       const returnedForm = formFromMember(body.member);
       savedPayload.current = payloadKey(returnedForm);
-      setMembers((current) => wasNew ? [body.member, ...current] : current.map((item) => String(item.id) === String(body.member.id) ? { ...item, ...body.member } : item));
+      updateMembers((current) => wasNew ? [body.member, ...current] : current.map((item) => String(item.id) === String(body.member.id) ? { ...item, ...body.member } : item));
       setSelected((current) => current && String(current.id) === String(body.member.id) ? { ...current, ...body.member } : body.member);
       if (formVersion.current === version) setForm(returnedForm);
       setNewToken(''); setSaveState(formVersion.current === version ? 'saved' : 'dirty');
@@ -145,7 +153,7 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
       return true;
     } catch { setMessage(t('serverError')); setSaveState('error'); return false; }
     finally { savingRef.current = false; setSaving(false); }
-  }, [router, t]);
+  }, [router, t, updateMembers]);
   async function save(event) {
     event.preventDefault();
     await persistForm(payloadFromForm(form), formVersion.current, Boolean(selected.isNew), selected.id);
@@ -166,7 +174,7 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
       const response = await fetch(`/api/admin/members/${selected.id}`, { method: 'DELETE' });
       const body = await response.json().catch(() => ({}));
       if (!response.ok || !body.ok) { setConfirmDelete(false); setMessage(body.message || t('deleteError')); return; }
-      setMembers((current) => current.filter((item) => String(item.id) !== String(selected.id)));
+      updateMembers((current) => current.filter((item) => String(item.id) !== String(selected.id)));
       setConfirmDelete(false); close(); router.refresh();
     } catch {
       setConfirmDelete(false); setMessage(t('deleteServerError'));
@@ -201,7 +209,7 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
         if (action === 'add') current.add(groupIdValue); else current.delete(groupIdValue);
         return { ...member, email_group_ids: [...current] };
       };
-      setMembers((current) => current.map(updateMembership));
+      updateMembers((current) => current.map(updateMembership));
       setSelected((current) => updateMembership(current));
       const text = group.kind === 'hamlet'
         ? action === 'add' ? t('hamletAssigned', {name: group.name}) : t('hamletRemoved')
@@ -292,23 +300,36 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
     <aside className={`admin-detail-panel${selected ? ' is-open' : ''}`} aria-hidden={!selected} aria-label={t('editMember')} onKeyDown={(event) => { if (event.key === 'Escape' && !saving && !confirmDelete) { event.stopPropagation(); close(); } }}>
       <div className="admin-detail-header"><div><p className="eyebrow">{selected?.isNew ? t('newMember') : t('member')}</p><h2>{selected?.isNew ? t('createMember') : selected?.h_number}</h2>{!selected?.isNew && <span className={`admin-save-status is-${saveState}`} role="status">{t(`saveStates.${saveState}`)}</span>}</div><button className="admin-button" type="button" ref={detailCloseButton} onClick={close} disabled={saving}>{t('close')}</button></div>
       {form && <form className="admin-detail-form" onSubmit={save}>
-        <section aria-label={t('sharedProperties')}>{selected.shared_email_groups?.map((group) => <details key={group.email}><summary>{group.email} · {t('propertyCount', {count: group.properties.length})}</summary><ul>{group.properties.map((property) => <li key={property.id}><Link href={`/admin/members?member=${encodeURIComponent(property.id)}`}>{property.h_number} · {property.contact_name || t('contactMissing')} · {property.street_address || t('addressMissing')}</Link></li>)}</ul></details>)}</section>
-        {canMatrikkelSync && !selected.isNew && <Link className="admin-button" href={`/admin/members/matrikkel?member=${encodeURIComponent(selected.id)}`}>{t('updateMember')}</Link>}
-        <label>{t('membershipStatus')}<Select value={form.membership_status || 'member'} onChange={(event) => updateForm('membership_status', event.target.value)}><option value="member">{t('regularMember')}</option><option value="exempt">{t('exemptMembership')}</option></Select></label>
-        <label className="admin-checkbox"><input type="checkbox" checked={Boolean(form.turufjell_as_sharing_opt_out)} onChange={(event) => updateForm('turufjell_as_sharing_opt_out', event.target.checked)} /> {t('optOut')}</label><span className="admin-field-note">{t('optOutNote')}</span>
-        {!selected.isNew && <section className="member-group-memberships" aria-labelledby="member-group-memberships-title">
-          <div className="admin-section-header"><div><p className="eyebrow">{t('groupMembershipsEyebrow')}</p><h3 id="member-group-memberships-title">{t('groupMemberships')}</h3></div></div>
-          <label>{t('hamlet')}<Select value={selected.hamlet_id || ''} onChange={(event) => changeSelectedHamlet(event.target.value)} disabled={Boolean(groupBusy) || data.mock}><option value="">{t('notLinked')}</option>{hamlets.map((group) => <option value={group.id} key={group.id}>{group.name}</option>)}</Select></label>
-          <span className="admin-field-note">{t('hamletMapNote')} <Link href="/admin/map">{t('editHamletInMap')}</Link></span>
-          <fieldset className="member-email-group-list" disabled={Boolean(groupBusy) || data.mock}><legend>{t('emailGroups')}</legend>
-            {emailGroups.length ? emailGroups.map((group) => {
-              const checkedInGroup = (selected.email_group_ids || []).map(String).includes(String(group.id));
-              return <label className="admin-checkbox" key={group.id}><input type="checkbox" checked={checkedInGroup} onChange={(event) => changeGroupMembership(group, event.target.checked ? 'add' : 'remove', [selected.id], `detail-${group.id}`)} /> {group.name}</label>;
-            }) : <p>{t('noEmailGroups')}</p>}
-          </fieldset>
-          {groupMessage && <p className={groupMessage.type === 'error' ? 'form-error' : 'admin-success'} role="status">{groupMessage.text}</p>}
-        </section>}
-        <div className="admin-detail-field-grid is-property">{propertyFields.map(renderField)}</div>{renderField(['street_address', true])}<div className="admin-detail-field-grid is-ownership">{ownershipFields.map(renderField)}</div>{selected?.street_address && <MemberPropertyMap streetAddress={selected.street_address} />}{contactFields.map(renderField)}
+        <section className="admin-detail-section" aria-labelledby="member-cadastral-title">
+          <div className="admin-section-header"><h3 id="member-cadastral-title">{t('cadastralData')}</h3></div>
+          <div className="admin-detail-field-grid is-property">{propertyFields.map(renderField)}</div>
+          {renderField(['street_address', true])}
+          <div className="admin-detail-field-grid is-ownership">{ownershipFields.map(renderField)}</div>
+          {selected?.street_address && <MemberPropertyMap streetAddress={selected.street_address} />}
+          {canMatrikkelSync && !selected.isNew && <Link className="admin-button admin-detail-section-action" href={`/admin/members/matrikkel?member=${encodeURIComponent(selected.id)}`}>{t('updateMember')}</Link>}
+        </section>
+        <section className="admin-detail-section" aria-labelledby="member-contact-title">
+          <div className="admin-section-header"><h3 id="member-contact-title">{t('contactInformation')}</h3></div>
+          {contactFields.map(renderField)}
+        </section>
+        <section className="admin-detail-section" aria-labelledby="member-affiliations-title">
+          <div className="admin-section-header"><h3 id="member-affiliations-title">{t('statusAndAffiliations')}</h3></div>
+          <label>{t('membershipStatus')}<Select value={form.membership_status || 'member'} onChange={(event) => updateForm('membership_status', event.target.value)}><option value="member">{t('regularMember')}</option><option value="exempt">{t('exemptMembership')}</option></Select></label>
+          <label className="admin-checkbox"><input type="checkbox" checked={Boolean(form.turufjell_as_sharing_opt_out)} onChange={(event) => updateForm('turufjell_as_sharing_opt_out', event.target.checked)} /> {t('optOut')}</label><span className="admin-field-note">{t('optOutNote')}</span>
+          <section aria-label={t('sharedProperties')}>{selected.shared_email_groups?.map((group) => <details key={group.email}><summary>{group.email} · {t('propertyCount', {count: group.properties.length})}</summary><ul>{group.properties.map((property) => <li key={property.id}><Link href={`/admin/members?member=${encodeURIComponent(property.id)}`}>{property.h_number} · {property.contact_name || t('contactMissing')} · {property.street_address || t('addressMissing')}</Link></li>)}</ul></details>)}</section>
+          {!selected.isNew && <section className="member-group-memberships" aria-labelledby="member-group-memberships-title">
+            <div className="admin-section-header"><div><p className="eyebrow">{t('groupMembershipsEyebrow')}</p><h3 id="member-group-memberships-title">{t('groupMemberships')}</h3></div></div>
+            <label>{t('hamlet')}<Select value={selected.hamlet_id || ''} onChange={(event) => changeSelectedHamlet(event.target.value)} disabled={Boolean(groupBusy) || data.mock}><option value="">{t('notLinked')}</option>{hamlets.map((group) => <option value={group.id} key={group.id}>{group.name}</option>)}</Select></label>
+            <span className="admin-field-note">{t('hamletMapNote')} <Link href="/admin/map">{t('editHamletInMap')}</Link></span>
+            <fieldset className="member-email-group-list" disabled={Boolean(groupBusy) || data.mock}><legend>{t('emailGroups')}</legend>
+              {emailGroups.length ? emailGroups.map((group) => {
+                const checkedInGroup = (selected.email_group_ids || []).map(String).includes(String(group.id));
+                return <label className="admin-checkbox" key={group.id}><input type="checkbox" checked={checkedInGroup} onChange={(event) => changeGroupMembership(group, event.target.checked ? 'add' : 'remove', [selected.id], `detail-${group.id}`)} /> {group.name}</label>;
+              }) : <p>{t('noEmailGroups')}</p>}
+            </fieldset>
+            {groupMessage && <p className={groupMessage.type === 'error' ? 'form-error' : 'admin-success'} role="status">{groupMessage.text}</p>}
+          </section>}
+        </section>
         {newToken && <p className="admin-success">{t('memberId', {id: newToken})}</p>}{message && <p className={saveState === 'error' ? 'form-error' : 'admin-success'} role="status">{message}</p>}
         <button className="primary-button" type="submit" disabled={saving || data.mock}>{saving ? t('saving') : selected.isNew ? t('createMember') : t('saveNow')}</button>{!selected.isNew && <button className="admin-delete" type="button" onClick={() => setConfirmDelete(true)} disabled={data.mock}>{t('delete')}</button>}{data.mock && <p className="privacy-subnote">{t('mockReadonly')}</p>}
       </form>}

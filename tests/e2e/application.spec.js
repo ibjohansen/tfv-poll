@@ -360,6 +360,18 @@ test('synthetic member details close with Escape', async ({ page, context }) => 
   await expect(row).toBeFocused();
 });
 
+test('member search waits for typing to finish and preserves the input', async ({ page, context }) => {
+  await authenticate(context);
+  await page.goto('/admin/members');
+  const search = page.getByRole('searchbox', { name: 'Søk i medlemsregisteret' });
+  await search.pressSequentially('H-TEST-001', { delay: 70 });
+  await expect(search).toHaveValue('H-TEST-001');
+  await expect(page).not.toHaveURL(/\bq=/);
+  await expect(page).toHaveURL(/\bq=H-TEST-001/, { timeout: 5_000 });
+  await expect(search).toHaveValue('H-TEST-001');
+  await expect(search).toBeFocused();
+});
+
 test('map draws, edits and deletes a polygon without external services', async ({ page, context }) => {
   await authenticate(context);
   await page.goto('/admin/map');

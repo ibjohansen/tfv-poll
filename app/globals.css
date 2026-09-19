@@ -1533,6 +1533,10 @@ input, textarea, select { caret-color: var(--accent); }
 .admin-save-status.is-error { color: #b91c1c; }
 .admin-save-status.is-error::before { background: #dc2626; }
 .admin-detail-form { display: grid; gap: 20px; }
+.admin-detail-section { display: grid; gap: 16px; padding: 0 0 24px; border-bottom: 1px solid #e4e4e7; }
+.admin-detail-section:last-of-type { padding-bottom: 0; border-bottom: 0; }
+.admin-detail-section > .admin-section-header h3 { margin: 0; color: #18181b; font-size: 16px; }
+.admin-detail-section-action { justify-self: start; }
 .admin-detail-field-grid { display: grid; gap: 12px; }
 .admin-detail-field-grid.is-property { grid-template-columns: .7fr 1.45fr .8fr; }
 .admin-detail-field-grid.is-ownership { grid-template-columns: 1.35fr 1fr; }
@@ -1573,7 +1577,8 @@ input, textarea, select { caret-color: var(--accent); }
 .member-group-memberships { display: grid; gap: 14px; padding: 16px; border: 1px solid #e4e4e7; border-radius: 12px; background: #fafafa; }
 .member-group-memberships .admin-section-header .eyebrow { margin: 0 0 4px; color: #71717a; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
 .member-group-memberships .admin-meta { padding: 12px 0; }
-.member-email-group-list { display: grid; gap: 10px; margin: 0; padding: 0; border: 0; }
+.member-email-group-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; border: 0; }
+.member-email-group-list .admin-checkbox { min-height: 38px; padding: 8px 10px; border: 1px solid #e4e4e7; border-radius: 8px; background: white; }
 .member-email-group-list legend { margin-bottom: 9px; color: #3f3f46; font-size: 12px; font-weight: 650; }
 .member-email-group-list p { margin: 0; color: #71717a; font-size: 12px; }
 
@@ -2818,6 +2823,7 @@ input, textarea, select { caret-color: var(--accent); }
 @media (max-width: 640px) {
   .admin-bulk-group-action { align-items: stretch; flex-direction: column; }
   .admin-bulk-group-action label { flex-basis: auto; }
+  .member-email-group-list { grid-template-columns: 1fr; }
 }
 
 .language-switcher {
@@ -2891,7 +2897,26 @@ input, textarea, select { caret-color: var(--accent); }
 .survey-recipient-search-results { max-height: 16rem; overflow: auto; }
 .survey-recipient-picker ul { list-style: none; padding: 0; }
 .survey-recipient-picker li { display: flex; align-items: center; gap: .5rem; margin-bottom: .4rem; }
+.cookie-notice { position: fixed; z-index: 90; right: 1rem; bottom: 1rem; display: flex; align-items: center; gap: .85rem; width: min(34rem, calc(100% - 2rem)); padding: .8rem .9rem; border: 1px solid var(--line); border-radius: .85rem; background: rgba(255, 255, 255, .97); color: var(--foreground); box-shadow: 0 12px 35px #0002; font-size: .82rem; line-height: 1.45; }
+body:has(.cookie-notice) { padding-bottom: 6rem; }
+.cookie-notice p { flex: 1; margin: 0; }
+.cookie-notice a { color: var(--primary-dark); font-weight: 700; text-underline-offset: 3px; }
+.cookie-notice button { min-height: 36px; padding: .4rem .7rem; border: 1px solid var(--line); border-radius: .6rem; background: var(--surface-muted); color: var(--foreground); font: inherit; font-weight: 700; cursor: pointer; }
+.cookie-notice button:focus-visible, .cookie-notice a:focus-visible { outline: 3px solid var(--brand-burgundy); outline-offset: 3px; }
+.legal-information-page { width: min(100% - 2rem, 900px); margin: 0 auto; padding: 4rem 0 6rem; color: var(--foreground); }
+.legal-information-page h1 { margin: .35rem 0 1rem; font-size: clamp(2rem, 5vw, 3.5rem); }
+.legal-information-page h2 { margin: 2.5rem 0 .75rem; font-size: 1.35rem; }
+.legal-information-page p { line-height: 1.7; }
+.legal-information-intro { max-width: 48rem; color: var(--text-soft); font-size: 1.1rem; }
+.legal-table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: .85rem; }
+.legal-table-scroll table { width: 100%; border-collapse: collapse; font-size: .9rem; text-align: left; }
+.legal-table-scroll th, .legal-table-scroll td { min-width: 10rem; padding: .85rem 1rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+.legal-table-scroll thead th { background: var(--surface-muted); }
+.legal-table-scroll tbody tr:last-child > * { border-bottom: 0; }
 @media (max-width: 640px) {
   .shared-select-options { font-size: 18px; }
   .shared-select-options [role="option"] { min-height: 54px; }
+  .cookie-notice { align-items: stretch; flex-direction: column; }
+  body:has(.cookie-notice) { padding-bottom: 12rem; }
+  .cookie-notice button { align-self: flex-end; }
 }

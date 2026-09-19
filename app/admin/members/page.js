@@ -29,10 +29,13 @@ export default async function AdminMembersPage({ searchParams }) {
   const groupId = /^[1-9][0-9]{0,15}$/.test(params.group || '') ? params.group : '';
   const turufjellAsSharing = ['allowed', 'opted_out'].includes(params.sharing) ? params.sharing : '';
   const selectedId = /^\d+$/.test(params.member || '') ? params.member : '';
+  // Keep the search field mounted while q changes, but reset client-side directory
+  // state when the selected member or one of the result-shaping filters changes.
+  const directoryKey = [sort, direction, incompleteContact, hasComment, membershipStatus, hamletId, groupId, turufjellAsSharing, selectedId].join(':');
   let data;
   let surveys;
   let initialSelected;
   let groups;
   try { [data, surveys, initialSelected, groups] = await Promise.all([getAdminMembers(search, 1, sort, direction, incompleteContact, hasComment, { membershipStatus, hamletId, groupId, turufjellAsSharing }), getAdminSurveys(), selectedId ? getAdminMemberById(selectedId) : null, getMemberGroups()]); } catch { data = null; }
-  return <main className="admin-shell"><AdminModuleHeader active="members" title={t('admin.common.members')} email={session.user.email} /><section className="admin-content">{!data ? <p className="form-error" role="alert">{t('admin.pages.membersUnavailable')}</p> : <AdminMemberDirectory key={`${search}-${sort}-${direction}-${incompleteContact}-${hasComment}-${selectedId}-${membershipStatus}-${hamletId}-${groupId}-${turufjellAsSharing}`} data={data} surveys={surveys} search={search} sort={sort} direction={direction} incompleteContact={incompleteContact} hasComment={hasComment} initialSelected={initialSelected} membershipStatus={membershipStatus} hamletId={hamletId} groupId={groupId} turufjellAsSharing={turufjellAsSharing} groups={groups} canMatrikkelSync={isAllowedMatrikkelSync(session.user)} />}</section></main>;
+  return <main className="admin-shell"><AdminModuleHeader active="members" title={t('admin.common.members')} email={session.user.email} /><section className="admin-content">{!data ? <p className="form-error" role="alert">{t('admin.pages.membersUnavailable')}</p> : <AdminMemberDirectory key={directoryKey} data={data} surveys={surveys} search={search} sort={sort} direction={direction} incompleteContact={incompleteContact} hasComment={hasComment} initialSelected={initialSelected} membershipStatus={membershipStatus} hamletId={hamletId} groupId={groupId} turufjellAsSharing={turufjellAsSharing} groups={groups} canMatrikkelSync={isAllowedMatrikkelSync(session.user)} />}</section></main>;
 }

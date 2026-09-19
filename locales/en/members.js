@@ -27,6 +27,9 @@ members.requests.reviewCodes = {
 members.matrikkel.hNumberLabel = 'H-number';
 members.adminDirectory.saveStates.idle = '—';
 Object.assign(members.adminDirectory, {
+  cadastralData: 'Cadastral data',
+  contactInformation: 'Contact information',
+  statusAndAffiliations: 'Membership status, opt-out and affiliations',
   groups: 'Manage groups',
   tableCaption: 'Select properties with the checkboxes for export, cadastral updates or email-group assignment. Select a row to view and edit member details.',
   selectAction: 'Select for export, cadastral update or email group',

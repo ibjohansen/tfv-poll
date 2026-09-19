@@ -2,6 +2,17 @@
 
 ## Ikke publisert
 
+- Medlemsregisterets fritekstsøk venter nå 600 ms etter siste tastetrykk og
+  oppdaterer resultatene uten å remontere hele registerkomponenten eller miste
+  tekst og fokus. Tomtepanelet grupperer matrikkeldata, kontaktinformasjon og
+  medlemsstatus/tilknytninger i arbeidsrekkefølge, med mer kompakte
+  e-postgruppevalg.
+- En nøktern informasjonsmelding og egen side dokumenterer de nødvendige
+  informasjonskapslene og lokal lagring, uten å be om samtykke til teknologi
+  løsningen ikke bruker. Vurderingen følger ekomloven § 3-15 og Datatilsynets
+  veiledning.
+- Målte og kodebaserte tiltaksplaner for ytelse, kart/registerkontroll og CMS er
+  lagt i `docs/` som prioriterte, testbare implementeringsprompter.
 - De sju prioriterte UU-funnene er rettet lokalt: tydeligere kontrast og
   tastaturfokus, felles hoppelenke, rutespesifikke sidetitler, komplett
   fokusstyring i artikkeldialogen, norske Leaflet-kontroller og konkrete,
