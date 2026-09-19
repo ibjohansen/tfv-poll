@@ -1,5 +1,20 @@
 # ToDo
 
+## Universell utforming – gjennomgang 19. september 2026
+
+De 35 norske minimumskravene for privat/frivillig sektor er vurdert og lagt inn
+som en konkret arbeidsliste i [UU-sjekklisten](docs/uu-checklist.md). Gjennomgangen
+fant sju sannsynlige avvik og ni krav som trenger bredere manuell test.
+
+- [ ] Rett de sju P0-funnene: kontrast, hoppelenke, sidetitler, modal fokus,
+  språkvelgerfokus, Leaflet-språk og identifikasjon av surveyfeil.
+- [ ] Gjennomfør P1-testene med tastatur, VoiceOver/NVDA, 200 prosent tekst,
+  kontrastmåling, innloggede flyter og reelt CMS-innhold.
+- [ ] Oppdater statusen for hvert av de 35 kravene etter retting og regresjonstest.
+
+Dette er en teknisk forhåndsvurdering og arbeidsliste, ikke en formell
+samsvarserklæring eller juridisk vurdering.
+
 ## Nye grensesnitt- og undersøkelsesendringer, 17. september
 
 - [x] Felles store nedtrekkslister med tastaturstøtte på desktop/mobil.
