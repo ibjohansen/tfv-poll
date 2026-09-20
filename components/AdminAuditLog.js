@@ -1,7 +1,7 @@
 import Select from "@/components/Select";
 import AutoFilterForm from '@/components/AutoFilterForm';
 import Link from 'next/link';
-import { auditPageHref } from '@/lib/audit-filters';
+import { AUDIT_SOURCES, auditPageHref } from '@/lib/audit-filters';
 import { getServerI18n } from '@/lib/i18n/server';
 
 function formatDate(value, locale) {
@@ -59,19 +59,19 @@ function entityHref(entry) {
 
 export default async function AdminAuditLog({ data, filters, tables }) {
   const { t, locale } = await getServerI18n('admin.auditLog');
-  const { actor, table, q, from, to, operation, status } = filters;
+  const { source, table, q, from, to, operation, status } = filters;
   const pageCount = Math.max(1, Math.ceil(data.total / data.pageSize));
   return <section className="admin-audit" aria-labelledby="audit-title">
     <div className="admin-section-header"><div><p className="eyebrow">{t('eyebrow')}</p><h2 id="audit-title">{t('title')}</h2><p>{t('help')}</p></div><span>{data.total}</span></div>
     <AutoFilterForm key={JSON.stringify(filters)} className="admin-audit-filters" action="/admin/audit">
-      <label>{t('user')}<Select name="actor" defaultValue={actor}><option value="">{t('allUsers')}</option>{data.actors.map((value) => <option value={value} key={value}>{value}</option>)}</Select></label>
+      <label>{t('source')}<Select name="source" defaultValue={source}><option value="">{t('allSources')}</option>{AUDIT_SOURCES.map((value) => <option value={value} key={value}>{t(`sources.${value}`)}</option>)}</Select></label>
       <label>{t('area')}<Select name="table" defaultValue={table}><option value="">{t('allAreas')}</option>{tables.map((value) => <option value={value} key={value}>{t(`tables.${value}`, {}, value)}</option>)}</Select></label>
       <label>{t('search')}<input name="q" type="search" defaultValue={q} maxLength={200} placeholder={t('searchPlaceholder')} /></label>
       <label>{t('changeType')}<Select name="operation" defaultValue={operation}><option value="">{t('allTypes')}</option>{['INSERT', 'UPDATE', 'DELETE'].map((value) => <option key={value} value={value}>{t(`operations.${value}`)}</option>)}</Select></label>
       <label>{t('status')}<input name="status" defaultValue={status} maxLength={80} placeholder={t('statusPlaceholder')} /></label>
       <label>{t('from')}<input name="from" type="date" defaultValue={from} max={to || '9998-12-31'} /></label>
       <label>{t('to')}<input name="to" type="date" defaultValue={to} min={from || undefined} max="9998-12-31" /></label>
-      {(actor || table || q || from || to || operation || status) && <Link href="/admin/audit">{t('reset')}</Link>}
+      {(source || table || q || from || to || operation || status) && <Link href="/admin/audit">{t('reset')}</Link>}
     </AutoFilterForm>
     {!data.entries.length ? <p className="admin-inbox-empty">{t('noResults')}</p> : <ol className="admin-audit-list">{data.entries.map((entry) => {
       const fields = changedFields(entry, t, locale);

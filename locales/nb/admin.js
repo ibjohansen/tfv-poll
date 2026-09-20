@@ -138,9 +138,10 @@ const admin = {
   auditLog: {
     eyebrow: 'Revisjonsspor',
     title: 'Brukerendringer',
-    help: 'Endringer i sentrale data og eksport fra administrasjonen. Hemmelige tilgangsverdier er utelatt.',
-    user: 'Bruker',
-    allUsers: 'Alle brukere',
+    help: 'Endringer i sentrale data og eksport fra administrasjonen. Filtrer på brukerskjema, admingrensesnitt eller automatikk. Hemmelige tilgangsverdier er utelatt.',
+    source: 'Kilde',
+    allSources: 'Alle kilder',
+    sources: {public: 'Brukerskjema / forside', admin: 'Admingrensesnitt', system: 'System / automatikk'},
     area: 'Område',
     allAreas: 'Alle områder',
     search: 'Søk',

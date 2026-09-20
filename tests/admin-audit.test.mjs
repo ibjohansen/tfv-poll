@@ -28,7 +28,6 @@ test('audit total unwraps the aggregate row and supports subsequent pages', asyn
   assert.equal(data.page, 2);
   assert.equal(data.entries[0].changed_at, '2026-09-14T12:00:00.000Z');
   assert.deepEqual(plain(queries[1].values), [50, 50]);
-  assert.deepEqual(plain(data.actors), ['admin@example.test']);
 });
 
 test('audit paging clamps page bounds and never sends fractional or invalid offsets', async () => {
@@ -43,7 +42,7 @@ test('audit paging clamps page bounds and never sends fractional or invalid offs
 
 test('audit combines server-side filters with bound values and Oslo date boundaries', async () => {
   const { api, queries } = await setup();
-  const input = { q: "test%' OR 1=1 --", actor: 'admin@example.test', table: 'member_requests', operation: 'UPDATE', status: 'approved', from: '2026-03-29', to: '2026-03-29', page: 2 };
+  const input = { q: "test%' OR 1=1 --", source: 'public', table: 'member_requests', operation: 'UPDATE', status: 'approved', from: '2026-03-29', to: '2026-03-29', page: 2 };
   await api.getAdminAuditLog(input);
   assert.doesNotMatch(queries[0].query, /OR 1=1/);
   assert.ok(queries[0].values.includes(input.q));
@@ -55,6 +54,7 @@ test('audit combines server-side filters with bound values and Oslo date boundar
     assert.match(q.query, /INTERVAL '1 day'/);
     assert.match(q.query, /strpos\(lower/);
     assert.match(q.query, /COALESCE\(after_value->>'status'/);
+    assert.match(q.query, /WHEN changed_by ~\* '\^\(member\|applicant\):' THEN 'public'/);
   }
   const link = new URL(auditPageHref(3, normalizeAuditFilters(input)), 'https://example.test');
   assert.equal(link.searchParams.get('q'), input.q);
@@ -67,9 +67,9 @@ test('invalid dates fail before SQL and search inputs are bounded', async () => 
   for (const from of ['2026-02-30', '2026-13-01', '2026-2-01', "'; DELETE FROM audit_log", [], '0000-01-01']) await assert.rejects(api.getAdminAuditLog({ from }), /Invalid audit date/);
   await assert.rejects(api.getAdminAuditLog({ from: '2026-09-02', to: '2026-09-01' }), /range/);
   assert.equal(queries.length, 0);
-  const normalized = normalizeAuditFilters({ q: 'x'.repeat(201), actor: 'y'.repeat(400), operation: 'DROP', table: 'passwords' });
+  const normalized = normalizeAuditFilters({ q: 'x'.repeat(201), source: 'unknown', operation: 'DROP', table: 'passwords' });
   assert.equal(normalized.q.length, 200);
-  assert.equal(normalized.actor.length, 320);
+  assert.equal(normalized.source, '');
   assert.equal(normalized.operation, '');
   assert.equal(normalized.table, '');
 });

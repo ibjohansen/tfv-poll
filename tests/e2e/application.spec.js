@@ -320,6 +320,8 @@ test('inbox acknowledgement preserves comment on error and removes only acknowle
 test('audit details work by keyboard, escape displayed values and preserve filters in pagination', async ({ page, context }) => {
   await authenticate(context); await page.goto('/admin/browser-test');
   const audit = page.getByRole('region', { name: 'Brukerendringer', exact: true });
+  await expect(audit.getByRole('combobox', { name: 'Kilde', exact: true })).toContainText('Alle kilder');
+  await expect(audit.getByRole('combobox', { name: 'Bruker', exact: true })).toHaveCount(0);
   const summary = audit.locator('summary'); await summary.focus(); await summary.press('Enter');
   await expect(audit.getByText('<script>Syntetisk etter</script>', { exact: true })).toBeVisible();
   await expect(audit.locator('pre script')).toHaveCount(0);

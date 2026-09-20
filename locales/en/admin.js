@@ -138,9 +138,10 @@ const admin = {
   auditLog: {
     eyebrow: 'Audit trail',
     title: 'User changes',
-    help: 'Changes to key data and exports from the administration portal. Secret access values are omitted.',
-    user: 'User',
-    allUsers: 'All users',
+    help: 'Changes to key data and exports from the administration portal. Filter by user forms, the admin interface or automation. Secret access values are omitted.',
+    source: 'Source',
+    allSources: 'All sources',
+    sources: {public: 'User form / public site', admin: 'Admin interface', system: 'System / automation'},
     area: 'Area',
     allAreas: 'All areas',
     search: 'Search',
