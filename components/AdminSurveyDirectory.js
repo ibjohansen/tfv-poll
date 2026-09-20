@@ -89,8 +89,8 @@ function SurveyResults({ data, state, surveyId, t, formatLocale }) {
                       {answerOptions.map(({ value, color, label }) => (
                         <li key={value}>
                           <span className="survey-result-key"><i style={{ backgroundColor: color }} aria-hidden="true" />{question.options ? label : t(`answers.${value}`)}</span>
-                          <strong>{question.counts[value]}</strong>
-                          <small>{question.percentages[value].toLocaleString(formatLocale)} %</small>
+                          <strong>{question.percentages[value].toLocaleString(formatLocale)} %</strong>
+                          <small>{question.counts[value]}</small>
                           {question.multiple && <meter min={0} max={100} value={question.percentages[value]} aria-label={label} />}
                         </li>
                       ))}
