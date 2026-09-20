@@ -109,6 +109,7 @@ Produksjonsdiagnosen viste at funksjonskallet ble sendt til `/admin/login`
 (`307`), og at innloggingssidens `200` feilaktig ble tolket som startet jobb.
 Kjøringen ble derfor stående før første oppslag, uten funksjonslogg.
 
+- [ ] Undersøk hvorfor registerkontrollen ikke virker i Matrikkel-modulen.
 - [x] Unnta bare `/.netlify/functions/matrikkel-sync-background` fra
   nettleserinnlogging; behold jobbhemmelighet, POST-krav og validering av jobb-ID.
 - [x] Avvis omdirigeringer, godta bare `202` og begrens oppstartskallet til
