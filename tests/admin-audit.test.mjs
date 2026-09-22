@@ -94,11 +94,13 @@ test('email events remain under the audit permission and support error-ID lookup
 test('export activity stores only allowlisted metadata and a normalized actor', async () => {
   const calls = [];
   const sql = async (strings, ...values) => { calls.push({ query: strings.join('?'), values }); };
-  await recordAdminExport(sql, { actor: ' Admin@Example.test ', action: 'member_export', count: 12, scope: 'selected', surveyId: 'a'.repeat(32), token: 'secret', members: [{ email: 'private@example.test' }] });
+  await recordAdminExport(sql, { actor: ' Admin@Example.test ', action: 'member_export', count: 12, scope: 'selected', token: 'secret', members: [{ email: 'private@example.test' }] });
   assert.match(calls[0].query, /INSERT INTO audit_log/);
   assert.equal(calls[0].values[1], 'admin@example.test');
-  assert.deepEqual(JSON.parse(calls[0].values[2]), { action: 'member_export', count: 12, scope: 'selected', survey_id: 'a'.repeat(32) });
+  assert.deepEqual(JSON.parse(calls[0].values[2]), { action: 'member_export', count: 12, scope: 'selected' });
   assert.doesNotMatch(JSON.stringify(calls), /private@example|secret/);
+  await assert.rejects(recordAdminExport(sql, { actor: 'a', action: 'member_export', count: 1, scope: 'all', surveyId: 'a'.repeat(32) }), /Invalid audit event/);
+  await assert.rejects(recordAdminExport(sql, { actor: 'a', action: 'survey_results_export', count: 1, scope: 'all' }), /Invalid audit event/);
   await assert.rejects(recordAdminExport(sql, { actor: 'a', action: 'unknown', count: 1, scope: 'all', surveyId: 'a'.repeat(32) }), /Invalid audit event/);
   assert.equal(calls.length, 1);
 });
@@ -107,7 +109,7 @@ test('member export is logged after workbook creation and is not returned if log
   const order = [];
   const queries = [];
   let denied = false, logError = false;
-  const sql = async strings => { const query = strings.join(''); queries.push(query); return query.includes('FROM surveys') ? [{ id: 'a'.repeat(32) }] : [{ h_number: '7' }]; };
+  const sql = async strings => { const query = strings.join(''); queries.push(query); return [{ h_number: '7' }]; };
   const api = await loadModule('lib/member-export.js', {
     './admin-access.js': { requirePermission: async () => { order.push('auth'); if (denied) throw new Error('Forbidden'); return { email: 'admin@example.test' }; } },
     './db.js': { getSql: () => { order.push('database'); return sql; } },
@@ -115,7 +117,7 @@ test('member export is logged after workbook creation and is not returned if log
     './member-workbook.js': { buildMemberWorkbook: async () => { order.push('workbook'); return Buffer.from('export'); } },
     './admin-activity.js': { recordAdminExport: async (_sql, details) => { order.push('audit'); assert.equal(details.count, 1); if (logError) throw new Error('Audit unavailable'); } },
   });
-  const input = { scope: 'all', surveyId: 'a'.repeat(32) };
+  const input = { scope: 'all' };
   assert.equal((await api.createMemberExport(input)).buffer.toString(), 'export');
   assert.match(queries.join('\n'), /turufjell_as_sharing_opt_out = FALSE/);
   assert.deepEqual(order, ['auth', 'database', 'workbook', 'audit']);

@@ -48,6 +48,17 @@ Object.assign(members.adminDirectory, {
   groupAdded: '{count} nye gruppetilknytninger ble lagret i «{name}».',
   groupRemoved: 'Tomten ble fjernet fra «{name}».',
   groupSaveError: 'Gruppetilknytningen kunne ikke lagres.',
+  annualFeeEyebrow: 'Betalingshistorikk',
+  annualFeeTitle: 'Årsavgift',
+  annualFeeHelp: 'Status lagres per tomt og kalenderår. Gjeldende år vises selv om status ikke er registrert tidligere.',
+  annualFeeCaption: 'Betalt årsavgift per år',
+  annualFeePaid: 'Betalt',
+  annualFeeToggle: 'Betalt årsavgift for {year}',
+  annualFeeSaved: 'Årsavgift for {year} er lagret.',
+  annualFeeError: 'Årsavgiften kunne ikke lagres.',
+  year: 'År',
+  yes: 'Ja',
+  no: 'Nei',
 });
 Object.assign(members.requests, {
   monthlyEyebrow: 'Automatisk kontroll',

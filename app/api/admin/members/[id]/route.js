@@ -1,6 +1,6 @@
 import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
-import { deleteAdminMember, updateAdminMember } from '@/lib/admin-member-updates';
+import { deleteAdminMember, setAdminMemberAnnualFee, updateAdminMember } from '@/lib/admin-member-updates';
 import { getAdminMemberById } from '@/lib/admin-members';
 import { getRequestI18n } from '@/lib/i18n/request';
 
@@ -22,7 +22,12 @@ export async function GET(request, { params }) {
 export async function PATCH(request, { params }) {
   const { t } = getRequestI18n(request, 'backend.adminMembers');
   try {
-    const member = await updateAdminMember((await params).id, await readJsonObject(request));
+    const input = await readJsonObject(request);
+    if (input.action === 'set_annual_fee') {
+      const annualFee = await setAdminMemberAnnualFee((await params).id, input);
+      return NextResponse.json({ ok: true, annualFee }, { headers: { 'Cache-Control': 'no-store' } });
+    }
+    const member = await updateAdminMember((await params).id, input);
     return NextResponse.json({ ok: true, member }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     const status = apiErrorStatus(error);
@@ -31,7 +36,7 @@ export async function PATCH(request, { params }) {
       : error.message === 'Mock data cannot be changed' ? t('mock')
         : error.message === 'H-nummer is required' ? t('hRequired')
           : error.message === 'Invalid member' ? t('invalid')
-            : t('save');
+            : error.message === 'Invalid annual fee' ? t('annualFee') : t('save');
     return NextResponse.json({ ok: false, message }, { status, headers: { 'Cache-Control': 'no-store' } });
   }
 }

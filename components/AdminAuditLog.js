@@ -35,6 +35,7 @@ function entityLabel(entry, t) {
   if (['email_campaigns', 'email_deliveries'].includes(entry.table_name)) return t(({ campaign_created: 'entities.campaignCreated', campaign_started: 'entities.campaignStarted', campaign_finished: 'entities.campaignFinished', testmail_requested: 'entities.testRequested', testmail_finished: 'entities.testFinished' })[value.action] || 'entities.emailEvent');
   if (entry.table_name === 'admin_actions' && value.action?.startsWith('group_')) return t('entities.group', {kind: t(value.kind === 'hamlet' ? 'entities.hamlet' : 'entities.emailGroup'), action: t(`entities.${value.action}`, {}, value.action)});
   if (entry.table_name === 'members') return t('entities.member', {id: value.h_number || `#${entry.row_id}`});
+  if (entry.table_name === 'member_annual_fees') return t('entities.annualFee', {year: value.fee_year});
   if (entry.table_name === 'member_requests') return t(value.request_type === 'membership' ? 'entities.membership' : 'entities.ownership', {id: value.h_number || `#${entry.row_id}`});
   if (entry.table_name === 'surveys') return value.title || t('entities.survey', {id: entry.row_id});
   if (entry.table_name === 'survey_responses') return t('entities.response', {id: entry.row_id});
@@ -51,6 +52,7 @@ function entityHref(entry) {
   if (entry.table_name === 'admin_actions' && entry.after_value?.action?.startsWith('group_')) return '/admin/members/groups';
   if (entry.table_name === 'admin_actions' && entry.after_value?.action?.startsWith('matrikkel_')) return '/admin/members/matrikkel';
   if (entry.table_name === 'members') return `/admin/members?member=${encodeURIComponent(entry.row_id)}`;
+  if (entry.table_name === 'member_annual_fees') return `/admin/members?member=${encodeURIComponent(entry.row_id.split(':')[0])}`;
   if (entry.table_name === 'member_requests') return '/admin/inbox';
   if (entry.table_name === 'member_profile_updates') return '/admin/inbox';
   if (['surveys', 'survey_responses'].includes(entry.table_name)) return '/admin/surveys';

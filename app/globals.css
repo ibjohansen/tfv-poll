@@ -1648,6 +1648,13 @@ input, textarea, select { caret-color: var(--accent); }
 .member-email-group-list .admin-checkbox { min-height: 38px; padding: 8px 10px; border: 1px solid #e4e4e7; border-radius: 8px; background: white; }
 .member-email-group-list legend { margin-bottom: 9px; color: #3f3f46; font-size: 12px; font-weight: 650; }
 .member-email-group-list p { margin: 0; color: #71717a; font-size: 12px; }
+.annual-fees > .admin-field-note { margin: -6px 0 0; }
+.annual-fee-table { width: 100%; border-collapse: collapse; overflow: hidden; border: 1px solid #e4e4e7; border-radius: 10px; background: white; font-size: 13px; }
+.annual-fee-table th, .annual-fee-table td { padding: 10px 12px; border-bottom: 1px solid #e4e4e7; text-align: left; }
+.annual-fee-table thead th { background: #f4f4f5; color: #52525b; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.annual-fee-table tbody tr:last-child > * { border-bottom: 0; }
+.annual-fee-table tbody th { width: 35%; color: #27272a; font-weight: 650; }
+.annual-fee-table .admin-checkbox { display: inline-flex !important; }
 
 .confirm-backdrop { position: fixed; z-index: 80; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(24, 24, 27, .38); backdrop-filter: blur(2px); }
 .confirm-dialog { width: min(100%, 460px); padding: 28px; border: 1px solid #e4e4e7; border-radius: 16px; background: white; box-shadow: 0 24px 70px rgba(24, 24, 27, .2); }

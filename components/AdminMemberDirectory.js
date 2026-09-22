@@ -49,7 +49,13 @@ function payloadKey(form) {
   return form ? JSON.stringify(payloadFromForm(form)) : '';
 }
 
-export default function AdminMemberDirectory({ data, surveys, search, sort, direction, incompleteContact, hasComment = false, initialSelected = null, membershipStatus = '', hamletId = '', groupId = '', turufjellAsSharing = '', groups = [], canMatrikkelSync = false }) {
+function annualFeesFor(member, currentYear) {
+  const fees = new Map((member?.annual_fees || []).map((fee) => [Number(fee.year), { year: Number(fee.year), paid: Boolean(fee.paid) }]));
+  if (!fees.has(currentYear)) fees.set(currentYear, { year: currentYear, paid: false });
+  return [...fees.values()].filter((fee) => Number.isSafeInteger(fee.year)).sort((left, right) => right.year - left.year);
+}
+
+export default function AdminMemberDirectory({ data, search, sort, direction, incompleteContact, hasComment = false, initialSelected = null, membershipStatus = '', hamletId = '', groupId = '', turufjellAsSharing = '', groups = [], canMatrikkelSync = false }) {
   const { t } = useI18n('members.adminDirectory');
   const [selected, setSelected] = useState(initialSelected);
   const [form, setForm] = useState(() => initialSelected ? formFromMember(initialSelected) : null);
@@ -65,13 +71,14 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
   const [checked, setChecked] = useState(() => new Set());
   const [exportOpen, setExportOpen] = useState(false);
   const [exportScope, setExportScope] = useState('all');
-  const [exportSurveyId, setExportSurveyId] = useState(surveys[0]?.id || '');
   const [exporting, setExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState('');
   const [excludeTurufjellAsOptOut, setExcludeTurufjellAsOptOut] = useState(true);
   const [bulkGroupId, setBulkGroupId] = useState('');
   const [groupBusy, setGroupBusy] = useState('');
   const [groupMessage, setGroupMessage] = useState(null);
+  const [annualFeeBusy, setAnnualFeeBusy] = useState(false);
+  const [annualFeeMessage, setAnnualFeeMessage] = useState(null);
   const [saveState, setSaveState] = useState(initialSelected ? 'saved' : 'idle');
   const savedPayload = useRef(initialSelected ? payloadKey(formFromMember(initialSelected)) : '');
   const formVersion = useRef(0);
@@ -128,9 +135,9 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [exportOpen, exporting]);
-  const select = (member) => { const next = formFromMember(member); detailTrigger.current = document.activeElement; formVersion.current += 1; savedPayload.current = payloadKey(next); setSelected(member); setForm(next); setSaveState('saved'); setMessage(''); setGroupMessage(null); setNewToken(''); };
-  const create = () => { const next = { h_number: '', cadastral_number: '', section_number: '', street_address: '', title_holder: '', registration_date: '', primary_contact_name: '', primary_contact_email: '', other_contact_emails: '', admin_comment: '', membership_status: 'member', turufjell_as_sharing_opt_out: false }; formVersion.current += 1; savedPayload.current = ''; setSelected({ isNew: true }); setForm(next); setSaveState('idle'); setMessage(''); setGroupMessage(null); setNewToken(''); };
-  const close = () => { setSelected(null); setForm(null); setGroupMessage(null); setNewToken(''); };
+  const select = (member) => { const next = formFromMember(member); detailTrigger.current = document.activeElement; formVersion.current += 1; savedPayload.current = payloadKey(next); setSelected(member); setForm(next); setSaveState('saved'); setMessage(''); setGroupMessage(null); setAnnualFeeMessage(null); setNewToken(''); };
+  const create = () => { const next = { h_number: '', cadastral_number: '', section_number: '', street_address: '', title_holder: '', registration_date: '', primary_contact_name: '', primary_contact_email: '', other_contact_emails: '', admin_comment: '', membership_status: 'member', turufjell_as_sharing_opt_out: false }; formVersion.current += 1; savedPayload.current = ''; setSelected({ isNew: true }); setForm(next); setSaveState('idle'); setMessage(''); setGroupMessage(null); setAnnualFeeMessage(null); setNewToken(''); };
+  const close = () => { setSelected(null); setForm(null); setGroupMessage(null); setAnnualFeeMessage(null); setNewToken(''); };
   const updateForm = (name, value) => { formVersion.current += 1; setForm((current) => ({ ...current, [name]: value })); };
   const persistForm = useCallback(async (payload, version, wasNew, memberId) => {
     saveController.current?.abort();
@@ -241,6 +248,32 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
     if (nextHamlet) await changeGroupMembership(nextHamlet, 'add', [selected.id], 'hamlet');
     else if (currentHamlet) await changeGroupMembership(currentHamlet, 'remove', [selected.id], 'hamlet');
   }
+  async function updateAnnualFee(year, paid) {
+    const memberId = selected.id;
+    setAnnualFeeBusy(true); setAnnualFeeMessage(null);
+    try {
+      const response = await fetch(`/api/admin/members/${memberId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set_annual_fee', year, paid }),
+        signal: AbortSignal.timeout(20_000),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !body.ok) throw new Error(body.message || t('annualFeeError'));
+      const savedFee = { year: Number(body.annualFee.year), paid: Boolean(body.annualFee.paid) };
+      const applyFee = (member) => {
+        if (!member || String(member.id) !== String(memberId)) return member;
+        const annualFees = [...(member.annual_fees || []).filter((fee) => Number(fee.year) !== savedFee.year), savedFee]
+          .sort((left, right) => Number(right.year) - Number(left.year));
+        return { ...member, annual_fees: annualFees };
+      };
+      updateMembers((current) => current.map(applyFee));
+      setSelected((current) => applyFee(current));
+      setAnnualFeeMessage({ type: 'success', text: t('annualFeeSaved', {year: savedFee.year}) });
+    } catch (error) {
+      setAnnualFeeMessage({ type: 'error', text: error.message || t('annualFeeError') });
+    } finally { setAnnualFeeBusy(false); }
+  }
   async function exportMembers(event) {
     event.preventDefault();
     setExporting(true); setExportMessage('');
@@ -248,7 +281,7 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
       const response = await fetch('/api/admin/members/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scope: exportScope, membershipStatus, memberIds: [...checked], surveyId: exportSurveyId, excludeTurufjellAsOptOut }),
+        body: JSON.stringify({ scope: exportScope, membershipStatus, memberIds: [...checked], excludeTurufjellAsOptOut }),
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
@@ -267,11 +300,12 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
   }
   const renderField = ([name, lockedAfterCreation, multiLine]) => { const readOnly = Boolean(lockedAfterCreation && !selected.isNew); return <div className="admin-detail-field" key={name}><label>{fieldLabel(name, form[name], t)}{name === 'admin_comment' || name === 'other_contact_emails' || multiLine ? <textarea value={multiLine ? displayLines(form[name]) : emptyToString(form[name])} onChange={(event) => updateForm(name, event.target.value)} rows={multiLine ? 3 : name === 'admin_comment' ? 5 : 3} readOnly={readOnly} /> : <input value={emptyToString(form[name])} onChange={(event) => updateForm(name, event.target.value)} required={name === 'h_number'} readOnly={readOnly} />}{name === 'other_contact_emails' && <span className="admin-field-note">{t('emailLines')}</span>}</label></div>; };
   const matrikkelSelection = [...checked].join(',');
+  const annualFees = annualFeesFor(selected, new Date().getFullYear());
   const countSuffix = `${incompleteContact ? t('incompleteSuffix') : ''}${hasComment ? t('commentSuffix') : ''}${!incompleteContact && !hasComment && search ? t('foundSuffix') : ''}${data.mock ? t('mockSuffix') : ''}`;
   return <>
     <div className="admin-toolbar"><Link className="admin-button" href="/admin/members/groups">{t('groups')}</Link></div>
     <div className="admin-toolbar">
-      <button className="admin-button" type="button" onClick={() => { setExportScope(checked.size ? 'selected' : 'all'); setExportMessage(''); setExportOpen(true); }} disabled={data.mock || !surveys.length}>{t('export', {selection: checked.size ? t('selectedSuffix', {count: checked.size}) : ''})}</button>
+      <button className="admin-button" type="button" onClick={() => { setExportScope(checked.size ? 'selected' : 'all'); setExportMessage(''); setExportOpen(true); }} disabled={data.mock}>{t('export', {selection: checked.size ? t('selectedSuffix', {count: checked.size}) : ''})}</button>
       {canMatrikkelSync && checked.size > 0 && <Link className="admin-button" href={`/admin/members/matrikkel?members=${encodeURIComponent(matrikkelSelection)}`}>{t('updateSelected', {count: checked.size})}</Link>}
       <button className="primary-button" type="button" onClick={create}>{t('newMember')}</button>
     </div>
@@ -338,6 +372,14 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
             {groupMessage && <p className={groupMessage.type === 'error' ? 'form-error' : 'admin-success'} role="status">{groupMessage.text}</p>}
           </section>}
         </section>
+        {!selected.isNew && <section className="admin-detail-section annual-fees" aria-labelledby="member-annual-fees-title">
+          <div className="admin-section-header"><div><p className="eyebrow">{t('annualFeeEyebrow')}</p><h3 id="member-annual-fees-title">{t('annualFeeTitle')}</h3></div></div>
+          <p className="admin-field-note">{t('annualFeeHelp')}</p>
+          <table className="annual-fee-table"><caption className="visually-hidden">{t('annualFeeCaption')}</caption><thead><tr><th scope="col">{t('year')}</th><th scope="col">{t('annualFeePaid')}</th></tr></thead><tbody>
+            {annualFees.map((fee) => <tr key={fee.year}><th scope="row">{fee.year}</th><td><label className="admin-checkbox"><input type="checkbox" checked={fee.paid} onChange={(event) => updateAnnualFee(fee.year, event.target.checked)} disabled={annualFeeBusy || data.mock} aria-label={t('annualFeeToggle', {year: fee.year})} /><span>{t(fee.paid ? 'yes' : 'no')}</span></label></td></tr>)}
+          </tbody></table>
+          {annualFeeMessage && <p className={annualFeeMessage.type === 'error' ? 'form-error' : 'admin-success'} role="status">{annualFeeMessage.text}</p>}
+        </section>}
         {newToken && <p className="admin-success">{t('memberId', {id: newToken})}</p>}{message && <p className={saveState === 'error' ? 'form-error' : 'admin-success'} role="status">{message}</p>}
         <button className="primary-button" type="submit" disabled={saving || data.mock}>{saving ? t('saving') : selected.isNew ? t('createMember') : t('saveNow')}</button>{!selected.isNew && <button className="admin-delete" type="button" onClick={() => setConfirmDelete(true)} disabled={data.mock}>{t('delete')}</button>}{data.mock && <p className="privacy-subnote">{t('mockReadonly')}</p>}
       </form>}
@@ -346,8 +388,7 @@ export default function AdminMemberDirectory({ data, surveys, search, sort, dire
     {exportOpen && <div className="confirm-backdrop" role="presentation"><section className="confirm-dialog export-dialog" role="dialog" aria-modal="true" aria-labelledby="export-title"><p className="eyebrow">{t('exportEyebrow')}</p><h2 id="export-title">{t('exportTitle')}</h2><form className="export-form" onSubmit={exportMembers}>
       <fieldset><legend>{t('exportMembers')}</legend><label><input type="radio" name="export-scope" value="all" checked={exportScope === 'all'} onChange={() => setExportScope('all')} /> {t('exportAll')}</label><label><input type="radio" name="export-scope" value="selected" checked={exportScope === 'selected'} onChange={() => setExportScope('selected')} disabled={!checked.size} /> {t('exportSelected', {count: checked.size})}</label></fieldset>
       <label className="admin-checkbox"><input type="checkbox" checked={excludeTurufjellAsOptOut} onChange={(event) => setExcludeTurufjellAsOptOut(event.target.checked)} /> {t('excludeOptOut')}</label>
-      <label htmlFor="export-survey">{t('survey')}<Select id="export-survey" value={exportSurveyId} onChange={(event) => setExportSurveyId(event.target.value)} required>{surveys.map((survey) => <option value={survey.id} key={survey.id}>{survey.title}{survey.has_ended ? t('ended') : survey.is_open ? '' : t('closed')}</option>)}</Select></label>
-      <p className="privacy-subnote">{t('exportPrivacy')}</p>{exportMessage && <p className="form-error" role="alert">{exportMessage}</p>}<div className="confirm-actions"><button ref={exportCancelButton} className="admin-button" type="button" onClick={() => setExportOpen(false)} disabled={exporting}>{t('cancel')}</button><button className="primary-button" type="submit" disabled={exporting || !exportSurveyId || (exportScope === 'selected' && !checked.size)}>{exporting ? t('generating') : t('download')}</button></div>
+      <p className="privacy-subnote">{t('exportPrivacy')}</p>{exportMessage && <p className="form-error" role="alert">{exportMessage}</p>}<div className="confirm-actions"><button ref={exportCancelButton} className="admin-button" type="button" onClick={() => setExportOpen(false)} disabled={exporting}>{t('cancel')}</button><button className="primary-button" type="submit" disabled={exporting || (exportScope === 'selected' && !checked.size)}>{exporting ? t('generating') : t('download')}</button></div>
     </form></section></div>}
   </>;
 }

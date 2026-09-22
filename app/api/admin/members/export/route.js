@@ -9,18 +9,12 @@ function sameOrigin(request) {
   return !origin || origin === request.nextUrl.origin;
 }
 
-function exportBaseUrl(request) {
-  const url = new URL(process.env.AUTH_URL || request.nextUrl.origin);
-  if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Invalid base URL');
-  return url.origin;
-}
-
 export async function POST(request) {
   const { t } = getRequestI18n(request, 'backend');
   if (!sameOrigin(request)) return Response.json({ ok: false, message: t('api.invalidRequest') }, { status: 403 });
   try {
     const input = await readJsonObject(request);
-    const result = await createMemberExport({ ...input, baseUrl: exportBaseUrl(request) });
+    const result = await createMemberExport(input);
     const date = new Date().toISOString().slice(0, 10);
     return new Response(new Uint8Array(result.buffer), {
       status: 200,
@@ -34,8 +28,7 @@ export async function POST(request) {
     const status = apiErrorStatus(error);
     console.error('Admin member export failed', { code: error.code || error.cause?.code, message: error.message });
     const message = error.message === 'No members selected' ? t('adminMembers.noSelection')
-      : error.message === 'Survey not found' ? t('adminMembers.surveyMissing')
-        : status === 400 ? t('adminMembers.exportCheck') : t('adminMembers.export');
+      : status === 400 ? t('adminMembers.exportCheck') : t('adminMembers.export');
     return Response.json({ ok: false, message }, { status, headers: { 'Cache-Control': 'no-store' } });
   }
 }

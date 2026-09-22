@@ -48,6 +48,17 @@ Object.assign(members.adminDirectory, {
   groupAdded: '{count} new group memberships were saved in “{name}”.',
   groupRemoved: 'The property was removed from “{name}”.',
   groupSaveError: 'The group membership could not be saved.',
+  annualFeeEyebrow: 'Payment history',
+  annualFeeTitle: 'Annual fee',
+  annualFeeHelp: 'Status is stored per property and calendar year. The current year is shown even when no status was previously recorded.',
+  annualFeeCaption: 'Annual fee payment by year',
+  annualFeePaid: 'Paid',
+  annualFeeToggle: 'Annual fee paid for {year}',
+  annualFeeSaved: 'The annual fee for {year} was saved.',
+  annualFeeError: 'The annual fee could not be saved.',
+  year: 'Year',
+  yes: 'Yes',
+  no: 'No',
 });
 Object.assign(members.requests, {
   monthlyEyebrow: 'Automatic check',

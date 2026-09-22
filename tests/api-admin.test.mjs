@@ -50,7 +50,7 @@ const cases = [
 ];
 const exportsByModule = {
   'admin-members': ['getAdminMembers', 'getAdminMemberById'],
-  'admin-member-updates': ['createAdminMember', 'updateAdminMember', 'deleteAdminMember'],
+  'admin-member-updates': ['createAdminMember', 'setAdminMemberAnnualFee', 'updateAdminMember', 'deleteAdminMember'],
   'member-export': ['createMemberExport'],
   'member-self-service': ['resolveAdminMemberRequest', 'updateAdminMemberRequestProperty'],
   'admin-surveys': ['getAdminSurveys', 'createAdminSurvey', 'copyAdminSurvey', 'updateAdminSurvey', 'deleteAdminSurvey'],
@@ -127,6 +127,17 @@ test('member search normalizes pagination and preserves combined filters', async
   const { route, calls } = await setup('members');
   await route.GET(request('/api/admin/members?q=%20Test%20&page=NaN&dir=desc&contact=incomplete&comment=present'));
   assert.deepEqual(plain(calls[0].args), ['Test', 1, 'h_number', 'desc', true, true, { membershipStatus: '', hamletId: '', groupId: '', turufjellAsSharing: '' }]);
+});
+
+test('member annual fee action is routed separately from ordinary member edits', async () => {
+  const { route, calls } = await setup('members/[id]', {}, { year: 2026, paid: true, marker: 'synthetic-result' });
+  const response = await route.PATCH(request('/api/admin/members/member-7', {
+    method: 'PATCH',
+    body: { action: 'set_annual_fee', year: 2026, paid: true },
+  }), { params: Promise.resolve({ id: '7' }) });
+  assert.equal(response.status, 200);
+  assert.equal(calls.at(-1).name, 'setAdminMemberAnnualFee');
+  assert.deepEqual(plain(calls.at(-1).args), ['7', { action: 'set_annual_fee', year: 2026, paid: true }]);
 });
 
 test('matrikkel start forwards an exact member selection', async () => {

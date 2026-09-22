@@ -72,6 +72,27 @@ test('sharing reservation defaults off, records its change and can be filtered',
   assert.equal(events.at(-1).after_value.turufjell_as_sharing_opt_out, true);
 });
 
+test('annual fee status is stored per property and year with audit history', async () => {
+  const year = new Date().getFullYear();
+  const member = await admin.createAdminMember({
+    h_number: `fee-${randomUUID()}`,
+    primary_contact_email: `${randomUUID()}@example.test`,
+    other_contact_emails: [],
+  });
+  assert.deepEqual((await directory.getAdminMemberById(String(member.id))).annual_fees, []);
+
+  assert.deepEqual(await admin.setAdminMemberAnnualFee(String(member.id), { year, paid: true }), { year, paid: true });
+  assert.deepEqual((await directory.getAdminMemberById(String(member.id))).annual_fees, [{ year, paid: true }]);
+  assert.deepEqual(await admin.setAdminMemberAnnualFee(String(member.id), { year, paid: false }), { year, paid: false });
+
+  const events = await db.sql`SELECT row_id, operation, changed_by, after_value FROM audit_log
+    WHERE table_name = 'member_annual_fees' AND row_id = ${`${member.id}:${year}`} ORDER BY id`;
+  assert.equal(events.length, 2);
+  assert.deepEqual(events.map((event) => event.operation), ['INSERT', 'UPDATE']);
+  assert.ok(events.every((event) => event.changed_by === 'admin@example.test'));
+  assert.equal(events.at(-1).after_value.paid, false);
+});
+
 test('indexed member search keeps Norwegian text, SPG H-numbers and literal wildcard characters searchable', async () => {
   const key = randomUUID();
   const member = await admin.createAdminMember({

@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation';
 import { isAllowedAdmin, isAllowedMatrikkelSync, isAuthConfigured } from '@/lib/admin-policy';
 import { getAdminSession } from '@/lib/admin-access';
 import { getAdminMemberById, getAdminMembers } from '@/lib/admin-members';
-import { getAdminSurveys } from '@/lib/admin-surveys';
 import AdminMemberDirectory from '@/components/AdminMemberDirectory';
 import { getMemberGroups } from '@/lib/member-groups';
 import { getServerI18n } from '@/lib/i18n/server';
@@ -32,9 +31,8 @@ export default async function AdminMembersPage({ searchParams }) {
   // state when the selected member or one of the result-shaping filters changes.
   const directoryKey = [sort, direction, incompleteContact, hasComment, membershipStatus, hamletId, groupId, turufjellAsSharing, selectedId].join(':');
   let data;
-  let surveys;
   let initialSelected;
   let groups;
-  try { [data, surveys, initialSelected, groups] = await Promise.all([getAdminMembers(search, 1, sort, direction, incompleteContact, hasComment, { membershipStatus, hamletId, groupId, turufjellAsSharing }), getAdminSurveys(), selectedId ? getAdminMemberById(selectedId) : null, getMemberGroups()]); } catch { data = null; }
-  return <section className="admin-content">{!data ? <p className="form-error" role="alert">{t('admin.pages.membersUnavailable')}</p> : <AdminMemberDirectory key={directoryKey} data={data} surveys={surveys} search={search} sort={sort} direction={direction} incompleteContact={incompleteContact} hasComment={hasComment} initialSelected={initialSelected} membershipStatus={membershipStatus} hamletId={hamletId} groupId={groupId} turufjellAsSharing={turufjellAsSharing} groups={groups} canMatrikkelSync={isAllowedMatrikkelSync(session.user)} />}</section>;
+  try { [data, initialSelected, groups] = await Promise.all([getAdminMembers(search, 1, sort, direction, incompleteContact, hasComment, { membershipStatus, hamletId, groupId, turufjellAsSharing }), selectedId ? getAdminMemberById(selectedId) : null, getMemberGroups()]); } catch { data = null; }
+  return <section className="admin-content">{!data ? <p className="form-error" role="alert">{t('admin.pages.membersUnavailable')}</p> : <AdminMemberDirectory key={directoryKey} data={data} search={search} sort={sort} direction={direction} incompleteContact={incompleteContact} hasComment={hasComment} initialSelected={initialSelected} membershipStatus={membershipStatus} hamletId={hamletId} groupId={groupId} turufjellAsSharing={turufjellAsSharing} groups={groups} canMatrikkelSync={isAllowedMatrikkelSync(session.user)} />}</section>;
 }

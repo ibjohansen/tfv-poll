@@ -107,6 +107,20 @@ ALTER TABLE members ADD COLUMN IF NOT EXISTS search_document TEXT
 CREATE INDEX IF NOT EXISTS members_search_document_trgm_idx
   ON members USING GIN (search_document gin_trgm_ops) WHERE deleted_at IS NULL;
 
+-- Årsavgift registreres per tomt og kalenderår. En eksplisitt FALSE-rad
+-- skiller «ikke betalt» fra fravær av eldre historikk.
+CREATE TABLE IF NOT EXISTS member_annual_fees (
+  member_id BIGINT NOT NULL REFERENCES members(id) ON DELETE RESTRICT,
+  fee_year INTEGER NOT NULL CHECK (fee_year BETWEEN 1900 AND 9999),
+  paid BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_changed_by TEXT,
+  PRIMARY KEY (member_id, fee_year)
+);
+CREATE INDEX IF NOT EXISTS member_annual_fees_year_paid_idx
+  ON member_annual_fees (fee_year, paid, member_id);
+
 -- Kjøringer mot Kartverkets Matrikkel-API. Hver kjøring tar et komplett
 -- øyeblikksbilde av feltene den har lov til å endre før første oppslag.
 CREATE TABLE IF NOT EXISTS matrikkel_sync_runs (
@@ -937,7 +951,10 @@ BEGIN
     RETURN NULL;
   END IF;
 
-  entity_id := COALESCE(new_data ->> 'id', old_data ->> 'id', 'unknown');
+  entity_id := CASE WHEN TG_TABLE_NAME = 'member_annual_fees'
+    THEN concat(COALESCE(new_data ->> 'member_id', old_data ->> 'member_id'), ':',
+      COALESCE(new_data ->> 'fee_year', old_data ->> 'fee_year'))
+    ELSE COALESCE(new_data ->> 'id', old_data ->> 'id', 'unknown') END;
 
   INSERT INTO audit_log (table_name, row_id, operation, changed_by, before_value, after_value)
   VALUES (TG_TABLE_NAME, entity_id, TG_OP, actor, old_data, new_data);
@@ -980,6 +997,15 @@ FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
 DROP TRIGGER IF EXISTS members_audit_trigger ON members;
 CREATE TRIGGER members_audit_trigger
 AFTER INSERT OR UPDATE OR DELETE ON members
+FOR EACH ROW EXECUTE FUNCTION record_audit_change();
+
+DROP TRIGGER IF EXISTS member_annual_fees_audit_context_trigger ON member_annual_fees;
+CREATE TRIGGER member_annual_fees_audit_context_trigger
+BEFORE INSERT OR UPDATE OR DELETE ON member_annual_fees
+FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
+DROP TRIGGER IF EXISTS member_annual_fees_audit_trigger ON member_annual_fees;
+CREATE TRIGGER member_annual_fees_audit_trigger
+AFTER INSERT OR UPDATE OR DELETE ON member_annual_fees
 FOR EACH ROW EXECUTE FUNCTION record_audit_change();
 
 DROP TRIGGER IF EXISTS member_requests_audit_context_trigger ON member_requests;
