@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import MemberInfo from "@/components/MemberInfo";
 import { getMockSurveyAccess, getSurveyAccess, surveySessionCookieName } from "@/lib/membership";
 import BrandLogo from '@/components/BrandLogo';
@@ -8,6 +9,7 @@ import { surveyDocuments, surveyLinkParameters } from "@/data/survey";
 import { isMockMode } from '@/lib/mock-store';
 import { getServerI18n } from '@/lib/i18n/server';
 import { getSurveyPreview } from '@/lib/survey-preview';
+import { isAccessSecret } from '@/lib/member-self-service-utils';
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -34,6 +36,11 @@ export default async function HomePage({ searchParams }) {
   const requestedSurveyId = params[surveyLinkParameters.survey];
   const previewToken = typeof params.preview === 'string' ? params.preview : null;
   const isPreview = Boolean(previewToken);
+  // Accept older links through the same verification and session flow as invitations.
+  // Keep redirect outside the access error handler: Next.js implements it by throwing.
+  if (!isPreview && typeof params.token === 'string' && isAccessSecret(params.token)) {
+    redirect(`/api/survey-access/verify?token=${encodeURIComponent(params.token)}`);
+  }
   let access;
   try {
     if (isPreview) {

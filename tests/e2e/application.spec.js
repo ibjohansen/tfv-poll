@@ -648,6 +648,33 @@ test('expired member access shows recovery and no member information', async ({ 
   await expect(page.getByRole('button', { name: 'Lagre kontaktopplysninger' })).toHaveCount(0);
 });
 
+test('legacy survey token links use the invitation verification route', async ({ page }) => {
+  const token = 'a'.repeat(64);
+  const verifiedTokens = [];
+  // The isolated server has no database: the synthetic token must be rejected.
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === '/api/survey-access/verify') verifiedTokens.push(url.searchParams.get('token'));
+  });
+  await page.goto(`/survey?token=${token}&next=https://example.invalid`);
+  await expect(page).toHaveURL(`${testOrigin}/survey?status=invalid`);
+  expect(verifiedTokens).toEqual([token]);
+  await expect(page.locator('.member-section')).toBeVisible();
+});
+
+test('survey ignores malformed or repeated tokens and preserves preview mode', async ({ page }) => {
+  const verificationRequests = [];
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/survey-access/verify') verificationRequests.push(request.url());
+  });
+  for (const query of ['', '?token=invalid', `?token=${'a'.repeat(64)}&token=${'b'.repeat(64)}`, `?preview=invalid&token=${'a'.repeat(64)}`]) {
+    await page.goto(`/survey${query}`);
+    await expect(page.locator('.member-section')).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/survey');
+    expect(verificationRequests).toEqual([]);
+  }
+});
+
 test('survey validates all answers and recovers from version conflict', async ({ page }) => {
   await page.goto(`/survey?klm=${'1'.repeat(32)}&xyz=${surveyId}`);
   await expect(page).toHaveTitle('Medlemsundersøkelse | Turufjell Vel');

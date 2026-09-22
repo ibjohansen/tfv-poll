@@ -92,6 +92,8 @@ Sertifikatkontrollen skal ikke deaktiveres.
   `/api/survey-access/verify` og fjernes straks fra adresselinjen. Lenken kan
   åpnes på nytt for å opprette en ny kortvarig økt frem til svar, tilbakekalling
   eller utløp.
+- Lenker på formen `/survey?token=...` videresendes også gjennom samme
+  tilgangskontroll. Nye invitasjoner bruker fortsatt `/api/survey-access/verify`.
 - Svar sendes til `/survey/api/responses`. Vedlegg som lastes opp på undersøkelsen
   i admin, leveres tilgangskontrollert fra privat Object Storage. Eldre statiske
   dokumenter kan fortsatt ligge under `/survey/dokumenter/`.
