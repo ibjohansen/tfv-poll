@@ -1945,6 +1945,31 @@ idempotent. Ukjent message ID aksepteres uten å endre en levering. Permanent
 bounce, spam, unsubscribe og suppression registreres lokalt og vises for admin;
 e-postadressen slettes eller endres aldri automatisk i `members`.
 
+### E-postoversikt og feilsøking
+
+Utsendelsesoversikten henter alle invitasjoner og kvitteringer for valgt
+undersøkelse. Flere rader vises automatisk ved scrolling (med «Vis flere» som
+tastaturalternativ). Flisene og filtrene for type, status og merknad gjelder hele
+resultatsettet, og alle kolonner kan sorteres. Typefilter vises bare når flere
+typer finnes. «Ikke sendt» inkluderer både sperrede mottakere og kvitteringer
+som bevisst er utelatt; merknaden skiller årsakene.
+
+«Logg» (tidligere «Brukerendringer») viser nye MailerSend-feil under området
+«E-posthendelser». Hvert mislykket sendeforsøk får en feil-ID og lagrer
+HTTP-status, leverandørens feilmelding/feilkode, valideringsfeil,
+forespørsels-ID eller nettverksfeil når opplysningene finnes. Referanser til
+utsendelsen gjør det mulig å åpne hendelsen fra e-postoversikten. Feilene lagres
+i eksisterende `audit_log`; denne endringen krever ingen skjemamigrering.
+Hemmeligheter, lenker med tilgangstoken og e-postinnhold skal ikke logges.
+Hvis databasen er utilgjengelig, skrives samme redigerte hendelse til serverloggen
+med feil-ID, samt beskjed om at varig lagring feilet. Eldre generelle feil kan
+ikke få konkrete detaljer som aldri ble lagret; de vises som historiske feil.
+
+Verifiser etter publisering med en kontrollert feil i et isolert testmiljø:
+sjekk at feilen får en feil-ID, finnes i «Logg», og kan åpnes fra utsendelsen.
+Kontroller også at merknadsfilteret finner en rad utenfor de første 25 radene.
+Ikke fremprovoser feilsendinger til reelle medlemmer i produksjon.
+
 ### Database og personvern
 
 Kjør `npm run db:setup` med `DATABASE_URL_UNPOOLED` før versjonen deployes.

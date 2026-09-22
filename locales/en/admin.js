@@ -5,7 +5,7 @@ const admin = {
     members: 'Member register',
     surveys: 'Surveys',
     web: 'Web',
-    audit: 'User changes',
+    audit: 'Audit log',
     usage: 'Usage statistics',
     map: 'Map and register checks',
     newsletters: 'Newsletters',
@@ -137,7 +137,7 @@ const admin = {
   },
   auditLog: {
     eyebrow: 'Audit trail',
-    title: 'User changes',
+    title: 'Audit log',
     help: 'Changes to key data and exports from the administration portal. Filter by user forms, the admin interface or automation. Secret access values are omitted.',
     source: 'Source',
     allSources: 'All sources',
@@ -285,3 +285,15 @@ const admin = {
 };
 
 export default admin;
+
+admin.auditLog.help = 'Data changes, administrative actions and email errors. Filter by public forms, administration or automated activity. Secrets and email content are omitted.';
+admin.auditLog.searchPlaceholder = 'Error ID, property number, name or changed value';
+admin.auditLog.tables.email_events = 'Email events';
+admin.auditLog.entities.emailFailure = 'Email error';
+Object.assign(admin.auditLog.fields, {
+  error_id: 'Error ID', mail_id: 'Mail reference', email_type: 'Email type',
+  code: 'Error code', message: 'Error description', provider: 'Provider',
+  provider_message: 'Provider response', provider_code: 'Provider error code',
+  http_status: 'HTTP status', request_id: 'Provider request ID',
+  network_code: 'Network error', retry_at: 'Earliest retry', validation_errors: 'Validation errors',
+});

@@ -5,7 +5,7 @@ const admin = {
     members: 'Medlemsregister',
     surveys: 'Undersøkelser',
     web: 'Web',
-    audit: 'Brukerendringer',
+    audit: 'Logg',
     usage: 'Bruksstatistikk',
     map: 'Kart og registerkontroll',
     newsletters: 'Nyhetsbrev',
@@ -137,15 +137,15 @@ const admin = {
   },
   auditLog: {
     eyebrow: 'Revisjonsspor',
-    title: 'Brukerendringer',
-    help: 'Endringer i sentrale data og eksport fra administrasjonen. Filtrer på brukerskjema, admingrensesnitt eller automatikk. Hemmelige tilgangsverdier er utelatt.',
+    title: 'Logg',
+    help: 'Endringer, administrative handlinger og e-postfeil. Filtrer på brukerskjema, admingrensesnitt eller automatikk. Hemmelige tilgangsverdier og e-postinnhold er utelatt.',
     source: 'Kilde',
     allSources: 'Alle kilder',
     sources: {public: 'Brukerskjema / forside', admin: 'Admingrensesnitt', system: 'System / automatikk'},
     area: 'Område',
     allAreas: 'Alle områder',
     search: 'Søk',
-    searchPlaceholder: 'Navn, e-post, H-nummer eller endret verdi',
+    searchPlaceholder: 'Feil-ID, H-nummer, navn eller endret verdi',
     changeType: 'Endringstype',
     allTypes: 'Alle typer',
     status: 'Status',
@@ -285,3 +285,13 @@ const admin = {
 };
 
 export default admin;
+
+admin.auditLog.tables.email_events = 'E-posthendelser';
+admin.auditLog.entities.emailFailure = 'E-postfeil';
+Object.assign(admin.auditLog.fields, {
+  error_id: 'Feil-ID', mail_id: 'Utsendelsesreferanse', email_type: 'E-posttype',
+  code: 'Feilkode', message: 'Feilbeskrivelse', provider: 'Leverandør',
+  provider_message: 'Svar fra leverandør', provider_code: 'Leverandørens feilkode',
+  http_status: 'HTTP-status', request_id: 'Leverandørens forespørsels-ID',
+  network_code: 'Nettverksfeil', retry_at: 'Neste mulige forsøk', validation_errors: 'Valideringsfeil',
+});

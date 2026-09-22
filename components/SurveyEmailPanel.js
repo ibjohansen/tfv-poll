@@ -2,6 +2,7 @@
 
 import Select from "@/components/Select";
 import SurveyRecipientPicker from '@/components/SurveyRecipientPicker';
+import SurveyMailOverview from '@/components/SurveyMailOverview';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { useI18n } from '@/components/LocaleProvider';
@@ -10,7 +11,6 @@ export default function SurveyEmailPanel({ surveyId, adminEmail }) {
   const { t } = useI18n('surveys.email');
   const [overview, setOverview] = useState(null);
   const [state, setState] = useState('loading');
-  const [page, setPage] = useState(1);
   const [groupId, setGroupId] = useState('');
   const [recipients, setRecipients] = useState(adminEmail || '');
   const [busy, setBusy] = useState('');
@@ -27,7 +27,7 @@ export default function SurveyEmailPanel({ surveyId, adminEmail }) {
   const load = useCallback(async (signal) => {
     const version = ++requestVersion.current;
     try {
-      const query = new URLSearchParams({ page: String(page) });
+      const query = new URLSearchParams();
       query.set('groupId', groupId);
       query.set('includeOtherEmails', String(includeOtherEmails));
       if (memberIds) query.set('memberIds', memberIds);
@@ -41,7 +41,7 @@ export default function SurveyEmailPanel({ surveyId, adminEmail }) {
     } catch (error) {
       if (error.name !== 'AbortError' && version === requestVersion.current) { setMessage(error.message); setMessageKind('error'); setState('error'); }
     }
-  }, [groupId, page, surveyId, t, includeOtherEmails, memberIds]);
+  }, [groupId, surveyId, t, includeOtherEmails, memberIds]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -117,7 +117,7 @@ export default function SurveyEmailPanel({ surveyId, adminEmail }) {
       <label className="survey-email-group">{t('recipientGroup')}
         <Select value={groupId} disabled={Boolean(busy) || groupSelectionLocked} onChange={(event) => {
           const nextGroupId = event.target.value;
-          setGroupId(nextGroupId); setPage(1); setState('loading'); setMessage(''); setMessageKind('');
+          setGroupId(nextGroupId); setState('loading'); setMessage(''); setMessageKind('');
           setOverview((current) => current ? { ...current, selected_group_id: nextGroupId || null,
             recipients: [], recipient_count: 0, missing_email_count: 0 } : current);
         }}>
@@ -135,35 +135,28 @@ export default function SurveyEmailPanel({ surveyId, adminEmail }) {
       {campaign ? <>
         <div className="survey-email-campaign-heading"><span className={`status-pill is-${campaign.status === 'completed' ? 'open' : 'closed'}`}>{t(`statuses.${campaign.status}`, {}, campaign.status)}</span><span>{t('processed', {count: progress})}</span></div>
         <div className="progress-track" aria-label={t('progress', {count: progress})}><span className="progress-value" style={{ width: `${progress}%` }} /></div>
-        <dl className="survey-email-stats"><div><dt>{t('accepted')}</dt><dd>{campaign.sent_count}</dd></div><div><dt>{t('delivered')}</dt><dd>{campaign.delivered_count}</dd></div><div><dt>{t('failed')}</dt><dd>{campaign.failed_count}</dd></div><div><dt>{t('suppressed')}</dt><dd>{campaign.suppressed_count}</dd></div></dl>
         {automaticallyPaused
           ? <p className="survey-email-warning" role="status">{t('jobPaused', {time: new Date(retryAt).toLocaleString()})}</p>
           : campaign.error_message && <p className="form-error" role="alert">{t('jobStopped', {message: campaign.error_message})}</p>}
         {['pending', 'failed'].includes(campaign.status) && <button className="admin-button" type="button" disabled={!canResume || Boolean(busy)} aria-describedby={blockedReason ? 'survey-email-blocked-reason' : undefined} onClick={() => { setSendAction('send'); setConfirmSend(true); }}>{t('restart')}</button>}
-        <button className="primary-button" type="button" disabled={!canSelect || Boolean(busy)} onClick={() => { setSendAction('append'); setConfirmSend(true); }}>{t('addRecipients')}</button>
         {campaign.status === 'completed' && <button className="admin-button" type="button" disabled={!canReplace || Boolean(busy)} aria-describedby={blockedReason ? 'survey-email-blocked-reason' : undefined} onClick={() => { setSendAction('resend'); setConfirmSend(true); }}>{t('sendNewLinks')}</button>}
+        <button className="primary-button" type="button" disabled={!canSelect || Boolean(busy)} onClick={() => { setSendAction('append'); setConfirmSend(true); }}>{t('addRecipients')}</button>
       </> : <>
         <p>{t(overview.recipient_count === 1 ? 'oneWillReceive' : 'manyWillReceive', {count: overview.recipient_count})}</p>
         <button className="primary-button" type="button" disabled={!canStart || Boolean(busy)} aria-describedby={blockedReason ? 'survey-email-blocked-reason' : undefined} onClick={() => { setSendAction('send'); setConfirmSend(true); }}>{t('start')}</button>
       </>}
-    </section>
-
-    {(groupId || selectedMembers.length > 0) && <section className="survey-email-recipients" aria-labelledby="survey-email-recipients-heading">
+    {(groupId || selectedMembers.length > 0) && <section className="survey-email-recipients" aria-labelledby="survey-email-recipients-heading" aria-busy={state === 'loading'}>
       <h4 id="survey-email-recipients-heading">{t('recipientList')}</h4>
-      {previewRecipients.length ? <div className="admin-table-scroll"><table className="admin-table">
-        <caption>{t('recipientCaption')}</caption><thead><tr><th scope="col">{t('name')}</th><th scope="col">{t('titleHolder')}</th><th scope="col">{t('primaryEmail')}</th><th scope="col">{t('recipientEmail')}</th></tr></thead>
-        <tbody>{previewRecipients.map((recipient) => <tr key={`${recipient.id}:${recipient.email || recipient.primary_contact_email}`}><th scope="row">{recipient.name || '—'}</th><td>{recipient.title_holder || '—'}</td><td>{recipient.primary_contact_email || '—'}</td><td>{recipient.email || recipient.primary_contact_email}{recipient.is_primary === false && <small> · {t('additionalEmail')}</small>}</td></tr>)}</tbody>
+      {state === 'loading' ? <p role="status">{t('loading')}</p> : previewRecipients.length ? <div className="admin-table-scroll"><table className="admin-table">
+        <caption>{t('recipientCaption')}</caption><thead><tr><th scope="col">{t('propertyNumber')}</th><th scope="col">{t('address')}</th><th scope="col">{t('titleHolder')}</th><th scope="col">{t('name')}</th><th scope="col">{t('primaryEmail')}</th>{includeOtherEmails && <th scope="col">{t('recipientEmail')}</th>}</tr></thead>
+        <tbody>{previewRecipients.map((recipient) => <tr key={`${recipient.id}:${recipient.email || recipient.primary_contact_email}`}><th scope="row">{recipient.h_number || '—'}</th><td>{recipient.street_address || '—'}</td><td>{recipient.title_holder || '—'}</td><td>{recipient.name || '—'}</td><td>{recipient.primary_contact_email || t('missingPrimaryEmail')}</td>{includeOtherEmails && <td>{recipient.email || recipient.primary_contact_email}{recipient.is_primary === false && <small> · {t('additionalEmail')}</small>}</td>}</tr>)}</tbody>
       </table></div> : <p>{t('noRecipients')}</p>}
     </section>}
+    </section>
 
-    {campaign && <section className="survey-email-deliveries"><h4>{t('deliveryStatus')}</h4>
-      <div className="admin-table-scroll"><table className="admin-table"><caption>{t('deliveryCaption')}</caption><thead><tr><th scope="col">{t('member')}</th><th scope="col">{t('domain')}</th><th scope="col">{t('status')}</th><th scope="col">{t('note')}</th></tr></thead><tbody>{overview.deliveries.map((delivery) => <tr key={delivery.id}><th scope="row">{delivery.h_number || t('unknown')}</th><td>{delivery.recipient_domain}</td><td>{t(`statuses.${delivery.status}`, {}, delivery.status)}</td><td>{delivery.failure_reason || '—'}</td></tr>)}</tbody></table></div>
-      {overview.pages > 1 && <nav className="survey-email-pages" aria-label={t('deliveryPages')}><button className="admin-button" type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>{t('previous')}</button><span>{t('page', {page: overview.page, pages: overview.pages})}</span><button className="admin-button" type="button" disabled={page >= overview.pages} onClick={() => setPage((value) => value + 1)}>{t('next')}</button></nav>}
-    </section>}
+    <SurveyMailOverview key={surveyId} history={overview.mail_history} loading={state === 'loading'} />
+
     {message && <p className={messageKind === 'success' ? 'admin-success' : 'form-error'} role="status">{message}</p>}
-    {overview.receipts && <section className="survey-email-card"><h4>{t('receipts')}</h4><p>{t('receiptCounts', overview.receipts)}</p>
-      {overview.receipts.issues?.length > 0 && <div className="admin-table-scroll"><table className="admin-table"><caption>{t('receiptIssuesCaption')}</caption><thead><tr><th scope="col">{t('member')}</th><th scope="col">{t('address')}</th><th scope="col">{t('recipientEmail')}</th><th scope="col">{t('status')}</th><th scope="col">{t('note')}</th></tr></thead><tbody>{overview.receipts.issues.map((issue) => <tr key={issue.id}><th scope="row">{issue.h_number || t('unknown')}</th><td>{issue.street_address || '—'}</td><td>{issue.recipient_email || '—'}</td><td>{t(`statuses.${issue.status}`, {}, issue.status)}</td><td>{t(`receiptReasons.${issue.failure_reason}`, {}, issue.failure_reason || t('unknown'))}</td></tr>)}</tbody></table></div>}
-    </section>}
     <ConfirmDialog open={confirmSend} eyebrow={t('confirmEyebrow')} destructive={false} title={t('confirmTitle', {count: sendAction === 'send' && campaign ? campaign.total_count : overview.recipient_count})} description={t(sendAction === 'resend' ? 'replaceDescription' : sendAction === 'append' ? 'appendDescription' : 'sendDescription')} confirmLabel={t('start')} busy={Boolean(busy)} onCancel={() => setConfirmSend(false)} onConfirm={() => post(sendAction, { groupId, memberIds: selectedMembers.map((member) => String(member.id)), includeOtherEmails, singleResponsePerProperty })} />
   </section>;
 }

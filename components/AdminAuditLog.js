@@ -25,6 +25,7 @@ function changedFields(entry, t, locale) {
 
 function entityLabel(entry, t) {
   const value = entry.after_value || entry.before_value || {};
+  if (entry.table_name === 'email_events') return t('entities.emailFailure');
   if (value.action?.startsWith('hamlet_polygon_')) return t(value.action === 'hamlet_polygon_clear' ? 'entities.hamletCleared' : 'entities.hamletSaved', {name: value.name});
   if (value.action === 'hamlet_members_sync') return t('entities.hamletSync', {count: value.changed_count || 0});
   if (value.action === 'hamlet_members_bulk_assignment') return t('entities.hamletBulk', {count: value.changed_count || 0});
@@ -78,7 +79,13 @@ export default async function AdminAuditLog({ data, filters, tables }) {
       const href = entityHref(entry);
       return <li key={entry.id}>
         <div className="admin-audit-summary"><div><span className={`admin-audit-operation is-${entry.operation.toLowerCase()}`}>{entry.table_name === 'admin_actions' ? t('performed') : t(`operations.${entry.operation}`)}</span><strong>{t(`tables.${entry.table_name}`, {}, entry.table_name)} · {entityLabel(entry, t)}</strong></div><time dateTime={entry.changed_at}>{formatDate(entry.changed_at, locale)}</time></div>
-        <p>{t('performedBy')} <strong>{entry.changed_by}</strong>{fields.length && entry.table_name !== 'admin_actions' ? t('changedFields', {count: fields.length}) : ''}</p>
+        <p>{t('performedBy')} <strong>{entry.changed_by}</strong>{fields.length && !['admin_actions', 'email_events'].includes(entry.table_name) ? t('changedFields', {count: fields.length}) : ''}</p>
+        {entry.table_name === 'email_events' && <p className="admin-audit-error">
+          {entry.after_value?.provider_message || entry.after_value?.message}
+          {entry.after_value?.http_status && <> · HTTP {entry.after_value.http_status}</>}
+          {' · '}{entry.after_value?.provider_code || entry.after_value?.network_code || entry.after_value?.code}
+          <br />{t('fields.error_id')}: {entry.after_value?.error_id}
+        </p>}
         <div className="admin-audit-actions">{href && <Link href={href}>{t('openRecord')}</Link>}<details><summary>{t('fullLog')}</summary><div className="admin-audit-values">{fields.map((field) => <section key={field}><h3>{t(`fields.${field}`, {}, field)}</h3><div><div><span>{t('before')}</span><pre>{formatValue(entry.before_value?.[field], t)}</pre></div><div><span>{t('after')}</span><pre>{formatValue(entry.after_value?.[field], t)}</pre></div></div></section>)}</div></details></div>
       </li>;
     })}</ol>}

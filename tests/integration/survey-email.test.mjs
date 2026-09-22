@@ -9,6 +9,7 @@ import * as emailUtils from '../../lib/survey-email-utils.js';
 import * as securityConfig from '../../lib/security-config.js';
 import * as securityEvents from '../../lib/security-events.js';
 import * as surveyPreview from '../../lib/survey-preview.js';
+import * as surveyMailOverview from '../../lib/survey-mail-overview.js';
 import { normalizeEmail, MailerServiceError } from '../../lib/mailer-service.js';
 import { memberTestEnvironment as env } from '../helpers/member-service.mjs';
 
@@ -22,6 +23,7 @@ async function service(sendEmail, suppressionCheck = async () => []) {
     './member-self-service-utils.js': memberUtils, './survey-email-utils.js': emailUtils,
     './security-config.js': securityConfig, './security-events.js': securityEvents,
     './survey-preview.js': surveyPreview,
+    './survey-mail-overview.js': surveyMailOverview,
     './survey-email-background.js': { getSurveyEmailBackgroundStatus: () => 'ready' },
     './email-templates.js': { renderSurveyInvitationEmail: () => ({ subject: 'Synthetic', text: 'No actual send', html: '' }) },
     './mailer-service.js': { getMailerSendConfig: () => ({}), getMailerSendSuppressions: suppressionCheck,

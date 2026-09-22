@@ -82,6 +82,15 @@ test('audit permission is checked even in mock mode', async () => {
   assert.equal(queries.length, 0);
 });
 
+test('email events remain under the audit permission and support error-ID lookup', async () => {
+  const { api, state, queries } = await setup();
+  await api.getAdminAuditLog({ table: 'email_events', source: 'system', q: 'trace-id' });
+  assert.deepEqual(plain(queries[0].values), ['system', 'email_events', 'trace-id']);
+  assert.ok(api.getAuditedTables().includes('email_events'));
+  state.denied = true;
+  await assert.rejects(api.getAdminAuditLog({ table: 'email_events' }), /Forbidden/);
+});
+
 test('export activity stores only allowlisted metadata and a normalized actor', async () => {
   const calls = [];
   const sql = async (strings, ...values) => { calls.push({ query: strings.join('?'), values }); };

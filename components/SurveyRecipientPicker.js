@@ -26,8 +26,18 @@ export default function SurveyRecipientPicker({ surveyId, selected, onChange, di
   }
   return <fieldset disabled={disabled} className="survey-recipient-picker"><legend>{t('individualProperties')}</legend>
     <label>{t('searchProperties')}<input type="search" value={query} maxLength={200} onChange={(event) => { setQuery(event.target.value); setMembers([]); setError(''); }} /></label>
-    {selected.length > 0 && <ul>{selected.map((member) => <li key={member.id}>{member.h_number} · {member.street_address} <button className="admin-button" type="button" onClick={() => toggle(member)} aria-label={t('removeProperty', { number: member.h_number })}>×</button></li>)}</ul>}
-    {query && <div className="survey-recipient-search-results">{members.map((member) => <label className="admin-checkbox" key={member.id}><input type="checkbox" checked={selected.some((item) => item.id === member.id)} onChange={() => toggle(member)} />{member.h_number} · {member.street_address} · {member.primary_contact_name}</label>)}</div>}
+    {selected.length > 0 && <ul>{selected.map((member) => <li key={member.id}>
+      <span className="survey-recipient-details"><span>{member.h_number} · {member.street_address}</span>
+        <span>{t('titleHolder')}: {member.title_holder || '—'}</span>
+        <span>{member.primary_contact_email ? `${t('primaryEmail')}: ${member.primary_contact_email}` : t('missingPrimaryEmail')}</span></span>
+      <button className="admin-button" type="button" onClick={() => toggle(member)} aria-label={t('removeProperty', { number: member.h_number })}>×</button>
+    </li>)}</ul>}
+    {query && <div className="survey-recipient-search-results">{members.map((member) => <label className="admin-checkbox" key={member.id}>
+      <input type="checkbox" checked={selected.some((item) => item.id === member.id)} onChange={() => toggle(member)} />
+      <span className="survey-recipient-details"><span>{member.h_number} · {member.street_address}</span>
+        <span>{t('titleHolder')}: {member.title_holder || '—'}</span>
+        <span>{member.primary_contact_email ? `${t('primaryEmail')}: ${member.primary_contact_email}` : t('missingPrimaryEmail')}</span></span>
+    </label>)}</div>}
     {error && <p className="form-error" role="status">{error}</p>}
   </fieldset>;
 }

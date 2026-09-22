@@ -319,12 +319,17 @@ test('inbox acknowledgement preserves comment on error and removes only acknowle
 
 test('audit details work by keyboard, escape displayed values and preserve filters in pagination', async ({ page, context }) => {
   await authenticate(context); await page.goto('/admin/browser-test');
-  const audit = page.getByRole('region', { name: 'Brukerendringer', exact: true });
+  const audit = page.getByRole('region', { name: 'Logg', exact: true });
   await expect(audit.getByRole('combobox', { name: 'Kilde', exact: true })).toContainText('Alle kilder');
   await expect(audit.getByRole('combobox', { name: 'Bruker', exact: true })).toHaveCount(0);
-  const summary = audit.locator('summary'); await summary.focus(); await summary.press('Enter');
+  const summary = audit.locator('summary').first(); await summary.focus(); await summary.press('Enter');
   await expect(audit.getByText('<script>Syntetisk etter</script>', { exact: true })).toBeVisible();
   await expect(audit.locator('pre script')).toHaveCount(0);
+  const error = audit.locator('li').filter({ hasText: 'E-posthendelser · E-postfeil' });
+  await expect(error).toContainText('HTTP 422');
+  await expect(error).toContainText('Feil-ID: synthetic-error');
+  await error.locator('summary').click();
+  await expect(error.getByText('request-synthetic-1', { exact: true })).toBeVisible();
   await expect(audit.getByRole('link', { name: 'Neste' })).toHaveAttribute('href', /q=Syntetisk/);
   await expect(audit.getByRole('link', { name: 'Neste' })).toHaveAttribute('href', /page=2/);
   await audit.getByRole('searchbox', { name: 'Søk', exact: true }).fill('nytt søk');
@@ -373,6 +378,139 @@ test('newsletter requires saved groups and preview, supports test errors and can
   await expect(page.getByRole('alertdialog')).toHaveCount(0);
   await expect(section.getByRole('alert')).toContainText('Oppstart ikke bekreftet.');
   await expect(section.getByRole('button', { name: 'Kontroller / gjenoppta jobb' })).toBeEnabled();
+});
+
+test('survey mail overview filters and sorts the full dataset and scrolls without pagination', async ({ page, context }, testInfo) => {
+  await authenticate(context);
+  let onlyReceipts = false;
+  let requests = 0;
+  const entries = [
+    { id: 'invitation:1', member_id: 1, accepted: true, kind: 'invitation', status: 'sent', h_number: 'H1', recipient_domain: 'example.invalid' },
+    { id: 'invitation:2', member_id: 1, accepted: true, kind: 'invitation', status: 'sent', h_number: 'H1', recipient_domain: 'example.invalid' },
+    ...Array.from({ length: 59 }, (_, i) => ({ id: `receipt:failed-${i}`, kind: 'receipt', status: 'failed', h_number: `H${i + 3}`, recipient_domain: 'example.invalid', failure_reason: 'UPSTREAM' })),
+    { id: 'receipt:tail', kind: 'receipt', status: 'failed', h_number: 'H62', recipient_domain: 'example.invalid', failure_reason: 'UPSTREAM',
+      diagnostic: { error_id: 'synthetic-tail-error', http_status: 422, provider_code: 'MS42201', provider_message: 'Sender domain must be verified' } },
+    { id: 'receipt:skip', kind: 'receipt', status: 'suppressed', h_number: 'H2', recipient_domain: 'example.invalid', failure_reason: 'ADMIN_IMPORT_NO_RECEIPT' },
+  ];
+  const counts = { sent_invitations: 2, sent_properties: 1, failed: 60, suppressed: 1 };
+  await page.route(`**/api/admin/surveys/${surveyId}/email*`, (route) => {
+    expect(route.request().method()).toBe('GET'); requests++;
+    return route.fulfill({ json: { ok: true, overview: {
+      configured: true, background_configured: true, bulk_enabled: true, survey: { can_send: true },
+      groups: [], recipients: [], recipient_count: 0, missing_email_count: 0,
+      campaign: { status: 'completed', total_count: 2, sent_count: 2, failed_count: 0, suppressed_count: 0 },
+      mail_history: { counts, entries: onlyReceipts ? entries.filter((entry) => entry.kind === 'receipt') : entries },
+    } } });
+  });
+  await page.goto('/admin/browser-test');
+  const section = page.getByRole('region', { name: 'E-postoversikt', exact: true });
+  const filters = section.getByRole('group', { name: 'Filtrer e-postoversikten' });
+  const table = section.getByRole('table');
+  const rows = table.locator('tbody tr');
+  const reset = section.getByRole('button', { name: 'Vis alle', exact: true });
+  const note = section.getByRole('searchbox', { name: 'Merknad', exact: true });
+  await expect(rows).toHaveCount(25);
+  await expect(filters.getByRole('button', { name: /^Sendte invitasjoner/ })).toContainText('2');
+  await expect(filters.getByRole('button', { name: /^Unike tomter/ })).toContainText('1');
+  await expect(filters.getByRole('button', { name: /^Feilet/ })).toContainText('60');
+  await note.fill('MS42201');
+  await expect(rows).toHaveCount(1);
+  await expect(table).toContainText('H62');
+  await expect(table.getByRole('link', { name: 'Åpne i Logg' })).toHaveAttribute('href', '/admin/audit?table=email_events&q=synthetic-tail-error');
+  await reset.click();
+  // All column headings are keyboard-operable and expose sort direction.
+  for (const label of ['Medlem', 'Adresse', 'Type', 'Mottaker / domene', 'Status', 'Merknad']) {
+    const header = table.getByRole('columnheader').filter({ has: page.getByRole('button', { name: label, exact: true }) });
+    await header.getByRole('button').click();
+    await expect(header).toHaveAttribute('aria-sort', 'ascending');
+    await header.getByRole('button').click();
+    await expect(header).toHaveAttribute('aria-sort', 'descending');
+    if (label === 'Medlem') await expect(rows.first()).toContainText('H62');
+  }
+  await reset.click();
+  await section.getByRole('combobox', { name: 'Type', exact: true }).click();
+  await page.getByRole('option', { name: 'Kvittering', exact: true }).click();
+  await section.getByRole('combobox', { name: 'Status', exact: true }).click();
+  await page.getByRole('option', { name: 'Ikke sendt', exact: true }).click();
+  await note.fill('etter avtale');
+  await expect(rows).toHaveCount(1);
+  await expect(table).toContainText('H2');
+  const failed = filters.getByRole('button', { name: /^Feilet/ });
+  await failed.click(); // clears conflicting column filters
+  await expect(failed).toHaveAttribute('aria-pressed', 'true');
+  await expect(rows).toHaveCount(25);
+  await expect(section).toContainText('Viser 25 av 60 treff');
+  await section.getByRole('button', { name: 'Vis flere', exact: true }).scrollIntoViewIfNeeded();
+  await expect(rows).toHaveCount(50);
+  await section.getByRole('button', { name: 'Vis flere', exact: true }).scrollIntoViewIfNeeded();
+  await expect(rows).toHaveCount(60);
+  await expect(section.getByRole('button', { name: 'Vis flere', exact: true })).toHaveCount(0);
+  const notSent = filters.getByRole('button', { name: /^Ikke sendt/ });
+  await notSent.focus(); await page.keyboard.press('Enter');
+  await expect(notSent).toHaveAttribute('aria-pressed', 'true');
+  await expect(rows).toHaveCount(1);
+  await expect(table).toContainText('etter avtale');
+  await expect(section.getByRole('navigation')).toHaveCount(0);
+  await expect(section).not.toContainText(/NaN|undefined/);
+  await section.screenshot({ path: testInfo.outputPath('mail-overview.png') });
+  await filters.getByRole('button', { name: /^Unike tomter/ }).click();
+  await expect(rows).toHaveCount(1);
+  await expect(table).toHaveAccessibleName('Én sendt invitasjon per tomt');
+  const sent = filters.getByRole('button', { name: /^Sendte invitasjoner/ });
+  await sent.click(); await expect(rows).toHaveCount(2);
+  await sent.click();
+  await expect(table).toHaveAccessibleName('Alle invitasjoner og kvitteringer');
+  expect(requests).toBe(1); // sorting/filtering never requests a partial page
+  onlyReceipts = true;
+  await page.reload();
+  await expect(section.getByRole('combobox', { name: 'Status', exact: true })).toBeVisible();
+  await expect(section.getByRole('combobox', { name: 'Type', exact: true })).toHaveCount(0);
+});
+
+test('adding survey recipients shows primary email in the picker and directly below the add button', async ({ page, context }, testInfo) => {
+  await authenticate(context);
+  const member = { id: '7001', h_number: 'H25', street_address: 'Testvegen 25', title_holder: 'Kari Hjemmelshaver', primary_contact_name: 'Kari Kontakt', primary_contact_email: 'kari@example.invalid' };
+  await page.route(`**/api/admin/surveys/${surveyId}/email*`, (route) => {
+    expect(route.request().method()).toBe('GET'); // no real or simulated sending
+    const query = new URL(route.request().url()).searchParams;
+    if (query.has('search')) return route.fulfill({ json: { ok: true, members: [member,
+      { id: '7002', h_number: 'H26', street_address: 'Testvegen 26', title_holder: 'Ola Hjemmelshaver', primary_contact_email: null },
+    ] } });
+    const selected = query.get('memberIds') === member.id;
+    const primary = { ...member, name: member.primary_contact_name, email: member.primary_contact_email, is_primary: true };
+    const recipients = selected ? [primary] : [];
+    if (selected && query.get('includeOtherEmails') === 'true') recipients.push({ ...primary, email: 'extra@example.invalid', is_primary: false });
+    return route.fulfill({ json: { ok: true, overview: {
+      configured: true, background_configured: true, bulk_enabled: true, survey: { can_send: true },
+      groups: [], recipients, recipient_count: recipients.length, missing_email_count: 0,
+      campaign: { status: 'completed', total_count: 1, sent_count: 1, failed_count: 0, suppressed_count: 0 },
+      mail_history: { counts: { sent_invitations: 1, sent_properties: 1, failed: 0, suppressed: 0 }, entries: [] },
+    } } });
+  });
+  await page.goto('/admin/browser-test');
+  const section = page.getByRole('region', { name: 'Send undersøkelsen', exact: true });
+  const picker = section.getByRole('group', { name: 'Enkelttomter', exact: true });
+  await picker.getByRole('searchbox').fill('Hjemmelshaver');
+  const choice = picker.getByRole('checkbox', { name: /H25.*Testvegen 25.*Kari Hjemmelshaver.*kari@example.invalid/ });
+  await expect(choice).toBeVisible();
+  await expect(picker.getByRole('checkbox', { name: /H26.*Hoved-e-post mangler/ })).toBeVisible();
+  await choice.check();
+  await expect(picker.locator('li')).toContainText('kari@example.invalid');
+  const preview = section.locator('.survey-email-recipients');
+  await expect(preview.getByRole('table')).toContainText('kari@example.invalid');
+  await expect(preview).toContainText('H25');
+  await expect(preview).toContainText('Testvegen 25');
+  await expect(preview).toContainText('Kari Hjemmelshaver');
+  await expect(preview.getByRole('columnheader', { name: 'Hoved-e-post', exact: true })).toBeVisible();
+  expect(await preview.evaluate((element) => element.previousElementSibling.textContent)).toBe('Legg til nye mottakere');
+  expect(await preview.evaluate((element) => Boolean(element.compareDocumentPosition(document.querySelector('#mail-overview-title')) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
+  await picker.screenshot({ path: testInfo.outputPath('recipient-picker.png') });
+  await section.getByRole('checkbox', { name: 'Ta også med øvrige registrerte e-postadresser', exact: true }).check();
+  await expect(preview.getByRole('table')).toContainText('extra@example.invalid');
+  await expect(preview.getByRole('table').locator('tbody tr')).toHaveCount(2);
+  await expect(preview.getByRole('table').locator('tbody tr').last()).toContainText('kari@example.invalid');
+  await picker.getByRole('button', { name: 'Fjern H25 fra utvalget', exact: true }).click();
+  await expect(preview).toHaveCount(0);
 });
 
 test('survey email panel keeps failed dispatch status and offers safe restart', async ({ page, context }) => {
