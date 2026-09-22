@@ -69,6 +69,12 @@ export default function PublicHamletMapView({ hamlets, activeHamlet, properties,
     map.createPane('buildingPane');
     map.getPane('buildingPane').style.zIndex = '250';
     map.getPane('buildingPane').style.pointerEvents = 'none';
+    // Keep hamlet hover highlighting below properties. bringToFront() only
+    // reorders layers within their own pane, so it cannot cover property hits.
+    map.createPane('publicHamlets');
+    map.getPane('publicHamlets').style.zIndex = '410';
+    map.createPane('publicProperties');
+    map.getPane('publicProperties').style.zIndex = '420';
     const buildings = L.tileLayer.wms(BUILDING_MAP.url, {
       attribution: BUILDING_MAP.attribution,
       layers: BUILDING_MAP.layers,
@@ -121,7 +127,7 @@ export default function PublicHamletMapView({ hamlets, activeHamlet, properties,
     for (const hamlet of hamlets) {
       const active = hamlet.id === activeHamlet?.id;
       const baseStyle = hamletStyle(active);
-      const layer = L.geoJSON(hamlet.polygon, { style: baseStyle }).addTo(group);
+      const layer = L.geoJSON(hamlet.polygon, { style: baseStyle, pane: 'publicHamlets' }).addTo(group);
       layer.bindTooltip(hamlet.name, { sticky: true, direction: 'right', offset: L.point(18, 0) });
       layer.on('mouseover', () => {
         layer.setStyle(hamletStyle(active, true));
@@ -146,20 +152,21 @@ export default function PublicHamletMapView({ hamlets, activeHamlet, properties,
       const hoverStyle = { ...propertyStyle(active, true), ...(point ? { fillOpacity: 0.95 } : {}) };
       const baseRadius = active ? 9 : 6;
       const layer = L.geoJSON(feature, {
+        pane: 'publicProperties',
         style: baseStyle,
         pointToLayer: (_feature, point) => L.circleMarker(point, {
-          ...baseStyle, radius: baseRadius, fillOpacity: 0.95,
+          ...baseStyle, radius: baseRadius, fillOpacity: 0.95, pane: 'publicProperties',
         }),
       }).addTo(group);
       const tooltip = document.createElement('div');
       tooltip.className = 'public-property-tooltip';
-      for (const value of [property.hNumber, property.address, property.cadastralNumber]) {
+      for (const [label, value] of [[t('hNumber'), property.hNumber], [t('cadastral'), property.cadastralNumber], [t('address'), property.address]]) {
         const row = document.createElement('div');
-        row.textContent = value || '–';
+        row.textContent = `${label}: ${value || t('notRegistered')}`;
         tooltip.appendChild(row);
       }
       layer.bindTooltip(tooltip,
-        { sticky: true, direction: 'right', offset: L.point(18, 0) });
+        { sticky: true, direction: 'auto', offset: L.point(12, 0) });
       layer.on('mouseover', () => {
         stylePropertyLayer(layer, hoverStyle, active ? 10 : 8);
         layer.bringToFront();
@@ -167,7 +174,7 @@ export default function PublicHamletMapView({ hamlets, activeHamlet, properties,
       layer.on('mouseout', () => stylePropertyLayer(layer, baseStyle, baseRadius));
       layer.on('click', () => onSelectProperty(property));
     }
-  }, [activeHamlet, hamlets, onHoverHamlet, onSelectHamlet, onSelectProperty, properties, selectedProperty]);
+  }, [activeHamlet, hamlets, onHoverHamlet, onSelectHamlet, onSelectProperty, properties, selectedProperty, t]);
 
   useEffect(() => {
     const selectedGeometry = selectedProperty?.geometry || (selectedProperty
@@ -177,13 +184,16 @@ export default function PublicHamletMapView({ hamlets, activeHamlet, properties,
     const geometry = selectedGeometry || activeHamlet?.polygon?.geometry;
     if (!mapRef.current) return;
     if (!geometry) {
-      mapRef.current.setView(latLng(TURUFJELL_CENTER), 14);
+      mapRef.current.setView(latLng(TURUFJELL_CENTER), 14, { animate: false });
       return;
     }
-    if (geometry.type === 'Point') mapRef.current.setView(latLng(geometry.coordinates), 17);
+    // A second selection during an animated zoom can be ignored by Leaflet.
+    // Apply selection-driven views immediately so the latest property wins.
+    if (geometry.type === 'Point') mapRef.current.setView(latLng(geometry.coordinates), 17, { animate: false });
     else {
       const bounds = L.geoJSON({ type: 'Feature', properties: {}, geometry }).getBounds();
       if (bounds.isValid()) mapRef.current.fitBounds(bounds, {
+        animate: false,
         maxZoom: selectedGeometry ? 18 : 17,
         padding: selectedGeometry ? [20, 20] : [8, 8],
       });

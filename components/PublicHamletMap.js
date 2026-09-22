@@ -25,6 +25,8 @@ export default function PublicHamletMap({hamlets}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const controllerRef = useRef(null);
+  const tableRef = useRef(null);
+  const selectedRowRef = useRef(null);
   const activeHamlet = useMemo(() => hamlets.find((hamlet) => hamlet.id === activeId) || null, [activeId, hamlets]);
 
   const loadProperties = useCallback(async (hamletId) => {
@@ -53,6 +55,18 @@ export default function PublicHamletMap({hamlets}) {
   }, [t]);
 
   useEffect(() => () => controllerRef.current?.abort(), []);
+
+  useEffect(() => {
+    const table = tableRef.current;
+    const row = selectedRowRef.current;
+    if (!table || !row) return;
+    // Scroll only the table, not the page: keep the map visible after a map click.
+    const bounds = table.getBoundingClientRect();
+    const selected = row.getBoundingClientRect();
+    const headerHeight = table.querySelector('thead')?.getBoundingClientRect().height || 0;
+    if (selected.top < bounds.top + headerHeight) table.scrollTop += selected.top - bounds.top - headerHeight;
+    else if (selected.bottom > bounds.bottom) table.scrollTop += selected.bottom - bounds.bottom;
+  }, [selectedProperty]);
 
   const selectHamlet = useCallback((hamlet) => {
     if (hamlet.id === activeId) {
@@ -133,7 +147,7 @@ export default function PublicHamletMap({hamlets}) {
         : showProperties && !loading && <p>{t('summary', {count: properties.length, name: activeHamlet?.name})} {selectedProperty && t('selected', {value: selectedProperty.address || selectedProperty.cadastralNumber})} {properties.some((property) => !property.geometry) && t('noGeometry')}</p>}
     </div>
     {showProperties && properties.length > 0 &&
-      <div className="public-property-table" role="region" aria-label={t('region', {name: activeHamlet?.name})}
+      <div ref={tableRef} className="public-property-table" role="region" aria-label={t('region', {name: activeHamlet?.name})}
            tabIndex={0}>
         <table>
           <caption>{t('caption', {name: activeHamlet?.name})}</caption>
@@ -145,6 +159,7 @@ export default function PublicHamletMap({hamlets}) {
           </tr>
           </thead>
           <tbody>{properties.map((property) => <tr key={property.id}
+                                                   ref={selectedProperty?.id === property.id ? selectedRowRef : null}
                                                    className={selectedProperty?.id === property.id ? 'is-selected' : undefined}
                                                    tabIndex={0} aria-selected={selectedProperty?.id === property.id}
                                                    title={t('showInMap')}
@@ -156,6 +171,7 @@ export default function PublicHamletMap({hamlets}) {
           }}>
             <th scope="row">
               <button type="button" onClick={() => setSelectedProperty(property)}
+                      aria-pressed={selectedProperty?.id === property.id}
                       title={t('showInMap')}>{property.hNumber || '–'}</button>
             </th>
             <td>{property.cadastralNumber || '–'}</td>

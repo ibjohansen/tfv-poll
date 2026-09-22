@@ -68,6 +68,65 @@ test('public map loads automatically and requests Kartverket tiles', async ({ pa
   await expect.poll(() => tileRequests.length).toBeGreaterThan(0);
 });
 
+test('public property map tooltips and table selection work in both directions', async ({ page, context }, testInfo) => {
+  await authenticate(context);
+  const properties = [
+    { id: 'point-1', hNumber: 'H1', cadastralNumber: '10/1', address: 'Testvegen 1', latitude: 60.425, longitude: 9.488 },
+    ...Array.from({ length: 29 }, (_, i) => ({ id: `unlocated-${i}`, hNumber: `H${i + 2}`, cadastralNumber: `10/${i + 2}`, address: `Testvegen ${i + 2}` })),
+    { id: 'polygon-31', hNumber: 'H31', cadastralNumber: '10/31', address: 'Testvegen 31', geometry: { type: 'Polygon', coordinates: [[
+      [9.486, 60.422], [9.487, 60.422], [9.487, 60.423], [9.486, 60.423], [9.486, 60.422],
+    ]] } },
+  ];
+  await page.route('**/api/map/hamlets/7401/properties', (route) => route.fulfill({ json: { ok: true, properties } }));
+  await page.goto('/admin/browser-test');
+  const section = page.getByRole('region', { name: 'Grender og eiendommer', exact: true });
+  if (testInfo.project.name === 'mobile') {
+    await section.getByRole('combobox', { name: 'Velg grend', exact: true }).click();
+    await page.getByRole('option', { name: 'Syntetisk grend', exact: true }).click();
+  } else await section.getByRole('button', { name: 'Syntetisk grend', exact: true }).click();
+  const table = section.locator('.public-property-table');
+  await expect(table.locator('tbody tr')).toHaveCount(31);
+  const paths = section.locator('.leaflet-publicProperties-pane path');
+  await expect(paths).toHaveCount(2);
+  const map = section.locator('.public-hamlet-map');
+  await map.scrollIntoViewIfNeeded();
+  // Moving through the grend must not raise its polygon above the properties.
+  const hamlet = section.locator('.leaflet-publicHamlets-pane path');
+  await hamlet.hover();
+  await paths.last().hover();
+  if (testInfo.project.name === 'desktop') {
+    const tooltip = section.locator('.public-property-tooltip');
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toHaveText('H-nummer: H31Gårds- og bruksnummer: 10/31Adresse: Testvegen 31');
+  }
+  await paths.last().click();
+  const lastRow = table.locator('tbody tr').last();
+  await expect(lastRow).toHaveAttribute('aria-selected', 'true');
+  await expect(lastRow).toHaveClass('is-selected');
+  await expect.poll(() => table.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  expect(await lastRow.evaluate((row) => {
+    const bounds = row.closest('.public-property-table').getBoundingClientRect();
+    const selected = row.getBoundingClientRect();
+    return selected.top >= bounds.top && selected.bottom <= bounds.bottom + 1;
+  })).toBe(true);
+  await expect(paths.last()).toHaveAttribute('stroke', '#5a2636');
+  await table.getByRole('button', { name: 'H1', exact: true }).click();
+  await expect(table.locator('tbody tr').first()).toHaveAttribute('aria-selected', 'true');
+  await expect(lastRow).toHaveAttribute('aria-selected', 'false');
+  await expect(paths.first()).toHaveAttribute('stroke', '#5a2636');
+  await expect(paths.last()).toHaveAttribute('stroke', '#33626d');
+  await map.scrollIntoViewIfNeeded();
+  await paths.first().hover();
+  if (testInfo.project.name === 'desktop') {
+    await expect(section.locator('.public-property-tooltip')).toHaveCount(1);
+    await expect(section.locator('.public-property-tooltip')).toContainText('Gårds- og bruksnummer: 10/1');
+    await map.screenshot({ path: testInfo.outputPath('property-tooltip.png') });
+  }
+  await lastRow.focus(); await page.keyboard.press('Enter');
+  await expect(lastRow).toHaveAttribute('aria-selected', 'true');
+  await expect(paths.last()).toHaveAttribute('stroke', '#5a2636');
+});
+
 test('map workspace separates register checks from keyboard-accessible hamlet maintenance', async ({ page, context }) => {
   const polygon = { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[
     [9.49, 60.46], [9.50, 60.46], [9.50, 60.47], [9.49, 60.47], [9.49, 60.46],

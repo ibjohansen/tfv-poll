@@ -2533,7 +2533,7 @@ input, textarea, select { caret-color: var(--accent); }
 .public-property-table caption { padding: 14px 16px; color: var(--text-soft); text-align: left; }
 .public-property-table th, .public-property-table td { padding: 12px 16px; border-top: 1px solid var(--line); }
 .public-property-table thead th { position: sticky; z-index: 1; top: 0; background: var(--surface-muted); font-size: 11px; }
-.public-property-table tbody tr.is-selected { background: var(--accent-soft); }
+.public-property-table tbody tr.is-selected { background: var(--accent-soft); box-shadow: inset 4px 0 var(--brand-burgundy); }
 .public-property-table button { padding: 0; border: 0; background: transparent; color: var(--brand-burgundy); font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .public-map-source { margin: 14px 0 0; color: var(--text-soft); font-size: 11px; }
 
