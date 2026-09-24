@@ -115,7 +115,7 @@ test('survey verification removes token from URL and clears cookies after invali
   const send = () => route.GET(request(`https://internal-deploy.example/api/survey-access/verify?token=${'a'.repeat(64)}`));
   const ok = await send();
   assert.equal(ok.status, 303);
-  assert.equal(ok.headers.get('location'), 'https://medlemsservice.turufjellvel.no/survey');
+  assert.equal(ok.headers.get('location'), 'https://medlemsservice.turufjellvel.no/survey?verified=1');
   assert.match(ok.headers.get('set-cookie'), /HttpOnly/);
   session = null;
   for (const cause of [null, new Error('secret')]) {

@@ -2,24 +2,44 @@
 
 This is a small production-oriented member administration application for Turufjell Vel.
 
-## Model and reasoning recommendations
+## Model and reasoning selection
 
-For every user request, you should evaluate if the current model and reasoning level is suitable for the requestet task
-by evaluating which Codex model and reasoning level that best balances result quality, latency, and cost for the task.
-Always state the result of this evaluation at the start of the response. If the current model is adequate, state that
-the current model and reasoning level are suitable and continue. If any other model is better suited, stop the
-workflow, suggest a Codex model and reasoning level that best balances result quality, latency, and cost for the task
-and wait for the answer.
+Before starting each task, select the lowest-cost available Codex model and reasoning level likely to meet the task’s
+quality requirements. Then compare that selection with the current configuration.
 
-- State the recommendation concisely as:
-  `Current model is unsuitable for the request, my recommendation is: <model> / <reasoning level>`.
-- When no change is recommended, state concisely:
-  `Model assessment: current model / current reasoning level is suitable for this request.`
-- Prefer the lowest-cost model and reasoning level likely to complete the task correctly.
-- Escalate only when ambiguity, architectural impact, risk, multi-step investigation, or quality requirements justify
-  it.
-- Mention a higher-quality alternative when the tradeoff is material.
-- A recommendation does not change the active model; the user selects it in the Codex model picker or with `/model`.
+Do not justify keeping the current model merely because it can perform the task. A more expensive model needs a
+concrete, task-specific justification.
+
+### Selection rules
+
+- Prefer a cheaper model and lower reasoning level for straightforward edits, summaries, and routine execution of
+  existing checks.
+- Use Terra / medium as the starting candidate for scoped engineering work:
+  single-feature accessibility audits, ordinary debugging, focused code reviews, and test implementation.
+- Several files, multiple tool calls, or a combination of automated and manual checks do not, by themselves, justify a
+  stronger model.
+- Recommend a stronger model or higher reasoning level only when identifiable ambiguity, architectural complexity,
+  consequences of error, or demanding verification requirements make the cheaper candidate unlikely to succeed. State
+  that reason in one sentence.
+- Reassess if the work reveals complexity that was not apparent initially.
+- Treat recommendations as informed judgments, not guarantees. Do not claim knowledge of the active model, reasoning
+  setting, availability, or pricing unless that information is available.
+
+### Response and switching
+
+State the assessment before starting task work.
+
+If the current configuration is the preferred choice:
+`Model assessment: current model / current reasoning level is the recommended choice for this task.`
+
+If another configuration offers better value:
+`Model assessment: switch recommended to <model> / <reasoning level> — <brief task-specific reason>.`
+
+When recommending a switch, pause task execution and wait for the user's choice. The user changes the model through the
+model picker or `/model`; a recommendation does not change it automatically.
+
+When the request itself concerns explaining or revising this policy, provide the assessment and answer directly without
+requiring a model-switch decision.
 
 ## Stack
 

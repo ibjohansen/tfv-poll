@@ -11,7 +11,13 @@ export async function GET(request) {
   catch (error) {
     console.error('Survey access verification failed', { code: error.code || error.cause?.code, occurredAt: new Date().toISOString() });
   }
-  if (!session) destination.searchParams.set('status', 'invalid');
+  if (session) {
+    // Netlify preserves the source query string when a redirect target has none.
+    // Keep a harmless query parameter so the access secret cannot reappear in the URL.
+    destination.searchParams.set('verified', '1');
+  } else {
+    destination.searchParams.set('status', 'invalid');
+  }
   const response = NextResponse.redirect(destination, 303);
   response.headers.set('Cache-Control', 'no-store, private');
   const cookieName = surveySessionCookieName();
