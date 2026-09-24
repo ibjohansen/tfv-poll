@@ -40,6 +40,10 @@
 .map-search-polygon > summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: .85rem 1rem; cursor: pointer; font-weight: 650; }
 .map-search-polygon > summary small { color: #665950; font-size: .8rem; font-weight: 400; }
 .map-search-polygon > div { display: grid; gap: .75rem; padding: 0 1rem 1rem; border-top: 1px solid #e6e0d8; }
+.map-import-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin: .75rem 0; }
+.map-new-badge { display: inline-flex; align-items: center; min-height: 1.5rem; padding: 0 .45rem; border-radius: 999px; background: #dff3ef; color: #155d56; font-size: .75rem; font-weight: 750; white-space: nowrap; }
+.map-results-table input[type="checkbox"] { margin-right: .4rem; accent-color: #155d56; }
+.map-new-address-icon { display: grid; width: 26px !important; height: 26px !important; place-items: center; border: 2px solid #155d56; border-radius: 50%; background: #dff3ef; color: #155d56; font-size: 20px; font-weight: 800; line-height: 1; }
 .map-coordinate-list { max-height: 300px; overflow: auto; padding: .5rem 1.5rem; }
 .map-coordinate-list li { display: flex; flex-wrap: wrap; align-items: end; gap: .5rem; margin: .75rem 0; }
 .map-coordinate-list label { display: grid; gap: .25rem; }

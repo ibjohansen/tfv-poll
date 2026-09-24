@@ -31,6 +31,7 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
   const [hamlets, setHamlets] = useState([]);
   const [hamletBusy, setHamletBusy] = useState(false);
   const [hamletDirty, setHamletDirty] = useState(false);
+  const [importBusy, setImportBusy] = useState(false);
   const hamletControlsRef = useRef(null);
   const requestRef = useRef(null);
   const requestSequence = useRef(0);
@@ -144,6 +145,17 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
     dispatch({ type: 'member-opened', memberId: String(memberId) });
   }
 
+  async function importAddresses(addresses) {
+    setImportBusy(true);
+    try {
+      const response = await requestMap('members', { addresses }, undefined, t('requestFailed'));
+      const result = await response.json();
+      dispatch({ type: 'notice-set', notice: t('results.imported', {count: result.imported.length, skipped: result.skipped.length}) });
+      await runRegisterControl();
+    } catch (error) { dispatch({ type: 'error-set', error: error.message || t('requestFailed') }); }
+    finally { setImportBusy(false); }
+  }
+
   function closeMember() {
     const memberId = returnMemberId.current;
     dispatch({ type: 'member-closed' });
@@ -151,6 +163,9 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
   }
 
   const hasResults = Boolean(state.data.addresses || state.data.properties || state.data.roads || state.data.comparison);
+  const missingAddressIds = new Set((state.data.comparison?.rows || []).filter((row) => row.status === 'MISSING_IN_REGISTER')
+    .flatMap((row) => row.officialAddresses.map((address) => address.id)));
+  const mappedAddresses = (state.data.addresses?.addresses || []).map((address) => ({ ...address, isNew: missingAddressIds.has(address.id) }));
   const canRun = Boolean(state.area && !state.editMode && state.phase !== MAP_PHASES.FETCHING);
   const step = state.phase === MAP_PHASES.REVIEWING ? 4 : state.data.comparison ? 3 : state.phase === MAP_PHASES.FETCHING || state.area ? 2 : 1;
 
@@ -199,7 +214,7 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
       <section className="map-main-panel" aria-label={t('workflow.map')}>
         <div className="map-canvas-shell">
           <MapView vertices={vertices} drawing={drawing} editing={editing} onVerticesChange={changeVertices} layers={FIXED_MAP_LAYERS} selected={state.selected} onSelect={selectObject} onError={(error) => dispatch({ type: 'error-set', error })} hamlets={hamlets}
-            addresses={state.data.addresses?.addresses || []} roads={state.data.roads?.roads || []} boundaries={state.data.properties?.boundaries || []}
+            addresses={mappedAddresses} roads={state.data.roads?.roads || []} boundaries={state.data.properties?.boundaries || []}
           />
         </div>
         {state.selected && !state.selectedMemberId && <ObjectDetails key={state.selected.id} selected={state.selected} comparison={state.data.comparison}
@@ -224,9 +239,9 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
       <section className="map-result-panel" hidden={state.task !== MAP_TASKS.REGISTER} aria-label={t('results.title')}>
         {[...(state.data.addresses?.warnings || []), ...(state.data.roads?.warnings || []), ...(state.data.properties?.warnings || [])].map((warning) => <p key={warning} className="map-warning">{warning}</p>)}
         {state.data.addresses?.fetchedAt && <p className="muted">{t('addressFetched', {date: new Date(state.data.addresses.fetchedAt).toLocaleString(formatLocale)})}</p>}
-        <ResultsPanel addresses={state.data.addresses?.addresses} properties={state.data.addresses ? propertiesFromAddresses(state.data.addresses.addresses) : null}
+        <ResultsPanel addresses={mappedAddresses} properties={state.data.addresses ? propertiesFromAddresses(state.data.addresses.addresses) : null}
           boundaries={state.data.properties?.boundaries} roads={state.data.roads?.roads} comparison={state.data.comparison}
-          selectedId={state.selected?.id} onReview={() => dispatch({ type: 'review-started' })} onSelect={selectObject} />
+          selectedId={state.selected?.id} onReview={() => dispatch({ type: 'review-started' })} onSelect={selectObject} onImport={importAddresses} importBusy={importBusy} />
         {!hasResults && <p>{t('workflow.noResults')}</p>}
       </section>
     </div>

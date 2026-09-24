@@ -74,6 +74,7 @@ Object.assign(map.admin.results, {
   comparisonSource: 'Kartverket and Turufjell Vel', internalSource: 'Turufjell Vel internal register', noDifference: 'No difference found.',
   confidence: { MATCH: 'High – unambiguous match', MISSING_IN_REGISTER: 'High – found only at Kartverket', MISSING_IN_MAP_DATA: 'Low – location or source needs review', POSSIBLE_MATCH: 'Medium – several candidates', CONFLICT: 'Low – sources disagree' },
   actions: { MATCH: 'No action needed', MISSING_IN_REGISTER: 'Assess whether to add the property', MISSING_IN_MAP_DATA: 'Check address and cadastral data', POSSIBLE_MATCH: 'Select the right candidate manually', CONFLICT: 'Compare sources before updating', UNKNOWN: 'Find the correct location before concluding' },
+  new: 'New', selectAllNew: 'Select all new', selectNew: 'Select {address} for import', importSelected: 'Import selected ({count})', imported: '{count} new addresses imported. {skipped} were already registered.',
 });
 Object.assign(map.admin.results.columns, { plot: 'Property / register record', difference: 'Difference', confidence: 'Confidence', nextAction: 'Next action', queue: 'Work queue' });
 map.admin.drawing.addCoordinate = 'Add coordinate point';
@@ -109,7 +110,7 @@ map.backend = {
     reloadHamlet: 'Reload the hamlet before saving.', hamletName: 'Give the hamlet a name of 1–100 characters.', invalidReviewStatus: 'Invalid review status.',
     registerTooLarge: 'The register is too large for this comparison. No partial report was created.', hamletMissing: 'The hamlet does not exist.',
     hamletMock: 'Hamlets cannot be saved in demonstration mode.', hamletChanged: 'The hamlet was changed or deleted by another administrator. Reload the hamlet list. Your draft was retained.',
-    hamletDuplicate: 'A hamlet with this name already exists. Select it from the list to link it to the polygon.',
+    hamletDuplicate: 'A hamlet with this name already exists. Select it from the list to link it to the polygon.', invalidImport: 'Select at least one valid official address to import.', importMock: 'Addresses cannot be imported in demonstration mode.',
   },
   warnings: {
     unlocatedAddresses: '{count} address objects had no coordinates. Comparison is disabled to prevent false discrepancies.',

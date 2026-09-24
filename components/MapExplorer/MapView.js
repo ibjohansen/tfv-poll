@@ -102,10 +102,10 @@ export default function MapView({ vertices, drawing, editing, onVerticesChange, 
       const layer = L.geoJSON(feature, {
         style: { color: active ? '#b33b24' : color, weight: active ? 6 : 3, fillOpacity: 0.12,
           dashArray: item.kind === 'hamlet' && !item.reviewed ? '6 5' : undefined },
-        pointToLayer: (_, coordinates) => L.circleMarker(coordinates, { radius: active ? 9 : 6, color: active ? '#b33b24' : color, fillOpacity: 0.9, weight: 2 }),
+        pointToLayer: (_, coordinates) => item.isNew ? L.marker(coordinates, { title: `${t('results.new')}: ${item.address}`, icon: L.divIcon({ className: 'map-new-address-icon', html: '<span aria-hidden="true">+</span>', iconSize: [26, 26], iconAnchor: [13, 13] }) }) : L.circleMarker(coordinates, { radius: active ? 9 : 6, color: active ? '#b33b24' : color, fillOpacity: 0.9, weight: 2 }),
       }).addTo(group);
       const label = document.createElement('span');
-      label.textContent = `${item.address || item.name || t('unnamed')} · ${item.source}${item.kind === 'hamlet' && !item.reviewed ? ` · ${t('draftLabel')}` : ''}`;
+      label.textContent = `${item.isNew ? `${t('results.new')} · ` : ''}${item.address || item.name || t('unnamed')} · ${item.source}${item.kind === 'hamlet' && !item.reviewed ? ` · ${t('draftLabel')}` : ''}`;
       layer.bindTooltip(label);
       layer.on('click', () => { if (!drawing && !editing) onSelect(item); });
     }

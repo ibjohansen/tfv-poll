@@ -75,6 +75,7 @@ Object.assign(map.admin.results, {
   comparisonSource: 'Kartverket og Turufjell Vel', internalSource: 'Turufjell Vels interne register', noDifference: 'Ingen forskjell funnet.',
   confidence: { MATCH: 'Høy – entydig treff', MISSING_IN_REGISTER: 'Høy – bare funnet hos Kartverket', MISSING_IN_MAP_DATA: 'Lav – plassering eller kilde må kontrolleres', POSSIBLE_MATCH: 'Middels – flere kandidater', CONFLICT: 'Lav – kildene er uenige' },
   actions: { MATCH: 'Ingen handling nødvendig', MISSING_IN_REGISTER: 'Vurder om tomten skal registreres', MISSING_IN_MAP_DATA: 'Kontroller adresse og matrikkeldata', POSSIBLE_MATCH: 'Velg riktig kandidat manuelt', CONFLICT: 'Sammenlign kildene før oppdatering', UNKNOWN: 'Finn riktig plassering før konklusjon' },
+  new: 'Ny', selectAllNew: 'Velg alle nye', selectNew: 'Velg {address} for import', importSelected: 'Importer valgte ({count})', imported: '{count} nye adresser importert. {skipped} var allerede registrert.',
 });
 Object.assign(map.admin.results.columns, { plot: 'Tomt / registerpost', difference: 'Forskjell', confidence: 'Sikkerhet', nextAction: 'Neste handling', queue: 'Arbeidskø' });
 map.admin.drawing.addCoordinate = 'Legg til koordinatpunkt';
@@ -110,7 +111,7 @@ map.backend = {
     reloadHamlet: 'Last grenden på nytt før du lagrer.', hamletName: 'Gi grenden et navn på 1–100 tegn.', invalidReviewStatus: 'Ugyldig kontrollstatus.',
     registerTooLarge: 'Registeret er for stort for denne sammenligningen. Ingen delvis rapport er laget.', hamletMissing: 'Grenden finnes ikke.',
     hamletMock: 'Grender kan ikke lagres i demonstrasjonsmodus.', hamletChanged: 'Grenden er endret eller slettet av en annen administrator. Last grendelisten på nytt. Utkastet ditt er beholdt.',
-    hamletDuplicate: 'Det finnes allerede en grend med dette navnet. Velg den fra listen for å knytte til polygonet.',
+    hamletDuplicate: 'Det finnes allerede en grend med dette navnet. Velg den fra listen for å knytte til polygonet.', invalidImport: 'Velg minst én gyldig, offisiell adresse for import.', importMock: 'Adresser kan ikke importeres i demonstrasjonsmodus.',
   },
   warnings: {
     unlocatedAddresses: '{count} adresseobjekter manglet koordinater. Sammenligning er deaktivert for å unngå falske avvik.',

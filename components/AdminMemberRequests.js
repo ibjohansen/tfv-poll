@@ -6,6 +6,7 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import { useI18n } from '@/components/LocaleProvider';
 
 function requestTitle(request, t) {
+  if (request.request_type === 'map_import') return `Kartimport · ${request.h_number}`;
   if (request.request_type === 'profile_update') return t('correctionTitle', {id: request.h_number});
   return t(request.request_type === 'ownership_transfer' ? 'ownershipTitle' : 'membershipTitle', {id: request.h_number || request.street_address});
 }
@@ -97,7 +98,7 @@ export default function AdminMemberRequests({ initialRequests, showEmpty = false
     {!requests.length && <p className="admin-inbox-empty">{t('empty')}</p>}
     {requests.length > 0 && <div className="admin-member-request-list">{requests.map((request) => <article key={request.id}>
       {request.requested_comment && <section aria-label={t('memberComment')}><strong>{t('containsComment')}</strong><p className="member-comment-text">{request.requested_comment}</p></section>}
-      <div className="admin-member-request-summary"><h3>{requestTitle(request, t)}</h3><p>{request.street_address || t('addressMissing')} · {request.title_holder || t('ownerMissing')}</p><span className={`admin-request-verification ${request.status === 'pending_verification' ? 'is-unverified' : 'is-verified'}`}>{request.status === 'pending_verification' ? t('unverified') : t('emailVerified')}</span></div>
+      <div className="admin-member-request-summary"><h3>{requestTitle(request, t)}</h3><p>{request.street_address || t('addressMissing')} · {request.title_holder || t('ownerMissing')}</p><span className={`admin-request-verification ${request.status === 'pending_verification' ? 'is-unverified' : 'is-verified'}`}>{request.request_type === 'map_import' ? 'Opprettet fra kart' : request.status === 'pending_verification' ? t('unverified') : t('emailVerified')}</span></div>
       <dl><div><dt>{t('cadastral')}</dt><dd>{request.cadastral_number || t('notProvided')}</dd></div><div><dt>{t('section')}</dt><dd>{request.section_number || t('notProvided')}</dd></div><div><dt>{t('newContact')}</dt><dd>{request.requested_contact_name}</dd></div><div><dt>{t('newEmail')}</dt><dd>{request.requested_primary_email}</dd></div><div><dt>{t('otherAddresses')}</dt><dd>{request.requested_other_emails?.join(', ') || t('none')}</dd></div></dl>
       {request.request_type === 'membership' && <section className={`admin-property-review is-${request.matrikkel_review?.status || 'pending'}`} aria-label={t('cadastralReview')}>
         <strong>{['verified', 'manual'].includes(request.matrikkel_review?.status) ? t('cadastralResolved') : t('cadastralRequired')}</strong>
@@ -109,7 +110,7 @@ export default function AdminMemberRequests({ initialRequests, showEmpty = false
         </div>
         <div className="admin-property-actions"><button className="admin-button" type="button" disabled={busy} onClick={() => updateProperty(request, 'check_property')}>{t('check')}</button><button className="admin-button" type="button" disabled={busy} onClick={() => updateProperty(request, 'confirm_property')}>{t('confirmManually')}</button></div>
       </section>}
-      {request.request_type === 'profile_update' ? <div className="admin-member-request-actions"><p>{t('alreadyUpdated')}</p><button className="admin-button" type="button" disabled={busy} onClick={() => acknowledge(request)}>{t('acknowledge')}</button></div>
+      {['profile_update', 'map_import'].includes(request.request_type) ? <div className="admin-member-request-actions"><p>{request.request_type === 'map_import' ? 'Kompletter H-nummer og kontaktopplysninger i medlemsregisteret før oppgaven markeres som lest.' : t('alreadyUpdated')}</p><button className="admin-button" type="button" disabled={busy} onClick={() => acknowledge(request)}>{t('acknowledge')}</button></div>
         : <div className="admin-member-request-actions"><button className="admin-button" type="button" disabled={busy} onClick={() => setDecision({ request, action: 'reject' })}>{t('reject')}</button><button className="primary-button" type="button" disabled={busy || (request.request_type === 'membership' && !['verified', 'manual'].includes(request.matrikkel_review?.status))} onClick={() => setDecision({ request, action: 'approve' })}>{t('approve')}</button></div>}
     </article>)}</div>}
     {message && <p className={messageKind === 'success' ? 'admin-success' : 'form-error'} role="status">{message}</p>}

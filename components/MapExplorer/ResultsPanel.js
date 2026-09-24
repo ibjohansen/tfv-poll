@@ -32,19 +32,23 @@ function categoryForStatus(status) {
   return 'noDeviation';
 }
 
-export default function ResultsPanel({ addresses, properties, boundaries, roads, comparison, onSelect, onReview, selectedId = '' }) {
+export default function ResultsPanel({ addresses, properties, boundaries, roads, comparison, onSelect, onReview, onImport, importBusy = false, selectedId = '' }) {
   const { t, formatLocale } = useI18n('map.admin');
   const [tab, setTab] = useState('comparison');
   const [filter, setFilter] = useState('');
   const [reviewFilter, setReviewFilter] = useState('followUp');
   const [descending, setDescending] = useState(false);
   const [queue, setQueue] = useState({});
+  const [selectedNew, setSelectedNew] = useState(() => new Set());
   const search = normalizeAddress(filter);
   const includes = (values) => normalizeAddress(values.filter(Boolean).join(' ')).includes(search);
   const availableTabs = useMemo(() => [comparison && 'comparison', addresses && 'addresses', properties && 'properties', boundaries && 'boundaries', roads && 'roads'].filter(Boolean),
     [addresses, boundaries, comparison, properties, roads]);
   const activeTab = availableTabs.includes(tab) ? tab : availableTabs[0];
   const c = (key) => t(`results.columns.${key}`);
+  const missingIds = new Set((comparison?.rows || []).filter((row) => row.status === 'MISSING_IN_REGISTER').flatMap((row) => row.officialAddresses.map((address) => address.id)));
+  const newAddresses = (addresses || []).filter((address) => missingIds.has(address.id));
+  const toggleNew = (id) => setSelectedNew((current) => { const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next; });
 
   const categories = comparison ? {
     followUp: comparison.rows.filter((row) => categoryForStatus(row.status) === 'followUp').length,
@@ -82,8 +86,9 @@ export default function ResultsPanel({ addresses, properties, boundaries, roads,
         <option value="unprocessed">{t('results.queueUnprocessed')}</option><option value="deferred">{t('results.queueDeferred')}</option><option value="handled">{t('results.queueHandled')}</option>
       </Select></label>}
     </div>
-    {activeTab === 'addresses' && <ResultTable key={`addresses:${filter}:${descending}`} caption={t('results.addressCaption')} rows={sortAddresses(addresses, descending).filter((address) => includes([addressLabel(address), propertyLabel(address), address.postalCode]))} onSelect={onSelect} selectedId={selectedId}
-      columns={[[c('address'), addressLabel], [c('cadastral'), propertyLabel], [c('postalCode'), (address) => address.postalCode || '–'], [c('postalPlace'), (address) => address.postalPlace || '–'], [c('source'), (address) => address.source]]} />}
+    {activeTab === 'addresses' && <>{newAddresses.length > 0 && <div className="map-import-actions"><span className="map-new-badge">{t('results.new')}</span><button type="button" className="admin-button" onClick={() => setSelectedNew(new Set(newAddresses.map((address) => address.id)))}>{t('results.selectAllNew')}</button><button type="button" className="primary-button" disabled={!selectedNew.size || importBusy} onClick={() => onImport?.(newAddresses.filter((address) => selectedNew.has(address.id)))}>{importBusy ? t('processing') : t('results.importSelected', {count: selectedNew.size})}</button></div>}
+      <ResultTable key={`addresses:${filter}:${descending}`} caption={t('results.addressCaption')} rows={sortAddresses(addresses, descending).filter((address) => includes([addressLabel(address), propertyLabel(address), address.postalCode]))} onSelect={onSelect} selectedId={selectedId}
+        columns={[[c('address'), (address) => <>{missingIds.has(address.id) && <><input aria-label={t('results.selectNew', {address: addressLabel(address)})} type="checkbox" checked={selectedNew.has(address.id)} onChange={(event) => { event.stopPropagation(); toggleNew(address.id); }} /> <span className="map-new-badge">{t('results.new')}</span> </>}{addressLabel(address)}</>], [c('cadastral'), propertyLabel], [c('postalCode'), (address) => address.postalCode || '–'], [c('postalPlace'), (address) => address.postalPlace || '–'], [c('source'), (address) => address.source]]} /></>}
     {activeTab === 'properties' && <><p>{t('results.propertyHelp')}</p><ResultTable key={`properties:${filter}`} caption={t('results.propertyCaption')} rows={properties.filter((property) => includes([property.label, ...property.addresses.map(addressLabel)]))} selectedId={selectedId}
       onSelect={(property) => onSelect({ ...property, kind: 'property', name: property.label })} columns={[[c('cadastral'), (property) => property.label], [c('addresses'), (property) => property.addresses.map(addressLabel).join(' · ')], [c('fnr'), (property) => property.fnr ?? '–'], [c('snr'), (property) => property.snr ?? t('results.unavailable')], [c('source'), (property) => property.source]]} /></>}
     {activeTab === 'boundaries' && <><p>{t('results.boundaryHelp')}</p><ResultTable key={`boundaries:${filter}`} caption={t('results.boundaryCaption')} rows={boundaries.filter((property) => includes([property.name, property.id]))} onSelect={onSelect} selectedId={selectedId}
