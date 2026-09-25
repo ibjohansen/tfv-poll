@@ -34,6 +34,64 @@ test('accounting budget, reference totals, keyboard access and mobile layout', a
   await page.screenshot({ path: testInfo.outputPath('accounting-budget.png'), fullPage: true });
 });
 
+test('uploaded receipt saves after choosing a currency and entering a comma-decimal rate', async ({ page, context }) => {
+  await authenticate(context);
+  const state = { year: 2026, years: [2026], settings: { ...proposeAccountingYear(2026, 411), version: 1 }, memberCount: 420, paidMemberCount: 400, expenses: [], attachments: [] };
+  const file = { id: 'a'.repeat(32), year: 2026, expense_id: null, original_filename: 'synthetic-receipt.pdf', url: `/api/admin/accounting/files/${'a'.repeat(32)}`,
+    suggestion: { supplier: 'Synthetic supplier', amount: '16.25', currency: '', invoice_date: '2026-09-12', category: 'systems' } };
+  const operations = [];
+  const consoleErrors = [];
+  page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
+  await page.route('**/api/admin/accounting/files', (route) => {
+    state.attachments = [file];
+    return route.fulfill({ status: 201, json: { ok: true, file } });
+  });
+  await page.route('**/api/admin/accounting?year=2026', (route) => route.fulfill({ json: { ok: true, data: state } }));
+  await page.route('**/api/admin/accounting', (route) => {
+    const body = route.request().postDataJSON(); operations.push(body);
+    state.expenses = body.entries.map((entry) => ({ ...normalizeExpense(entry, 2026), version: 1 }));
+    file.expense_id = state.expenses[0].id;
+    return route.fulfill({ json: { ok: true } });
+  });
+  await page.goto('/admin/regnskap/browser-test');
+  const dashboard = page.locator('.accounting-dashboard');
+  await dashboard.getByRole('button', { name: 'Kostnader og bilag', exact: true }).click();
+  await dashboard.getByLabel('Last opp kvitteringer').setInputFiles({ name: 'receipt.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.7\nSynthetic receipt') });
+  const draft = dashboard.locator('.accounting-draft');
+  await expect(draft).toHaveCount(1);
+  const currency = draft.getByRole('combobox', { name: 'Valuta', exact: true });
+  const rate = draft.getByLabel('Kurs: NOK per 1 valutaenhet');
+  // A missing currency must block submission and explain why, even though the native select is hidden.
+  await rate.fill('10,123456');
+  await draft.getByRole('checkbox').check();
+  await dashboard.getByRole('button', { name: 'Lagre 1 kostnader' }).click();
+  await expect(dashboard.getByRole('alert')).toContainText('Kontroller at alle påkrevde felt er fylt ut riktig.');
+  expect(operations).toHaveLength(0);
+  await currency.click();
+  await page.getByRole('option', { name: 'USD', exact: true }).click();
+  await expect(currency).toHaveText('USD');
+  await expect(dashboard.getByRole('alert')).toHaveCount(0);
+  await expect(rate).toHaveValue('');
+  await expect(draft.getByRole('checkbox')).not.toBeChecked();
+  await currency.click();
+  await page.getByRole('option', { name: 'NOK', exact: true }).click();
+  await expect(rate).toHaveValue('1');
+  await expect(rate).toBeDisabled();
+  await currency.click();
+  await page.getByRole('option', { name: 'USD', exact: true }).click();
+  await expect(rate).toBeEnabled();
+  await expect(rate).toHaveValue('');
+  await rate.fill('10,123456');
+  await draft.getByRole('checkbox').check();
+  await dashboard.getByRole('button', { name: 'Lagre 1 kostnader' }).click();
+  await expect(draft).toHaveCount(0);
+  expect(operations).toHaveLength(1);
+  expect(operations[0]).toMatchObject({ operation: 'batch', year: 2026, entries: [{ currency: 'USD', exchange_rate: '10,123456', reviewed: true }] });
+  expect(state.expenses[0].amount_ore).toBe(16451);
+  await expect(dashboard.locator('.accounting-expenses tbody')).toContainText('USD');
+  expect(consoleErrors.filter((message) => message.includes('same key'))).toEqual([]);
+});
+
 test('supplier batch requires receipt review and preserves individual amounts and status dates', async ({ page, context }) => {
   await authenticate(context);
   const state = { year: 2026, years: [2026], settings: { ...proposeAccountingYear(2026, 411), version: 1 }, memberCount: 420, paidMemberCount: 400, expenses: [], attachments: [] };
@@ -64,11 +122,18 @@ test('supplier batch requires receipt review and preserves individual amounts an
   ]);
   await expect(dashboard.locator('.accounting-draft')).toHaveCount(2);
   await expect(dashboard.getByLabel('Leverandør', { exact: true })).toHaveValue('Synthetic supplier');
-  // Apply only the rate to each row; original amounts must remain distinct.
+  // Choose and apply shared currency/rate through the UI; individual amounts must remain distinct.
   const drafts = dashboard.locator('.accounting-draft');
-  await drafts.nth(0).getByLabel('Kurs: NOK per 1 valutaenhet').fill('10.123456');
-  await drafts.nth(1).getByLabel('Kurs: NOK per 1 valutaenhet').fill('10.123456');
+  const shared = dashboard.locator('.accounting-batch-defaults');
+  await shared.getByRole('combobox', { name: 'Valuta', exact: true }).click();
+  await page.getByRole('option', { name: 'USD', exact: true }).click();
+  await expect(shared.getByRole('combobox', { name: 'Valuta', exact: true })).toHaveText('USD');
+  await shared.getByLabel('Kurs: NOK per 1 valutaenhet').fill('10.123456');
+  await shared.getByRole('button', { name: 'Bruk på alle bilag' }).click();
+  await expect(drafts.nth(0).getByRole('combobox', { name: 'Valuta', exact: true })).toHaveText('USD');
+  await expect(drafts.nth(1).getByRole('combobox', { name: 'Valuta', exact: true })).toHaveText('USD');
   await dashboard.getByRole('button', { name: 'Lagre 2 kostnader' }).click();
+  await expect(dashboard.getByRole('alert')).toContainText('Kontroller og bekreft hvert bilag før lagring.');
   expect(operations).toHaveLength(0);
   await drafts.nth(0).getByRole('checkbox').check(); await drafts.nth(1).getByRole('checkbox').check();
   await dashboard.getByRole('button', { name: 'Lagre 2 kostnader' }).click();

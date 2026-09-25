@@ -40,6 +40,7 @@ export default function AdminAccounting({ initialData, canWrite }) {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
   const [errors, setErrors] = useState([]);
+  const [expenseValidationError, setExpenseValidationError] = useState(false);
   const [notice, setNotice] = useState('');
   const [selected, setSelected] = useState([]);
   const [statusDate, setStatusDate] = useState(today);
@@ -80,6 +81,7 @@ export default function AdminAccounting({ initialData, canWrite }) {
     setDrafts((current) => current.map((entry) => entry.id === id ? { ...entry, ...values, ...('reviewed' in values ? {} : { reviewed: false }) } : entry));
   }
   function addFile(file) {
+    setExpenseValidationError(false);
     if (editing) setDrafts((current) => current.map((entry) => ({ ...entry, attachment_ids: [...new Set([...entry.attachment_ids, file.id])], reviewed: false })));
     else {
       setDrafts((current) => current.some((entry) => entry.attachment_ids.includes(file.id)) ? current : [...current, draftExpense(file, data.year)]);
@@ -109,6 +111,7 @@ export default function AdminAccounting({ initialData, canWrite }) {
     setErrors(failures); setProgress(''); setBusy(false);
   }
   function editExpense(expense) {
+    setExpenseValidationError(false);
     setEditing(expense.id); setSupplier(expense.supplier);
     setDrafts([{ ...expense, amount: decimalString(expense.amount_minor), exchange_rate: decimalString(expense.exchange_rate_million, 6),
       submitted_on: expense.submitted_on || '', paid_on: expense.paid_on || '', reviewed: false,
@@ -117,6 +120,7 @@ export default function AdminAccounting({ initialData, canWrite }) {
   }
   async function saveExpenses(event) {
     event.preventDefault();
+    setExpenseValidationError(false);
     await action(async () => {
       const entries = drafts.map((entry) => ({ ...entry, supplier }));
       if (editing) await api({ operation: 'expense', year: data.year, ...entries[0] });
@@ -169,12 +173,12 @@ export default function AdminAccounting({ initialData, canWrite }) {
       {canWrite && <section className="accounting-panel" ref={editor}>
         <h2>{editing ? t('edit') : t('newExpense')}</h2><p>{t('checkSuggestion')}</p>
         <label className="accounting-upload">{t('upload')}<input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={upload} disabled={busy || !data.settings.version} aria-describedby="accounting-upload-help" /></label><p id="accounting-upload-help">{t('uploadHelp')}</p>
-        {!editing && <button type="button" className="admin-button" disabled={busy || !data.settings.version || drafts.length >= 30} onClick={() => { setDrafts([...drafts, draftExpense(null, data.year)]); batchId.current ||= uuid(); }}>{t('manual')}</button>}
+        {!editing && <button type="button" className="admin-button" disabled={busy || !data.settings.version || drafts.length >= 30} onClick={() => { setExpenseValidationError(false); setDrafts([...drafts, draftExpense(null, data.year)]); batchId.current ||= uuid(); }}>{t('manual')}</button>}
         {pendingFiles.length > 0 && <details><summary>{t('pendingFiles')} ({pendingFiles.length})</summary><ul className="accounting-pending-files">{pendingFiles.map((file) => <li key={file.id}><a href={file.url}>{file.original_filename}</a><button className="admin-button" type="button" disabled={busy || (editing ? drafts[0].attachment_ids.length >= 10 : drafts.length >= 30)} onClick={() => addFile(file)}>{t('useFile')}</button></li>)}</ul></details>}
-        {drafts.length > 0 && <form onSubmit={saveExpenses}><fieldset disabled={busy}><legend>{editing ? t('edit') : t('shared')}</legend>
+        {drafts.length > 0 && <form onSubmit={saveExpenses} onInvalid={() => setExpenseValidationError(true)} onChange={() => setExpenseValidationError(false)}><fieldset disabled={busy}><legend>{editing ? t('edit') : t('shared')}</legend>
           {editPaid && <p className="accounting-notice">{t('paidEdit')}</p>}
           <label>{t('supplier')}<input required maxLength={160} value={supplier} disabled={Boolean(editPaid)} onChange={(e) => { setSupplier(e.target.value); setDrafts(drafts.map((entry) => ({ ...entry, reviewed: false }))); }} /></label>
-          {drafts.length > 1 && <div className="accounting-batch-defaults"><div className="accounting-fields"><label>{t('category')}<Select value={shared.category} onChange={(e) => setShared({ ...shared, category: e.target.value })}>{accountingCategories.filter((entry) => entry.kind === 'expense').map((category) => <option key={category.id} value={category.id}>{t(`categories.${category.id}`)}</option>)}</Select></label><label>{t('currency')}<Select value={shared.currency} onChange={(e) => setShared({ ...shared, currency: e.target.value, exchange_rate: e.target.value === 'NOK' ? '1' : '' })}>{accountingCurrencies.map((value) => <option key={value}>{value}</option>)}</Select></label><label>{t('rate')}<input inputMode="decimal" value={shared.exchange_rate} disabled={shared.currency === 'NOK'} onChange={(e) => setShared({ ...shared, exchange_rate: e.target.value })} /></label></div><button className="admin-button" type="button" onClick={() => setDrafts(drafts.map((entry) => ({ ...entry, ...shared, reviewed: false })))}>{t('applyShared')}</button><p>{t('sharedHelp')}</p></div>}
+          {drafts.length > 1 && <div className="accounting-batch-defaults"><div className="accounting-fields"><label>{t('category')}<Select value={shared.category} onChange={(e) => setShared({ ...shared, category: e.target.value })}>{accountingCategories.filter((entry) => entry.kind === 'expense').map((category) => <option key={category.id} value={category.id}>{t(`categories.${category.id}`)}</option>)}</Select></label><label>{t('currency')}<Select value={shared.currency} onChange={(e) => setShared({ ...shared, currency: e.target.value, exchange_rate: e.target.value === 'NOK' ? '1' : '' })}>{accountingCurrencies.map((value) => <option key={value} value={value}>{value}</option>)}</Select></label><label>{t('rate')}<input inputMode="decimal" value={shared.exchange_rate} disabled={shared.currency === 'NOK'} onChange={(e) => setShared({ ...shared, exchange_rate: e.target.value })} /></label></div><button className="admin-button" type="button" onClick={() => setDrafts(drafts.map((entry) => ({ ...entry, ...shared, reviewed: false })))}>{t('applyShared')}</button><p>{t('sharedHelp')}</p></div>}
           {drafts.map((entry, index) => <fieldset className="accounting-draft" key={entry.id}><legend>{t('draft', { number: index + 1 })}</legend>
             <ul className="accounting-file-links">{entry.attachment_ids.map((id) => { const file = files.find((item) => item.id === id); return file && <li key={id}><a href={file.url}>{file.original_filename}</a></li>; })}</ul>
             {entry.warning && <p className="accounting-notice">{t(entry.warning)}</p>}
@@ -185,7 +189,7 @@ export default function AdminAccounting({ initialData, canWrite }) {
               <label>{t('description')}<input required maxLength={500} value={entry.description} onChange={(e) => updateDraft(entry.id, { description: e.target.value })} /></label>
               <label>{t('category')}<Select value={entry.category} disabled={Boolean(editPaid)} onChange={(e) => updateDraft(entry.id, { category: e.target.value })}>{accountingCategories.filter((category) => category.kind === 'expense').map((category) => <option key={category.id} value={category.id}>{t(`categories.${category.id}`)}</option>)}</Select></label>
               <label>{t('amount')}<input inputMode="decimal" required value={entry.amount} disabled={Boolean(editPaid)} onChange={(e) => updateDraft(entry.id, { amount: e.target.value })} /></label>
-              <label>{t('currency')}<Select required value={entry.currency} disabled={Boolean(editPaid)} onChange={(e) => updateDraft(entry.id, { currency: e.target.value, exchange_rate: e.target.value === 'NOK' ? '1' : '' })}><option value="">{t('notEntered')}</option>{accountingCurrencies.map((value) => <option key={value}>{value}</option>)}</Select></label>
+              <label>{t('currency')}<Select required value={entry.currency} disabled={Boolean(editPaid)} onChange={(e) => updateDraft(entry.id, { currency: e.target.value, exchange_rate: e.target.value === 'NOK' ? '1' : '' })}><option value="">{t('notEntered')}</option>{accountingCurrencies.map((value) => <option key={value} value={value}>{value}</option>)}</Select></label>
               <label>{t('rate')}<input inputMode="decimal" required value={entry.exchange_rate} disabled={Boolean(editPaid) || entry.currency === 'NOK'} onChange={(e) => updateDraft(entry.id, { exchange_rate: e.target.value })} /></label>
               <label>{t('submittedDate')}<input type="date" value={entry.submitted_on} onChange={(e) => updateDraft(entry.id, { submitted_on: e.target.value })} /></label>
               <label>{t('paidDate')}<input type="date" value={entry.paid_on} onChange={(e) => updateDraft(entry.id, { paid_on: e.target.value })} /></label>
@@ -195,6 +199,7 @@ export default function AdminAccounting({ initialData, canWrite }) {
             <label className="accounting-check"><input type="checkbox" required checked={entry.reviewed} onChange={(e) => updateDraft(entry.id, { reviewed: e.target.checked })} />{t('reviewed')}</label>
             {!editing && <button className="admin-button" type="button" onClick={() => setDrafts(drafts.filter((item) => item.id !== entry.id))}>{t('removeDraft')}</button>}
           </fieldset>)}
+          {expenseValidationError && <p className="form-error" role="alert">{t('errors.invalidInput')} {drafts.some((entry) => !entry.reviewed) && t('errors.reviewRequired')}</p>}
           <p className="accounting-emphasis">{t('batchTotal', { amount: money(total) })}</p><div className="accounting-actions"><button className="primary-button" type="submit">{busy ? t('saving') : editing ? t('saveExpense') : t('saveBatch', { count: drafts.length })}</button>{editing && <button className="admin-button" type="button" onClick={() => { setEditing(null); setDrafts([]); }}>{t('cancelEdit')}</button>}</div>
         </fieldset></form>}
       </section>}
