@@ -19,6 +19,15 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  serverExternalPackages: ['pdfjs-dist'],
+  // PDF.js loads its worker and optional Node canvas shim dynamically.
+  outputFileTracingIncludes: {
+    '/api/admin/accounting/files': [
+      './node_modules/pdfjs-dist/package.json',
+      './node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs',
+      './node_modules/@napi-rs/canvas*/**/*',
+    ],
+  },
   images: {
     minimumCacheTTL: 604800,
   },

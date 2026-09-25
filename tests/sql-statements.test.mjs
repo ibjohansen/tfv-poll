@@ -28,8 +28,8 @@ test('production schema contains complete audit triggers without sensitive value
   const contextTriggers = statements.filter((statement) => /CREATE TRIGGER \w+_audit_context_trigger/.test(statement));
 
   assert.ok(auditFunction);
-  assert.equal(auditTriggers.length, 9);
-  assert.equal(contextTriggers.length, 9);
+  assert.equal(auditTriggers.length, 12);
+  assert.equal(contextTriggers.length, 12);
   assert.match(auditFunction, /old_data := old_data - 'access_token'/);
   assert.match(auditFunction, /old_data := old_data - 'verification_token_hash'/);
   assert.match(auditFunction, /old_data := old_data - 'storage_key'/);

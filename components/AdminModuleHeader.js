@@ -16,7 +16,7 @@ export default async function AdminModuleHeader({ email, pendingTaskCount, visib
   if (!Number.isInteger(taskCount)) {
     try { taskCount = await getAdminTaskCount(); } catch { taskCount = 0; }
   }
-  const labels = Object.fromEntries(['overview', 'inbox', 'members', 'map', 'matrikkel', 'newsletters', 'surveys', 'web', 'usage', 'audit', 'navigation'].map((key) => [key, t(`admin.common.${key}`)]));
+  const labels = Object.fromEntries(['overview', 'inbox', 'members', 'map', 'matrikkel', 'newsletters', 'accounting', 'surveys', 'web', 'usage', 'audit', 'navigation'].map((key) => [key, t(`admin.common.${key}`)]));
   labels.pendingTasks = t('admin.common.pendingTasks');
   const titles = { ...labels, overview: t('admin.common.memberService'), groups: t('admin.common.groups'), web: t('admin.pages.websites'), matrikkel: t('admin.pages.updateCadastral') };
   return <>

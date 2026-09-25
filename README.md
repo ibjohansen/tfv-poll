@@ -23,6 +23,8 @@ CMS for informasjonssider.
   undersøkelser med personlige invitasjoner, resultater og Excel-eksport.
 - Strukturert CMS med sanert riktekst, hovedbilder og vedlegg i privat Object
   Storage, samt personvernvennlig, egenhostet statistikk med Visx-grafer.
+- Regnskap med årsbudsjett, justerbar kontingent, leverandørbatcher, private
+  kvitteringer, valutakurs per bilag, levert-/utbetaltstatus og årsmøteoversikt.
 - Rollebasert administrasjon gjennom Microsoft Entra ID, revisjonsspor og
   kontrollerte Netlify-bakgrunnsjobber for e-post og matrikkelsynkronisering.
 
@@ -80,6 +82,10 @@ Sertifikatkontrollen skal ikke deaktiveres.
 - `/admin/map` viser kart- og registerkontroll, lagrede grendepolygoner,
   adresser, eiendommer, veier og kobling til medlemsregisteret.
 - `/admin/surveys` er modulen Undersøkelser.
+- `/admin/regnskap?year=2026` viser budsjett, inntekter og kostnadsbilag.
+  Alle autoriserte administratorer har lesetilgang; endringer krever eksisterende
+  `members`-rettighet. `/admin/regnskap/arsmote?year=2027` viser regnskap 2026 og
+  budsjett 2027 til årsmøtet. Se [regnskapsmodulen](docs/regnskap.md).
 - `/admin/web` er CMS-et for nettsider, hovedbilder og nedlastbare vedlegg.
 - `/admin/usage` viser anonym, aggregert bruksstatistikk og krever
   revisjonsrettighet.
@@ -699,6 +705,44 @@ gjenopptas idempotent uten å sende ferdigbehandlede leveringer på nytt.
 
 ## Produksjonssetting: Netlify + Neon + Microsoft Entra ID
 
+Regnskapsmodulen innfører `/admin/regnskap`, `/admin/regnskap/arsmote`,
+`GET/POST /api/admin/accounting`, `POST /api/admin/accounting/files`,
+`GET /api/admin/accounting/files/[id]` og `GET /api/admin/accounting/export`.
+Alle rutene krever administratorøkt; alle skriv krever `members`-rettighet og
+kontroll av request-origin. Det er ingen ny Entra-rolle eller miljøvariabel.
+Privat lagring gjenbruker `cms-assets` med egne `accounting/<år>/`-nøkler og
+eksisterende `NEON_STORAGE_*`-konfigurasjon. Filene registreres ikke som
+CMS-vedlegg og kan ikke utleveres gjennom offentlige CMS-ruter.
+
+Den additive regnskapsmigreringen ble utført og verifisert i produksjon
+25. september 2026 etter eksplisitt godkjenning. Modulen ble publisert på
+Netlify samme dag. Kildekode, skjema, tester og utrullingsrapport følger
+regnskapsendringen i Git, slik at senere Git-baserte deployer beholder modulen. Se
+[utrullingsrapporten](docs/database-release-accounting-2026-09-25.md).
+`accounting_years`, `accounting_expenses` og `accounting_attachments`, indekser,
+beløps-/datokontroller og audit-triggere er opprettet. Den avgrensede migreringen
+i `scripts/release-accounting-schema.mjs` velger 19 regnskapsoperasjoner fra
+`database/schema.sql`, krever bekreftet vert, miljø, skjema-hash og snapshot,
+og kontrollerer eksisterende data før commit. Nye migreringer må fortsatt
+testes på isolert schema-only-gren og godkjennes eksplisitt etter punkt 2.
+Et fullt, idempotent databaseskjema og
+regnskapstransaksjonene testes også lokalt med PostgreSQL/WASM (PGlite) som del
+av `npm run check`; dette erstatter ikke produksjonsgrenens utrullingstest.
+
+PDF.js kjører i Node og er unntatt Next.js-bundling via `serverExternalPackages`.
+`outputFileTracingIncludes` inkluderer PDF-worker og Node canvas-støtten som
+lastes dynamisk. Kontroller at Netlify-pakken inkluderer
+`pdfjs-dist/legacy/build/pdf.mjs`, `pdf.worker.mjs` og aktuell plattformpakke for
+`@napi-rs/canvas`. Opplasting skjer sekvensielt med én fil per forespørsel,
+maksimalt 3 MB per fil / 4 MB forespørsel. Dette holder hver binær opplasting
+innenfor Netlifys funksjonsgrenser. Det kreves ingen Python-, OCR- eller
+bakgrunnstjeneste. Bilder og skannede/passordbeskyttede PDF-er uten lesbar tekst
+registreres med manuell utfylling. Ingen bankoverføring utføres av modulen.
+Ved manuell deploy fra macOS må funksjonspakken også inneholde Linux x64 GNU-
+varianten av `@napi-rs/canvas` med samme versjon som hovedpakken. En lokal
+macOS-binær alene kan ikke lastes i Netlifys Linux-runtime. Skybygg installerer
+riktig plattformvariant fra den låste avhengighetsfilen.
+
 Kartmodulen ligger på `/admin/map`, med beskyttede Node-ruter
 `POST /api/admin/map/search`, `GET/POST /api/admin/map/hamlets` og
 `GET /api/admin/members/[id]`. De bruker eksisterende `members`-rettighet og
@@ -1241,6 +1285,22 @@ på samme tomt, og at tillegg av mottakere ikke sender tidligere invitasjoner p�
 
 Utfør kontrollene i denne rekkefølgen:
 
+- Åpne `/admin/regnskap?year=2026` med en autorisert administrator. Kontroller
+  grunnlaget 411 × 250 = 102 750 kr, kostnader 93 000 kr og resultat 9 750 kr.
+  Opprett bare et syntetisk testår på isolert gren. Endre kontingent/medlemsantall,
+  og bekreft at andre år beholdes og at tom inntekt vises som «Ikke registrert».
+- På den isolerte grenen: last opp to syntetiske PDF-er fra samme leverandør,
+  kontroller forslagene, oppgi individuell valutakurs og lagre én batch. Test
+  identisk fil, gjentatt fakturanummer, feil regnskapsår og to samtidige faner.
+  Ingen avvisning skal lagre en del av batchen. Kontroller at levert- og
+  utbetalingsdato beholdes, at utbetaling krever levering, og at revisjonsloggen
+  ikke inneholder lagringsnøkler. Test at uautoriserte nedlastinger avvises og
+  at en konto uten `members` ikke kan skrive eller laste opp.
+- Kontroller Regnskap ved 320 px bredde og med tastatur. Åpne
+  `/admin/regnskap/arsmote?year=2027`, kontroller regnskap 2026 mot budsjett 2027,
+  og prøv utskrift/PDF og CSV. CSV-eksporten skal inneholde valutakurs og
+  statusdatoer og logges som `accounting_export`. Avstem faktiske inntekter og
+  kostnader med regnskapsfører før rapporten brukes som endelig årsmøtedokument.
 - Åpne **Undersøkelser → Utsendelse** innlogget. Kontroller at en ventende eller
   feilet kampanje viser **Start bakgrunnsjobben på nytt**, og at knappen er aktiv
   når API-oversikten har `background_status: "ready"`, e-post er konfigurert,

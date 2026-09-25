@@ -22,6 +22,8 @@ await mkdir(join(directory, 'app/admin/browser-test'), { recursive: true });
 await cp(join(root, 'tests/e2e/fixture-page.jsx'), join(directory, 'app/admin/browser-test/page.js'));
 await mkdir(join(directory, 'app/admin/map-browser-test'), { recursive: true });
 await cp(join(root, 'tests/e2e/map-fixture-page.jsx'), join(directory, 'app/admin/map-browser-test/page.js'));
+await mkdir(join(directory, 'app/admin/regnskap/browser-test'), { recursive: true });
+await cp(join(root, 'tests/e2e/accounting-fixture-page.jsx'), join(directory, 'app/admin/regnskap/browser-test/page.js'));
 await symlink(join(root, 'node_modules'), join(directory, 'node_modules'), 'dir');
 const child = spawn(process.execPath, [join(root, 'node_modules/next/dist/bin/next'), 'dev', '--webpack', '--hostname', '127.0.0.1', '--port', '4319'], {
   cwd: directory, stdio: 'inherit', env: {
@@ -32,7 +34,7 @@ const child = spawn(process.execPath, [join(root, 'node_modules/next/dist/bin/ne
     AUTH_SECRET: testAuthSecret, AUTH_URL: testOrigin, AUTH_TRUST_HOST: 'true',
     AUTH_MICROSOFT_ENTRA_ID_TENANT_ID: testTenant,
     AUTH_MICROSOFT_ENTRA_ID_ID: 'synthetic-client', AUTH_MICROSOFT_ENTRA_ID_SECRET: 'synthetic-secret',
-    ADMIN_EMAILS: testAdmin, ADMIN_REQUIRED_ROLES: 'TFV.MemberAdmin,TFV.SurveyAdmin,TFV.CmsEditor,TFV.SecurityAudit',
+    ADMIN_EMAILS: testAdmin, ADMIN_REQUIRED_ROLES: 'TFV.ReadOnly,TFV.MemberAdmin,TFV.SurveyAdmin,TFV.CmsEditor,TFV.SecurityAudit',
     DATABASE_URL: '', DATABASE_URL_UNPOOLED: '', MAILERSEND_ENABLED: 'false', MAILERSEND_BULK_ENABLED: 'false',
   },
 });

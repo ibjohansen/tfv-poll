@@ -1,5 +1,6 @@
 const admin = {
   common: {
+    accounting: 'Accounts',
     overview: 'Overview',
     inbox: 'Task list',
     members: 'Member register',
@@ -24,6 +25,7 @@ const admin = {
     pendingOne: '{count} pending',
     pendingMany: '{count} pending',
     descriptions: {
+      accounting: 'Plan budgets and track expenses, receipts and reimbursements.',
       inbox: 'Review new registrations, ownership changes and cadastral clarifications.',
       members: 'Find, create and maintain members and their personal access links.',
       map: 'Check hamlets, addresses, properties and the member register on the map.',
@@ -178,6 +180,9 @@ const admin = {
       survey_responses: 'Survey response',
       cms_pages: 'Web page',
       cms_attachments: 'Web attachment',
+      accounting_years: 'Financial year and budget',
+      accounting_expenses: 'Expense',
+      accounting_attachments: 'Accounting attachment',
       admin_actions: 'Administrative action',
       email_campaigns: 'Email campaign',
       email_deliveries: 'Test email',

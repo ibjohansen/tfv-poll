@@ -7,6 +7,7 @@ import surveys from './surveys.js';
 import cms from './cms.js';
 import email from './email.js';
 import backend from './backend.js';
+import accounting from './accounting.js';
 
-const messages = { general, public: publicMessages, members, map, admin, surveys, cms, email, backend };
+const messages = { general, public: publicMessages, members, map, admin, surveys, cms, email, backend, accounting };
 export default messages;

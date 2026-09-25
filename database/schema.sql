@@ -855,6 +855,65 @@ ALTER TABLE cms_pages ADD COLUMN IF NOT EXISTS last_changed_by TEXT;
 ALTER TABLE cms_attachments ADD COLUMN IF NOT EXISTS last_changed_by TEXT;
 ALTER TABLE survey_attachments ADD COLUMN IF NOT EXISTS last_changed_by TEXT;
 
+-- Regnskapsoversikt: kalenderår, kontingent/budsjett som årssnapshot og private bilag.
+CREATE TABLE IF NOT EXISTS accounting_years (
+  id INTEGER PRIMARY KEY CHECK (id BETWEEN 2000 AND 2099),
+  annual_fee_ore BIGINT NOT NULL CHECK (annual_fee_ore BETWEEN 0 AND 100000000),
+  member_count INTEGER NOT NULL CHECK (member_count BETWEEN 0 AND 100000),
+  budget JSONB NOT NULL CHECK (jsonb_typeof(budget) = 'object'),
+  actual_income JSONB NOT NULL CHECK (jsonb_typeof(actual_income) = 'object'),
+  version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_changed_by TEXT
+);
+
+CREATE TABLE IF NOT EXISTS accounting_expenses (
+  id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
+  year INTEGER NOT NULL REFERENCES accounting_years(id) ON DELETE RESTRICT,
+  batch_id TEXT NOT NULL CHECK (batch_id ~ '^[a-f0-9]{32}$'),
+  supplier TEXT NOT NULL CHECK (length(btrim(supplier)) BETWEEN 1 AND 160),
+  invoice_number TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL CHECK (length(btrim(description)) BETWEEN 1 AND 500),
+  category TEXT NOT NULL CHECK (category IN ('board', 'systems', 'accountant', 'trailer', 'other', 'bank')),
+  invoice_date DATE NOT NULL CHECK (EXTRACT(YEAR FROM invoice_date) = year),
+  currency TEXT NOT NULL CHECK (currency IN ('NOK','USD','EUR','GBP','SEK','DKK','CHF','CAD','AUD','PLN')),
+  amount_minor BIGINT NOT NULL CHECK (amount_minor BETWEEN 1 AND 100000000000),
+  exchange_rate_million BIGINT NOT NULL CHECK (exchange_rate_million BETWEEN 1 AND 10000000000),
+  amount_ore BIGINT GENERATED ALWAYS AS (round(amount_minor::numeric * exchange_rate_million / 1000000)::bigint) STORED
+    CHECK (amount_ore BETWEEN 1 AND 100000000000),
+  submitted_on DATE,
+  paid_on DATE,
+  notes TEXT NOT NULL DEFAULT '',
+  receipt_note TEXT NOT NULL DEFAULT '',
+  version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_changed_by TEXT,
+  UNIQUE (id, year),
+  CHECK (currency <> 'NOK' OR exchange_rate_million = 1000000),
+  CHECK (paid_on IS NULL OR (submitted_on IS NOT NULL AND paid_on >= submitted_on))
+);
+CREATE INDEX IF NOT EXISTS accounting_expenses_year_idx ON accounting_expenses (year, invoice_date, id);
+CREATE UNIQUE INDEX IF NOT EXISTS accounting_expenses_invoice_idx
+  ON accounting_expenses (lower(btrim(supplier)), lower(btrim(invoice_number))) WHERE invoice_number <> '';
+
+CREATE TABLE IF NOT EXISTS accounting_attachments (
+  id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
+  year INTEGER NOT NULL REFERENCES accounting_years(id) ON DELETE RESTRICT,
+  expense_id TEXT,
+  original_filename TEXT NOT NULL,
+  storage_key TEXT NOT NULL UNIQUE,
+  mime_type TEXT NOT NULL CHECK (mime_type IN ('application/pdf','image/jpeg','image/png','image/webp')),
+  size_bytes INTEGER NOT NULL CHECK (size_bytes BETWEEN 1 AND 3145728),
+  sha256 TEXT NOT NULL UNIQUE CHECK (sha256 ~ '^[a-f0-9]{64}$'),
+  suggestion JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_changed_by TEXT,
+  FOREIGN KEY (expense_id, year) REFERENCES accounting_expenses(id, year) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS accounting_attachments_year_idx ON accounting_attachments (year, expense_id);
+
 CREATE TABLE IF NOT EXISTS audit_log (
   id BIGSERIAL PRIMARY KEY,
   table_name TEXT NOT NULL,
@@ -942,7 +1001,7 @@ BEGIN
   ELSIF TG_TABLE_NAME = 'member_requests' THEN
     old_data := old_data - 'verification_token_hash';
     new_data := new_data - 'verification_token_hash';
-  ELSIF TG_TABLE_NAME IN ('cms_attachments', 'survey_attachments') THEN
+  ELSIF TG_TABLE_NAME IN ('cms_attachments', 'survey_attachments', 'accounting_attachments') THEN
     old_data := old_data - 'storage_key';
     new_data := new_data - 'storage_key';
   END IF;
@@ -1069,6 +1128,33 @@ FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
 DROP TRIGGER IF EXISTS cms_attachments_audit_trigger ON cms_attachments;
 CREATE TRIGGER cms_attachments_audit_trigger
 AFTER INSERT OR UPDATE OR DELETE ON cms_attachments
+FOR EACH ROW EXECUTE FUNCTION record_audit_change();
+
+DROP TRIGGER IF EXISTS accounting_years_audit_context_trigger ON accounting_years;
+CREATE TRIGGER accounting_years_audit_context_trigger
+BEFORE INSERT OR UPDATE OR DELETE ON accounting_years
+FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
+DROP TRIGGER IF EXISTS accounting_years_audit_trigger ON accounting_years;
+CREATE TRIGGER accounting_years_audit_trigger
+AFTER INSERT OR UPDATE OR DELETE ON accounting_years
+FOR EACH ROW EXECUTE FUNCTION record_audit_change();
+
+DROP TRIGGER IF EXISTS accounting_expenses_audit_context_trigger ON accounting_expenses;
+CREATE TRIGGER accounting_expenses_audit_context_trigger
+BEFORE INSERT OR UPDATE OR DELETE ON accounting_expenses
+FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
+DROP TRIGGER IF EXISTS accounting_expenses_audit_trigger ON accounting_expenses;
+CREATE TRIGGER accounting_expenses_audit_trigger
+AFTER INSERT OR UPDATE OR DELETE ON accounting_expenses
+FOR EACH ROW EXECUTE FUNCTION record_audit_change();
+
+DROP TRIGGER IF EXISTS accounting_attachments_audit_context_trigger ON accounting_attachments;
+CREATE TRIGGER accounting_attachments_audit_context_trigger
+BEFORE INSERT OR UPDATE OR DELETE ON accounting_attachments
+FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
+DROP TRIGGER IF EXISTS accounting_attachments_audit_trigger ON accounting_attachments;
+CREATE TRIGGER accounting_attachments_audit_trigger
+AFTER INSERT OR UPDATE OR DELETE ON accounting_attachments
 FOR EACH ROW EXECUTE FUNCTION record_audit_change();
 
 -- Alle gamle, miljøløse selvbetjeningslenker tilbakekalles. De tre globale

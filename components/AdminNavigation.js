@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { activeAdminModule, adminModules } from '@/lib/admin-navigation';
 
 export function ModuleIcon({ name }) {
+  if (name === 'accounting') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18H5V3Zm3 4h8M8 11h2m4 0h2m-8 4h2m4 0h2m-8 3h2m4 0h2" /></svg>;
   if (name === 'inbox') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4V4Zm0 11h4l2 2h4l2-2h4" /></svg>;
   if (name === 'members') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 20v-1.5a4.5 4.5 0 0 0-4.5-4.5h-5A4.5 4.5 0 0 0 2 18.5V20M9 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8-1a3 3 0 1 0 0-6m1 11a4 4 0 0 1 4 4v2" /></svg>;
   if (name === 'surveys') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10a2 2 0 0 1 2 2v16H5V5a2 2 0 0 1 2-2Zm2 5h6m-6 4h6m-6 4h4" /></svg>;
