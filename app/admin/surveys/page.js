@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getAdminSession } from '@/lib/admin-access';
 import { isAllowedAdmin, isAuthConfigured } from '@/lib/admin-policy';
 import { getAdminSurveys } from '@/lib/admin-surveys';
+import { getAdminSurveyHamlets } from '@/lib/admin-survey-results';
 import AdminSurveyDirectory from '@/components/AdminSurveyDirectory';
 import { getServerI18n } from '@/lib/i18n/server';
 import { adminPageMetadata } from '@/lib/page-metadata';
@@ -18,7 +19,8 @@ export default async function AdminSurveysPage({ searchParams }) {
   const params = await searchParams;
   const sort = ['title', 'is_open', 'ends_on', 'response_count', 'question_version'].includes(params.sort) ? params.sort : 'title';
   const direction = params.dir === 'desc' ? 'desc' : 'asc';
-  let surveys;
+  let surveys, surveyHamlets = [];
   try { surveys = await getAdminSurveys(sort, direction); } catch { surveys = null; }
-  return <section className="admin-content">{surveys ? <AdminSurveyDirectory key={`${sort}-${direction}`} surveys={surveys} sort={sort} direction={direction} adminEmail={session.user.email} /> : <p className="form-error" role="alert">{t('admin.pages.surveysUnavailable')}</p>}</section>;
+  try { if (surveys) surveyHamlets = await getAdminSurveyHamlets(); } catch { surveyHamlets = []; }
+  return <section className="admin-content">{surveys ? <AdminSurveyDirectory key={`${sort}-${direction}`} surveys={surveys} surveyHamlets={surveyHamlets} sort={sort} direction={direction} adminEmail={session.user.email} /> : <p className="form-error" role="alert">{t('admin.pages.surveysUnavailable')}</p>}</section>;
 }

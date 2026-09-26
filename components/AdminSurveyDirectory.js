@@ -107,7 +107,7 @@ function SurveyResults({ data, state, surveyId, hamletId, t, formatLocale, onRet
   );
 }
 
-export default function AdminSurveyDirectory({ surveys, sort, direction, adminEmail }) {
+export default function AdminSurveyDirectory({ surveys, surveyHamlets = [], sort, direction, adminEmail }) {
   const { t, formatLocale } = useI18n('surveys.admin');
   const router = useRouter();
   const [selected, setSelected] = useState(null);
@@ -130,7 +130,7 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
   const [resultsState, setResultsState] = useState('idle');
   const [resultsReload, setResultsReload] = useState(0);
   const [hamletId, setHamletId] = useState('');
-  const [resultHamlets, setResultHamlets] = useState([]);
+  const [resultHamlets, setResultHamlets] = useState(surveyHamlets);
   const selectedId = selected && !selected.isNew ? selected.id : null;
 
   useEffect(() => {
@@ -142,17 +142,17 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
         if (controller.signal.aborted) return;
         if (!response.ok || !body.ok) throw new Error(body.message || t('resultsError'));
         setResults(body.results);
-        setResultHamlets(body.results.hamlets ?? []);
+        setResultHamlets(body.results.hamlets ?? surveyHamlets);
         setResultsState('ready');
       })
       .catch((error) => {
         if (!controller.signal.aborted && error.name !== 'AbortError') setResultsState('error');
       });
     return () => controller.abort();
-  }, [selectedId, resultsReload, hamletId, t]);
+  }, [selectedId, resultsReload, hamletId, surveyHamlets, t]);
 
   function select(survey) {
-    setHamletId(''); setResultHamlets([]);
+    setHamletId(''); setResultHamlets(surveyHamlets);
     setResultsReload((value) => value + 1);
     setSelected(survey);
     setActiveTab('settings');
@@ -168,7 +168,7 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
   }
 
   function create() {
-    setHamletId(''); setResultHamlets([]);
+    setHamletId(''); setResultHamlets(surveyHamlets);
     setSelected({ isNew: true, is_open: true, question_version: 1, response_count: 0 });
     setActiveTab('settings');
     setResults(null);

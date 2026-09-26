@@ -43,6 +43,7 @@ before(async () => {
 after(() => db.close());
 
 test('hamlet filtering preserves effective email responses, historical question snapshots and deleted-member responses', async () => {
+  assert.deepEqual(plain((await api.getAdminSurveyHamlets()).map((hamlet) => hamlet.id)), ['1', '2', '3']);
   const all = await api.getAdminSurveyResults(id);
   const a = await api.getAdminSurveyResults(id, '1');
   const b = await api.getAdminSurveyResults(id, '2');
