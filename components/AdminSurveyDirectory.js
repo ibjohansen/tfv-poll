@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import Select from '@/components/Select';
 import SurveyEmailPanel from '@/components/SurveyEmailPanel';
 import SurveyAttachments from '@/components/SurveyAttachments';
 import SurveyQuestionOptions from '@/components/SurveyQuestionOptions';
@@ -35,9 +36,9 @@ function formatEndDate(value, locale) {
   return new Intl.DateTimeFormat(locale, {dateStyle: 'short', timeZone: 'Europe/Oslo'}).format(new Date(`${value}T12:00:00Z`));
 }
 
-function SurveyResults({ data, state, surveyId, t, formatLocale }) {
+function SurveyResults({ data, state, surveyId, hamletId, t, formatLocale, onRetry }) {
   if (state === 'loading') return <p className="survey-results-status" role="status">{t('loadingResults')}</p>;
-  if (state === 'error') return <p className="form-error" role="alert">{t('resultsError')}</p>;
+  if (state === 'error') return <div><p className="form-error" role="alert">{t('resultsError')}</p><button className="admin-button" type="button" onClick={onRetry}>{t('retryResults')}</button></div>;
   if (!data) return null;
 
   return (
@@ -45,16 +46,16 @@ function SurveyResults({ data, state, surveyId, t, formatLocale }) {
       <div className="survey-results-summary">
         <div>
           <p className="eyebrow">{t('results')}</p>
-          <h3 id="survey-results-heading">{t(data.response_count === 1 ? 'responseOne' : 'responseMany', {count: data.response_count})}</h3>
+          <h3 id="survey-results-heading" aria-live="polite">{t(data.response_count === 1 ? 'responseOne' : 'responseMany', {count: data.response_count})}</h3>
           <p>{t('resultsHelp')}</p>
         </div>
-        <a className="admin-button survey-results-export" href={`/api/admin/surveys/${surveyId}/results/export`}>{t('export')}</a>
+        <a className="admin-button survey-results-export" href={`/api/admin/surveys/${surveyId}/results/export${hamletId ? `?hamlet=${encodeURIComponent(hamletId)}` : ''}`}>{t('export')}</a>
       </div>
 
       {data.response_count === 0 ? (
         <div className="survey-results-empty">
           <strong>{t('noAnswers')}</strong>
-          <p>{t('chartsHelp')}</p>
+          <p>{t(hamletId ? 'filteredChartsHelp' : 'chartsHelp')}</p>
         </div>
       ) : data.versions.map((version) => (
         <section className="survey-result-version" key={version.version} aria-labelledby={`result-version-${version.version}`}>
@@ -128,25 +129,31 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
   const [results, setResults] = useState(null);
   const [resultsState, setResultsState] = useState('idle');
   const [resultsReload, setResultsReload] = useState(0);
+  const [hamletId, setHamletId] = useState('');
+  const [resultHamlets, setResultHamlets] = useState([]);
   const selectedId = selected && !selected.isNew ? selected.id : null;
 
   useEffect(() => {
     if (!selectedId) return undefined;
     const controller = new AbortController();
-    fetch(`/api/admin/surveys/${selectedId}/results`, { signal: controller.signal })
+    fetch(`/api/admin/surveys/${selectedId}/results${hamletId ? `?hamlet=${encodeURIComponent(hamletId)}` : ''}`, { signal: controller.signal })
       .then(async (response) => {
         const body = await response.json();
+        if (controller.signal.aborted) return;
         if (!response.ok || !body.ok) throw new Error(body.message || t('resultsError'));
         setResults(body.results);
+        setResultHamlets(body.results.hamlets ?? []);
         setResultsState('ready');
       })
       .catch((error) => {
-        if (error.name !== 'AbortError') setResultsState('error');
+        if (!controller.signal.aborted && error.name !== 'AbortError') setResultsState('error');
       });
     return () => controller.abort();
-  }, [selectedId, resultsReload, t]);
+  }, [selectedId, resultsReload, hamletId, t]);
 
   function select(survey) {
+    setHamletId(''); setResultHamlets([]);
+    setResultsReload((value) => value + 1);
     setSelected(survey);
     setActiveTab('settings');
     setResults(null);
@@ -161,6 +168,7 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
   }
 
   function create() {
+    setHamletId(''); setResultHamlets([]);
     setSelected({ isNew: true, is_open: true, question_version: 1, response_count: 0 });
     setActiveTab('settings');
     setResults(null);
@@ -307,7 +315,22 @@ export default function AdminSurveyDirectory({ surveys, sort, direction, adminEm
             {activeTab === 'email' && !selected.isNew ? (
               <SurveyEmailPanel surveyId={selected.id} adminEmail={adminEmail} />
             ) : activeTab === 'results' && !selected.isNew ? (
-              <SurveyResults data={results} state={resultsState} surveyId={selected.id} t={t} formatLocale={formatLocale} />
+              <div className="survey-results-view">
+                <div className="survey-results-filter">
+                  <label htmlFor="survey-results-hamlet">{t('hamlet')}</label>
+                  <Select id="survey-results-hamlet" value={hamletId} aria-describedby="survey-results-filter-help" onChange={(event) => {
+                    if (event.target.value === hamletId) return;
+                    setResultsState('loading'); setHamletId(event.target.value);
+                  }}>
+                    <option value="">{t('allHamlets')}</option>
+                    {resultHamlets.map((hamlet) => <option key={hamlet.id} value={hamlet.id}>{hamlet.name}</option>)}
+                    <option value="none">{t('noHamlet')}</option>
+                  </Select>
+                </div>
+                <p id="survey-results-filter-help" className="admin-field-note">{t('resultsHamletHelp')}</p>
+                <SurveyResults data={results} state={resultsState} surveyId={selected.id} hamletId={hamletId} t={t} formatLocale={formatLocale}
+                  onRetry={() => { setResultsState('loading'); setResultsReload((value) => value + 1); }} />
+              </div>
             ) : (
               <form className="admin-detail-form" onSubmit={save}>
                 <label>{t('name')}<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={200} required /></label>

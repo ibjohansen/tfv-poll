@@ -50,8 +50,8 @@ function payloadKey(form) {
 }
 
 function annualFeesFor(member, currentYear) {
-  const fees = new Map((member?.annual_fees || []).map((fee) => [Number(fee.year), { year: Number(fee.year), paid: Boolean(fee.paid) }]));
-  if (!fees.has(currentYear)) fees.set(currentYear, { year: currentYear, paid: false });
+  const fees = new Map((member?.annual_fees || []).map((fee) => [Number(fee.year), { year: Number(fee.year), paid: Boolean(fee.paid), invoiced_on: fee.invoiced_on || null }]));
+  if (!fees.has(currentYear)) fees.set(currentYear, { year: currentYear, paid: false, invoiced_on: null });
   return [...fees.values()].filter((fee) => Number.isSafeInteger(fee.year)).sort((left, right) => right.year - left.year);
 }
 
@@ -260,7 +260,7 @@ export default function AdminMemberDirectory({ data, search, sort, direction, in
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok || !body.ok) throw new Error(body.message || t('annualFeeError'));
-      const savedFee = { year: Number(body.annualFee.year), paid: Boolean(body.annualFee.paid) };
+      const savedFee = { year: Number(body.annualFee.year), paid: Boolean(body.annualFee.paid), invoiced_on: body.annualFee.invoiced_on || null };
       const applyFee = (member) => {
         if (!member || String(member.id) !== String(memberId)) return member;
         const annualFees = [...(member.annual_fees || []).filter((fee) => Number(fee.year) !== savedFee.year), savedFee]
@@ -375,8 +375,8 @@ export default function AdminMemberDirectory({ data, search, sort, direction, in
         {!selected.isNew && <section className="admin-detail-section annual-fees" aria-labelledby="member-annual-fees-title">
           <div className="admin-section-header"><div><p className="eyebrow">{t('annualFeeEyebrow')}</p><h3 id="member-annual-fees-title">{t('annualFeeTitle')}</h3></div></div>
           <p className="admin-field-note">{t('annualFeeHelp')}</p>
-          <table className="annual-fee-table"><caption className="visually-hidden">{t('annualFeeCaption')}</caption><thead><tr><th scope="col">{t('year')}</th><th scope="col">{t('annualFeePaid')}</th></tr></thead><tbody>
-            {annualFees.map((fee) => <tr key={fee.year}><th scope="row">{fee.year}</th><td><label className="admin-checkbox"><input type="checkbox" checked={fee.paid} onChange={(event) => updateAnnualFee(fee.year, event.target.checked)} disabled={annualFeeBusy || data.mock} aria-label={t('annualFeeToggle', {year: fee.year})} /><span>{t(fee.paid ? 'yes' : 'no')}</span></label></td></tr>)}
+          <table className="annual-fee-table"><caption className="visually-hidden">{t('annualFeeCaption')}</caption><thead><tr><th scope="col">{t('year')}</th><th scope="col">{t('annualFeeInvoiced')}</th><th scope="col">{t('annualFeePaid')}</th></tr></thead><tbody>
+            {annualFees.map((fee) => <tr key={fee.year}><th scope="row">{fee.year}</th><td>{fee.invoiced_on || t('no')}</td><td><label className="admin-checkbox"><input type="checkbox" checked={fee.paid} onChange={(event) => updateAnnualFee(fee.year, event.target.checked)} disabled={annualFeeBusy || data.mock} aria-label={t('annualFeeToggle', {year: fee.year})} /><span>{t(fee.paid ? 'yes' : 'no')}</span></label></td></tr>)}
           </tbody></table>
           {annualFeeMessage && <p className={annualFeeMessage.type === 'error' ? 'form-error' : 'admin-success'} role="status">{annualFeeMessage.text}</p>}
         </section>}

@@ -24,7 +24,7 @@ const map = {
 };
 
 Object.assign(map.admin, {
-  fetchingControl: 'Henter nødvendige kilder og sammenligner registeret …',
+  fetchingControl: 'Henter nødvendige kilder og sammenligner medlemsregisteret …',
   controlReady: '{counts} er hentet og kontrollert.{warning}',
   confirmReplaceArea: 'Valgt område og hentede resultater blir fjernet. Vil du endre området?',
   workflow: {
@@ -39,7 +39,8 @@ Object.assign(map.admin, {
     recommended: 'Anbefalt – raskeste og sikreste valg', customArea: 'Tegn egendefinert område',
     customAreaHelp: 'Brukes når kontrollen ikke følger en lagret grend.', selectedArea: 'Valgt område',
     boundaryTools: 'Tegn eller juster grendegrensen', sources: 'Kilder og personvern',
-    controlAction: 'Kontroller registeret', readOnly: 'Kontrollen leser og sammenligner data. Den oppdaterer aldri medlemsregisteret.',
+    controlAction: 'Kontroller medlemsregisteret', readOnly: 'Kontrollen leser og sammenligner data. Den oppdaterer aldri medlemsregisteret.',
+    automaticControl: 'Når du velger en lagret grend, kontrolleres medlemsregisteret automatisk.',
     runControl: 'Kontroller og vis forslag', chooseAreaFirst: 'Velg en lagret grend eller fullfør et egendefinert område først.',
     supplementarySources: 'Flere kartkilder', supplementaryHelp: 'Veier og separate kildeuttrekk er valgfrie og endrer ikke registeret.',
     noResults: 'Ingen resultater ennå. Velg et område og kjør kontrollen.',
@@ -51,7 +52,7 @@ Object.assign(map.admin, {
   },
 });
 Object.assign(map.admin.hamlets, {
-  selectTitle: 'Velg lagret grend', selectHelp: 'En lagret grend er anbefalt fordi kontrollen da avgrenses til kjente medlemstilknytninger.',
+  selectTitle: 'Velg lagret grend', selectHelp: 'Når du velger en grend med lagret polygon, hentes kartdata og medlemsregisteret kontrolleres automatisk for grenden.',
   selectLegend: 'Lagret kontrollområde', selectedReviewed: 'Kontrollert intern grendegrense', selectedDraft: 'Intern grendegrense som må kontrolleres',
   useSelected: 'Bruk denne grenden',
 });

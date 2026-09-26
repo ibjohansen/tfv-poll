@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import ExcelJS from 'exceljs';
 import { accountingDefaults, accountingReference2025 } from '../data/accounting.js';
 import { accountingSummary, decimalUnits, convertToOre, normalizeExpense, normalizeExpenseBatch,
   normalizeYearSettings, proposeAccountingYear } from '../lib/accounting-validation.js';
 import { suggestReceipt } from '../lib/accounting-receipts.js';
-import { accountingCsv } from '../lib/accounting-export.js';
+import { accountingWorkbook } from '../lib/accounting-export.js';
+import { accountingBudgetChartSeries, accountingChartAxisMoney, accountingChartSeries } from '../lib/accounting-chart.js';
+import { collectionCandidatesCsv, parseFeeStatusCsv } from '../lib/accounting-fee-files.js';
 import { loadModule, request } from './helpers/load-module.mjs';
 
 const expense = { id: 'a'.repeat(32), supplier: 'Test supplier', invoice_number: 'TEST-1', description: 'Subscription',
@@ -21,6 +24,9 @@ test('decimal arithmetic rounds once to NOK øre and rejects malformed or oversi
 });
 
 test('expense validation enforces review, period, currency, receipts and reimbursement order', () => {
+  assert.equal(normalizeExpense({ ...expense, claimant_name: '  Kari Test  ' }, 2026).claimant_name, 'Kari Test');
+  assert.equal(normalizeExpense(expense, 2026).claimant_name, '');
+  for (const claimant_name of [42, 'x'.repeat(321), 'Test\u0000person']) assert.throws(() => normalizeExpense({ ...expense, claimant_name }, 2026));
   assert.equal(normalizeExpense(expense, 2026).amount_ore, 16451);
   for (const changes of [{ reviewed: false }, { invoice_date: '2025-09-12' }, { invoice_date: '2026-02-30' },
     { currency: 'NOK' }, { currency: 'XXX' }, { amount: '0' }, { exchange_rate: '0' }, { receipt_note: '' },
@@ -76,12 +82,67 @@ test('server recalculates membership budget and preserves explicit zero income',
   assert.equal(saved.budget.dues, 10275000); assert.deepEqual(saved.actual_income, { dues: null, fees: 0, reminders: 2050 });
 });
 
-test('CSV export preserves monetary precision and neutralizes spreadsheet formulas', () => {
-  const entry = normalizeExpense({ ...expense, supplier: '=HYPERLINK("bad")', notes: '\t=1+1' }, 2026);
-  const output = accountingCsv({ expenses: [entry], attachments: [] }, (value) => value);
-  assert.match(output, /"164.51"/); assert.match(output, /"10.123456"/);
-  assert.match(output, /"'=HYPERLINK/); assert.match(output, /"'=1\+1"/);
-  assert.match(accountingCsv({ expenses: [{ ...entry, notes: '\t=1+1' }], attachments: [] }, (value) => value), /"'\t=1\+1"/);
+test('accountant workbook excludes internal IDs and preserves typed financial fields', async () => {
+  const entry = { ...normalizeExpense({ ...expense, supplier: '=HYPERLINK("bad")', claimant_name: '=1+1', notes: '=1+1' }, 2026), batch_id: 'batch-internal' };
+  const buffer = await accountingWorkbook({ expenses: [entry], attachments: [{ expense_id: entry.id, original_filename: 'kvittering.pdf' }] }, (value) => value);
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const sheet = workbook.getWorksheet('Kostnader');
+  const headerValues = sheet.getRow(1).values.slice(1);
+  const headers = Object.fromEntries(headerValues.map((header, index) => [header, index + 1]));
+  const row = sheet.getRow(2);
+
+  assert.equal(headers.expenseId, undefined); assert.equal(headers.batchId, undefined);
+  assert.equal(row.getCell(headers.amount).value, 16.25);
+  assert.equal(row.getCell(headers.rate).value, 10.123456);
+  assert.equal(row.getCell(headers.nok).value, 164.51);
+  assert.ok(row.getCell(headers.invoiceDate).value instanceof Date);
+  assert.equal(row.getCell(headers.supplier).value, '=HYPERLINK("bad")');
+  assert.equal(row.getCell(headers.notes).value, '=1+1');
+  assert.equal(row.getCell(headers.files).value, 'kvittering.pdf');
+  assert.equal(row.getCell(headers.claimant).value, '=1+1');
+});
+
+test('chart groups monthly costs and carries the cumulative line forward', () => {
+  const settings = proposeAccountingYear(2026, 411);
+  const entries = [normalizeExpense(expense, 2026), normalizeExpense({ ...expense, id: 'b'.repeat(32), invoice_number: 'TEST-2', invoice_date: '2026-11-01', amount: '10' }, 2026)];
+  const series = accountingChartSeries(settings, entries);
+  assert.equal(series.expectedIncome, 10275000);
+  assert.equal(series.monthly[8], 16451); assert.equal(series.monthly[10], 10123);
+  assert.equal(series.cumulative[9], 16451); assert.equal(series.cumulative[11], 26574);
+});
+
+test('budget chart distributes every øre evenly across the year', () => {
+  const settings = proposeAccountingYear(2026, 411);
+  settings.budget.other += 1;
+  const series = accountingBudgetChartSeries(settings);
+  assert.equal(series.expectedIncome, 10275000);
+  assert.equal(series.cumulative[11], 9300001);
+  assert.equal(series.monthly.reduce((sum, amount) => sum + amount, 0), 9300001);
+  assert.equal(Math.max(...series.monthly) - Math.min(...series.monthly), 1);
+});
+
+test('chart axis money is deterministic across server and browser runtimes', () => {
+  assert.equal(accountingChartAxisMoney(0, 'nb-NO'), '0\u00a0kr');
+  assert.equal(accountingChartAxisMoney(2_775_000, 'nb-NO'), '27,8k\u00a0kr');
+  assert.equal(accountingChartAxisMoney(102_750_000, 'nb-NO'), '1m\u00a0kr');
+  assert.equal(accountingChartAxisMoney(2_775_000, 'en-GB'), '27.8k\u00a0NOK');
+});
+
+test('annual-fee CSV import accepts stable IDs or H-numbers and rejects ambiguity', () => {
+  assert.deepEqual(parseFeeStatusCsv('member_id;status\n42;paid\n43;paid\n'), [
+    { type: 'member_id', value: '42' }, { type: 'member_id', value: '43' },
+  ]);
+  assert.deepEqual(parseFeeStatusCsv('\uFEFFH-nummer\nSPG H 42\n'), [{ type: 'h_number', value: 'SPG H 42' }]);
+  assert.throws(() => parseFeeStatusCsv('name\nUnknown\n'), /invalidFeeImport/);
+  assert.throws(() => parseFeeStatusCsv('member_id\n42\n42\n'), /duplicateFeeImport/);
+});
+
+test('collection candidate CSV has exact claim amounts and neutralizes formulas', () => {
+  const output = collectionCandidatesCsv({ year: 2026, annualFeeOre: 25000, members: [{ id: '42', h_number: '=1+1',
+    cadastral_number: '10/42', section_number: '', street_address: 'Testvegen 1', title_holder: 'Test',
+    primary_contact_name: 'Kontakt', primary_contact_email: 'test@example.test', other_contact_emails: [], invoiced_on: '2026-02-01' }] }, (value) => value);
+  assert.match(output, /"250\.00"/); assert.match(output, /"'=1\+1"/);
 });
 
 test('request guard authenticates before reading uploads and caps bodies without content-length', async () => {

@@ -113,13 +113,17 @@ CREATE TABLE IF NOT EXISTS member_annual_fees (
   member_id BIGINT NOT NULL REFERENCES members(id) ON DELETE RESTRICT,
   fee_year INTEGER NOT NULL CHECK (fee_year BETWEEN 1900 AND 9999),
   paid BOOLEAN NOT NULL DEFAULT FALSE,
+  invoiced_on DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_changed_by TEXT,
   PRIMARY KEY (member_id, fee_year)
 );
+ALTER TABLE member_annual_fees ADD COLUMN IF NOT EXISTS invoiced_on DATE;
 CREATE INDEX IF NOT EXISTS member_annual_fees_year_paid_idx
   ON member_annual_fees (fee_year, paid, member_id);
+CREATE INDEX IF NOT EXISTS member_annual_fees_collection_candidates_idx
+  ON member_annual_fees (fee_year, member_id) WHERE invoiced_on IS NOT NULL AND paid = FALSE;
 
 -- Kjøringer mot Kartverkets Matrikkel-API. Hver kjøring tar et komplett
 -- øyeblikksbilde av feltene den har lov til å endre før første oppslag.
@@ -913,6 +917,11 @@ CREATE TABLE IF NOT EXISTS accounting_attachments (
   FOREIGN KEY (expense_id, year) REFERENCES accounting_expenses(id, year) ON DELETE RESTRICT
 );
 CREATE INDEX IF NOT EXISTS accounting_attachments_year_idx ON accounting_attachments (year, expense_id);
+
+-- Keep the editable claimant separate from the immutable uploader and audit actor.
+-- Existing records remain unknown; last_changed_by is not proof of who paid.
+ALTER TABLE accounting_expenses ADD COLUMN IF NOT EXISTS claimant_name TEXT NOT NULL DEFAULT '' CHECK (length(claimant_name) <= 320);
+ALTER TABLE accounting_attachments ADD COLUMN IF NOT EXISTS uploaded_by TEXT NOT NULL DEFAULT '' CHECK (length(uploaded_by) <= 320);
 
 CREATE TABLE IF NOT EXISTS audit_log (
   id BIGSERIAL PRIMARY KEY,

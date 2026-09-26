@@ -23,7 +23,7 @@ CMS for informasjonssider.
   undersøkelser med personlige invitasjoner, resultater og Excel-eksport.
 - Strukturert CMS med sanert riktekst, hovedbilder og vedlegg i privat Object
   Storage, samt personvernvennlig, egenhostet statistikk med Visx-grafer.
-- Regnskap med årsbudsjett, justerbar kontingent, leverandørbatcher, private
+- Økonomi med årsbudsjett, justerbar kontingent, leverandørbatcher, private
   kvitteringer, valutakurs per bilag, levert-/utbetaltstatus og årsmøteoversikt.
 - Rollebasert administrasjon gjennom Microsoft Entra ID, revisjonsspor og
   kontrollerte Netlify-bakgrunnsjobber for e-post og matrikkelsynkronisering.
@@ -85,7 +85,7 @@ Sertifikatkontrollen skal ikke deaktiveres.
 - `/admin/regnskap?year=2026` viser budsjett, inntekter og kostnadsbilag.
   Alle autoriserte administratorer har lesetilgang; endringer krever eksisterende
   `members`-rettighet. `/admin/regnskap/arsmote?year=2027` viser regnskap 2026 og
-  budsjett 2027 til årsmøtet. Se [regnskapsmodulen](docs/regnskap.md).
+  budsjett 2027 til årsmøtet. Se [økonomimodulen](docs/regnskap.md).
 - `/admin/web` er CMS-et for nettsider, hovedbilder og nedlastbare vedlegg.
 - `/admin/usage` viser anonym, aggregert bruksstatistikk og krever
   revisjonsrettighet.
@@ -299,6 +299,12 @@ sequenceDiagram
 Sletting er alltid myk: medlemmer får `deleted_at` og tilbakekalt medlemslenke,
 mens undersøkelser får `deleted_at` og lukkes. Vanlige oppslag filtrerer bort
 slike rader; historiske svar beholdes.
+
+Under undersøkelsens **Resultater** kan grafene filtreres på grend, inkludert
+«Alle grender» og «Uten grend». Svarantall, prosentfordeling og Excel-eksport
+bruker samme utvalg. Filteret bruker tomtens nåværende grend i medlemsregisteret,
+ikke en historisk grend ved svartidspunktet. Spørsmålsversjoner og lagrede svar
+endres ikke. Dette krever ingen ny databasekolonne eller medlemsadministratorrolle.
 
 ### Opprettelse og publisering av nettside
 
@@ -705,9 +711,10 @@ gjenopptas idempotent uten å sende ferdigbehandlede leveringer på nytt.
 
 ## Produksjonssetting: Netlify + Neon + Microsoft Entra ID
 
-Regnskapsmodulen innfører `/admin/regnskap`, `/admin/regnskap/arsmote`,
+Økonomimodulen innfører `/admin/regnskap`, `/admin/regnskap/arsmote`,
 `GET/POST /api/admin/accounting`, `POST /api/admin/accounting/files`,
-`GET /api/admin/accounting/files/[id]` og `GET /api/admin/accounting/export`.
+`GET /api/admin/accounting/files/[id]`, `GET/POST /api/admin/accounting/export`,
+`POST /api/admin/accounting/fees/import` og `GET /api/admin/accounting/fees/collection`.
 Alle rutene krever administratorøkt; alle skriv krever `members`-rettighet og
 kontroll av request-origin. Det er ingen ny Entra-rolle eller miljøvariabel.
 Privat lagring gjenbruker `cms-assets` med egne `accounting/<år>/`-nøkler og
@@ -721,10 +728,24 @@ regnskapsendringen i Git, slik at senere Git-baserte deployer beholder modulen. 
 [utrullingsrapporten](docs/database-release-accounting-2026-09-25.md).
 `accounting_years`, `accounting_expenses` og `accounting_attachments`, indekser,
 beløps-/datokontroller og audit-triggere er opprettet. Den avgrensede migreringen
-i `scripts/release-accounting-schema.mjs` velger 19 regnskapsoperasjoner fra
+i `scripts/release-accounting-schema.mjs` velger de godkjente regnskapsoperasjonene fra
 `database/schema.sql`, krever bekreftet vert, miljø, skjema-hash og snapshot,
 og kontrollerer eksisterende data før commit. Nye migreringer må fortsatt
 testes på isolert schema-only-gren og godkjennes eksplisitt etter punkt 2.
+
+«Lagt ut av» krever to nye additive tekstkolonner: `accounting_expenses.claimant_name`
+og `accounting_attachments.uploaded_by`. De ble migrert og verifisert i produksjon
+26. september 2026 etter eksplisitt godkjenning, schema-only-test og snapshot;
+se [migreringsrapporten](docs/database-release-claimants-2026-09-26.md).
+Ingen applikasjonsdeploy ble gjort i denne operasjonen. Verifiser at ny opplasting foreslår innlogget navn,
+at navnet kan endres og beholdes etter lagring/utbetaling, og at Excel-eksporten
+viser navnet. Eldre bilag skal fortsatt vise «Ikke registrert» inntil navnet er kjent.
+
+Kontingentoppfølgingen krever i tillegg den additive `member_annual_fees.invoiced_on`-
+kolonnen og kandidatindeksen. Tilleggsmigreringen ble verifisert på en isolert
+schema-only-gren og utført i produksjon 25. september 2026 etter et eget
+snapshot. Den etterfølgende Netlify-deployen er dokumentert i
+[utrullingsrapporten](docs/database-release-accounting-2026-09-25.md).
 Et fullt, idempotent databaseskjema og
 regnskapstransaksjonene testes også lokalt med PostgreSQL/WASM (PGlite) som del
 av `npm run check`; dette erstatter ikke produksjonsgrenens utrullingstest.
@@ -1296,11 +1317,16 @@ Utfør kontrollene i denne rekkefølgen:
   utbetalingsdato beholdes, at utbetaling krever levering, og at revisjonsloggen
   ikke inneholder lagringsnøkler. Test at uautoriserte nedlastinger avvises og
   at en konto uten `members` ikke kan skrive eller laste opp.
-- Kontroller Regnskap ved 320 px bredde og med tastatur. Åpne
+- Kontroller Økonomi ved 320 px bredde og med tastatur. Åpne
   `/admin/regnskap/arsmote?year=2027`, kontroller regnskap 2026 mot budsjett 2027,
-  og prøv utskrift/PDF og CSV. CSV-eksporten skal inneholde valutakurs og
+  og prøv utskrift/PDF og Excel. Excel-eksporten skal inneholde valutakurs og
   statusdatoer og logges som `accounting_export`. Avstem faktiske inntekter og
   kostnader med regnskapsfører før rapporten brukes som endelig årsmøtedokument.
+- På isolert gren: importer én syntetisk CSV med `member_id` som fakturert og én
+  med `H-nummer` som betalt. Kontroller forhåndsvisning, avvisning av ukjente og
+  dupliserte tomter, fakturert dato i medlemsregisteret og at inkassoeksporten
+  bare inneholder fakturerte, ubetalte tomter. Kontroller at eksporten logges som
+  `collection_candidates_export`; bruk aldri reelle medlemsdata i testen.
 - Åpne **Undersøkelser → Utsendelse** innlogget. Kontroller at en ventende eller
   feilet kampanje viser **Start bakgrunnsjobben på nytt**, og at knappen er aktiv
   når API-oversikten har `background_status: "ready"`, e-post er konfigurert,

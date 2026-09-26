@@ -84,6 +84,41 @@ publiseringen beskrevet ovenfor er den først verifiserte produksjonsversjonen.
 
 Commit-melding: `feat: add accounting module and verified database release`.
 
+## Oppfølging: kontingentimport og kostnadsoversikt
+
+Tilleggsmigreringen for fakturaoppfølging ble utført og den utvidede
+regnskapsmodulen ble publisert 25. september 2026.
+
+- Schema-only-grenen `test-accounting-fees-20260925` verifiserte alle 37
+  eksisterende tabeller uten produksjonsrader. Fem PostgreSQL-integrasjonstester
+  bestod med syntetiske data.
+- Snapshot `pre-accounting-fees-2026-09-25`, ID
+  `snap-divine-firefly-b25zc3dw`, ble opprettet kl. 14:37:34 UTC før
+  produksjonsmigreringen.
+- Migreringsskriptet anvendte 21 godkjente operasjoner. Kontroll av radantall og
+  kontrollsummer viste at eksisterende data var bevart. Kolonnen
+  `member_annual_fees.invoiced_on`, kandidatindeksen, tre regnskapstabeller,
+  seks audit-triggere og tre regnskapsindekser ble verifisert fra en ny
+  produksjonsforbindelse kl. 14:38:03 UTC.
+- Kontrollert SHA-256 for skjemaet var
+  `28176b0226fe0c9ce6a473faff39245d24ed16dc3f774d22c368243a57ad7021`.
+- `npm run check` bestod med lint, 367 tester og produksjonsbygg. Tolv
+  regnskapsnettlesertester bestod på mobil og desktop. Ingen avhengigheter eller
+  låsefiler ble endret.
+- Netlify-deploy `6ab6885be4d7e5c397df02d3` ble publisert kl. 14:43:53 UTC.
+  Netlifys API bekreftet status `ready`, produksjonskontekst og ingen feil.
+- Deployen ble bygget fra en ren midlertidig mappe. En `onPostBuild`-kontroll
+  bekreftet seks funksjonsarkiver uten lokale miljøfiler, med de nye rutene,
+  PDF.js-worker og Linux x64 GNU canvas i serverpakken.
+- Forsiden og informasjonssiden svarte 200. Publisert JavaScript, CSS og logo
+  svarte 200 med riktig innholdstype. Regnskapssiden videresendte uinnloggede
+  til innlogging, og både hoved-API-et og den nye inkassoeksporten avviste
+  uinnloggede med 401.
+
+Innlogget produksjonskontroll av fakturaimport, betalingsimport og eksport til
+inkasso/regnskapsfører gjenstår. Ingen ekte kontingentfil eller kostnad ble
+opprettet under etterkontrollen.
+
 Ved applikasjonsfeil kan forrige deploy reaktiveres mens de additive
 regnskapstabellene beholdes. Ikke gjenopprett hele databasen automatisk:
 det kan overskrive nye medlemssvar og annen aktivitet etter snapshotet.

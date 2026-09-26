@@ -24,7 +24,7 @@ const map = {
 };
 
 Object.assign(map.admin, {
-  fetchingControl: 'Loading the required sources and comparing the register …',
+  fetchingControl: 'Loading the required sources and comparing the member register …',
   controlReady: '{counts} were loaded and checked.{warning}',
   confirmReplaceArea: 'The selected area and loaded results will be removed. Change the area?',
   workflow: {
@@ -38,7 +38,8 @@ Object.assign(map.admin, {
     controls: 'Control panel', map: 'Map', areaChoice: '1. Select area', savedArea: 'Select saved hamlet',
     recommended: 'Recommended – fastest and safest choice', customArea: 'Draw custom area', customAreaHelp: 'Use when the check does not follow a saved hamlet.',
     selectedArea: 'Selected area', boundaryTools: 'Draw or adjust the hamlet boundary', sources: 'Sources and privacy',
-    controlAction: 'Check the register', readOnly: 'The check only reads and compares data. It never updates the member register.',
+    controlAction: 'Check the member register', readOnly: 'The check only reads and compares data. It never updates the member register.',
+    automaticControl: 'Selecting a saved hamlet automatically checks the member register.',
     runControl: 'Check and show suggestions', chooseAreaFirst: 'Select a saved hamlet or complete a custom area first.',
     supplementarySources: 'Additional map sources', supplementaryHelp: 'Roads and separate source extracts are optional and do not change the register.',
     noResults: 'No results yet. Select an area and run the check.',
@@ -50,7 +51,7 @@ Object.assign(map.admin, {
   },
 });
 Object.assign(map.admin.hamlets, {
-  selectTitle: 'Select saved hamlet', selectHelp: 'A saved hamlet is recommended because the check is then limited to known member links.',
+  selectTitle: 'Select saved hamlet', selectHelp: 'Selecting a hamlet with a saved polygon automatically loads map data and checks the member register for that hamlet.',
   selectLegend: 'Saved check area', selectedReviewed: 'Reviewed internal hamlet boundary', selectedDraft: 'Internal hamlet boundary requiring review',
   useSelected: 'Use this hamlet',
 });

@@ -27,6 +27,11 @@ Object.assign(surveys.admin, {
 });
 surveys.form.answers.usikker = 'Vet ikke';
 surveys.admin.answers.usikker = 'Vet ikke';
+Object.assign(surveys.admin, {
+  hamlet: 'Grend', allHamlets: 'Alle grender', noHamlet: 'Uten grend', retryResults: 'Prøv igjen',
+  resultsHamletHelp: 'Valget oppdaterer grafene, svarantallet og Excel-eksporten automatisk, basert på tomtens nåværende grend i medlemsregisteret.',
+  filteredChartsHelp: 'Velg en annen grend eller «Alle grender» for å se flere svar.',
+});
 export default surveys;
 Object.assign(surveys.form, { selectMany: 'Velg ett eller flere alternativer.', selectOne: 'Velg ett alternativ.' });
 Object.assign(surveys.email, {

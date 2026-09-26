@@ -10,6 +10,13 @@ Den additive produksjonsmigreringen ble utført og verifisert 16. september.
 
 ## Bruk
 
+I **Kontroller medlemsregister** starter kontrollen automatisk når du velger en
+grend med lagret polygon. Startknappen vises derfor ikke for dette området.
+For et egendefinert område fullfører du polygonet og velger **Kontroller og vis
+forslag**. Ved feil, delvis innhenting eller avbrudd kan du bruke **Prøv igjen**.
+Kontrollen sammenligner kartdata med Turufjell Vels medlemsregister uten å
+endre medlemsopplysningene.
+
 1. Åpne **Kart og registerkontroll** fra administrasjonsmenyen.
 2. Utvid **Søkepolygon**, velg **Tegn polygon**, klikk/trykk inn hjørner og
    velg **Fullfør polygon**.

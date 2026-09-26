@@ -1,4 +1,4 @@
-// Approved accounting-only migration. Never loads env files, exports rows,
+// Accounting-only migration plan; execution requires explicit approval. Never loads env files, exports rows,
 // deploys code, restores a snapshot, or changes unrelated application data.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -12,9 +12,12 @@ export function accountingStatements(schema) {
   const selected = splitSqlStatements(schema).filter((statement) =>
     /CREATE TABLE IF NOT EXISTS accounting_(years|expenses|attachments)\s*\(/.test(statement)
     || /CREATE (?:UNIQUE )?INDEX IF NOT EXISTS accounting_\w+\s/.test(statement)
+    || /ALTER TABLE member_annual_fees ADD COLUMN IF NOT EXISTS invoiced_on DATE/.test(statement)
+    || /ALTER TABLE accounting_(?:expenses ADD COLUMN IF NOT EXISTS claimant_name|attachments ADD COLUMN IF NOT EXISTS uploaded_by) TEXT/.test(statement)
+    || /CREATE INDEX IF NOT EXISTS member_annual_fees_collection_candidates_idx\s/.test(statement)
     || /CREATE OR REPLACE FUNCTION record_audit_change\(\)/.test(statement)
     || /(?:DROP TRIGGER IF EXISTS|CREATE TRIGGER) accounting_\w+\s/.test(statement));
-  assert.equal(selected.length, 19, 'Review the accounting migration selection if the schema changes');
+  assert.equal(selected.length, 23, 'Review the accounting migration selection if the schema changes');
   return selected;
 }
 
@@ -23,10 +26,14 @@ async function fingerprints(db) {
   const tables = (await db.query("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename")).rows;
   const result = {};
   for (const { tablename } of tables) {
+    // The additive nullable invoice marker changes the JSON row shape, not the
+    // existing values. Exclude it on both sides so the data checksum stays comparable.
+    const addedColumns = { member_annual_fees: 'invoiced_on', accounting_expenses: 'claimant_name', accounting_attachments: 'uploaded_by' };
+    const rowJson = addedColumns[tablename] ? `to_jsonb(t) - '${addedColumns[tablename]}'` : 'to_jsonb(t)';
     // Only aggregates leave Postgres, not member details, receipts or tokens.
     result[tablename] = (await db.query(`SELECT count(*)::int AS count,
       md5(COALESCE(string_agg(h, '' ORDER BY h), '')) AS checksum
-      FROM (SELECT md5(to_jsonb(t)::text) h FROM ${quote(tablename)} t) hashes`)).rows[0];
+      FROM (SELECT md5((${rowJson})::text) h FROM ${quote(tablename)} t) hashes`)).rows[0];
   }
   return result;
 }
@@ -56,7 +63,18 @@ export async function verifyAccountingSchema(db) {
   assert.equal(generated?.is_generated, 'ALWAYS');
   const [audit] = (await db.query("SELECT prosrc FROM pg_proc WHERE oid='record_audit_change()'::regprocedure")).rows;
   assert.ok(audit.prosrc.includes("'accounting_attachments'"));
-  return { tables: 3, auditTriggers: triggers, indexes, generatedNokAmount: true };
+  const [feeInvoiceColumn] = (await db.query(`SELECT data_type FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='member_annual_fees' AND column_name='invoiced_on'`)).rows;
+  assert.equal(feeInvoiceColumn?.data_type, 'date');
+  const [collectionIndex] = (await db.query(`SELECT indexdef FROM pg_indexes
+    WHERE schemaname='public' AND indexname='member_annual_fees_collection_candidates_idx'`)).rows;
+  assert.match(collectionIndex?.indexdef || '', /invoiced_on IS NOT NULL/);
+  const claimantColumns = (await db.query(`SELECT table_name, column_name, data_type, is_nullable FROM information_schema.columns
+    WHERE table_schema = 'public' AND ((table_name = 'accounting_expenses' AND column_name = 'claimant_name')
+      OR (table_name = 'accounting_attachments' AND column_name = 'uploaded_by'))`)).rows;
+  assert.equal(claimantColumns.length, 2);
+  assert.ok(claimantColumns.every((column) => column.data_type === 'text' && column.is_nullable === 'NO'));
+  return { tables: 3, auditTriggers: triggers, indexes, generatedNokAmount: true, annualFeeInvoiceDate: true };
 }
 
 async function main() {

@@ -27,6 +27,11 @@ Object.assign(surveys.admin, {
 });
 surveys.form.answers.usikker = 'Don’t know';
 surveys.admin.answers.usikker = 'Don’t know';
+Object.assign(surveys.admin, {
+  hamlet: 'Hamlet', allHamlets: 'All hamlets', noHamlet: 'No hamlet', retryResults: 'Try again',
+  resultsHamletHelp: 'Your selection automatically updates the charts, response count and Excel export, based on each property’s current hamlet in the member register.',
+  filteredChartsHelp: 'Select another hamlet or “All hamlets” to see more responses.',
+});
 export default surveys;
 Object.assign(surveys.form, { selectMany: 'Select one or more options.', selectOne: 'Select one option.' });
 Object.assign(surveys.email, {

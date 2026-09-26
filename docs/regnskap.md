@@ -1,6 +1,6 @@
-# Regnskap
+# Økonomi
 
-Modulen ligger under **Regnskap** i administrasjonen. Den gir en løpende oversikt
+Modulen ligger under **Økonomi** i administrasjonen. Den gir en løpende oversikt
 ved siden av vellets ordinære regnskap. Kalenderåret er regnskapsperiode;
 årsmøtet i april får forrige års regnskap og inneværende års budsjett.
 
@@ -74,24 +74,56 @@ betyr refundert eller betalt av vellet. Begge lagres som datoer. Utbetaling
 krever leveringsdato senest samme dag. Marker flere kostnader for samlet
 statusoppdatering. Beløp og kontering er låst etter utbetaling; feilregistrert
 betalingsstatus kan korrigeres eksplisitt før økonomifeltene redigeres.
+Hvis en kostnad merkes direkte som utbetalt, settes manglende leveringsdato til
+samme dato. Søk og statusfilter kan kombineres før flere kostnader velges.
 Ingen betaling sendes til bank eller ekstern regnskapsfører.
 
 ## Årsmøte og eksport
 
 **Årsmøteoversikt** åpner regnskap for valgt år og budsjett for det neste året.
 Siden kan skrives ut eller lagres som PDF fra nettleseren. Ulagrede forslag og
-manglende inntekter merkes tydelig. **Last ned kostnader (CSV)** eksporterer alle
-kostnader for året med originalbeløp, kurs, NOK-beløp, datoer, notater og
-vedleggsnavn. Potensielle regnearkformler behandles som tekst.
+manglende inntekter merkes tydelig. I oversikten kan diagrammet veksles mellom
+regnskap og budsjett. Begge viser forventede inntekter som en fast linje. I
+regnskapsvisningen vises registrerte kostnader i måneden de inntraff. I
+budsjettvisningen fordeles alle budsjetterte årskostnader jevnt over årets tolv
+måneder. Stolpene viser månedlige kostnader, og linjen viser akkumulert beløp.
+Kostnadseksporten bruker valgte rader, eller hele det filtrerte søkeresultatet
+når ingenting er valgt. Den lastes ned som en Excel-fil med år, kontokode,
+kategori, originalbeløp, kurs, NOK-beløp, statusdatoer, notater og vedleggsnavn.
+Interne bilags- og batch-ID-er tas ikke med.
+
+## Kontingentoppfølging
+
+**Kontingentoppfølging** viser hvor mange aktive medlemstomter som er fakturert,
+betalt og kandidater for inkasso i valgt år. Fakturert lagres som dato i
+`member_annual_fees.invoiced_on`; betaling bruker det eksisterende `paid`-feltet.
+Begge statusene vises også på tomten i medlemsregisteret. Forventet medlemstall
+omfatter bare aktive tomter med medlemsstatus `member`. Antall aktive tomter med
+status `exempt` vises separat; begge tall lenker til riktig filtrert visning i
+medlemsregisteret.
+
+Returlister fra regnskapssystemet importeres først som en kontrollvisning og
+skrives ikke før alle rader matcher én aktiv medlemstomt. Det foreløpige CSV-
+formatet krever enten `member_id`/`medlems_id` eller `h_number`/`H-nummer`.
+Ukjente og dupliserte identifikatorer avviser hele importen. Formatadapteren er
+isolert i `lib/accounting-fee-files.js` og skal tilpasses når faktiske eksempel-
+filer fra regnskapssystemet foreligger.
+
+Inkassoeksporten er et kontrollgrunnlag, ikke en automatisk oversendelse. Den
+inneholder fakturerte, ikke betalte medlemstomter med eiendoms-, kontakt- og
+kravfelter. Listen må kontrolleres manuelt, og kolonnene må avtales med
+inkassopartneren før operativ bruk. Eksporten registreres i revisjonsloggen.
 
 ## Tilgang, drift og verifikasjon
 
-Lesing og nedlasting krever eksisterende `read`-rettighet. Skriving krever
-`members`; `TFV.ReadOnly` kan ikke endre data. Bilag lagres i den eksisterende
+Lesing og kostnadseksport krever eksisterende `read`-rettighet. Skriving og
+inkassoeksport med kontaktdata krever `members`; `TFV.ReadOnly` kan ikke endre
+data eller hente inkassogrunnlag. Bilag lagres i den eksisterende
 private `cms-assets`-bøtten med `accounting/<år>/`-prefiks, uten kobling til
 offentlige sider. API-responser og nedlastinger har `private, no-store`.
 
-Databasen har egne tabeller for år, kostnader og vedlegg. Kostnader fra én
+Databasen har egne tabeller for år, kostnader og vedlegg, og en additiv
+fakturert-dato i eksisterende årsavgiftstabell. Kostnader fra én
 batch og vedleggskoblinger lagres i samme transaksjon. SHA-256 hindrer at samme
 fil registreres to ganger, og en unik indeks hindrer samme normaliserte
 leverandør/fakturanummer, også på tvers av år. Oppdateringer bruker versjoner
@@ -110,12 +142,31 @@ PGlite bruker én forbindelse og erstatter ikke en flerforbindelsestest på Neon
 og betalinger på ekte PostgreSQL. Fem slike tester bestod på en isolert Neon-gren
 før [produksjonsmigreringen 25. september](database-release-accounting-2026-09-25.md).
 
-Migrering og publisering ble godkjent og gjennomført 25. september 2026; se
-[utrullingsrapporten](database-release-accounting-2026-09-25.md). Innlogget
-produksjonskontroll gjenstår. Følg produksjonsprosedyren og sjekklisten i README
-ved senere utrulling. Ingen nye miljøvariabler, bøtter, Entra-roller eller
+Den opprinnelige regnskapsmigreringen og publiseringen ble gjennomført 25.
+september 2026; se [utrullingsrapporten](database-release-accounting-2026-09-25.md).
+Kontingentoppfølgingens additive kolonne og indeks er klargjort, men er ikke
+produksjonsmigrert eller deployet. Følg produksjonsprosedyren og sjekklisten i
+README ved senere utrulling. Ingen nye miljøvariabler, bøtter, Entra-roller eller
 bakgrunnsfunksjoner er nødvendige.
 
 Arbeidsflyten er inspirert av leverandørenes beskrivelser av
 [utlegg med valuta og status](https://hjelp.fiken.no/reiseregning-og-utlegg-for-ansatte)
 og [kontroll av forslag fra kvitteringer](https://hjelp.fiken.no/ta-bilde-av-kvitteringer-med-mobil-app).
+
+## Hvem har lagt ut?
+
+Hvert utlegg har et redigerbart felt «Lagt ut av». Nye opplastinger foreslår
+innlogget brukers navn (epost hvis navn mangler). Forslaget er lagret på vedlegget,
+slik at opplastinger som ferdigstilles senere beholder opprinnelig forslag.
+Manuelle, nye kostnader foreslår også innlogget bruker. Navnet kan endres per
+kostnad, også i en batch, og vises i kostnadsoversikten, søk og Excel-eksport.
+Feltet kan være tomt ved direkte leverandørbetaling eller ukjent utlegger.
+
+Utlegger (`accounting_expenses.claimant_name`) er adskilt fra faktisk opplaster
+(`accounting_attachments.uploaded_by`) og revisjonssporets innloggede aktør.
+Endring av utlegger endrer ikke opplasters identitet. Eldre poster gis ikke
+automatisk dagens brukernavn: siste redigerer er ikke nødvendigvis utlegger.
+
+De to nye kolonnene ble migrert og verifisert i produksjon 26. september 2026;
+se [migreringsrapporten](database-release-claimants-2026-09-26.md). Eksisterende
+data er bevart. Ingen applikasjonsdeploy ble gjort i denne operasjonen.

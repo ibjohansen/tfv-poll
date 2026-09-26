@@ -38,7 +38,7 @@ export default function BrandLogo({ variant = 'horizontal', tone = 'light', clas
       height={logo.height}
       alt={decorative ? '' : 'Turufjell Vel'}
       className={className}
-      loading="lazy"
+      loading="eager"
     />
   );
 }

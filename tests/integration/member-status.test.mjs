@@ -81,9 +81,9 @@ test('annual fee status is stored per property and year with audit history', asy
   });
   assert.deepEqual((await directory.getAdminMemberById(String(member.id))).annual_fees, []);
 
-  assert.deepEqual(await admin.setAdminMemberAnnualFee(String(member.id), { year, paid: true }), { year, paid: true });
-  assert.deepEqual((await directory.getAdminMemberById(String(member.id))).annual_fees, [{ year, paid: true }]);
-  assert.deepEqual(await admin.setAdminMemberAnnualFee(String(member.id), { year, paid: false }), { year, paid: false });
+  assert.deepEqual(await admin.setAdminMemberAnnualFee(String(member.id), { year, paid: true }), { year, paid: true, invoiced_on: null });
+  assert.deepEqual((await directory.getAdminMemberById(String(member.id))).annual_fees, [{ year, paid: true, invoiced_on: null }]);
+  assert.deepEqual(await admin.setAdminMemberAnnualFee(String(member.id), { year, paid: false }), { year, paid: false, invoiced_on: null });
 
   const events = await db.sql`SELECT row_id, operation, changed_by, after_value FROM audit_log
     WHERE table_name = 'member_annual_fees' AND row_id = ${`${member.id}:${year}`} ORDER BY id`;

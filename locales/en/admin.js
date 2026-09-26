@@ -1,6 +1,6 @@
 const admin = {
   common: {
-    accounting: 'Accounts',
+    accounting: 'Finance',
     overview: 'Overview',
     inbox: 'Task list',
     members: 'Member register',

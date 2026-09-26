@@ -26,12 +26,31 @@ test('task changes preserve unfinished work and stale responses cannot replace c
   let state = mapWorkflowReducer(createMapWorkflowState(), { type: 'area-ready', area });
   state = mapWorkflowReducer(state, { type: 'task-changed', task: MAP_TASKS.HAMLETS });
   assert.equal(state.area, area);
-  state = mapWorkflowReducer(state, { type: 'fetch-started', requestId: 7, busy: 'comparison' });
+  state = mapWorkflowReducer(state, { type: 'fetch-started', requestId: 7, busy: 'comparison', notice: 'Henter medlemsregisteret …' });
   const stale = mapWorkflowReducer(state, { type: 'fetch-succeeded', requestId: 6, data: { comparison: { rows: ['stale'] } } });
   assert.equal(stale, state);
   state = mapWorkflowReducer(state, { type: 'fetch-failed', requestId: 7, error: 'feil', retry: 'comparison' });
   assert.equal(state.phase, MAP_PHASES.ERROR);
   assert.equal(state.retry, 'comparison');
+  assert.equal(state.busy, '');
+  assert.equal(state.notice, '', 'a failed request must not leave the loading announcement visible');
+});
+
+test('automatic checks can be retried after partial results or cancellation', () => {
+  let state = mapWorkflowReducer(createMapWorkflowState(), { type: 'area-ready', area });
+  state = mapWorkflowReducer(state, { type: 'fetch-started', requestId: 1, busy: 'comparison' });
+  state = mapWorkflowReducer(state, { type: 'fetch-succeeded', requestId: 1,
+    data: { addresses: null, properties: { boundaries: [] }, roads: null, comparison: null }, retry: 'control' });
+  assert.equal(state.retry, 'control');
+  assert.equal(state.phase, MAP_PHASES.RESULTS_READY);
+  state = mapWorkflowReducer(state, { type: 'fetch-started', requestId: 2, busy: 'comparison' });
+  state = mapWorkflowReducer(state, { type: 'fetch-cancelled', requestId: 2, notice: 'Avbrutt', retry: 'control' });
+  assert.equal(state.retry, 'control');
+  assert.equal(state.busy, '');
+  assert.equal(state.notice, 'Avbrutt');
+  state = mapWorkflowReducer(state, { type: 'fetch-started', requestId: 3, busy: 'comparison' });
+  state = mapWorkflowReducer(state, { type: 'fetch-succeeded', requestId: 3, data: { comparison: { rows: [] } } });
+  assert.equal(state.retry, null);
 });
 
 test('opening member details keeps one review surface active', () => {

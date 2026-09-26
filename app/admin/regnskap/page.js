@@ -18,6 +18,6 @@ export default async function AccountingPage({ searchParams }) {
   let data, error;
   try { data = await getAccountingOverview(year); } catch (caught) { error = caught; }
   return <section className="admin-content">{data
-    ? <AdminAccounting key={data.year} initialData={data} canWrite={adminPermissions(user).has('members')} />
+    ? <AdminAccounting key={data.year} initialData={data} canWrite={adminPermissions(user).has('members')} currentUserName={(user.name?.trim() || user.email).slice(0, 320)} />
     : <p className="form-error" role="alert">{t(error?.code === 'invalidYear' ? 'errors.invalidYear' : 'unavailable')}</p>}</section>;
 }

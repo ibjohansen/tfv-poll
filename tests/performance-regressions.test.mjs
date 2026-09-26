@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { loadModule } from './helpers/load-module.mjs';
 
+test('above-the-fold brand logos load eagerly', async () => {
+  const source = await readFile(new URL('../components/BrandLogo.js', import.meta.url), 'utf8');
+  assert.match(source, /loading="eager"/);
+  assert.doesNotMatch(source, /loading="lazy"/);
+});
+
 test('public shell stays independent of auth while waiting for the CSP nonce request', async () => {
   const [layout, page, cookies] = await Promise.all([
     readFile(new URL('../app/layout.js', import.meta.url), 'utf8'),

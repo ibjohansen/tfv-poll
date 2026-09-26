@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 export async function GET(request, { params }) {
   const { t } = getRequestI18n(request, 'backend.adminSurveys');
   try {
-    const result = await createAdminSurveyResultsExport((await params).id);
+    const result = await createAdminSurveyResultsExport((await params).id, new URL(request.url).searchParams.get('hamlet') ?? '');
     const date = new Date().toISOString().slice(0, 10);
     return new Response(new Uint8Array(result.buffer), {
       headers: {
@@ -19,7 +19,7 @@ export async function GET(request, { params }) {
   } catch (error) {
     const status = apiErrorStatus(error);
     console.error('Admin survey results export failed', { code: error.code || error.cause?.code, message: error.message });
-    const message = t(status === 404 ? 'missingShort' : status === 400 ? 'invalidId' : 'export');
+    const message = t(error.message === 'Invalid survey hamlet filter' ? 'invalidHamlet' : status === 404 ? 'missingShort' : status === 400 ? 'invalidId' : 'export');
     return Response.json({ ok: false, message }, { status, headers: { 'Cache-Control': 'no-store, private' } });
   }
 }

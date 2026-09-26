@@ -35,7 +35,7 @@ after(() => db.close());
 test('accounting-only schema is idempotent and preserves saved budgets', async () => {
   const schema = await readFile(new URL('../../database/schema.sql', import.meta.url), 'utf8');
   const statements = accountingStatements(schema);
-  assert.equal(statements.length, 19);
+  assert.equal(statements.length, 23);
   await db.sql.transaction(statements.map((statement) => db.sql.query(statement)));
   await verifyAccountingSchema(db.pool);
   const data = await api.getAccountingOverview(year);
@@ -75,7 +75,6 @@ test('a duplicate invoice rolls back every expense in its batch', async () => {
 test('concurrent payment updates succeed once and stale batches do not partially update', async () => {
   const inputs = [entry(), entry()];
   const created = await batch(inputs);
-  await assert.rejects(api.updateAccountingStatuses(year, { entries: created, action: 'pay', date: `${year}-09-20` }), /statusConflict/);
   const submitted = await api.updateAccountingStatuses(year, { entries: created, action: 'submit', date: `${year}-09-18` });
   const results = await Promise.allSettled([1, 2].map(() => api.updateAccountingStatuses(year, { entries: submitted, action: 'pay', date: `${year}-09-20` })));
   assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);

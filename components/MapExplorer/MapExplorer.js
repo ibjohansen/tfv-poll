@@ -86,7 +86,8 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
         roads && `${roads.roads.length} ${t('roadGroups')}`].filter(Boolean).join(' / ');
       const warning = [addressResult.status === 'rejected' && t('addressesFailed'), propertyResult.status === 'rejected' && t('propertiesFailed'),
         roadResult.status === 'rejected' && t('roadsFailed')].filter(Boolean).map((message) => ` ${message}`).join('');
-      dispatch({ type: 'fetch-succeeded', requestId: request.requestId, data: nextData, notice: t('controlReady', {counts, warning}) });
+      dispatch({ type: 'fetch-succeeded', requestId: request.requestId, data: nextData,
+        notice: t('controlReady', {counts, warning}), retry: warning ? 'control' : null });
     } catch (failure) {
       if (requestRef.current?.requestId !== request.requestId || request.controller.signal.aborted) return;
       dispatch({ type: 'fetch-failed', requestId: request.requestId,
@@ -122,7 +123,10 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
   }, []);
 
   function changeTask(task) {
-    if (task !== state.task) dispatch({ type: 'task-changed', task });
+    if (task === state.task) return;
+    dispatch({ type: 'task-changed', task });
+    if (task === MAP_TASKS.REGISTER && state.activeHamlet?.polygon && state.area && !state.editMode
+      && state.phase !== MAP_PHASES.FETCHING && !state.data.comparison && !state.retry) runRegisterControl();
   }
 
   function changeAreaSource(source) {
@@ -137,7 +141,7 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
     const current = requestRef.current;
     if (!current) return;
     current.controller.abort(); requestRef.current = null;
-    dispatch({ type: 'fetch-cancelled', requestId: current.requestId, notice: t('cancelled') });
+    dispatch({ type: 'fetch-cancelled', requestId: current.requestId, notice: t('cancelled'), retry: 'control' });
   }
 
   function openMember(memberId) {
@@ -167,6 +171,7 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
     .flatMap((row) => row.officialAddresses.map((address) => address.id)));
   const mappedAddresses = (state.data.addresses?.addresses || []).map((address) => ({ ...address, isNew: missingAddressIds.has(address.id) }));
   const canRun = Boolean(state.area && !state.editMode && state.phase !== MAP_PHASES.FETCHING);
+  const isSavedArea = Boolean(state.activeHamlet?.polygon);
   const step = state.phase === MAP_PHASES.REVIEWING ? 4 : state.data.comparison ? 3 : state.phase === MAP_PHASES.FETCHING || state.area ? 2 : 1;
 
   return <div className="map-explorer">
@@ -228,7 +233,8 @@ export default function MapExplorer({ canMatrikkelSync = false }) {
 
       {state.task === MAP_TASKS.REGISTER && <section className="map-action-panel" aria-labelledby="map-control-action-title">
         <h2 id="map-control-action-title">{t('workflow.controlAction')}</h2><p>{t('workflow.readOnly')}</p>
-        <button type="button" className="primary-button" disabled={!canRun} aria-describedby={!state.area ? 'map-control-disabled-help' : undefined} onClick={runRegisterControl}>{t('workflow.runControl')}</button>
+        {isSavedArea ? <p className="muted">{t('workflow.automaticControl')}</p>
+          : <button type="button" className="primary-button" disabled={!canRun} aria-describedby={!state.area ? 'map-control-disabled-help' : undefined} onClick={() => runRegisterControl()}>{t('workflow.runControl')}</button>}
         {!state.area && <p id="map-control-disabled-help" className="muted">{t('workflow.chooseAreaFirst')}</p>}
         {state.busy && <div className="map-inline-status"><span role="status">{t('processing')}</span><button type="button" className="admin-button" onClick={cancelRequest}>{t('cancel')}</button></div>}
         {state.error && <p className="error-message" role="alert">{state.error}</p>}

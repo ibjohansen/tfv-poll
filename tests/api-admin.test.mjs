@@ -95,6 +95,21 @@ function makeRequest(path, method, options = {}, extra = {}) {
   });
 }
 
+test('survey charts and Excel export forward the same hamlet filter and reject invalid filters', async () => {
+  for (const path of ['surveys/[id]/results', 'surveys/[id]/results/export']) {
+    const { route, state, calls } = await setup(path);
+    for (const filter of ['1', 'none', '']) {
+      const response = await route.GET(request(`/api/admin/${path}?hamlet=${filter}`), routeContext());
+      assert.equal(response.status, 200);
+      assert.deepEqual(plain(calls.at(-1).args), ['a'.repeat(32), filter]);
+    }
+    state.error = new Error('Invalid survey hamlet filter');
+    const invalid = await route.GET(request(`/api/admin/${path}?hamlet=bad`), routeContext());
+    assert.equal(invalid.status, 400);
+    assert.equal((await invalid.json()).message, 'Velg en gyldig grend.');
+  }
+});
+
 for (const [path, method, module, operation, status, options = {}] of cases) {
   test(`${method} /api/admin/${path} (${operation}): success, permissions and safe failures`, async () => {
     const { route, state, calls } = await setup(path, {}, options.value);

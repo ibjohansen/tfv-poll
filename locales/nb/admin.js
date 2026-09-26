@@ -9,7 +9,7 @@ const admin = {
     usage: 'Bruksstatistikk',
     map: 'Kart og registerkontroll',
     newsletters: 'Nyhetsbrev',
-    accounting: 'Regnskap',
+    accounting: 'Økonomi',
     groups: 'Grender og e-postgrupper',
     matrikkel: 'Matrikkel',
     memberService: 'Medlemsservice',
