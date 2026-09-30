@@ -57,7 +57,8 @@ tekst 30. september 2026. Dette gjør at alpinaktiviteter kan bruke nummer som
 
 Databasen er klar for aktivitetskartet. De 11 radene er kladder, og
 aktivitetskartet er dessuten bevisst slått av på forsiden i denne
-produksjonssettingen.
+produksjonssettingen. Applikasjonsversjonen ble publisert fra commit
+`091f5e3b99928f98f5d628b574ca9875bd3435d2` på Netlify 30. september 2026.
 
 Ved en applikasjonsfeil beholdes det additive skjemaet og forrige deploy kan
 reaktiveres. Ikke gjenopprett produksjonssnapshotet automatisk: en restore kan

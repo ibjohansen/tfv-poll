@@ -803,8 +803,9 @@ topografiske kart og Esri World Imagery (satellitt- og flyfoto). Ingen
 personopplysninger eller ny miljøvariabel inngår.
 Adminkartet kan åpnes i fullskjerm med tegneverktøyene tilgjengelige. Den
 additive produksjonsmigreringen ble kjørt og verifisert 30. september 2026; se
-[migreringsstatus](docs/database-migration-2026-09-30.md). Kodeversjonen er ikke
-publisert.
+[migreringsstatus](docs/database-migration-2026-09-30.md). Kodeversjonen ble
+publisert på Netlify 30. september 2026, med aktivitetskartet fortsatt skjult på
+forsiden.
 
 HTML-ruter rendres ved request-tid fordi den strenge CSP-en bruker en ny nonce
 per request. Next.js kan ikke legge denne nonce-en på scripts i statisk eller
