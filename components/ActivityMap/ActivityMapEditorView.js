@@ -18,19 +18,22 @@ export default function ActivityMapEditorView({ features, draft, drawing, editin
   const baseLayers = useRef(null);
   const layers = useRef(null);
   const [baseMap, setBaseMap] = useState('topographic');
+  const labelsRef = useRef(labels);
   const latest = useRef({ draft, drawing, onGeometryChange, onError });
   useEffect(() => { latest.current = { draft, drawing, onGeometryChange, onError }; }, [draft, drawing, onGeometryChange, onError]);
+  useEffect(() => { labelsRef.current = labels; }, [labels]);
 
   useEffect(() => {
+    const mapLabels = labelsRef.current;
     const map = L.map(container.current, { scrollWheelZoom: false, zoomControl: false }).setView(latLng(ACTIVITY_MAP_CENTER), 16);
     mapRef.current = map;
-    L.control.zoom({ zoomInTitle: labels.zoomIn, zoomOutTitle: labels.zoomOut }).addTo(map);
+    L.control.zoom({ zoomInTitle: mapLabels.zoomIn, zoomOutTitle: mapLabels.zoomOut }).addTo(map);
     map.attributionControl.setPrefix(false);
     const topographic = L.tileLayer(BACKGROUND_MAP.url, { attribution: BACKGROUND_MAP.attribution, maxZoom: BACKGROUND_MAP.maxZoom }).addTo(map);
     const satellite = L.tileLayer(SATELLITE_MAP.url, { attribution: SATELLITE_MAP.attribution, maxZoom: SATELLITE_MAP.maxZoom });
     baseLayers.current = { topographic, satellite };
     let warned = false;
-    const warn = () => { if (!warned) latest.current.onError(labels.tileError); warned = true; };
+    const warn = () => { if (!warned) latest.current.onError(labelsRef.current.tileError); warned = true; };
     topographic.on('tileerror', warn);
     satellite.on('tileerror', warn);
     layers.current = L.featureGroup().addTo(map);
@@ -45,8 +48,9 @@ export default function ActivityMapEditorView({ features, draft, drawing, editin
     });
     const resize = new ResizeObserver(() => map.invalidateSize());
     resize.observe(container.current);
+    requestAnimationFrame(() => map.invalidateSize());
     return () => { resize.disconnect(); map.remove(); mapRef.current = null; baseLayers.current = null; };
-  }, [labels]);
+  }, []);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -94,7 +98,17 @@ export default function ActivityMapEditorView({ features, draft, drawing, editin
     }
   }, [draft, drawing, editing, features, labels, onGeometryChange, onSelect]);
 
-  return <><div ref={container} className={`activity-admin-map${drawing ? ' is-drawing' : ''}`} aria-label={labels.canvas} />
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    // Leaflet owns the container's classes. Replacing className in JSX removes
+    // leaflet-container and its tile sizing rules when drawing is toggled.
+    map.getContainer().classList.toggle('is-drawing', drawing);
+    const frame = requestAnimationFrame(() => map.invalidateSize());
+    return () => cancelAnimationFrame(frame);
+  }, [drawing, editing]);
+
+  return <><div ref={container} className="activity-admin-map" aria-label={labels.canvas} />
     <label className="activity-map-layer-control"><span>{labels.baseMap}</span><select value={baseMap} onChange={(event) => setBaseMap(event.target.value)}>
       <option value="topographic">{labels.topographicMap}</option><option value="satellite">{labels.satelliteMap}</option>
     </select></label></>;

@@ -2,10 +2,11 @@ import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { unstable_cache } from 'next/cache';
 import PublicHomePage from '@/components/PublicHomePage';
+import { getPublicActivityMapFeatures } from '@/lib/activity-map-service';
 import { getPublishedCmsPageSummaries } from '@/lib/cms-pages';
 import { getPublicMapHamlets } from '@/lib/map/public-map-service';
 import { carouselImagesFromFilenames } from '@/lib/public-carousel';
-import { PUBLIC_CMS_CACHE_TAG, PUBLIC_HAMLETS_CACHE_TAG } from '@/lib/public-content-cache';
+import { PUBLIC_ACTIVITY_MAP_CACHE_TAG, PUBLIC_CMS_CACHE_TAG, PUBLIC_HAMLETS_CACHE_TAG } from '@/lib/public-content-cache';
 
 export const runtime = 'nodejs';
 
@@ -31,19 +32,27 @@ const getCachedPublicMapHamlets = unstable_cache(
   ['home-public-map-hamlets'],
   { revalidate: 300, tags: [PUBLIC_HAMLETS_CACHE_TAG] },
 );
+const getCachedPublicActivityMapFeatures = unstable_cache(
+  getPublicActivityMapFeatures,
+  ['home-public-activity-map-features'],
+  { revalidate: 300, tags: [PUBLIC_ACTIVITY_MAP_CACHE_TAG] },
+);
 async function safely(promise, fallback) {
   try { return await promise; } catch { return fallback; }
 }
 
-export default async function HomePage() {
-  const [carouselImages, pages, hamlets] = await Promise.all([
+export default async function HomePage({ searchParams }) {
+  const showActivityMap = (await searchParams).maps === 'turutrollet';
+  const [carouselImages, pages, hamlets, activityMapFeatures] = await Promise.all([
     getCachedCarouselImages(),
     safely(getCachedPublishedCmsPageSummaries(), []),
     safely(getCachedPublicMapHamlets(), []),
+    showActivityMap ? safely(getCachedPublicActivityMapFeatures(), []) : null,
   ]);
   return <PublicHomePage
     carouselImages={carouselImages.length ? carouselImages : [{ id: 'fallback', src: '/turufjell.jpeg', photographer: null, number: 0 }]}
     pages={pages}
     hamlets={JSON.parse(JSON.stringify(hamlets))}
+    activityMapFeatures={activityMapFeatures === null ? null : JSON.parse(JSON.stringify(activityMapFeatures))}
   />;
 }

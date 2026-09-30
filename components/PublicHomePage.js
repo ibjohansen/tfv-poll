@@ -7,9 +7,10 @@ import HomeHeroCarousel from '@/components/HomeHeroCarousel';
 import PublicArticleDirectory from '@/components/PublicArticleDirectory';
 import MemberSelfServiceEntry from '@/components/MemberSelfServiceEntry';
 import PublicHamletMap from '@/components/PublicHamletMap';
+import PublicActivityMap from '@/components/ActivityMap/PublicActivityMap';
 import { useI18n } from '@/components/LocaleProvider';
 
-export default function PublicHomePage({ carouselImages, pages, hamlets }) {
+export default function PublicHomePage({ carouselImages, pages, hamlets, activityMapFeatures = null }) {
   const { t } = useI18n();
   return <div className="brand-public-home min-h-dvh bg-background text-foreground">
     <SiteHeader />
@@ -22,6 +23,7 @@ export default function PublicHomePage({ carouselImages, pages, hamlets }) {
         </div>
       </section>
       <PublicHamletMap hamlets={hamlets} />
+      {activityMapFeatures !== null && <PublicActivityMap features={activityMapFeatures} />}
       <Suspense fallback={null}><MemberSelfServiceEntry /></Suspense>
       {pages.length > 0 && <PublicArticleDirectory pages={pages} />}
     </main>

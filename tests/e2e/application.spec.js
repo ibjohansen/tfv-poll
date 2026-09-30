@@ -71,6 +71,11 @@ test('public map loads automatically and requests Kartverket tiles', async ({ pa
 
 test('activity maps switch to satellite imagery and lifts use polygon drawing', async ({ page, context }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'One desktop browser verifies the shared activity-map behaviour.');
+  // Loaded, deterministic tiles let this test check rendering without external services.
+  await page.route(/^https:\/\/(cache\.kartverket\.no|services\.arcgisonline\.com)\//, (route) => route.fulfill({
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#dce8d2"/><path d="M0 128H256M128 0V256" stroke="#809775"/></svg>',
+  }));
   const satelliteRequests = [];
   page.on('request', (request) => {
     if (new URL(request.url()).hostname === 'services.arcgisonline.com') satelliteRequests.push(request.url());
@@ -95,15 +100,23 @@ test('activity maps switch to satellite imagery and lifts use polygon drawing', 
   await expect(page.getByRole('button', { name: 'Plasser punkt' })).toHaveCount(0);
   await page.getByLabel('Navn').fill('Slåtteliheisen');
   await page.getByLabel('Nummer').fill('H1');
-  await page.getByRole('button', { name: 'Tegn polygon' }).click();
   const adminMap = page.locator('.activity-admin-map');
+  await expect(adminMap).toHaveClass(/leaflet-container/);
+  await expect(adminMap.locator('.leaflet-tile-loaded').first()).toBeVisible();
+  const mapClasses = (await adminMap.getAttribute('class')).split(/\s+/).filter((name) => name.startsWith('leaflet-'));
+  await page.getByRole('button', { name: 'Tegn polygon' }).click();
   await expect(adminMap).toHaveClass(/is-drawing/);
+  for (const name of mapClasses) await expect(adminMap).toHaveClass(new RegExp(`\\b${name}\\b`));
+  await expect(adminMap.locator('.leaflet-tile-loaded').first()).toBeVisible();
+  await expect(adminMap.locator('.leaflet-tile-loaded').first()).toHaveCSS('max-width', 'none');
   await expect(adminMap).toHaveCSS('cursor', 'crosshair');
   const box = await adminMap.boundingBox();
   for (const [x, y] of [[.35, .35], [.65, .35], [.5, .65]]) await adminMap.click({ position: { x: box.width * x, y: box.height * y } });
   await expect(adminMap.locator('div.activity-polygon-vertex')).toHaveCount(3);
   await expect(adminMap.locator('img.leaflet-marker-icon')).toHaveCount(0);
   await page.getByRole('button', { name: 'Fullfør' }).click();
+  for (const name of mapClasses) await expect(adminMap).toHaveClass(new RegExp(`\\b${name}\\b`));
+  await expect(adminMap).not.toHaveClass(/is-drawing/);
   await page.getByRole('button', { name: 'Lagre aktivitet' }).click();
   await expect.poll(() => savedActivity?.featureType).toBe('lift');
   expect(savedActivity.activityNumber).toBe('H1');

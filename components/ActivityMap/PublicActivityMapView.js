@@ -90,6 +90,8 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
       layer.on('click', () => onSelect(feature.id));
       featureLayers.current.set(feature.id, layer);
     }
+    const bounds = group.getBounds();
+    if (bounds.isValid()) mapRef.current.fitBounds(bounds, { maxZoom: 17, padding: [42, 42] });
   }, [features, onSelect, selectedId, showAlpineColors, t]);
 
   useEffect(() => {

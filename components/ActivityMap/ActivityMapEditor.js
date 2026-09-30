@@ -57,7 +57,7 @@ export default function ActivityMapEditor() {
 
   useEffect(() => {
     let active = true;
-    request().then((body) => { if (active) setFeatures(body.features || []); })
+    request().then((body) => { if (active) setFeatures([...(body.features || [])].sort(compareFeatures)); })
       .catch((failure) => { if (active && failure.name !== 'AbortError') setError(failure.message); })
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; controllerRef.current?.abort(); };

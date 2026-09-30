@@ -15,6 +15,7 @@ test('only the exact machine-authenticated background functions bypass the brows
     './lib/route-access': { isPublicPath },
   });
   const matches = (url) => doesProxyMatch({ config: plain(proxy.config), nextConfig: {}, url });
+  for (const path of ['/_next/hmr', '/_next/hmr?id=test', '/_next/webpack-hmr']) assert.equal(matches(path), false, path);
   for (const path of ['/.netlify/functions/matrikkel-sync-background', '/.netlify/functions/matrikkel-sync-background/',
     '/.netlify/functions/matrikkel-sync-background?test=1', '/.netlify/functions/survey-email-background',
     '/.netlify/functions/survey-email-background/', '/.netlify/functions/survey-email-background?test=1',
