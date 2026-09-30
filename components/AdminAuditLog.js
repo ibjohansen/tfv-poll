@@ -40,6 +40,7 @@ function entityLabel(entry, t) {
   if (entry.table_name === 'surveys') return value.title || t('entities.survey', {id: entry.row_id});
   if (entry.table_name === 'survey_responses') return t('entities.response', {id: entry.row_id});
   if (entry.table_name === 'cms_pages') return value.title || t('entities.webPage', {id: entry.row_id});
+  if (entry.table_name === 'activity_map_features') return value.name || entry.row_id;
   if (entry.table_name === 'admin_actions') return t(({ member_export: 'entities.memberExport', survey_results_export: 'entities.surveyExport', map_export: 'entities.mapExport', matrikkel_approve: 'entities.matrikkelApprove', matrikkel_cancel: 'entities.matrikkelCancel', matrikkel_hide: 'entities.matrikkelHide' })[value.action] || 'entities.adminAction');
   return value.original_filename || t('entities.attachment', {id: entry.row_id});
 }
@@ -57,6 +58,7 @@ function entityHref(entry) {
   if (entry.table_name === 'member_profile_updates') return '/admin/inbox';
   if (['surveys', 'survey_responses'].includes(entry.table_name)) return '/admin/surveys';
   if (['cms_pages', 'cms_attachments'].includes(entry.table_name)) return '/admin/web';
+  if (entry.table_name === 'activity_map_features') return '/admin/activity-map';
   return null;
 }
 

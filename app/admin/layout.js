@@ -11,7 +11,7 @@ function visibleAdminModules(user) {
   const permissions = adminPermissions(user);
   const keys = ['overview'];
   if (permissions.has('read')) keys.push('accounting');
-  if (permissions.has('members')) keys.push('inbox', 'members', 'map', 'newsletters');
+  if (permissions.has('members')) keys.push('inbox', 'members', 'map', 'activityMap', 'newsletters');
   if (isAllowedMatrikkelSync(user)) keys.push('matrikkel');
   if (permissions.has('surveys')) keys.push('surveys');
   if (permissions.has('cms')) keys.push('web');

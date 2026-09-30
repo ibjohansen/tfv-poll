@@ -522,6 +522,67 @@ DROP TRIGGER IF EXISTS member_hamlets_version_trigger ON member_hamlets;
 CREATE TRIGGER member_hamlets_version_trigger BEFORE UPDATE ON member_hamlets
 FOR EACH ROW EXECUTE FUNCTION version_hamlet_polygon();
 ALTER TABLE members ADD COLUMN IF NOT EXISTS hamlet_id BIGINT REFERENCES member_hamlets(id) ON DELETE RESTRICT;
+
+-- Publiserte aktivitetsflater og -punkter for alpinanlegget. Geometrien
+-- valideres også i applikasjonen; databasekontrollene hindrer ugyldige
+-- kombinasjoner av kategori, type og alpin farge.
+CREATE TABLE IF NOT EXISTS activity_map_features (
+  id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
+  name TEXT NOT NULL CHECK (length(btrim(name)) BETWEEN 1 AND 160),
+  category TEXT NOT NULL CHECK (category IN ('cycling', 'alpine')),
+  activity_number TEXT,
+  feature_type TEXT NOT NULL,
+  alpine_color TEXT CHECK (alpine_color IN ('blue', 'yellow', 'green', 'red', 'black')),
+  geometry JSONB,
+  is_draft BOOLEAN NOT NULL DEFAULT FALSE,
+  version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ,
+  last_changed_by TEXT
+);
+ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS activity_number TEXT;
+ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_number_check;
+ALTER TABLE activity_map_features ALTER COLUMN activity_number TYPE TEXT USING activity_number::TEXT;
+ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS is_draft BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE activity_map_features ALTER COLUMN geometry DROP NOT NULL;
+ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_features_feature_type_check;
+ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_type_check;
+ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_type_check
+  CHECK (feature_type IN ('trail', 'park', 'sledding', 'lift'));
+ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_number_check
+  CHECK (activity_number IS NULL OR (length(activity_number) BETWEEN 1 AND 24
+    AND activity_number = btrim(activity_number) AND activity_number !~ '[[:cntrl:]]'));
+ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_combination_check;
+ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_combination_check CHECK (
+  (category = 'cycling' AND activity_number IS NULL AND feature_type = 'trail' AND alpine_color IS NULL
+    AND (geometry IS NULL OR geometry->>'type' = 'Polygon')) OR
+  (category = 'alpine' AND feature_type = 'trail' AND (geometry IS NULL OR geometry->>'type' = 'Polygon')) OR
+  (category = 'alpine' AND feature_type = 'lift' AND alpine_color IS NULL
+    AND (geometry IS NULL OR geometry->>'type' = 'Polygon')) OR
+  (category = 'alpine' AND feature_type IN ('park', 'sledding') AND alpine_color IS NULL
+    AND (geometry IS NULL OR geometry->>'type' = 'Point'))
+);
+ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_published_geometry_check;
+ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_published_geometry_check
+  CHECK (is_draft OR geometry IS NOT NULL);
+DROP INDEX IF EXISTS activity_map_features_public_idx;
+CREATE INDEX IF NOT EXISTS activity_map_features_published_idx
+  ON activity_map_features (category, feature_type, activity_number, lower(name), id)
+  WHERE deleted_at IS NULL AND is_draft = FALSE AND geometry IS NOT NULL;
+
+CREATE OR REPLACE FUNCTION increment_activity_map_feature_version()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.version := OLD.version + 1;
+  NEW.updated_at := NOW();
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS activity_map_features_version_trigger ON activity_map_features;
+CREATE TRIGGER activity_map_features_version_trigger
+BEFORE UPDATE ON activity_map_features
+FOR EACH ROW EXECUTE FUNCTION increment_activity_map_feature_version();
 CREATE INDEX IF NOT EXISTS members_hamlet_idx ON members (hamlet_id) WHERE deleted_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS member_email_groups (
@@ -1075,6 +1136,33 @@ DROP TRIGGER IF EXISTS member_annual_fees_audit_trigger ON member_annual_fees;
 CREATE TRIGGER member_annual_fees_audit_trigger
 AFTER INSERT OR UPDATE OR DELETE ON member_annual_fees
 FOR EACH ROW EXECUTE FUNCTION record_audit_change();
+
+DROP TRIGGER IF EXISTS activity_map_features_audit_context_trigger ON activity_map_features;
+CREATE TRIGGER activity_map_features_audit_context_trigger
+BEFORE INSERT OR UPDATE OR DELETE ON activity_map_features
+FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
+DROP TRIGGER IF EXISTS activity_map_features_audit_trigger ON activity_map_features;
+CREATE TRIGGER activity_map_features_audit_trigger
+AFTER INSERT OR UPDATE OR DELETE ON activity_map_features
+FOR EACH ROW EXECUTE FUNCTION record_audit_change();
+
+-- Første katalog over alpinløyper. Faste ID-er og konfliktkontroll gjør
+-- innsettingen trygg å kjøre flere ganger. Geometri fylles inn senere.
+INSERT INTO activity_map_features
+  (id, name, category, activity_number, feature_type, alpine_color, geometry, is_draft, last_changed_by)
+VALUES
+  ('798a797a571e9a1cd5a17cd6680e7655', 'Slåtteliløypa', 'alpine', '1', 'trail', 'blue', NULL, TRUE, 'system:activity-map-seed'),
+  ('a926ed58cf5405a5ca500f4ff38d9df0', 'Furuløypa', 'alpine', '2', 'trail', 'green', NULL, TRUE, 'system:activity-map-seed'),
+  ('ada66ad7797cb2896564eae3e9aa958e', 'Dompappen', 'alpine', '3', 'trail', 'red', NULL, TRUE, 'system:activity-map-seed'),
+  ('0b4654e38e61dce92663dacaedb5d818', 'Blåbærløypa', 'alpine', '4', 'trail', 'blue', NULL, TRUE, 'system:activity-map-seed'),
+  ('393dc9a29777f65633d24bac0e068c39', 'Grønnfinken', 'alpine', '5', 'trail', 'green', NULL, TRUE, 'system:activity-map-seed'),
+  ('054a816f45a73b0b0eade3f77dadeae4', 'Rødreven', 'alpine', '6', 'trail', 'red', NULL, TRUE, 'system:activity-map-seed'),
+  ('514225ace4b549cccb9729291409394e', 'Høgseterløypa', 'alpine', '7', 'trail', 'blue', NULL, TRUE, 'system:activity-map-seed'),
+  ('b06724062a3ffe5659118a06c42c3242', 'Harahopp', 'alpine', '5', 'trail', 'green', NULL, TRUE, 'system:activity-map-seed'),
+  ('105293bb391602174eb45e4ca8976f96', 'Plogen', 'alpine', '8', 'trail', 'green', NULL, TRUE, 'system:activity-map-seed'),
+  ('c9b2d1d682e5c5147b4c4e30b25afef7', 'Trollskogen', 'alpine', '9', 'trail', 'blue', NULL, TRUE, 'system:activity-map-seed'),
+  ('cd6cc311eacb95d1ac61570bc1d4473a', 'Eventyrskogen', 'alpine', '10', 'trail', 'blue', NULL, TRUE, 'system:activity-map-seed')
+ON CONFLICT (id) DO NOTHING;
 
 DROP TRIGGER IF EXISTS member_requests_audit_context_trigger ON member_requests;
 CREATE TRIGGER member_requests_audit_context_trigger

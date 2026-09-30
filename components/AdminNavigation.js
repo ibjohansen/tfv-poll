@@ -13,6 +13,7 @@ export function ModuleIcon({ name }) {
   if (name === 'audit') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18H6V3Zm3 5h6m-6 4h6m-6 4h4" /></svg>;
   if (name === 'usage') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10m6 10V4m6 16v-7m4 7H2" /></svg>;
   if (name === 'newsletter') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3V5Zm1 1 8 7 8-7" /></svg>;
+  if (name === 'activity') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19c3-7 5-11 8-14 2 3 4 7 8 14M7 15h10M9.5 10h5" /><circle cx="12" cy="5" r="1" /></svg>;
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3V10Zm6 10v-6h6v6" /></svg>;
 }
 

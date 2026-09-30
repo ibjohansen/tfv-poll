@@ -778,11 +778,33 @@ produksjonsverifikasjon gjenstår.
 De 11 digitaliserte grendene er nå lagret som kontrollerte polygoner i databasen;
 applikasjonen har ikke lenger en separat utkastkatalog.
 Node må kunne nå `ws.geonorge.no` og `overpass-api.de` over HTTPS, og nettleseren
-må kunne hente kartbilder fra `cache.kartverket.no` og det valgfrie, detaljerte
-bygningslaget fra `wms.geonorge.no`. CSP tillater kun disse to eksterne
-bildekildene. Sørg for passende delt/WAF-rate-limit på kartrutene ved
+må kunne hente kartbilder fra `cache.kartverket.no`, satellittlaget fra
+`services.arcgisonline.com` og det valgfrie, detaljerte bygningslaget fra
+`wms.geonorge.no`. CSP tillater kun disse tre eksterne bildekildene. Sørg for
+passende delt/WAF-rate-limit på kartrutene ved
 produksjonsbruk; den lokale 20/minutt-grensen er bare per-instans.
 Se [kartmodulens datakilder, begrensninger og bruk](docs/map-explorer.md).
+
+Aktivitetskartet ligger på `/admin/activity-map`, med beskyttet Node-rute
+`GET/POST /api/admin/activity-map/features`. Ruten bruker eksisterende
+`members`-rettighet, same-origin-kontroll og pooled databaseforbindelse. Data
+lagres i den additive tabellen `activity_map_features`; sykkel- og alpinløyper
+samt heiser er polygoner, mens park og akebakke er alpine punkt.
+Alpinaktiviteter kan
+ha nummer som tekst (for eksempel `1`, `A` eller `1A`), og alpinløyper kan ha blå, gul, grønn, rød eller svart
+fargekategori. Nye aktiviteter lagres som kladd som standard og kan opprettes
+uten geometri. Bare aktiviteter som er tatt ut av kladd og har gyldig geometri
+vises på forsiden. De elleve navngitte alpinløypene ligger som en idempotent
+kladd-seed i skjemaet. Den offentlige presentasjonskomponenten leser bare ID, navn, nummer, kategori, type,
+eventuell farge og geometri, og kan vise én eller begge kategorier samt slå
+alpinfargene av/på. Aktivitetskartet er foreløpig ikke aktivert på forsiden.
+Admin- og forsidekartet kan veksle mellom Kartverkets
+topografiske kart og Esri World Imagery (satellitt- og flyfoto). Ingen
+personopplysninger eller ny miljøvariabel inngår.
+Adminkartet kan åpnes i fullskjerm med tegneverktøyene tilgjengelige. Den
+additive produksjonsmigreringen ble kjørt og verifisert 30. september 2026; se
+[migreringsstatus](docs/database-migration-2026-09-30.md). Kodeversjonen er ikke
+publisert.
 
 HTML-ruter rendres ved request-tid fordi den strenge CSP-en bruker en ny nonce
 per request. Next.js kan ikke legge denne nonce-en på scripts i statisk eller
@@ -972,7 +994,8 @@ skrive medlemsopplysninger til logger eller eksportfiler. Se
 [migreringsstatus 15. september 2026](docs/database-migration-2026-09-15.md),
 [migreringsstatus 16. september 2026](docs/database-migration-2026-09-16.md),
 [migreringsstatus 17. september 2026](docs/database-migration-2026-09-17.md) og
-[migreringsstatus 19. september 2026](docs/database-migration-2026-09-19.md)
+[migreringsstatus 19. september 2026](docs/database-migration-2026-09-19.md),
+samt [migreringsstatus 30. september 2026](docs/database-migration-2026-09-30.md)
 for utført testing, bekreftede produksjonsmigreringer og gjenopprettingspunkter.
 
 For CMS-revisjoner skal den additive migreringen kjøres før kodeversjonen
@@ -996,7 +1019,7 @@ ikke automatisk.
 
 Skjemaet oppretter også `audit_log` og triggere på `members`, `member_requests`,
 `surveys`, `survey_responses`, `survey_attachments`, `cms_pages` og
-`cms_attachments`. Loggen starter
+`cms_attachments`, samt `activity_map_features`. Loggen starter
 når migreringen kjøres; den rekonstruerer ikke historikk fra tidligere
 endringer. Tilgangstoken, verifiseringshash og interne lagringsnøkler utelates.
 
@@ -1376,6 +1399,20 @@ Utfør kontrollene i denne rekkefølgen:
   adresse, alle matrikkelreferanser, nøyaktighetsklasse og kilde. Et avkortet
   eller endret uttrekk skal avvises. Teiggrenser er ikke grensepåvisning.
   Kontroller at redigering/sletting fjerner gamle resultater, også under lasting.
+- Åpne `/admin/activity-map` med medlemsadministrator. Opprett én sykkel- og én
+  alpinløype som polygon, gi alpinløypen nummer og farge, opprett en heis som
+  polygon, og opprett punkt for park og akebakke. Bytt mellom topografisk kart
+  og satellittkart i både admin- og forsidevisningen. Kontroller at kartet og
+  tegneverktøyene fungerer i fullskjerm. Lagre en kladd uten geometri,
+  kontroller at den ikke vises på
+  forsiden, og kontroller at publisering uten geometri avvises. Verifiser at de
+  elleve forhåndsdefinerte alpinløypene finnes som kladder med riktig nummer og
+  farge. Kontroller redigering, versjonskonflikt, sletting og revisjonslogg.
+  Uten sesjon skal både GET og POST mot `/api/admin/activity-map/features` gi
+  401; konto uten `members`-rettighet skal få 403. Åpne deretter forsiden uten
+  innlogging og kontroller nøyaktig kartsenter, kategori-filtre, alpinfarger av/på,
+  tastatur og mobilbredde 320 px. Offentlig data skal bare inneholde ID, navn,
+  nummer, kategori, type, eventuell farge og geometri.
 - Kontroller at alle `/api/admin/map/*`-rutene, inkludert både GET og POST for
   `/api/admin/map/hamlets`, svarer 401 uten sesjon og 403
   med rolle uten `members`-rettighet. Test feil fra ekstern karttjeneste og

@@ -12,6 +12,7 @@ import SurveyForm from '@/components/SurveyForm';
 import Select from '@/components/Select';
 import PublicArticleDirectory from '@/components/PublicArticleDirectory';
 import PublicHamletMap from '@/components/PublicHamletMap';
+import PublicActivityMap from '@/components/ActivityMap/PublicActivityMap';
 import { surveyId } from '@/data/survey';
 
 export default async function BrowserFixtures() {
@@ -28,6 +29,18 @@ export default async function BrowserFixtures() {
         [9.48, 60.42], [9.49, 60.42], [9.49, 60.43], [9.48, 60.42],
       ]] } },
     }]} />
+    <PublicActivityMap features={[
+      { id: 'activity-cycle-1', name: 'Sykkelrunden', category: 'cycling', featureType: 'trail', alpineColor: null,
+        geometry: { type: 'Polygon', coordinates: [[[9.488, 60.469], [9.494, 60.469], [9.494, 60.473], [9.488, 60.469]]] } },
+      { id: 'activity-alpine-1', name: 'Blåløypa', category: 'alpine', activityNumber: '4A', featureType: 'trail', alpineColor: 'blue',
+        geometry: { type: 'Polygon', coordinates: [[[9.493, 60.472], [9.498, 60.472], [9.498, 60.476], [9.493, 60.472]]] } },
+      { id: 'activity-park-1', name: 'Terrengparken', category: 'alpine', featureType: 'park', alpineColor: null,
+        geometry: { type: 'Point', coordinates: [9.496, 60.474] } },
+      { id: 'activity-sledding-1', name: 'Akebakken', category: 'alpine', featureType: 'sledding', alpineColor: null,
+        geometry: { type: 'Point', coordinates: [9.491, 60.471] } },
+      { id: 'activity-lift-1', name: 'Testheisen', category: 'alpine', featureType: 'lift', alpineColor: null,
+        geometry: { type: 'Point', coordinates: [9.495, 60.475] } },
+    ]} />
     <section aria-label="Test av flervalg"><SurveyForm questionVersion={4} questions={[
       { id: 'q1', number: 1, text: 'Velg aktiviteter', multiple: true, options: [{ value: 'ski', label: 'Skitur' }, { value: 'walk', label: 'Fottur' }] },
       { id: 'q2', number: 2, text: 'Ønsker du mer informasjon?' },

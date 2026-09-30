@@ -22,6 +22,8 @@ await mkdir(join(directory, 'app/admin/browser-test'), { recursive: true });
 await cp(join(root, 'tests/e2e/fixture-page.jsx'), join(directory, 'app/admin/browser-test/page.js'));
 await mkdir(join(directory, 'app/admin/map-browser-test'), { recursive: true });
 await cp(join(root, 'tests/e2e/map-fixture-page.jsx'), join(directory, 'app/admin/map-browser-test/page.js'));
+await mkdir(join(directory, 'app/activity-map-browser-test'), { recursive: true });
+await cp(join(root, 'tests/e2e/activity-map-fixture-page.jsx'), join(directory, 'app/activity-map-browser-test/page.js'));
 await mkdir(join(directory, 'app/admin/regnskap/browser-test'), { recursive: true });
 await cp(join(root, 'tests/e2e/accounting-fixture-page.jsx'), join(directory, 'app/admin/regnskap/browser-test/page.js'));
 await symlink(join(root, 'node_modules'), join(directory, 'node_modules'), 'dir');

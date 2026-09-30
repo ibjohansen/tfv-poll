@@ -31,7 +31,6 @@ const getCachedPublicMapHamlets = unstable_cache(
   ['home-public-map-hamlets'],
   { revalidate: 300, tags: [PUBLIC_HAMLETS_CACHE_TAG] },
 );
-
 async function safely(promise, fallback) {
   try { return await promise; } catch { return fallback; }
 }

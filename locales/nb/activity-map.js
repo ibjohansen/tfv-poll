@@ -1,0 +1,35 @@
+const activityMap = {
+  public: {
+    eyebrow: 'Aktiviteter i fjellet', title: 'Aktivitetskart',
+    introduction: 'Utforsk sykkelområder og alpintilbudet. Velg én eller begge kategorier, og slå løypefargene av eller på.',
+    filters: 'Vis aktiviteter', showColors: 'Vis fargekategorier for alpinløyper',
+    categories: { cycling: 'Sykkel', alpine: 'Alpint' },
+    types: { trail: 'Løype', park: 'Park', sledding: 'Akebakke', lift: 'Heis' },
+    colors: { blue: 'Blå', yellow: 'Gul', green: 'Grønn', red: 'Rød', black: 'Svart' },
+    visibleCount: '{count} aktiviteter vises.', selected: 'Valgt: {name}.', visibleActivities: 'Synlige aktiviteter',
+    noCategories: 'Velg minst én aktivitetskategori for å vise innholdet.', empty: 'Ingen aktiviteter er publisert ennå.',
+    source: 'Aktivitetsområder: Turufjell Vel. Kartlag: Kartverket og Esri World Imagery.', loading: 'Laster aktivitetskart …',
+    tileError: 'Bakgrunnskartet kunne ikke lastes. Prøv igjen senere.', canvasLabel: 'Aktivitetskart over alpinanlegget på Turufjell',
+    baseMap: 'Kartlag', topographicMap: 'Topografisk', satelliteMap: 'Satellitt',
+    zoomIn: 'Zoom inn', zoomOut: 'Zoom ut', enterFullscreen: 'Vis kartet i fullskjerm', exitFullscreen: 'Avslutt fullskjerm', fullscreenError: 'Kartet kunne ikke åpnes i fullskjerm.',
+  },
+  admin: {
+    eyebrow: 'Aktivitetskart', title: 'Administrer aktiviteter',
+    introduction: 'Opprett sykkel- og alpinaktiviteter, tegn polygoner for løyper og heiser, eller plasser punkt for park og akebakke. Bare publiserte aktiviteter vises på forsiden.',
+    savedFeatures: 'Lagrede aktiviteter', new: 'Ny aktivitet', loading: 'Laster aktiviteter …', empty: 'Ingen aktiviteter er lagret.',
+    createTitle: 'Opprett aktivitet', editTitle: 'Rediger «{name}»', name: 'Navn', number: 'Nummer', category: 'Kategori', type: 'Type', color: 'Alpinfarge', noColor: 'Ingen farge', ordinaryTrail: 'Ingen særtype',
+    categories: { cycling: 'Sykkel', alpine: 'Alpint' }, types: { trail: 'Løype', park: 'Park', sledding: 'Akebakke', lift: 'Heis' },
+    colors: { blue: 'Blå', yellow: 'Gul', green: 'Grønn', red: 'Rød', black: 'Svart' },
+    geometryTools: 'Verktøy for kartgeometri', drawPolygon: 'Tegn polygon', placePoint: 'Plasser punkt', finish: 'Fullfør', editGeometry: 'Rediger geometri', finishEditing: 'Fullfør redigering', clearGeometry: 'Fjern geometri',
+    polygonHelp: 'Klikk i kartet for hvert hjørne. Minst tre hjørner må plasseres før polygonet kan fullføres.', pointHelp: 'Klikk i kartet for å plassere punktet. Et lagret punkt kan flyttes ved å velge «Rediger geometri».',
+    save: 'Lagre aktivitet', saving: 'Lagrer …', delete: 'Slett aktivitet', saved: '«{name}» er lagret.', deleted: 'Aktiviteten er slettet.',
+    draft: 'Kladd', saveAsDraft: 'Lagre som kladd', draftHelp: 'Kladder kan lagres uten geometri og vises ikke på forsiden.', publishNeedsGeometry: 'Legg inn geometri før aktiviteten kan publiseres.',
+    confirmDelete: 'Slette «{name}» fra aktivitetskartet?', confirmDiscard: 'Ulagrede endringer blir borte. Vil du fortsette?', requestError: 'Aktivitetskartet kunne ikke oppdateres.',
+    mapCanvasLabel: 'Kart for redigering av aktivitetsløyper', zoomIn: 'Zoom inn', zoomOut: 'Zoom ut',
+    tileError: 'Bakgrunnskartet kunne ikke lastes.', polygonPoint: 'Polygonpunkt {number}', activityPoint: 'Aktivitetspunkt',
+    baseMap: 'Kartlag', topographicMap: 'Topografisk', satelliteMap: 'Satellitt',
+    enterFullscreen: 'Vis kartet i fullskjerm', exitFullscreen: 'Avslutt fullskjerm', fullscreenError: 'Kartet kunne ikke åpnes i fullskjerm.',
+  },
+};
+
+export default activityMap;

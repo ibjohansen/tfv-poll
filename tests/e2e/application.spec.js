@@ -69,6 +69,50 @@ test('public map loads automatically and requests Kartverket tiles', async ({ pa
   await expect.poll(() => tileRequests.length).toBeGreaterThan(0);
 });
 
+test('activity maps switch to satellite imagery and lifts use polygon drawing', async ({ page, context }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'One desktop browser verifies the shared activity-map behaviour.');
+  const satelliteRequests = [];
+  page.on('request', (request) => {
+    if (new URL(request.url()).hostname === 'services.arcgisonline.com') satelliteRequests.push(request.url());
+  });
+
+  await page.goto('/activity-map-browser-test');
+  await page.getByRole('combobox', { name: 'Kartlag' }).selectOption('satellite');
+  await expect.poll(() => satelliteRequests.length).toBeGreaterThan(0);
+  await expect(page.locator('.leaflet-control-attribution')).toContainText('Esri');
+
+  let savedActivity;
+  await authenticate(context);
+  await page.route('**/api/admin/activity-map/features', (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: { ok: true, features: [] } });
+    savedActivity = route.request().postDataJSON();
+    return route.fulfill({ json: { feature: { ...savedActivity, id: 'activity-lift-created', version: 1 } } });
+  });
+  await page.goto('/admin/activity-map');
+  await page.getByRole('combobox', { name: 'Kategori' }).selectOption('alpine');
+  await page.getByRole('combobox', { name: 'Type' }).selectOption('lift');
+  await expect(page.getByRole('button', { name: 'Tegn polygon' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Plasser punkt' })).toHaveCount(0);
+  await page.getByLabel('Navn').fill('Slåtteliheisen');
+  await page.getByLabel('Nummer').fill('H1');
+  await page.getByRole('button', { name: 'Tegn polygon' }).click();
+  const adminMap = page.locator('.activity-admin-map');
+  await expect(adminMap).toHaveClass(/is-drawing/);
+  await expect(adminMap).toHaveCSS('cursor', 'crosshair');
+  const box = await adminMap.boundingBox();
+  for (const [x, y] of [[.35, .35], [.65, .35], [.5, .65]]) await adminMap.click({ position: { x: box.width * x, y: box.height * y } });
+  await expect(adminMap.locator('div.activity-polygon-vertex')).toHaveCount(3);
+  await expect(adminMap.locator('img.leaflet-marker-icon')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Fullfør' }).click();
+  await page.getByRole('button', { name: 'Lagre aktivitet' }).click();
+  await expect.poll(() => savedActivity?.featureType).toBe('lift');
+  expect(savedActivity.activityNumber).toBe('H1');
+  expect(savedActivity.geometry.type).toBe('Polygon');
+  const priorRequests = satelliteRequests.length;
+  await page.getByRole('combobox', { name: 'Kartlag' }).selectOption('satellite');
+  await expect.poll(() => satelliteRequests.length).toBeGreaterThan(priorRequests);
+});
+
 test('public property map tooltips and table selection work in both directions', async ({ page, context }, testInfo) => {
   await authenticate(context);
   const properties = [

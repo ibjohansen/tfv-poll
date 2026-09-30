@@ -19,7 +19,7 @@ function permissionForPath(pathname) {
 function contentSecurityPolicy(nonce) {
   const development = process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : '';
   const upgrade = process.env.NODE_ENV === 'production' ? '; upgrade-insecure-requests' : '';
-  return `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src https://norgeskart.no https://www.norgeskart.no; form-action 'self'; img-src 'self' data: blob: https://cache.kartverket.no https://wms.geonorge.no; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development}; connect-src 'self' https://ws.geonorge.no${upgrade}`;
+  return `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src https://norgeskart.no https://www.norgeskart.no; form-action 'self'; img-src 'self' data: blob: https://cache.kartverket.no https://wms.geonorge.no https://services.arcgisonline.com; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development}; connect-src 'self' https://ws.geonorge.no${upgrade}`;
 }
 
 function nextWithCsp(request, nonce, csp, requestedLocale) {

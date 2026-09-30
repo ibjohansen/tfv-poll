@@ -130,5 +130,13 @@ map.backend = {
     scope: 'Discrepancy totals include linked addresses, known points inside the polygon and cadastral references in loaded parcels. Unknown locations are shown separately; known points outside the polygon are excluded.',
   },
 };
+Object.assign(map.backend.errors, {
+  activityName: 'Enter a name for the activity.', activityAction: 'Invalid activity map action.',
+  activityIdentity: 'The activity or version is invalid.', activityCategory: 'Select a valid activity category.',
+  activityType: 'Select a valid activity type.', activityColor: 'Select a valid alpine colour.', activityNumber: 'The number may contain letters and digits (maximum 24 characters).',
+  activityPoint: 'Place a valid point on the map.', activityCombination: 'Category, activity type, colour and geometry cannot be combined in this way.',
+  activityDraft: 'The draft status is invalid.', activityPublishedGeometry: 'A published activity must have valid geometry.',
+  activityChanged: 'The activity was changed by another user. Reload and try again.', activityMock: 'Activities cannot be saved in demo mode.',
+});
 
 export default map;

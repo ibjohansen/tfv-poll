@@ -1,0 +1,35 @@
+const activityMap = {
+  public: {
+    eyebrow: 'Mountain activities', title: 'Activity map',
+    introduction: 'Explore cycling areas and alpine activities. Select one or both categories and toggle alpine trail colours.',
+    filters: 'Show activities', showColors: 'Show alpine trail colour categories',
+    categories: { cycling: 'Cycling', alpine: 'Alpine' },
+    types: { trail: 'Trail', park: 'Park', sledding: 'Sledding hill', lift: 'Lift' },
+    colors: { blue: 'Blue', yellow: 'Yellow', green: 'Green', red: 'Red', black: 'Black' },
+    visibleCount: '{count} activities shown.', selected: 'Selected: {name}.', visibleActivities: 'Visible activities',
+    noCategories: 'Select at least one activity category to show content.', empty: 'No activities have been published yet.',
+    source: 'Activity areas: Turufjell Vel. Map layers: Kartverket and Esri World Imagery.', loading: 'Loading activity map …',
+    tileError: 'The background map could not be loaded. Please try again later.', canvasLabel: 'Activity map of the alpine area at Turufjell',
+    baseMap: 'Map layer', topographicMap: 'Topographic', satelliteMap: 'Satellite',
+    zoomIn: 'Zoom in', zoomOut: 'Zoom out', enterFullscreen: 'Open map in full screen', exitFullscreen: 'Exit full screen', fullscreenError: 'The map could not be opened in full screen.',
+  },
+  admin: {
+    eyebrow: 'Activity map', title: 'Manage activities',
+    introduction: 'Create cycling and alpine activities, draw polygons for trails and lifts, or place points for parks and sledding hills. Only published activities are shown on the home page.',
+    savedFeatures: 'Saved activities', new: 'New activity', loading: 'Loading activities …', empty: 'No activities have been saved.',
+    createTitle: 'Create activity', editTitle: 'Edit “{name}”', name: 'Name', number: 'Number', category: 'Category', type: 'Type', color: 'Alpine colour', noColor: 'No colour', ordinaryTrail: 'No special type',
+    categories: { cycling: 'Cycling', alpine: 'Alpine' }, types: { trail: 'Trail', park: 'Park', sledding: 'Sledding hill', lift: 'Lift' },
+    colors: { blue: 'Blue', yellow: 'Yellow', green: 'Green', red: 'Red', black: 'Black' },
+    geometryTools: 'Geometry tools', drawPolygon: 'Draw polygon', placePoint: 'Place point', finish: 'Finish', editGeometry: 'Edit geometry', finishEditing: 'Finish editing', clearGeometry: 'Clear geometry',
+    polygonHelp: 'Click the map for each corner. Place at least three corners before finishing the polygon.', pointHelp: 'Click the map to place the point. Move a saved point by selecting “Edit geometry”.',
+    save: 'Save activity', saving: 'Saving …', delete: 'Delete activity', saved: '“{name}” has been saved.', deleted: 'The activity has been deleted.',
+    draft: 'Draft', saveAsDraft: 'Save as draft', draftHelp: 'Drafts can be saved without geometry and are not shown on the home page.', publishNeedsGeometry: 'Add geometry before publishing the activity.',
+    confirmDelete: 'Delete “{name}” from the activity map?', confirmDiscard: 'Unsaved changes will be lost. Continue?', requestError: 'The activity map could not be updated.',
+    mapCanvasLabel: 'Map for editing activity trails', zoomIn: 'Zoom in', zoomOut: 'Zoom out',
+    tileError: 'The background map could not be loaded.', polygonPoint: 'Polygon point {number}', activityPoint: 'Activity point',
+    baseMap: 'Map layer', topographicMap: 'Topographic', satelliteMap: 'Satellite',
+    enterFullscreen: 'Open map in full screen', exitFullscreen: 'Exit full screen', fullscreenError: 'The map could not be opened in full screen.',
+  },
+};
+
+export default activityMap;

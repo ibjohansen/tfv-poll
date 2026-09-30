@@ -8,6 +8,7 @@ import cms from './cms.js';
 import email from './email.js';
 import backend from './backend.js';
 import accounting from './accounting.js';
+import activityMap from './activity-map.js';
 
-const messages = { general, public: publicMessages, members, map, admin, surveys, cms, email, backend, accounting };
+const messages = { general, public: publicMessages, members, map, admin, surveys, cms, email, backend, accounting, activityMap };
 export default messages;

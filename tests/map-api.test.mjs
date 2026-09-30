@@ -118,7 +118,7 @@ test('register adapter projects only needed fields and excludes deleted rows, to
   await assert.rejects(registerModule.getRegisterProperties({ hamletId: 'invalid' }), (error) => error.code === 'errors.invalidHamlet');
 });
 
-test('actual proxy enforces member role for map page/API and narrowly permits Kartverket image tiles', async () => {
+test('actual proxy enforces member role for map page/API and narrowly permits configured image tiles', async () => {
   const env = { AUTH_SECRET: 'test', AUTH_MICROSOFT_ENTRA_ID_ID: 'test', AUTH_MICROSOFT_ENTRA_ID_SECRET: 'test',
     AUTH_MICROSOFT_ENTRA_ID_TENANT_ID: '11111111-1111-1111-1111-111111111111',
     ADMIN_EMAILS: 'test@turufjellvel.no', ADMIN_REQUIRED_ROLES: 'TFV.ReadOnly,TFV.MemberAdmin,TFV.MatrikkelAdmin' };
@@ -137,7 +137,7 @@ test('actual proxy enforces member role for map page/API and narrowly permits Ka
   user.roles = ['TFV.MemberAdmin'];
   const allowed = await proxy(request('/admin/map'));
   assert.equal(allowed.status, 200);
-  assert.match(allowed.headers.get('Content-Security-Policy'), /img-src 'self' data: blob: https:\/\/cache.kartverket.no https:\/\/wms.geonorge.no;/);
+  assert.match(allowed.headers.get('Content-Security-Policy'), /img-src 'self' data: blob: https:\/\/cache.kartverket.no https:\/\/wms.geonorge.no https:\/\/services.arcgisonline.com;/);
   const localized = await proxy(request('/?lang=en'));
   assert.match(localized.headers.get('set-cookie'), /tfv_locale=en/);
   assert.doesNotMatch((await proxy(request('/?lang=de'))).headers.get('set-cookie') || '', /tfv_locale=/);

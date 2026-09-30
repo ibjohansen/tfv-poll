@@ -131,5 +131,13 @@ map.backend = {
     scope: 'Bare koblede adresser, kjente punkter i polygonet og matrikkelreferanser i hentede teiger inngår i mangeltall. Ukjent plassering vises separat; kjente punkter utenfor polygonet er utelatt.',
   },
 };
+Object.assign(map.backend.errors, {
+  activityName: 'Skriv inn et navn på aktiviteten.', activityAction: 'Ugyldig handling for aktivitetskartet.',
+  activityIdentity: 'Aktiviteten eller versjonen er ugyldig.', activityCategory: 'Velg en gyldig aktivitetskategori.',
+  activityType: 'Velg en gyldig aktivitetstype.', activityColor: 'Velg en gyldig alpinfarge.', activityNumber: 'Nummer kan inneholde bokstaver og tall (maks 24 tegn).',
+  activityPoint: 'Plasser et gyldig punkt i kartet.', activityCombination: 'Kategori, aktivitetstype, farge og geometri kan ikke kombineres slik.',
+  activityDraft: 'Kladdestatusen er ugyldig.', activityPublishedGeometry: 'En publisert aktivitet må ha gyldig geometri.',
+  activityChanged: 'Aktiviteten er endret av en annen bruker. Last siden på nytt og prøv igjen.', activityMock: 'Aktiviteter kan ikke lagres i demonstrasjonsmodus.',
+});
 
 export default map;
