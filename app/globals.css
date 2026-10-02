@@ -1115,6 +1115,13 @@ h2 {
 .matrikkel-history button { border: 0; background: transparent; cursor: pointer; font: inherit; }
 .matrikkel-history-open { padding: 0; color: var(--accent); text-align: left; text-decoration: underline; text-underline-offset: 3px; }
 .matrikkel-history-delete { min-height: 40px; padding: 6px 10px; color: var(--danger); font-size: 13px !important; font-weight: 800 !important; text-decoration: none !important; }
+.matrikkel-followup-action { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: -10px 0 28px; padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.matrikkel-followup-action p { margin: 0; color: var(--text-soft); }
+.matrikkel-change-values { display: grid; gap: 9px; margin: 0; }
+.matrikkel-change-values div { display: grid; gap: 2px; }
+.matrikkel-change-values dt { color: var(--text-soft); font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+.matrikkel-change-values dd { margin: 0; font-weight: 700; white-space: normal; }
+.matrikkel-change-values.is-proposed dd { color: var(--accent); }
 .admin-questions { display: grid; gap: 14px; padding-top: 8px; }
 .admin-section-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .admin-section-header h3 { margin: 0; font-size: 18px; }
@@ -1155,6 +1162,7 @@ h2 {
   .matrikkel-intro { flex-direction: column; }
   .matrikkel-member-picker, .matrikkel-selection { grid-template-columns: 1fr; }
   .matrikkel-status dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .matrikkel-followup-action { align-items: stretch; flex-direction: column; }
   .admin-detail-panel { padding: 24px 20px; }
 }
 

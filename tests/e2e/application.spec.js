@@ -327,6 +327,13 @@ test('article dialog traps focus and restores it to the article link', async ({ 
 
 test('public pageviews send only coarse anonymous dimensions and usage dashboard requires audit access', async ({ page, context }) => {
   let payload;
+  await page.addInitScript(() => {
+    const clearedKey = 'turufjell-vel:home-hero-carousel:test-storage-cleared';
+    if (!window.sessionStorage.getItem(clearedKey)) {
+      window.localStorage.removeItem('turufjell-vel:home-hero-carousel:last-image');
+      window.sessionStorage.setItem(clearedKey, 'true');
+    }
+  });
   await page.route('**/api/usage/pageview', (route) => {
     payload = route.request().postDataJSON();
     expect(route.request().headers().cookie).toBeUndefined();
@@ -341,12 +348,17 @@ test('public pageviews send only coarse anonymous dimensions and usage dashboard
   await expect(carousel).toBeVisible();
   await expect.poll(() => carousel.getByRole('img').evaluate((image) => image.complete && image.naturalWidth > 0)).toBe(true);
   await expect(carousel.getByText(/^Foto: /)).toBeVisible();
-  await carousel.getByRole('button', { name: 'Start automatisk bildebytte' }).click();
-  await carousel.getByRole('button', { name: /^Bilde 1 av / }).click();
   await expect(carousel.getByRole('button', { name: /^Bilde 1 av / })).toHaveAttribute('aria-current', 'true');
-  await carousel.focus();
-  await carousel.press('ArrowRight');
+  await expect(carousel.getByRole('button', { name: /^Bilde 2 av / })).toHaveAttribute('aria-current', 'true', { timeout: 6000 });
+  await carousel.getByRole('button', { name: 'Stopp automatisk bildebytte' }).click();
+  await carousel.getByRole('button', { name: /^Bilde 2 av / }).click();
   await expect(carousel.getByRole('button', { name: /^Bilde 2 av / })).toHaveAttribute('aria-current', 'true');
+  await page.reload();
+  const reloadedCarousel = page.getByRole('region', { name: 'Bilder fra Turufjell' });
+  await expect(reloadedCarousel.getByRole('button', { name: /^Bilde 1 av / })).toHaveAttribute('aria-current', 'true');
+  await reloadedCarousel.focus();
+  await reloadedCarousel.press('ArrowRight');
+  await expect(reloadedCarousel.getByRole('button', { name: /^Bilde 2 av / })).toHaveAttribute('aria-current', 'true');
   const expectedDevice = page.viewportSize().width < 768 ? 'mobile' : page.viewportSize().width < 1100 ? 'tablet' : 'desktop';
   await expect.poll(() => payload).toMatchObject({ events: [{ pageType: 'home', deviceCategory: expectedDevice }] });
   expect(Object.keys(payload).sort()).toEqual(['events', 'webVitals']);

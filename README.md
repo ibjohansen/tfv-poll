@@ -888,7 +888,11 @@ utsetter oppstarten til neste femminuttersintervall samme dag. Den månedlige
 kontrollen endrer aldri medlemsregisteret automatisk: sikre endringer og usikre
 treff legges til manuell vurdering, mens en kontroll uten avvik avsluttes uten å
 opprette en oppgave. Fullførte kontroller med avvik og kontroller som feiler,
-vises i oppgavelisten med lenke til det detaljerte resultatet.
+vises i oppgavelisten med lenke til det detaljerte resultatet. Den detaljerte
+visningen viser registrerte verdier før kontrollen ved siden av forslaget fra
+Matrikkelen. Når oppfølgingen er ferdig, kan administratoren merke den som
+fullført. Kjøringen og audit-historikken beholdes, mens oppgaven fjernes fra
+oppgavelisten.
 Den bruker eksisterende `DATABASE_URL`, `MATRIKKEL_JOB_SECRET` og Netlifys `URL`.
 Ingen ny produksjonsvariabel skal opprettes. Funksjonen kan ikke startes via
 en offentlig URL; se [Netlify Scheduled Functions](https://docs.netlify.com/build/functions/scheduled-functions/).

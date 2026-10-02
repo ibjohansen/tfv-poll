@@ -227,6 +227,7 @@ const admin = {
       matrikkelApprove: 'Matrikkelforslag godkjent',
       matrikkelCancel: 'Matrikkelkjøring stoppet',
       matrikkelHide: 'Matrikkelkjøring skjult',
+      matrikkelFollowupComplete: 'Matrikkeloppfølging merket som fullført',
       adminAction: 'Administrativ handling',
       attachment: 'Vedlegg #{id}'
     },

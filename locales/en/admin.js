@@ -227,6 +227,7 @@ const admin = {
       matrikkelApprove: 'Cadastral proposal approved',
       matrikkelCancel: 'Cadastral run stopped',
       matrikkelHide: 'Cadastral run hidden',
+      matrikkelFollowupComplete: 'Cadastral follow-up marked as completed',
       adminAction: 'Administrative action',
       attachment: 'Attachment #{id}'
     },

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
-import { activityFeatureRecord, activityGeometryKind, normalizeActivityFeatureInput, publicActivityFeatureRecord } from '../lib/activity-map.js';
+import { activityFeatureRecord, activityGeometryKind, normalizeActivityFeatureInput, publicActivityFeatureRecord, smoothActivityGeometry } from '../lib/activity-map.js';
 import { MapError } from '../lib/map/geo.js';
 import { loadModule, request } from './helpers/load-module.mjs';
 
@@ -51,6 +51,18 @@ test('activity map accepts versioned deletes and exposes only public fields', ()
   assert.deepEqual(Object.keys(publicResult).sort(), ['activityNumber', 'alpineColor', 'category', 'featureType', 'geometry', 'id', 'name'].sort());
   assert.doesNotMatch(JSON.stringify(publicResult), /private@example|version|isDraft/);
   assert.equal(activityFeatureRecord(row).version, 2); assert.equal(activityFeatureRecord(row).isDraft, true);
+});
+
+test('public activity polygons are smoothed without changing stored geometry or points', () => {
+  const geometry = polygon.geometry;
+  const original = structuredClone(geometry);
+  const smoothed = smoothActivityGeometry(geometry);
+  assert.equal(smoothed.type, 'Polygon');
+  assert.ok(smoothed.coordinates[0].length > geometry.coordinates[0].length);
+  assert.deepEqual(smoothed.coordinates[0][0], smoothed.coordinates[0].at(-1));
+  assert.deepEqual(geometry, original);
+  const point = { type: 'Point', coordinates: [9.4936, 60.4723] };
+  assert.equal(smoothActivityGeometry(point), point);
 });
 
 test('activity map service performs audited, versioned create, update and soft delete', async () => {

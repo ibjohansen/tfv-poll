@@ -9,6 +9,20 @@ function memberLabel(member, t) {
   return `${member.h_number} · ${member.street_address || t('addressMissing')}`;
 }
 
+const changeFields = ['cadastral_number', 'section_number', 'title_holder', 'registration_date'];
+const displayValue = (value, fallback) => String(value ?? '').trim() || fallback;
+
+function MatrikkelValues({ item, source, t }) {
+  const previous = item.previous_values || {};
+  const proposed = item.proposed_values || {};
+  const fields = changeFields.filter((field) => String(previous[field] ?? '').trim() !== String(proposed[field] ?? '').trim());
+  if (!fields.length) return <span>{t('none')}</span>;
+  const values = source === 'previous' ? previous : proposed;
+  return <dl className={`matrikkel-change-values is-${source}`}>{fields.map((field) => <div key={field}>
+    <dt>{t(`changeFields.${field}`)}</dt><dd>{displayValue(values[field], t('missing'))}</dd>
+  </div>)}</dl>;
+}
+
 export default function MatrikkelSyncPanel({ initialRuns, members = [], initialMemberId = '', initialMemberIds = [], initialRunId = '', configured, databaseReady }) {
   const { t, formatLocale } = useI18n('members.matrikkel');
   const [runs, setRuns] = useState(initialRuns);
@@ -16,6 +30,7 @@ export default function MatrikkelSyncPanel({ initialRuns, members = [], initialM
   const [active, setActive] = useState(null);
   const [confirm, setConfirm] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
+  const [confirmFollowup, setConfirmFollowup] = useState(false);
   const [deleteCandidate, setDeleteCandidate] = useState(null);
   const [scope, setScope] = useState('all');
   const [memberSearch, setMemberSearch] = useState('');
@@ -24,6 +39,7 @@ export default function MatrikkelSyncPanel({ initialRuns, members = [], initialM
   const [starting, setStarting] = useState(false);
   const [processingLocally, setProcessingLocally] = useState(false);
   const [message, setMessage] = useState('');
+  const [notice, setNotice] = useState('');
   const selectedMember = members.find((member) => member.id === selectedMemberId) || null;
   const memberQuery = memberSearch.trim().toLocaleLowerCase('nb-NO');
   const matchingMembers = memberQuery ? members.filter((member) => [member.h_number, member.street_address, member.cadastral_number]
@@ -84,7 +100,7 @@ export default function MatrikkelSyncPanel({ initialRuns, members = [], initialM
   }
 
   async function approve(item) {
-    setMessage('');
+    setMessage(''); setNotice('');
     try {
       const response = await fetch(`/api/admin/matrikkel/runs/${active.id}/items/${item.member_id}/approve`, { method: 'POST' });
       const body = await response.json();
@@ -95,6 +111,23 @@ export default function MatrikkelSyncPanel({ initialRuns, members = [], initialM
       setActive(detail.data);
       setRuns((current) => [detail.data, ...current.filter((run) => run.id !== detail.data.id)].slice(0, 10));
     } catch (error) { setMessage(error.message || t('approveError')); }
+  }
+
+  async function completeFollowup() {
+    if (!current) return;
+    setStarting(true); setMessage(''); setNotice('');
+    try {
+      const response = await fetch(`/api/admin/matrikkel/runs/${current.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'complete_followup' }),
+      });
+      const body = await response.json();
+      if (!response.ok || !body.ok) throw new Error(body.message);
+      const completed = { ...current, ...body.run };
+      setActive(completed);
+      setRuns((values) => values.map((run) => run.id === completed.id ? { ...run, ...completed } : run));
+      setConfirmFollowup(false); setNotice(t('followupCompleted'));
+    } catch (error) { setConfirmFollowup(false); setMessage(error.message || t('followupError')); }
+    finally { setStarting(false); }
   }
 
   async function stop() {
@@ -136,11 +169,18 @@ export default function MatrikkelSyncPanel({ initialRuns, members = [], initialM
     {!configured && <p className="form-error" role="alert">{t('apiMissing')}</p>}
     {!databaseReady && <p className="form-error" role="alert">{t('databaseMissing')}</p>}
     {message && <p className="form-error" role="alert">{message}</p>}
+    {notice && <p role="status">{notice}</p>}
     {current && <section className="matrikkel-status" aria-live="polite"><div><p className="eyebrow">{t('latest', {scope: currentScope})}</p><h2>{t(`statuses.${current.status}`, {}, current.status)}</h2><p>{t('startedBy', {user: current.requested_by})}</p></div><dl><div><dt>{t('processed')}</dt><dd>{current.processed_count || 0} / {current.total_count || 0}</dd></div><div><dt>{t('updated')}</dt><dd>{current.updated_count || 0}</dd></div><div><dt>{t('unchanged')}</dt><dd>{current.unchanged_count || 0}</dd></div><div><dt>{t('review')}</dt><dd>{current.review_count || 0}</dd></div><div><dt>{t('errors')}</dt><dd>{current.error_count || 0}</dd></div><div><dt>{t('backedUp')}</dt><dd>{current.backup_count ?? current.total_count ?? 0}</dd></div></dl>{current.error_message && <p className="form-error">{current.error_message}</p>}</section>}
-    {active?.items?.length > 0 && <div className="admin-table-scroll" role="region" aria-label={t('deviations')} tabIndex={0}><table className="admin-table"><caption>{t('deviationsCaption')}</caption><thead><tr><th>{t('hNumberLabel')}</th><th>{t('status')}</th><th>{t('address')}</th><th>{t('proposal')}</th><th>{t('message')}</th><th>{t('action')}</th></tr></thead><tbody>{active.items.map((item) => <tr key={item.member_id}><th scope="row">{item.h_number}</th><td>{item.status}</td><td>{item.source_address || t('missing')}</td><td>{item.proposed_values ? `${item.proposed_values.cadastral_number || ''} · ${item.proposed_values.title_holder || t('noOwner')}` : t('none')}</td><td>{item.message}</td><td>{item.status === 'review' && item.proposed_values && <button className="admin-button" type="button" onClick={() => approve(item)}>{t('approve')}</button>}</td></tr>)}</tbody></table></div>}
+    {current?.run_type === 'monthly' && ['completed', 'failed', 'cancelled'].includes(current.status) && <div className="matrikkel-followup-action">
+      {current.followup_completed_at
+        ? <p>{t('followupCompletedDetails', {user: current.followup_completed_by, date: new Date(current.followup_completed_at).toLocaleString(formatLocale)})}</p>
+        : <><p>{t('followupHelp')}</p><button className="primary-button" type="button" onClick={() => setConfirmFollowup(true)} disabled={starting}>{t('completeFollowup')}</button></>}
+    </div>}
+    {active?.items?.length > 0 && <div className="admin-table-scroll" role="region" aria-label={t('deviations')} tabIndex={0}><table className="admin-table"><caption>{t('deviationsCaption')}</caption><thead><tr><th>{t('hNumberLabel')}</th><th>{t('status')}</th><th>{t('address')}</th><th>{t('registeredValues')}</th><th>{t('proposedValues')}</th><th>{t('message')}</th><th>{t('action')}</th></tr></thead><tbody>{active.items.map((item) => <tr key={item.member_id}><th scope="row">{item.h_number}</th><td>{item.status}</td><td>{item.source_address || t('missing')}</td><td><MatrikkelValues item={item} source="previous" t={t} /></td><td><MatrikkelValues item={item} source="proposed" t={t} /></td><td>{item.message}</td><td>{item.status === 'review' && item.proposed_values && <button className="admin-button" type="button" onClick={() => approve(item)}>{t('approve')}</button>}</td></tr>)}</tbody></table></div>}
     {runs.length > 0 && <section className="matrikkel-history"><h2>{t('history')}</h2><ul>{runs.map((run) => { const date = new Date(run.created_at).toLocaleString(formatLocale); return <li key={run.id}><button className="matrikkel-history-open" type="button" onClick={() => { setActiveId(run.id); setActive(run); }}>{date} · {t(`statuses.${run.status}`, {}, run.status)} · {run.processed_count || 0}/{run.total_count}</button>{!['pending', 'running'].includes(run.status) && <button className="matrikkel-history-delete" type="button" onClick={() => setDeleteCandidate(run)} aria-label={t('removeRun', {date})}>{t('delete')}</button>}</li>; })}</ul></section>}
     <ConfirmDialog open={confirm} title={scope === 'test' ? t('confirmTest') : scope === 'member' ? t('confirmMember', {member: selectedMember ? memberLabel(selectedMember, t) : t('selectedMemberFallback')}) : scope === 'selection' ? t('confirmSelection', {count: selectedMemberIds.length}) : t('confirmAll')} description={scope === 'member' ? t('memberDescription') : scope === 'selection' ? t('selectionDescription') : t('allDescription')} confirmLabel={scope === 'test' ? t('startTest') : scope === 'member' ? t('updateOne') : scope === 'selection' ? t('updateSelection') : t('syncAll')} busy={starting} onCancel={() => setConfirm(false)} onConfirm={start} />
     <ConfirmDialog open={confirmStop} title={t('confirmStop')} description={t('stopDescription')} confirmLabel={t('stop')} busy={starting} onCancel={() => setConfirmStop(false)} onConfirm={stop} />
+    <ConfirmDialog open={confirmFollowup} title={t('confirmFollowup')} description={t('confirmFollowupDescription')} confirmLabel={t('completeFollowup')} busy={starting} onCancel={() => setConfirmFollowup(false)} onConfirm={completeFollowup} />
     <ConfirmDialog open={Boolean(deleteCandidate)} title={t('confirmRemove')} description={t('removeDescription')} confirmLabel={t('removeConfirm')} busy={starting} onCancel={() => setDeleteCandidate(null)} onConfirm={removeRun} />
   </>;
 }

@@ -53,7 +53,7 @@ test('member comment stays with its update, appears in inbox and can be acknowle
   assert.equal(audit[1].after_value.comment, comment);
 });
 
-test('monthly Matrikkel deviations appear in the task list count until the run is hidden', async () => {
+test('monthly Matrikkel deviations leave the task list when follow-up is completed without hiding the run', async () => {
   const before = await api.getAdminTaskCount();
   const runId = randomUUID().replaceAll('-', '');
   const monthSeed = Number.parseInt(runId.slice(0, 8), 16);
@@ -64,8 +64,11 @@ test('monthly Matrikkel deviations appear in the task list count until the run i
   const tasks = await api.getAdminMatrikkelTasks();
   assert.equal(tasks.find((task) => task.id === runId).review_count, 2);
   assert.equal(await api.getAdminTaskCount(), before + 1);
-  await db.sql`UPDATE matrikkel_sync_runs SET deleted_at = NOW() WHERE id = ${runId}`;
+  await db.sql`UPDATE matrikkel_sync_runs SET followup_completed_at = NOW(), followup_completed_by = 'admin@example.test' WHERE id = ${runId}`;
   assert.equal(await api.getAdminTaskCount(), before);
+  const [retained] = await db.sql`SELECT deleted_at, followup_completed_by FROM matrikkel_sync_runs WHERE id = ${runId}`;
+  assert.equal(retained.deleted_at, null);
+  assert.equal(retained.followup_completed_by, 'admin@example.test');
 });
 
 test('member can change sharing reservation and the timestamp and profile history are retained', async () => {

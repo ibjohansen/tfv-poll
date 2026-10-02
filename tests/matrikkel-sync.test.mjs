@@ -11,13 +11,25 @@ async function setup(options = {}) {
   const state = {
     run: { id: runId, status: 'pending', requested_by: 'admin@example.test', total_count: 1 },
     members: [{ ...member }], items: new Map(), queries: [], lookups: [], addresses: [],
-    owners: [{ name: 'Ny eier', dateFrom: '2026-01-01' }], matchType: 'EXACT', ...options,
+    owners: [{ name: 'Ny eier', dateFrom: '2026-01-01' }], matchType: 'EXACT', auditActions: [], ...options,
   };
   const sql = async (strings, ...values) => {
     const query = strings.join('?');
     state.queries.push({ query, values });
     if (state.databaseFailure?.(query)) throw new Error('Database unavailable');
     if (query.includes('pg_advisory_xact_lock')) return [];
+    if (query.includes('WITH completed AS')) {
+      if (!state.run || state.run.deleted_at || state.run.run_type !== 'monthly'
+        || !['completed', 'failed', 'cancelled'].includes(state.run.status)
+        || state.run.followup_completed_at) return [];
+      state.run.followup_completed_at = '2026-10-01T12:00:00.000Z';
+      state.run.followup_completed_by = values[0];
+      state.auditActions.push({ changedBy: values[2], action: 'matrikkel_followup_complete' });
+      return [{ ...state.run }];
+    }
+    if (query.includes('SELECT * FROM matrikkel_sync_runs WHERE id = ? AND deleted_at IS NULL')) {
+      return state.run && !state.run.deleted_at ? [{ ...state.run }] : [];
+    }
     if (query.includes("AND status = 'pending' AND started_at IS NULL")) {
       if (!state.run || state.run.status !== 'pending' || state.run.started_at || state.run.deleted_at) return [];
       state.run.status = 'failed';
@@ -199,6 +211,36 @@ test('dispatch failure status helper requires permission and rejects invalid, mi
     const { api } = await setup({ run });
     await assert.rejects(api.failPendingMatrikkelRun(runId), /Run not found/);
   }
+});
+
+test('monthly follow-up can be completed once without deleting its run or duplicate audit entries', async () => {
+  const { api, state } = await setup({
+    run: { id: runId, status: 'completed', run_type: 'monthly', requested_by: 'admin@example.test', total_count: 1 },
+  });
+  const completed = await api.completeMatrikkelFollowup(runId);
+  assert.equal(completed.followup_completed_by, 'admin@example.test');
+  assert.equal(completed.followup_completed_at, '2026-10-01T12:00:00.000Z');
+  assert.equal(state.run.deleted_at, undefined);
+  assert.deepEqual(state.auditActions, [{ changedBy: 'admin@example.test', action: 'matrikkel_followup_complete' }]);
+
+  const repeated = await api.completeMatrikkelFollowup(runId);
+  assert.equal(repeated.followup_completed_at, completed.followup_completed_at);
+  assert.equal(state.auditActions.length, 1);
+});
+
+test('follow-up completion rejects active, manual, invalid and missing runs', async () => {
+  const active = await setup({ run: { id: runId, status: 'running', run_type: 'monthly' } });
+  await assert.rejects(active.api.completeMatrikkelFollowup(runId), /Run still active/);
+
+  const manual = await setup({ run: { id: runId, status: 'completed', run_type: 'manual' } });
+  await assert.rejects(manual.api.completeMatrikkelFollowup(runId), /Follow-up unavailable/);
+
+  const invalid = await setup();
+  await assert.rejects(invalid.api.completeMatrikkelFollowup('invalid'), /Invalid run ID/);
+  assert.equal(invalid.state.queries.length, 0);
+
+  const missing = await setup({ run: null });
+  await assert.rejects(missing.api.completeMatrikkelFollowup(runId), /Run not found/);
 });
 
 test('exact match updates property, collapses duplicate owners and records requester', async () => {

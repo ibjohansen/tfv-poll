@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { ACTIVITY_MAP_CENTER } from '@/lib/activity-map';
+import { ACTIVITY_MAP_CENTER, smoothActivityGeometry } from '@/lib/activity-map';
 import { BACKGROUND_MAP, SATELLITE_MAP } from '@/lib/map/sources';
 import { useI18n } from '@/components/LocaleProvider';
 
@@ -76,7 +76,7 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
     for (const feature of features) {
       const selected = feature.id === selectedId;
       const style = featureStyle(feature, showAlpineColors, selected);
-      const layer = L.geoJSON({ type: 'Feature', properties: {}, geometry: feature.geometry }, {
+      const layer = L.geoJSON({ type: 'Feature', properties: {}, geometry: smoothActivityGeometry(feature.geometry) }, {
         style,
         pointToLayer: (_item, point) => L.circleMarker(point, { ...style, radius: selected ? 12 : 9, fillOpacity: .92 }),
       }).addTo(group);

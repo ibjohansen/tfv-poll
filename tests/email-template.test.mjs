@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { formatNorwegianDateTime, renderMemberAccessEmail, renderMembershipVerificationEmail, renderSurveyInvitationEmail, SYSTEM_EMAIL_FOOTER } from '../lib/email-templates.js';
+import { formatNorwegianDateTime, renderMemberAccessEmail, renderMembershipVerificationEmail, renderSurveyInvitationEmail, renderSurveyResultsEmail, SYSTEM_EMAIL_FOOTER } from '../lib/email-templates.js';
 import { buildSurveyUrl, isPastSurveyEnd, parseTestRecipients, selectCampaignRecipients } from '../lib/survey-email-utils.js';
 
 test('survey URL uses a scoped 256-bit token without exposing member or survey IDs', () => {
@@ -31,6 +31,18 @@ test('survey test email links to a non-persisting preview', () => {
   assert.match(rendered.html, /testinnsending lagres ikke/);
   assert.match(rendered.text, /forhåndsvisning/i);
   assert.match(rendered.text, /preview=signed-token/);
+});
+
+test('survey results draft contains the board statement and chart markup', () => {
+  const rendered = renderSurveyResultsEmail({ baseUrl: 'https://medlemsservice.turufjellvel.no', isTest: true, results: { versions: [{ questions: [{ text: 'Var løftet avgjørende?', answered_count: 274, percentages: { ja: 58, nei: 42 } }] }] } });
+  assert.equal(rendered.subject, '[TEST] Resultatet av medlemsundersøkelsen');
+  assert.match(rendered.html, /Totalt har 274 medlemmer svart/);
+  assert.match(rendered.html, /Styrets vurdering/);
+  assert.match(rendered.html, /Veien videre/);
+  assert.match(rendered.html, /<svg/);
+  assert.match(rendered.html, /58 %/);
+  assert.match(rendered.text, /ikke sendt til medlemslisten/);
+  assert.doesNotMatch(rendered.html, /<script|fonts\.googleapis/i);
 });
 
 test('member access and membership verification emails contain a visible 15-minute secret link', () => {

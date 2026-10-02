@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/components/LocaleProvider';
 
 const AUTOPLAY_DELAY_MS = 4000;
+const LAST_IMAGE_STORAGE_KEY = 'turufjell-vel:home-hero-carousel:last-image';
 
 function Chevron({ direction }) {
   return (
@@ -27,10 +28,12 @@ export default function HomeHeroCarousel({ images }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [hasFocusWithin, setHasFocusWithin] = useState(false);
-  const [isPaused, setIsPaused] = useState(true);
+  const [isPaused, setIsPaused] = useState(false);
   const [visible, setVisible] = useState(true);
+  const [hasRestoredImage, setHasRestoredImage] = useState(false);
   const container = useRef(null);
   const imageCount = images.length;
+  const activeImage = images[activeIndex];
 
   const showPrevious = useCallback(() => {
     setActiveIndex((current) => (current - 1 + imageCount) % imageCount);
@@ -39,6 +42,34 @@ export default function HomeHeroCarousel({ images }) {
   const showNext = useCallback(() => {
     setActiveIndex((current) => (current + 1) % imageCount);
   }, [imageCount]);
+
+  useEffect(() => {
+    if (hasRestoredImage) return;
+
+    const timer = window.setTimeout(() => {
+      try {
+        const lastImageId = window.localStorage.getItem(LAST_IMAGE_STORAGE_KEY);
+        const lastImageIndex = images.findIndex((image) => image.id === lastImageId);
+        if (lastImageIndex >= 0) setActiveIndex((lastImageIndex + 1) % imageCount);
+      } catch {
+        // The carousel must also work when the browser blocks local storage.
+      }
+
+      setHasRestoredImage(true);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [hasRestoredImage, imageCount, images]);
+
+  useEffect(() => {
+    if (!hasRestoredImage || !activeImage) return;
+
+    try {
+      window.localStorage.setItem(LAST_IMAGE_STORAGE_KEY, activeImage.id);
+    } catch {
+      // Remembering the image is optional and must not affect the carousel.
+    }
+  }, [activeImage, hasRestoredImage]);
 
   useEffect(() => {
     if (!window.IntersectionObserver || !container.current) return;
@@ -77,8 +108,6 @@ export default function HomeHeroCarousel({ images }) {
   function handleBlur(event) {
     if (!event.currentTarget.contains(event.relatedTarget)) setHasFocusWithin(false);
   }
-
-  const activeImage = images[activeIndex];
 
   return (
     <section

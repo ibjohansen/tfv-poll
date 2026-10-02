@@ -144,7 +144,9 @@ CREATE TABLE IF NOT EXISTS matrikkel_sync_runs (
   worker_lease_expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   started_at TIMESTAMPTZ,
-  completed_at TIMESTAMPTZ
+  completed_at TIMESTAMPTZ,
+  followup_completed_at TIMESTAMPTZ,
+  followup_completed_by TEXT
 );
 
 CREATE TABLE IF NOT EXISTS matrikkel_sync_backups (
@@ -187,6 +189,8 @@ ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS dispatch_attempts INTEG
 ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS last_dispatch_at TIMESTAMPTZ;
 ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS run_type TEXT NOT NULL DEFAULT 'manual';
 ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS scheduled_month DATE;
+ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS followup_completed_at TIMESTAMPTZ;
+ALTER TABLE matrikkel_sync_runs ADD COLUMN IF NOT EXISTS followup_completed_by TEXT;
 ALTER TABLE matrikkel_sync_items ADD COLUMN IF NOT EXISTS worker_token TEXT;
 ALTER TABLE matrikkel_sync_items ADD COLUMN IF NOT EXISTS attempt_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE matrikkel_sync_runs DROP CONSTRAINT IF EXISTS matrikkel_sync_runs_status_check;

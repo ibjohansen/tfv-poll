@@ -43,6 +43,7 @@ const cases = [
   ['cms/pages/[id]/attachments/[attachmentId]', 'DELETE', 'cms-files', 'deleteAdminCmsFile', 200],
   ['matrikkel/runs', 'GET', 'matrikkel-sync', 'getMatrikkelRuns', 200, { unauthorized: 403 }],
   ['matrikkel/runs', 'POST', 'matrikkel-sync', 'createMatrikkelRun', 201, { unauthorized: 403 }],
+  ['matrikkel/runs/[id]', 'PATCH', 'matrikkel-sync', 'completeMatrikkelFollowup', 200, { body: { action: 'complete_followup' }, unauthorized: 403 }],
   ['matrikkel/runs/[id]', 'DELETE', 'matrikkel-sync', 'deleteMatrikkelRunLog', 200, { unauthorized: 403 }],
   ['matrikkel/runs/[id]', 'DELETE', 'matrikkel-sync', 'cancelMatrikkelRun', 200, { query: '?action=cancel', unauthorized: 403 }],
   ['matrikkel/runs/[id]/process', 'POST', 'matrikkel-sync', 'processMatrikkelRun', 200, { unauthorized: 403 }],
@@ -59,7 +60,7 @@ const exportsByModule = {
   'survey-files': ['uploadAdminSurveyAttachment', 'updateAdminSurveyAttachment', 'deleteAdminSurveyAttachment'],
   'cms-pages': ['getAdminCmsPages', 'createAdminCmsPage', 'copyAdminCmsPage', 'getAdminCmsPage', 'updateAdminCmsPage', 'deleteAdminCmsPage', 'setAdminCmsPageStatus', 'getAdminCmsPageRevisions', 'restoreAdminCmsPageRevision'],
   'cms-files': ['uploadAdminCmsFile', 'deleteAdminCmsFile', 'reorderAdminCmsAttachments', 'updateAdminCmsAttachment', 'getAdminCmsMedia', 'reuseAdminCmsFile'],
-  'matrikkel-sync': ['getMatrikkelRuns', 'getMatrikkelRun', 'getMatrikkelMemberOptions', 'createMatrikkelRun', 'failPendingMatrikkelRun', 'deleteMatrikkelRunLog', 'cancelMatrikkelRun', 'processMatrikkelRun', 'approveMatrikkelItem'],
+  'matrikkel-sync': ['getMatrikkelRuns', 'getMatrikkelRun', 'getMatrikkelMemberOptions', 'createMatrikkelRun', 'failPendingMatrikkelRun', 'completeMatrikkelFollowup', 'deleteMatrikkelRunLog', 'cancelMatrikkelRun', 'processMatrikkelRun', 'approveMatrikkelItem'],
 };
 
 async function setup(path, overrides = {}, value) {

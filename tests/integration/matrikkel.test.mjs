@@ -88,6 +88,14 @@ test('monthly checks queue detected changes for manual approval without changing
   await f.api.approveMatrikkelItem(f.runId, f.memberId);
   const [afterApproval] = await db.sql`SELECT title_holder FROM members WHERE id = ${f.memberId}`;
   assert.equal(afterApproval.title_holder, 'Syntetisk ny eier');
+  const completed = await f.api.completeMatrikkelFollowup(f.runId);
+  assert.equal(completed.followup_completed_by, 'editor@example.test');
+  assert.ok(completed.followup_completed_at);
+  const [retained] = await db.sql`SELECT deleted_at FROM matrikkel_sync_runs WHERE id = ${f.runId}`;
+  assert.equal(retained.deleted_at, null);
+  const actions = await db.sql`SELECT changed_by, after_value->>'action' AS action FROM audit_log
+    WHERE table_name = 'admin_actions' AND row_id = ${f.runId} ORDER BY id`;
+  assert.deepEqual(actions.at(-1), { changed_by: 'editor@example.test', action: 'matrikkel_followup_complete' });
 });
 
 test('a live lease excludes a duplicate invocation', async () => {
