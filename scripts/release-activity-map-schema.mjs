@@ -9,7 +9,7 @@ import { splitSqlStatements } from './split-sql-statements.mjs';
 
 export function activityMapStatements(schema) {
   return splitSqlStatements(schema).filter((statement) =>
-    /(?:CREATE TABLE IF NOT EXISTS|ALTER TABLE|INSERT INTO) activity_map_(?:features|categories|types)\b/.test(statement)
+    /(?:CREATE TABLE IF NOT EXISTS|ALTER TABLE|INSERT INTO) activity_map_(?:features|categories|types|import_runs)\b/.test(statement)
     || /(?:CREATE (?:UNIQUE )?INDEX IF NOT EXISTS|DROP INDEX IF EXISTS|CREATE TRIGGER|DROP TRIGGER IF EXISTS) activity_map_\w+\b/.test(statement)
     || /CREATE OR REPLACE FUNCTION (?:increment_activity_map_feature_version|validate_activity_map_geometry|preserve_activity_map_type_geometry|record_audit_change)\(\)/.test(statement));
 }

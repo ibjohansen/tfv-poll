@@ -3313,6 +3313,11 @@ body:has(.cookie-notice) { padding-bottom: 6rem; }
 .public-activity-map-frame .leaflet-tooltip p { max-width: 260px; margin: 5px 0 0; color: #493f39; white-space: normal; }
 .public-activity-status { min-height: 44px; padding: 11px 0; color: var(--text-soft); font-size: 12px; }
 .public-activity-status p { margin: 0; }
+.activity-season-filter { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; font-weight: 700; }
+.activity-season-filter select { min-height: 44px; padding: 8px 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: #fff; color: var(--brand-brown); font: inherit; }
+.activity-selected-details { margin-bottom: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.activity-selected-details h3 { margin-top: 0; }
+.activity-selected-details a { display: inline-block; padding: 10px 0; text-decoration: underline; }
 .public-activity-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
 .public-activity-list button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 56px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--brand-brown); font: inherit; text-align: left; cursor: pointer; }
 .public-activity-list button:hover, .public-activity-list button[aria-pressed="true"] { border-color: var(--brand-light-burgundy); box-shadow: inset 3px 0 var(--brand-light-burgundy); }

@@ -93,6 +93,21 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
         label.append(description);
       }
       layer.bindTooltip(label, { sticky: true, direction: 'auto' });
+      const popup = label.cloneNode(true);
+      if (feature.season) {
+        const season = document.createElement('p');
+        season.textContent = t(`seasons.${feature.season}`);
+        popup.append(season);
+      }
+      if (feature.websiteUrl) {
+        const link = document.createElement('a');
+        link.href = feature.websiteUrl;
+        link.textContent = t('visitWebsite');
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        popup.append(link);
+      }
+      layer.bindPopup(popup);
       layer.on('click', () => onSelect(feature.id));
       featureLayers.current.set(feature.id, layer);
     }
@@ -105,6 +120,7 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
     if (!layer) return;
     const bounds = layer.getBounds();
     if (bounds.isValid()) mapRef.current.fitBounds(bounds, { maxZoom: 18, padding: [42, 42] });
+    layer.openPopup();
   }, [selectedId]);
 
   return <div ref={frame} className="public-activity-map-frame"><div ref={container} className="public-activity-map" aria-label={t('canvasLabel')} />

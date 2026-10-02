@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/components/LocaleProvider';
-import { ALPINE_COLORS, normalizeActivityNumber } from '@/lib/activity-map';
+import { ACTIVITY_SEASONS, ALPINE_COLORS, normalizeActivityNumber } from '@/lib/activity-map';
 import { activityCatalogLabel, activityCategoryLabel, activityTypeLabel, findActivityType, withActivityCatalog } from '@/lib/activity-map-catalog';
 import ActivityMapCatalogManager from './ActivityMapCatalogManager';
 
@@ -13,7 +13,7 @@ function MapLoading() {
 }
 const ActivityMapEditorView = dynamic(() => import('./ActivityMapEditorView'), { ssr: false, loading: MapLoading });
 
-const emptyDraft = () => ({ id: null, version: null, name: '', tooltipText: '', category: 'cycling', activityNumber: '', featureType: 'trail', alpineColor: '', geometry: null, isDraft: true });
+const emptyDraft = () => ({ id: null, version: null, name: '', tooltipText: '', season: '', websiteUrl: '', category: 'cycling', activityNumber: '', featureType: 'trail', alpineColor: '', geometry: null, isDraft: true });
 
 const geometryType = { polygon: 'Polygon', line: 'LineString', point: 'Point' };
 
@@ -142,7 +142,8 @@ export default function ActivityMapEditor() {
     try {
       const payload = { action: draft.id ? 'update' : 'create', id: draft.id, version: draft.version,
         name: draft.name, tooltipText: draft.tooltipText || null, category: draft.category, activityNumber: draft.category === 'alpine' && draft.activityNumber !== '' ? draft.activityNumber : null,
-        featureType: draft.featureType, alpineColor: draft.alpineColor || null, geometry: draft.geometry, isDraft: draft.isDraft };
+        featureType: draft.featureType, alpineColor: draft.alpineColor || null, geometry: draft.geometry, isDraft: draft.isDraft,
+        season: draft.season || null, websiteUrl: draft.websiteUrl || null };
       const { feature } = await request({ method: 'POST', body: JSON.stringify(payload) });
       setFeatures((current) => [...current.filter((item) => item.id !== feature.id), feature]
         .sort(compareFeatures));
@@ -199,6 +200,10 @@ export default function ActivityMapEditor() {
           <label>{t('type')}<select value={draft.featureType} onChange={(event) => changeType(event.target.value)}>
             {!kind && <option value="">{t('catalog.selectType')}</option>}{catalog.types.filter((item) => item.category === draft.category).map((item) => <option key={item.id} value={item.id}>{activityCatalogLabel(item, 'types', t)}</option>)}
           </select></label>
+          <label>{t('season')}<select value={draft.season || ''} onChange={(event) => setDraft((current) => ({ ...current, season: event.target.value }))}>
+            <option value="">{t('noSeason')}</option>{ACTIVITY_SEASONS.map((season) => <option key={season} value={season}>{t(`seasons.${season}`)}</option>)}
+          </select></label>
+          <label className="activity-tooltip-field">{t('website')}<input type="url" maxLength={2048} placeholder="https://" value={draft.websiteUrl || ''} onChange={(event) => setDraft((current) => ({ ...current, websiteUrl: event.target.value }))} /></label>
         </div>
         {!catalog.types.some((item) => item.category === draft.category) && !busy && <p className="muted">{t('catalog.noTypes')}</p>}
         <label className="activity-draft-toggle"><input type="checkbox" checked={draft.isDraft} onChange={(event) => setDraft((current) => ({ ...current, isDraft: event.target.checked }))} /><span><strong>{t('saveAsDraft')}</strong><small>{t('draftHelp')}</small></span></label>

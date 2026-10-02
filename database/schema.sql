@@ -576,6 +576,15 @@ CREATE TABLE IF NOT EXISTS activity_map_features (
 );
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS activity_number TEXT;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS tooltip_text TEXT;
+ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS season TEXT;
+ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS website_url TEXT;
+ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_season_check;
+ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_season_check
+  CHECK (season IS NULL OR season IN ('summer', 'winter', 'all_year'));
+ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_website_check;
+ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_website_check
+  CHECK (website_url IS NULL OR (length(website_url) BETWEEN 1 AND 2048
+    AND website_url ~ '^https?://[^[:space:]/@]+([/?#]|$)' AND website_url !~ '[[:space:][:cntrl:]]'));
 ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_features_category_check;
 ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_number_check;
 ALTER TABLE activity_map_features ALTER COLUMN activity_number TYPE TEXT USING activity_number::TEXT;
@@ -653,6 +662,20 @@ FOR EACH ROW EXECUTE FUNCTION increment_activity_map_feature_version();
 DROP TRIGGER IF EXISTS activity_map_types_version_trigger ON activity_map_types;
 CREATE TRIGGER activity_map_types_version_trigger BEFORE UPDATE ON activity_map_types
 FOR EACH ROW EXECUTE FUNCTION increment_activity_map_feature_version();
+
+-- Private, immutable-by-import recovery records. Never included in public APIs.
+CREATE TABLE IF NOT EXISTS activity_map_import_runs (
+  source_sha256 TEXT PRIMARY KEY CHECK (source_sha256 ~ '^[a-f0-9]{64}$'),
+  source_file TEXT NOT NULL,
+  plan_sha256 TEXT NOT NULL CHECK (plan_sha256 ~ '^[a-f0-9]{64}$'),
+  snapshot_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_by TEXT NOT NULL,
+  features_before JSONB NOT NULL,
+  categories_before JSONB NOT NULL,
+  types_before JSONB NOT NULL,
+  summary JSONB NOT NULL
+);
 CREATE INDEX IF NOT EXISTS members_hamlet_idx ON members (hamlet_id) WHERE deleted_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS member_email_groups (

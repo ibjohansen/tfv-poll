@@ -803,6 +803,12 @@ vises på forsiden. De elleve navngitte alpinløypene ligger som en idempotent
 kladd-seed i skjemaet. Den offentlige presentasjonskomponenten leser bare ID, navn, nummer,
 kort tooltip-tekst, kategori-/typenavn, eventuell farge og geometri. Kategorier med
 publiserte aktiviteter får automatisk egne filtre; alpinfargene kan slås av/på.
+Aktiviteter har også valgfri `season` (Sommer, Vinter eller Helårs) og `website_url`.
+Sesongfilteret kombineres med kategorifiltrene; helårsaktiviteter vises både om sommeren
+og vinteren. Eldre aktiviteter uten sesong holdes synlige til de er klassifisert.
+Websiden vises som en lenke i kartets klikkbare informasjonsboks og i et
+tastaturtilgjengelig detaljpanel. Bare http/https uten innloggingsopplysninger tillates.
+Disse feltene krever additiv migrering før denne kodeversjonen tas i bruk.
 Aktivitetskartet vises foreløpig bare når forsiden åpnes med `?maps=turutrollet`.
 Admin- og forsidekartet kan veksle mellom Kartverkets
 topografiske kart og Esri World Imagery (satellitt- og flyfoto). Ingen
@@ -828,6 +834,17 @@ Endringer i katalogen er versjonskontrollerte, loggføres og invaliderer offentl
 Produksjonsmigreringen er kjørt 2. oktober 2026; se
 [resultat og gjenopprettingspunkt](docs/database-migration-2026-10-02-activity-catalog.md).
 Dette er en databasemigrering, ikke en publisering av den tilhørende kodeversjonen.
+
+Aktivitetsimporten fra `aktiviteter.xlsx` ble testet på en isolert Neon-gren og
+kjørt i produksjonsdatabasen 3. oktober 2026 etter eksplisitt godkjenning og nytt snapshot.
+Den tilhørende kodeversjonen er ikke publisert. Senere produksjonskjøringer krever ny godkjenning.
+Se [importplan, tester og gjenoppretting](docs/activity-import-2026-10-03.md).
+Importen konverterer eksisterende alpinpolygoner og Flytsti Slåttelia til linjer,
+beholder Ferdighetspark og Pumptrack som polygoner og oppretter nye aktiviteter som kladder.
+Katalogens alpin-løype/heis endres til linje i samme låste transaksjon som geometrien.
+Vanlig administratorredigering beholder forbudet mot å endre geometriform på en type.
+Sikkerhetskopien i `activity_map_import_runs` er kun for intern gjenoppretting og
+skal aldri inkluderes i offentlige API-er eller Git. Det innføres ingen ruter eller miljøvariabler.
 
 HTML-ruter rendres ved request-tid fordi den strenge CSP-en bruker en ny nonce
 per request. Next.js kan ikke legge denne nonce-en på scripts i statisk eller
@@ -1475,6 +1492,17 @@ Utfør kontrollene i denne rekkefølgen:
   geometri og koblinger beholdes, og at nye navn vises i filtre og tooltip på
   `/?maps=turutrollet`. Kontroller også polygon/punkt, kladder, kategorier uten typer,
   duplikatnavn og at en foreldet versjon ikke overskriver nyere endringer.
+- Før aktivitetsimport: test migrering og import på en isolert Neon-gren, opprett
+  produksjonssnapshot etter godkjenning, og verifiser vert, skjema-hash og importplan-hash.
+  Kontroller at 11 nye aktiviteter er kladder, at 4 regnearktreff er oppdatert uten
+  dubletter, at 14 polygoner er blitt linjer, og at Ferdighetspark/Pumptrack beholder
+  geometrien. Kontroller importens sikkerhetskopi og før-/etterverdier i audit-loggen.
+  Importen skal kunne kjøres på nytt uten nye aktiviteter eller versjonsendringer.
+- Lagre og last sesong/webside på nytt. Test kategori + sesong sammen, Helårs under
+  sommer og vinter, kladder uten geometri og fravær av horisontal rulling på mobil.
+  Kontroller websidelenken både fra kartet og med tastatur i detaljpanelet.
+  Alpinløype og heis skal etter import bruke «Tegn linje», med redigerbare punkter,
+  bevart nummer og farge. Se over de beregnede midtlinjene, særlig brede områder.
 - Logg inn med en godkjent administratorkonto og kontroller modulene Medlemsregister,
   Oppgaveliste, Undersøkelser, Web og Brukerendringer. Velg et medlem med gateadresse, og kontroller
   at eiendomskartet er lukket under adressefeltet i detaljpanelet og kan åpnes.

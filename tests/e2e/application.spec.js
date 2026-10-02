@@ -139,10 +139,12 @@ test('activity maps support satellite layers, editable polygons and hiking route
 
   await page.reload();
   await page.getByRole('combobox', { name: 'Kategori', exact: true }).selectOption('hiking');
-  await expect(page.getByRole('button', { name: 'Tegn turrute' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Tegn linje' })).toBeVisible();
   await page.getByLabel('Navn', { exact: true }).fill('Utsiktsrunden');
   await page.getByLabel('Kort tekst i kartmarkør').fill('Fin kveldstur med utsikt.');
-  await page.getByRole('button', { name: 'Tegn turrute' }).click();
+  await page.getByRole('combobox', { name: 'Sesong', exact: true }).selectOption('summer');
+  await page.getByLabel('Webside', { exact: true }).fill('https://example.test/tur');
+  await page.getByRole('button', { name: 'Tegn linje' }).click();
   const hikingMap = page.locator('.activity-admin-map');
   const hikingBox = await hikingMap.boundingBox();
   for (const [x, y] of [[.35, .4], [.5, .5], [.65, .6]]) await hikingMap.click({ position: { x: hikingBox.width * x, y: hikingBox.height * y } });
@@ -152,6 +154,8 @@ test('activity maps support satellite layers, editable polygons and hiking route
   expect(savedActivity.category).toBe('hiking');
   expect(savedActivity.tooltipText).toBe('Fin kveldstur med utsikt.');
   expect(savedActivity.geometry.type).toBe('LineString');
+  expect(savedActivity.season).toBe('summer');
+  expect(savedActivity.websiteUrl).toBe('https://example.test/tur');
 });
 
 test('activity categories and types can be created, renamed and used after reload', async ({ page, context }) => {
@@ -189,7 +193,7 @@ test('activity categories and types can be created, renamed and used after reloa
   await editor.getByRole('combobox', { name: 'Type', exact: true }).selectOption({ label: 'Truger' });
   await editor.getByLabel('Navn', { exact: true }).fill('Trugerunden');
   await editor.getByLabel('Kort tekst i kartmarkør').fill('Følg vintermerkingen.');
-  await editor.getByRole('button', { name: 'Tegn turrute' }).click();
+  await editor.getByRole('button', { name: 'Tegn linje' }).click();
   const map = page.locator('.activity-admin-map');
   const box = await map.boundingBox();
   for (const [x, y] of [[.35, .4], [.5, .5], [.65, .6]]) await map.click({ position: { x: box.width * x, y: box.height * y } });
@@ -215,6 +219,31 @@ test('activity categories and types can be created, renamed and used after reloa
   await expect(page.getByRole('button', { name: /Trugerunden/ })).toHaveCount(0);
   await page.getByRole('checkbox', { name: 'Vinteraktiviteter', exact: true }).check();
   await expect(page.getByRole('button', { name: /Trugerunden/ })).toBeVisible();
+});
+
+test('activity seasons and website details work on desktop and mobile', async ({ page }) => {
+  await page.route(/^https:\/\/(cache\.kartverket\.no|services\.arcgisonline\.com)\//, (route) => route.fulfill({
+    contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#dce8d2"/></svg>',
+  }));
+  await page.goto('/activity-map-browser-test');
+  const filter = page.getByRole('combobox', { name: 'Sesong', exact: true });
+  await filter.selectOption('winter');
+  await expect(page.getByRole('button', { name: /Sykkelrunden/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Blåløypa/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Kafeen/ })).toBeVisible();
+  await filter.selectOption('summer');
+  await expect(page.getByRole('button', { name: /Blåløypa/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Sykkelrunden/ })).toBeVisible();
+  await page.getByRole('button', { name: /Kafeen/ }).click();
+  const details = page.getByRole('region', { name: 'Aktivitetsinformasjon' });
+  await expect(details).toContainText('Servering ved alpinanlegget.');
+  await expect(details.getByRole('link', { name: /Besøk webside/ })).toHaveAttribute('href', 'https://example.test/kafe');
+  await expect(details.getByRole('link')).toHaveAttribute('rel', 'noopener noreferrer');
+  await expect(page.locator('.leaflet-popup').getByRole('link')).toHaveAttribute('href', 'https://example.test/kafe');
+  await page.getByRole('checkbox', { name: 'Utsalg', exact: true }).uncheck();
+  await expect(details).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Kafeen/ })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
 test('public property map tooltips and table selection work in both directions', async ({ page, context }, testInfo) => {
