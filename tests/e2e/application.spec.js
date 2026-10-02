@@ -4,6 +4,7 @@ import axe from 'axe-core';
 import { testAdmin, testAuthSecret, testOrigin, testTenant } from './environment.mjs';
 import { surveyId } from '../../data/survey.js';
 import { validatePolygon } from '../../lib/map/geo.js';
+import { DEFAULT_ACTIVITY_CATALOG } from '../../lib/activity-map-catalog.js';
 
 test.beforeEach(async ({ context }) => {
   await context.route('**/*', (route) => new URL(route.request().url()).origin === testOrigin ? route.continue() : route.abort());
@@ -69,7 +70,7 @@ test('public map loads automatically and requests Kartverket tiles', async ({ pa
   await expect.poll(() => tileRequests.length).toBeGreaterThan(0);
 });
 
-test('activity maps switch to satellite imagery and lifts use polygon drawing', async ({ page, context }, testInfo) => {
+test('activity maps support satellite layers, editable polygons and hiking routes', async ({ page, context }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'One desktop browser verifies the shared activity-map behaviour.');
   // Loaded, deterministic tiles let this test check rendering without external services.
   await page.route(/^https:\/\/(cache\.kartverket\.no|services\.arcgisonline\.com)\//, (route) => route.fulfill({
@@ -89,16 +90,16 @@ test('activity maps switch to satellite imagery and lifts use polygon drawing', 
   let savedActivity;
   await authenticate(context);
   await page.route('**/api/admin/activity-map/features', (route) => {
-    if (route.request().method() === 'GET') return route.fulfill({ json: { ok: true, features: [] } });
+    if (route.request().method() === 'GET') return route.fulfill({ json: { ok: true, features: [], catalog: DEFAULT_ACTIVITY_CATALOG } });
     savedActivity = route.request().postDataJSON();
     return route.fulfill({ json: { feature: { ...savedActivity, id: 'activity-lift-created', version: 1 } } });
   });
   await page.goto('/admin/activity-map');
-  await page.getByRole('combobox', { name: 'Kategori' }).selectOption('alpine');
+  await page.getByRole('combobox', { name: 'Kategori', exact: true }).selectOption('alpine');
   await page.getByRole('combobox', { name: 'Type' }).selectOption('lift');
   await expect(page.getByRole('button', { name: 'Tegn polygon' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Plasser punkt' })).toHaveCount(0);
-  await page.getByLabel('Navn').fill('Slåtteliheisen');
+  await page.getByLabel('Navn', { exact: true }).fill('Slåtteliheisen');
   await page.getByLabel('Nummer').fill('H1');
   const adminMap = page.locator('.activity-admin-map');
   await expect(adminMap).toHaveClass(/leaflet-container/);
@@ -112,7 +113,7 @@ test('activity maps switch to satellite imagery and lifts use polygon drawing', 
   await expect(adminMap).toHaveCSS('cursor', 'crosshair');
   const box = await adminMap.boundingBox();
   for (const [x, y] of [[.35, .35], [.65, .35], [.5, .65]]) await adminMap.click({ position: { x: box.width * x, y: box.height * y } });
-  await expect(adminMap.locator('div.activity-polygon-vertex')).toHaveCount(3);
+  await expect(adminMap.locator('div.activity-geometry-vertex')).toHaveCount(3);
   await expect(adminMap.locator('img.leaflet-marker-icon')).toHaveCount(0);
   await page.getByRole('button', { name: 'Fullfør' }).click();
   for (const name of mapClasses) await expect(adminMap).toHaveClass(new RegExp(`\\b${name}\\b`));
@@ -121,9 +122,99 @@ test('activity maps switch to satellite imagery and lifts use polygon drawing', 
   await expect.poll(() => savedActivity?.featureType).toBe('lift');
   expect(savedActivity.activityNumber).toBe('H1');
   expect(savedActivity.geometry.type).toBe('Polygon');
+  await page.getByRole('combobox', { name: 'Filtrer på kategori' }).selectOption('cycling');
+  await expect(page.getByRole('button', { name: /Slåtteliheisen/ })).toHaveCount(0);
+  await page.getByRole('combobox', { name: 'Filtrer på kategori' }).selectOption('alpine');
+  await expect(page.getByRole('button', { name: /Slåtteliheisen/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Rediger geometri' }).click();
+  await expect(adminMap.locator('div.activity-geometry-midpoint')).toHaveCount(3);
+  await adminMap.locator('div.activity-geometry-midpoint').first().click();
+  await expect(adminMap.locator('div.activity-geometry-vertex')).toHaveCount(4);
+  await adminMap.locator('div.activity-geometry-vertex').first().click();
+  await expect(adminMap.locator('div.activity-geometry-vertex')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Fullfør redigering' }).click();
   const priorRequests = satelliteRequests.length;
   await page.getByRole('combobox', { name: 'Kartlag' }).selectOption('satellite');
   await expect.poll(() => satelliteRequests.length).toBeGreaterThan(priorRequests);
+
+  await page.reload();
+  await page.getByRole('combobox', { name: 'Kategori', exact: true }).selectOption('hiking');
+  await expect(page.getByRole('button', { name: 'Tegn turrute' })).toBeVisible();
+  await page.getByLabel('Navn', { exact: true }).fill('Utsiktsrunden');
+  await page.getByLabel('Kort tekst i kartmarkør').fill('Fin kveldstur med utsikt.');
+  await page.getByRole('button', { name: 'Tegn turrute' }).click();
+  const hikingMap = page.locator('.activity-admin-map');
+  const hikingBox = await hikingMap.boundingBox();
+  for (const [x, y] of [[.35, .4], [.5, .5], [.65, .6]]) await hikingMap.click({ position: { x: hikingBox.width * x, y: hikingBox.height * y } });
+  await page.getByRole('button', { name: 'Fullfør' }).click();
+  await page.getByRole('button', { name: 'Lagre aktivitet' }).click();
+  await expect.poll(() => savedActivity?.featureType).toBe('route');
+  expect(savedActivity.category).toBe('hiking');
+  expect(savedActivity.tooltipText).toBe('Fin kveldstur med utsikt.');
+  expect(savedActivity.geometry.type).toBe('LineString');
+});
+
+test('activity categories and types can be created, renamed and used after reload', async ({ page, context }) => {
+  await authenticate(context);
+  let catalog = structuredClone(DEFAULT_ACTIVITY_CATALOG);
+  let features = [];
+  await page.route('**/api/admin/activity-map/features', (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: { features, catalog } });
+    const feature = { ...route.request().postDataJSON(), id: 'custom-activity', version: 1 };
+    features = [feature];
+    return route.fulfill({ json: { feature } });
+  });
+  await page.route('**/api/admin/activity-map/catalog', (route) => {
+    const value = route.request().postDataJSON();
+    const key = value.kind === 'category' ? 'categories' : 'types';
+    const item = { ...value, id: value.id || `custom-${value.kind}`, version: (value.version || 0) + 1 };
+    catalog = { ...catalog, [key]: [...catalog[key].filter((record) => record.id !== item.id), item] };
+    return route.fulfill({ json: { catalog } });
+  });
+  await page.goto('/admin/activity-map');
+  await page.getByText('Administrer kategorier og typer', { exact: true }).click();
+  const categories = page.getByRole('form', { name: 'Aktivitetskategorier' });
+  const types = page.getByRole('form', { name: 'Aktivitetstyper' });
+  const editor = page.locator('.activity-editor-panel');
+  await categories.getByLabel('Kategorinavn').fill('Vintertur');
+  await categories.getByRole('button', { name: 'Lagre kategori' }).click();
+  await types.getByRole('combobox', { name: 'Kategori', exact: true }).selectOption({ label: 'Vintertur' });
+  await editor.getByRole('combobox', { name: 'Kategori', exact: true }).selectOption({ label: 'Vintertur' });
+  await expect(editor.getByRole('button', { name: 'Lagre aktivitet' })).toBeDisabled();
+  await expect(editor.getByText(/Opprett en type for denne kategorien/)).toBeVisible();
+  await types.getByLabel('Typenavn').fill('Truger');
+  await types.getByRole('combobox', { name: 'Geometriform', exact: true }).selectOption('line');
+  await types.getByRole('button', { name: 'Lagre type' }).click();
+  await expect(types.getByRole('combobox', { name: 'Geometriform', exact: true })).toBeDisabled();
+  await editor.getByRole('combobox', { name: 'Type', exact: true }).selectOption({ label: 'Truger' });
+  await editor.getByLabel('Navn', { exact: true }).fill('Trugerunden');
+  await editor.getByLabel('Kort tekst i kartmarkør').fill('Følg vintermerkingen.');
+  await editor.getByRole('button', { name: 'Tegn turrute' }).click();
+  const map = page.locator('.activity-admin-map');
+  const box = await map.boundingBox();
+  for (const [x, y] of [[.35, .4], [.5, .5], [.65, .6]]) await map.click({ position: { x: box.width * x, y: box.height * y } });
+  await editor.getByRole('button', { name: 'Fullfør', exact: true }).click();
+  await editor.getByRole('button', { name: 'Lagre aktivitet' }).click();
+  await expect.poll(() => features[0]?.geometry?.type).toBe('LineString');
+  const geometry = structuredClone(features[0].geometry);
+  await categories.getByLabel('Kategorinavn').fill('Vinteraktiviteter');
+  await categories.getByRole('button', { name: 'Lagre kategori' }).click();
+  await types.getByLabel('Typenavn').fill('Trugetur');
+  await types.getByRole('button', { name: 'Lagre type' }).click();
+  await expect(page.locator('.activity-feature-list')).toContainText('Vinteraktiviteter · Trugetur');
+  await page.reload();
+  await page.getByRole('button', { name: /Trugerunden/ }).click();
+  await expect(editor.getByRole('combobox', { name: 'Kategori', exact: true })).toHaveValue('custom-category');
+  await expect(editor.getByRole('combobox', { name: 'Type', exact: true })).toHaveValue('custom-type');
+  expect(features[0].geometry).toEqual(geometry);
+  await expect(editor.getByLabel('Kort tekst i kartmarkør')).toHaveValue('Følg vintermerkingen.');
+
+  await page.goto('/activity-map-browser-test');
+  await expect(page.getByRole('button', { name: /Trugerunden/ })).toContainText('Vinteraktiviteter · Trugetur');
+  await page.getByRole('checkbox', { name: 'Vinteraktiviteter', exact: true }).uncheck();
+  await expect(page.getByRole('button', { name: /Trugerunden/ })).toHaveCount(0);
+  await page.getByRole('checkbox', { name: 'Vinteraktiviteter', exact: true }).check();
+  await expect(page.getByRole('button', { name: /Trugerunden/ })).toBeVisible();
 });
 
 test('public property map tooltips and table selection work in both directions', async ({ page, context }, testInfo) => {

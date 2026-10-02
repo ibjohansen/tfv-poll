@@ -2,6 +2,9 @@
 import PublicActivityMap from '@/components/ActivityMap/PublicActivityMap';
 
 const features = [
+  { id: 'custom-activity', name: 'Trugerunden', category: 'custom-category', categoryName: 'Vinteraktiviteter', categoryColor: '#20636c',
+    featureType: 'custom-type', typeName: 'Trugetur', geometryKind: 'line', tooltipText: 'Følg vintermerkingen.',
+    geometry: { type: 'LineString', coordinates: [[9.493, 60.472], [9.495, 60.474]] } },
   { id: 'activity-cycle-1', name: 'Sykkelrunden', category: 'cycling', featureType: 'trail', alpineColor: null,
     geometry: { type: 'Polygon', coordinates: [[[9.488, 60.469], [9.494, 60.469], [9.494, 60.473], [9.488, 60.469]]] } },
   { id: 'activity-alpine-1', name: 'Blåløypa', category: 'alpine', activityNumber: '4A', featureType: 'trail', alpineColor: 'blue',

@@ -3,14 +3,29 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { ACTIVITY_MAP_CENTER, activityGeometryKind } from '@/lib/activity-map';
+import { ACTIVITY_MAP_CENTER } from '@/lib/activity-map';
+import { activityCategoryColor } from '@/lib/activity-map-catalog';
 import { BACKGROUND_MAP, SATELLITE_MAP } from '@/lib/map/sources';
 
 const latLng = ([longitude, latitude]) => [latitude, longitude];
-const colors = { cycling: '#16745a', alpine: '#7d3147' };
-const polygonVertexIcon = L.divIcon({
-  className: 'activity-polygon-vertex', html: '<span aria-hidden="true">+</span>', iconSize: [24, 24], iconAnchor: [12, 12],
+const geometryVertexIcon = L.divIcon({
+  className: 'activity-geometry-vertex', html: '<span aria-hidden="true">×</span>', iconSize: [24, 24], iconAnchor: [12, 12],
 });
+const geometryMidpointIcon = L.divIcon({
+  className: 'activity-geometry-midpoint', html: '<span aria-hidden="true">+</span>', iconSize: [22, 22], iconAnchor: [11, 11],
+});
+
+function verticesForGeometry(geometry) {
+  if (geometry.type === 'LineString') return geometry.coordinates;
+  const ring = geometry.coordinates[0];
+  return ring.length > 1 && ring[0][0] === ring.at(-1)[0] && ring[0][1] === ring.at(-1)[1] ? ring.slice(0, -1) : ring;
+}
+
+function geometryWithVertices(type, vertices, closed) {
+  return type === 'Polygon'
+    ? { type, coordinates: [closed && vertices.length ? [...vertices, vertices[0]] : vertices] }
+    : { type, coordinates: vertices };
+}
 
 export default function ActivityMapEditorView({ features, draft, drawing, editing, onSelect, onGeometryChange, onError, labels }) {
   const container = useRef(null);
@@ -41,9 +56,12 @@ export default function ActivityMapEditorView({ features, draft, drawing, editin
       const current = latest.current;
       if (!current.drawing) return;
       const point = [latlng.lng, latlng.lat];
-      if (activityGeometryKind(current.draft.featureType) === 'polygon') {
+      if (current.draft.geometryKind === 'polygon') {
         const ring = current.draft.geometry?.type === 'Polygon' ? current.draft.geometry.coordinates[0] : [];
         current.onGeometryChange({ type: 'Polygon', coordinates: [[...ring, point]] });
+      } else if (current.draft.geometryKind === 'line') {
+        const points = current.draft.geometry?.type === 'LineString' ? current.draft.geometry.coordinates : [];
+        current.onGeometryChange({ type: 'LineString', coordinates: [...points, point] });
       } else current.onGeometryChange({ type: 'Point', coordinates: point });
     });
     const resize = new ResizeObserver(() => map.invalidateSize());
@@ -68,10 +86,19 @@ export default function ActivityMapEditorView({ features, draft, drawing, editin
     for (const feature of features) {
       if (feature.id === draft.id || !feature.geometry) continue;
       const layer = L.geoJSON({ type: 'Feature', properties: {}, geometry: feature.geometry }, {
-        style: { color: colors[feature.category], weight: 3, fillOpacity: .18 },
-        pointToLayer: (_item, point) => L.circleMarker(point, { radius: 8, color: colors.alpine, fillColor: '#fff', fillOpacity: .95, weight: 3 }),
+        style: { color: activityCategoryColor(feature), weight: 3, fillOpacity: .18 },
+        pointToLayer: (_item, point) => L.circleMarker(point, { radius: 8, color: activityCategoryColor(feature), fillColor: '#fff', fillOpacity: .95, weight: 3 }),
       }).addTo(group);
-      layer.bindTooltip(feature.name);
+      const tooltip = document.createElement('div');
+      const name = document.createElement('strong');
+      name.textContent = feature.name;
+      tooltip.append(name);
+      if (feature.tooltipText) {
+        const description = document.createElement('p');
+        description.textContent = feature.tooltipText;
+        tooltip.append(description);
+      }
+      layer.bindTooltip(tooltip);
       layer.on('click', () => { if (!drawing && !editing) onSelect(feature); });
     }
     if (!draft.geometry) return;
@@ -80,17 +107,36 @@ export default function ActivityMapEditorView({ features, draft, drawing, editin
       style: currentStyle,
       pointToLayer: (_item, point) => L.circleMarker(point, { ...currentStyle, radius: 10, fillOpacity: .9 }),
     }).addTo(group);
-    if ((drawing || editing) && draft.geometry.type === 'Polygon') {
-      const ring = draft.geometry.coordinates[0];
-      const vertices = ring.length > 1 && ring[0][0] === ring.at(-1)[0] && ring[0][1] === ring.at(-1)[1] ? ring.slice(0, -1) : ring;
+    if ((drawing || editing) && (draft.geometry.type === 'Polygon' || draft.geometry.type === 'LineString')) {
+      const vertices = verticesForGeometry(draft.geometry);
+      const closed = editing && draft.geometry.type === 'Polygon';
+      const minimum = draft.geometry.type === 'Polygon' ? 3 : 2;
       vertices.forEach((coordinate, index) => L.marker(latLng(coordinate), {
-        draggable: editing, interactive: editing, icon: polygonVertexIcon, title: labels.polygonPoint(index + 1),
+        draggable: editing, interactive: true, bubblingMouseEvents: false, icon: geometryVertexIcon,
+        title: editing || vertices.length > minimum ? labels.removeGeometryPoint(index + 1) : labels.geometryPoint(index + 1),
       }).addTo(group)
         .on('dragend', (event) => {
           const point = event.target.getLatLng();
           const next = vertices.map((value, position) => position === index ? [point.lng, point.lat] : value);
-          onGeometryChange({ type: 'Polygon', coordinates: [editing ? [...next, next[0]] : next] });
+          onGeometryChange(geometryWithVertices(draft.geometry.type, next, closed));
+        })
+        .on('click', () => {
+          if (editing && vertices.length <= minimum) return;
+          const next = vertices.filter((_value, position) => position !== index);
+          onGeometryChange(next.length ? geometryWithVertices(draft.geometry.type, next, closed) : null);
         }));
+      if (editing) {
+        const segmentCount = draft.geometry.type === 'Polygon' ? vertices.length : vertices.length - 1;
+        for (let index = 0; index < segmentCount; index += 1) {
+          const nextIndex = (index + 1) % vertices.length;
+          const midpoint = [(vertices[index][0] + vertices[nextIndex][0]) / 2, (vertices[index][1] + vertices[nextIndex][1]) / 2];
+          L.marker(latLng(midpoint), { interactive: true, bubblingMouseEvents: false, icon: geometryMidpointIcon, title: labels.addGeometryPoint })
+            .addTo(group).on('click', () => {
+              const next = [...vertices.slice(0, index + 1), midpoint, ...vertices.slice(index + 1)];
+              onGeometryChange(geometryWithVertices(draft.geometry.type, next, closed));
+            });
+        }
+      }
     }
     if (editing && draft.geometry.type === 'Point') {
       L.marker(latLng(draft.geometry.coordinates), { draggable: true, title: draft.name || labels.activityPoint }).addTo(group)

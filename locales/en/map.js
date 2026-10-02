@@ -91,7 +91,7 @@ map.backend = {
     polygonCoordinates: 'The polygon must have valid longitude/latitude coordinates (GeoJSON, EPSG:4326).', polygonClosed: 'The polygon must be closed.',
     polygonRepeatedVertices: 'The polygon has repeated vertices.', polygonInvalid: 'The polygon intersects itself or is invalid.',
     polygonArea: 'Select an area between 1 m² and 25 km².', polygonLocation: 'Select an area near Turufjell (no more than 20 km from the starting point).',
-    polygonRadius: 'The area is too elongated. Select a smaller area (maximum search radius 5 km).',
+    polygonRadius: 'The area is too elongated. Select a smaller area (maximum search radius 5 km).', activityLine: 'The hiking route must contain between 2 and 200 valid points.', activityTooltipText: 'The map tooltip text can contain up to 300 characters.',
     invalidDatatype: 'Select addresses, property boundaries, roads or register comparison.', invalidBoundaries: 'Invalid property boundary option.',
     invalidComparisonHamlet: 'Select a valid hamlet for the register comparison.', incompleteAddresses: 'The address data is incomplete. Complete the search before comparing.',
     invalidAddressObject: 'Kartverket returned an invalid address object.', invalidAddressCoordinates: 'Kartverket returned an unexpected coordinate system or invalid coordinates.',
@@ -133,6 +133,9 @@ map.backend = {
 Object.assign(map.backend.errors, {
   activityName: 'Enter a name for the activity.', activityAction: 'Invalid activity map action.',
   activityIdentity: 'The activity or version is invalid.', activityCategory: 'Select a valid activity category.',
+  activityCatalogName: 'The name must contain between 1 and 80 characters.', activityCatalogGeometry: 'Choose polygon, line or point.',
+  activityCatalogColor: 'Select a valid category colour.', activityCatalogDuplicate: 'This name already exists. Choose a different name.',
+  activityCatalogChanged: 'The category or type has changed. Reload the page. Geometry cannot be changed for an existing type.',
   activityType: 'Select a valid activity type.', activityColor: 'Select a valid alpine colour.', activityNumber: 'The number may contain letters and digits (maximum 24 characters).',
   activityPoint: 'Place a valid point on the map.', activityCombination: 'Category, activity type, colour and geometry cannot be combined in this way.',
   activityDraft: 'The draft status is invalid.', activityPublishedGeometry: 'A published activity must have valid geometry.',

@@ -186,6 +186,7 @@ const admin = {
       accounting_expenses: 'Expense',
       accounting_attachments: 'Accounting attachment',
       activity_map_features: 'Activity map',
+      activity_map_categories: 'Activity categories', activity_map_types: 'Activity types',
       admin_actions: 'Administrative action',
       email_campaigns: 'Email campaign',
       email_deliveries: 'Test email',

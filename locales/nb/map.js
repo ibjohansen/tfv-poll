@@ -92,7 +92,7 @@ map.backend = {
     polygonCoordinates: 'Polygonet må ha gyldige lengde-/breddegrader (GeoJSON, EPSG:4326).', polygonClosed: 'Polygonet må være lukket.',
     polygonRepeatedVertices: 'Polygonet har gjentatte hjørner.', polygonInvalid: 'Polygonet krysser seg selv eller er ugyldig.',
     polygonArea: 'Velg et område mellom 1 m² og 25 km².', polygonLocation: 'Velg et område i nærheten av Turufjell (maksimalt 20 km fra startpunktet).',
-    polygonRadius: 'Området er for langstrakt. Velg et mindre utsnitt (søkeradius maks. 5 km).',
+    polygonRadius: 'Området er for langstrakt. Velg et mindre utsnitt (søkeradius maks. 5 km).', activityLine: 'Turruten må ha mellom 2 og 200 gyldige punkter.', activityTooltipText: 'Teksten i kartmarkøren kan være opptil 300 tegn.',
     invalidDatatype: 'Velg adresser, eiendomsgrenser, veier eller registersammenligning.', invalidBoundaries: 'Ugyldig valg av eiendomsgrenser.',
     invalidComparisonHamlet: 'Velg en gyldig grend for registersammenligningen.', incompleteAddresses: 'Adressegrunnlaget er ufullstendig. Hent et komplett søk før sammenligning.',
     invalidAddressObject: 'Kartverket returnerte et ugyldig adresseobjekt.', invalidAddressCoordinates: 'Kartverket returnerte et uventet koordinatsystem eller ugyldige koordinater.',
@@ -134,6 +134,9 @@ map.backend = {
 Object.assign(map.backend.errors, {
   activityName: 'Skriv inn et navn på aktiviteten.', activityAction: 'Ugyldig handling for aktivitetskartet.',
   activityIdentity: 'Aktiviteten eller versjonen er ugyldig.', activityCategory: 'Velg en gyldig aktivitetskategori.',
+  activityCatalogName: 'Navnet må inneholde mellom 1 og 80 tegn.', activityCatalogGeometry: 'Velg polygon, linje eller punkt.',
+  activityCatalogColor: 'Velg en gyldig kategorifarge.', activityCatalogDuplicate: 'Navnet finnes allerede. Velg et annet navn.',
+  activityCatalogChanged: 'Kategorien eller typen er endret. Last siden på nytt. Geometriformen til en eksisterende type kan ikke endres.',
   activityType: 'Velg en gyldig aktivitetstype.', activityColor: 'Velg en gyldig alpinfarge.', activityNumber: 'Nummer kan inneholde bokstaver og tall (maks 24 tegn).',
   activityPoint: 'Plasser et gyldig punkt i kartet.', activityCombination: 'Kategori, aktivitetstype, farge og geometri kan ikke kombineres slik.',
   activityDraft: 'Kladdestatusen er ugyldig.', activityPublishedGeometry: 'En publisert aktivitet må ha gyldig geometri.',

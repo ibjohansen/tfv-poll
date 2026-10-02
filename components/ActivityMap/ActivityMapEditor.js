@@ -3,7 +3,9 @@
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/components/LocaleProvider';
-import { activityGeometryKind, ALPINE_COLORS, normalizeActivityNumber } from '@/lib/activity-map';
+import { ALPINE_COLORS, normalizeActivityNumber } from '@/lib/activity-map';
+import { activityCatalogLabel, activityCategoryLabel, activityTypeLabel, findActivityType, withActivityCatalog } from '@/lib/activity-map-catalog';
+import ActivityMapCatalogManager from './ActivityMapCatalogManager';
 
 function MapLoading() {
   const { t } = useI18n('activityMap.admin');
@@ -11,7 +13,9 @@ function MapLoading() {
 }
 const ActivityMapEditorView = dynamic(() => import('./ActivityMapEditorView'), { ssr: false, loading: MapLoading });
 
-const emptyDraft = () => ({ id: null, version: null, name: '', category: 'cycling', activityNumber: '', featureType: 'trail', alpineColor: '', geometry: null, isDraft: true });
+const emptyDraft = () => ({ id: null, version: null, name: '', tooltipText: '', category: 'cycling', activityNumber: '', featureType: 'trail', alpineColor: '', geometry: null, isDraft: true });
+
+const geometryType = { polygon: 'Polygon', line: 'LineString', point: 'Point' };
 
 function compareFeatures(a, b) {
   if (a.isDraft !== b.isDraft) return a.isDraft ? -1 : 1;
@@ -24,6 +28,8 @@ function compareFeatures(a, b) {
 export default function ActivityMapEditor() {
   const { t } = useI18n('activityMap.admin');
   const [features, setFeatures] = useState([]);
+  const [catalog, setCatalog] = useState({ categories: [], types: [] });
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [draft, setDraft] = useState(emptyDraft);
   const [drawing, setDrawing] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -36,9 +42,12 @@ export default function ActivityMapEditor() {
   const mapFrameRef = useRef(null);
 
   const selected = useMemo(() => features.find((feature) => feature.id === draft.id) || null, [draft.id, features]);
+  const decoratedFeatures = useMemo(() => features.map((feature) => withActivityCatalog(feature, catalog)), [features, catalog]);
+  const filteredFeatures = useMemo(() => categoryFilter === 'all' ? decoratedFeatures : decoratedFeatures.filter((feature) => feature.category === categoryFilter), [categoryFilter, decoratedFeatures]);
   const mapLabels = useMemo(() => ({
     canvas: t('mapCanvasLabel'), zoomIn: t('zoomIn'), zoomOut: t('zoomOut'), tileError: t('tileError'),
-    polygonPoint: (number) => t('polygonPoint', { number }), activityPoint: t('activityPoint'), baseMap: t('baseMap'),
+    geometryPoint: (number) => t('geometryPoint', { number }), addGeometryPoint: t('addGeometryPoint'),
+    removeGeometryPoint: (number) => t('removeGeometryPoint', { number }), activityPoint: t('activityPoint'), baseMap: t('baseMap'),
     topographicMap: t('topographicMap'), satelliteMap: t('satelliteMap'),
   }), [t]);
 
@@ -57,7 +66,7 @@ export default function ActivityMapEditor() {
 
   useEffect(() => {
     let active = true;
-    request().then((body) => { if (active) setFeatures([...(body.features || [])].sort(compareFeatures)); })
+    request().then((body) => { if (active) { setFeatures([...(body.features || [])].sort(compareFeatures)); setCatalog(body.catalog); } })
       .catch((failure) => { if (active && failure.name !== 'AbortError') setError(failure.message); })
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; controllerRef.current?.abort(); };
@@ -82,16 +91,20 @@ export default function ActivityMapEditor() {
   }
 
   function changeCategory(category) {
-    if (category === 'cycling') {
-      setDraft((current) => ({ ...current, category, activityNumber: '', featureType: 'trail', alpineColor: '',
-        geometry: current.geometry?.type === 'Polygon' ? current.geometry : null }));
-    } else setDraft((current) => ({ ...current, category }));
+    setDraft((current) => {
+      const type = findActivityType(catalog, category, current.featureType) || catalog.types.find((item) => item.category === category);
+      const expected = geometryType[type?.geometryKind];
+      return { ...current, category, featureType: type?.id || '', activityNumber: category === 'alpine' ? current.activityNumber : '',
+        alpineColor: category === 'alpine' && type?.id === 'trail' ? current.alpineColor : '',
+        geometry: current.geometry?.type === expected ? current.geometry : null };
+    });
     setDrawing(false); setEditing(false);
   }
 
   function changeType(featureType) {
+    const expected = geometryType[findActivityType(catalog, draft.category, featureType)?.geometryKind];
     setDraft((current) => ({ ...current, featureType, alpineColor: featureType === 'trail' ? current.alpineColor : '',
-      geometry: current.geometry?.type === (activityGeometryKind(featureType) === 'polygon' ? 'Polygon' : 'Point') ? current.geometry : null }));
+      geometry: current.geometry?.type === expected ? current.geometry : null }));
     setDrawing(false); setEditing(false);
   }
 
@@ -128,7 +141,7 @@ export default function ActivityMapEditor() {
     setBusy(true); setError(''); setNotice('');
     try {
       const payload = { action: draft.id ? 'update' : 'create', id: draft.id, version: draft.version,
-        name: draft.name, category: draft.category, activityNumber: draft.category === 'alpine' && draft.activityNumber !== '' ? draft.activityNumber : null,
+        name: draft.name, tooltipText: draft.tooltipText || null, category: draft.category, activityNumber: draft.category === 'alpine' && draft.activityNumber !== '' ? draft.activityNumber : null,
         featureType: draft.featureType, alpineColor: draft.alpineColor || null, geometry: draft.geometry, isDraft: draft.isDraft };
       const { feature } = await request({ method: 'POST', body: JSON.stringify(payload) });
       setFeatures((current) => [...current.filter((item) => item.id !== feature.id), feature]
@@ -150,49 +163,56 @@ export default function ActivityMapEditor() {
     finally { setBusy(false); }
   }
 
-  const kind = activityGeometryKind(draft.featureType);
-  const expectedGeometry = kind === 'polygon' ? 'Polygon' : 'Point';
+  const kind = findActivityType(catalog, draft.category, draft.featureType)?.geometryKind;
+  const expectedGeometry = geometryType[kind];
   let numberValid = true;
   try { normalizeActivityNumber(draft.activityNumber, draft.category); } catch { numberValid = draft.activityNumber === ''; }
   const geometryValid = !draft.geometry || draft.geometry.type === expectedGeometry;
-  const canSave = draft.name.trim() && numberValid && geometryValid && (draft.isDraft || draft.geometry?.type === expectedGeometry) && !drawing && !editing && !busy;
-  const canFinish = kind !== 'polygon' || (draft.geometry?.coordinates?.[0]?.length || 0) >= 3;
+  const canSave = kind && draft.name.trim() && numberValid && geometryValid && (draft.isDraft || draft.geometry?.type === expectedGeometry) && !drawing && !editing && !busy;
+  const canFinish = kind === 'polygon' ? (draft.geometry?.coordinates?.[0]?.length || 0) >= 3
+    : kind === 'line' ? (draft.geometry?.coordinates?.length || 0) >= 2 : Boolean(draft.geometry);
 
   return <div className="activity-admin">
     <header className="activity-admin-heading"><p className="eyebrow">{t('eyebrow')}</p><h2>{t('title')}</h2><p>{t('introduction')}</p></header>
+    <ActivityMapCatalogManager catalog={catalog} onChange={setCatalog} disabled={busy || !catalog.categories.length} />
     <div className="activity-admin-layout">
       <aside className="activity-feature-list" aria-label={t('savedFeatures')}>
         <div className="activity-feature-list-heading"><h3>{t('savedFeatures')}</h3><button type="button" className="admin-button" onClick={newFeature}>{t('new')}</button></div>
-        {busy && !features.length ? <p role="status">{t('loading')}</p> : features.length ? <ul>{features.map((feature) => <li key={feature.id}>
+        <label className="activity-category-filter">{t('filterCategory')}<select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+          <option value="all">{t('allCategories')}</option>{catalog.categories.map((item) => <option key={item.id} value={item.id}>{activityCatalogLabel(item, 'categories', t)}</option>)}
+        </select></label>
+        {busy && !features.length ? <p role="status">{t('loading')}</p> : filteredFeatures.length ? <ul>{filteredFeatures.map((feature) => <li key={feature.id}>
           <button type="button" aria-pressed={draft.id === feature.id} onClick={() => selectFeature(feature)}>
-            <strong>{feature.activityNumber ? `${feature.activityNumber}. ${feature.name}` : feature.name}</strong><span>{t(`categories.${feature.category}`)} · {t(`types.${feature.featureType}`)}{feature.isDraft ? ` · ${t('draft')}` : ''}</span>
+            <strong>{feature.activityNumber ? `${feature.activityNumber}. ${feature.name}` : feature.name}</strong><span>{activityCategoryLabel(feature, t)} · {activityTypeLabel(feature, t)}{feature.isDraft ? ` · ${t('draft')}` : ''}</span>
           </button></li>)}</ul> : <p className="muted">{t('empty')}</p>}
       </aside>
       <section className="activity-editor-panel" aria-labelledby="activity-editor-title">
         <h3 id="activity-editor-title">{draft.id ? t('editTitle', { name: selected?.name || draft.name }) : t('createTitle')}</h3>
         <div className="activity-form-grid">
-          <label>{t('category')}<select value={draft.category} onChange={(event) => changeCategory(event.target.value)}><option value="cycling">{t('categories.cycling')}</option><option value="alpine">{t('categories.alpine')}</option></select></label>
+          <label>{t('category')}<select value={draft.category} onChange={(event) => changeCategory(event.target.value)}>{catalog.categories.map((item) => <option key={item.id} value={item.id}>{activityCatalogLabel(item, 'categories', t)}</option>)}</select></label>
           <label>{t('name')}<input maxLength={160} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label>
+          <label className="activity-tooltip-field">{t('tooltipText')}<input maxLength={300} value={draft.tooltipText || ''} onChange={(event) => setDraft((current) => ({ ...current, tooltipText: event.target.value }))} /></label>
           {draft.category === 'alpine' && <label>{t('number')}<input maxLength={24} inputMode="text" autoComplete="off" value={draft.activityNumber} onChange={(event) => setDraft((current) => ({ ...current, activityNumber: event.target.value }))} /></label>}
           {draft.category === 'alpine' && draft.featureType === 'trail' && <label>{t('color')}<select value={draft.alpineColor} onChange={(event) => setDraft((current) => ({ ...current, alpineColor: event.target.value }))}>
             <option value="">{t('noColor')}</option>{ALPINE_COLORS.map((color) => <option key={color} value={color}>{t(`colors.${color}`)}</option>)}
           </select></label>}
-          {draft.category === 'alpine' && <label>{t('type')}<select value={draft.featureType} onChange={(event) => changeType(event.target.value)}>
-            <option value="trail">{t('ordinaryTrail')}</option><option value="park">{t('types.park')}</option><option value="sledding">{t('types.sledding')}</option><option value="lift">{t('types.lift')}</option>
-          </select></label>}
+          <label>{t('type')}<select value={draft.featureType} onChange={(event) => changeType(event.target.value)}>
+            {!kind && <option value="">{t('catalog.selectType')}</option>}{catalog.types.filter((item) => item.category === draft.category).map((item) => <option key={item.id} value={item.id}>{activityCatalogLabel(item, 'types', t)}</option>)}
+          </select></label>
         </div>
+        {!catalog.types.some((item) => item.category === draft.category) && !busy && <p className="muted">{t('catalog.noTypes')}</p>}
         <label className="activity-draft-toggle"><input type="checkbox" checked={draft.isDraft} onChange={(event) => setDraft((current) => ({ ...current, isDraft: event.target.checked }))} /><span><strong>{t('saveAsDraft')}</strong><small>{t('draftHelp')}</small></span></label>
         <div className="activity-drawing-actions" role="group" aria-label={t('geometryTools')}>
-          <button type="button" className="admin-button" disabled={busy || drawing} onClick={startDrawing}>{t(kind === 'polygon' ? 'drawPolygon' : 'placePoint')}</button>
+          <button type="button" className="admin-button" disabled={busy || drawing || !kind} onClick={startDrawing}>{t(kind === 'polygon' ? 'drawPolygon' : kind === 'line' ? 'drawLine' : 'placePoint')}</button>
           {drawing && <button type="button" className="admin-button primary" disabled={!canFinish} onClick={finishDrawing}>{t('finish')}</button>}
           {!drawing && draft.geometry && <button type="button" className="admin-button" onClick={() => setEditing((value) => !value)}>{editing ? t('finishEditing') : t('editGeometry')}</button>}
           {draft.geometry && <button type="button" className="admin-button" onClick={clearGeometry}>{t('clearGeometry')}</button>}
         </div>
-        <p className="muted">{t(kind === 'polygon' ? 'polygonHelp' : 'pointHelp')}</p>
-        <div ref={mapFrameRef} className="activity-admin-map-frame"><ActivityMapEditorView features={features} draft={draft} drawing={drawing} editing={editing}
+        <p className="muted">{t(kind === 'polygon' ? 'polygonHelp' : kind === 'line' ? 'lineHelp' : 'pointHelp')}</p>
+        <div ref={mapFrameRef} className="activity-admin-map-frame"><ActivityMapEditorView features={filteredFeatures} draft={{ ...draft, geometryKind: kind }} drawing={drawing} editing={editing}
           onSelect={selectFeature} onGeometryChange={(geometry) => setDraft((current) => ({ ...current, geometry }))} onError={setError} labels={mapLabels} />
           <div className="activity-map-floating-actions">
-            {isFullscreen && !drawing && <button type="button" className="admin-button" disabled={busy} onClick={startDrawing}>{t(kind === 'polygon' ? 'drawPolygon' : 'placePoint')}</button>}
+            {isFullscreen && !drawing && <button type="button" className="admin-button" disabled={busy || !kind} onClick={startDrawing}>{t(kind === 'polygon' ? 'drawPolygon' : kind === 'line' ? 'drawLine' : 'placePoint')}</button>}
             {isFullscreen && drawing && <button type="button" className="admin-button primary" disabled={!canFinish} onClick={finishDrawing}>{t('finish')}</button>}
             {isFullscreen && !drawing && draft.geometry && <button type="button" className="admin-button" onClick={() => setEditing((value) => !value)}>{editing ? t('finishEditing') : t('editGeometry')}</button>}
             {fullscreenSupported && <button type="button" className="activity-map-fullscreen" title={isFullscreen ? t('exitFullscreen') : t('enterFullscreen')} onClick={toggleFullscreen}>

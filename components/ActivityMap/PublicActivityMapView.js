@@ -6,12 +6,13 @@ import 'leaflet/dist/leaflet.css';
 import { ACTIVITY_MAP_CENTER, smoothActivityGeometry } from '@/lib/activity-map';
 import { BACKGROUND_MAP, SATELLITE_MAP } from '@/lib/map/sources';
 import { useI18n } from '@/components/LocaleProvider';
+import { activityCategoryColor, activityCategoryLabel, activityTypeLabel } from '@/lib/activity-map-catalog';
 
 const latLng = ([longitude, latitude]) => [latitude, longitude];
 const alpineColors = { blue: '#2166ac', yellow: '#d6a900', green: '#238b45', red: '#c92f2f', black: '#202124' };
 
 function featureStyle(feature, colors, selected) {
-  const color = feature.category === 'cycling' ? '#16745a' : colors && feature.alpineColor ? alpineColors[feature.alpineColor] : '#7d3147';
+  const color = colors && feature.alpineColor ? alpineColors[feature.alpineColor] : activityCategoryColor(feature);
   return { color, fillColor: color, weight: selected ? 6 : 4, fillOpacity: selected ? .34 : .2, opacity: 1 };
 }
 
@@ -84,8 +85,13 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
       const name = document.createElement('strong');
       name.textContent = feature.activityNumber ? `${feature.activityNumber}. ${feature.name}` : feature.name;
       const detail = document.createElement('div');
-      detail.textContent = `${t(`categories.${feature.category}`)} · ${t(`types.${feature.featureType}`)}${feature.alpineColor && showAlpineColors ? ` · ${t(`colors.${feature.alpineColor}`)}` : ''}`;
+      detail.textContent = `${activityCategoryLabel(feature, t)} · ${activityTypeLabel(feature, t)}${feature.alpineColor && showAlpineColors ? ` · ${t(`colors.${feature.alpineColor}`)}` : ''}`;
       label.append(name, detail);
+      if (feature.tooltipText) {
+        const description = document.createElement('p');
+        description.textContent = feature.tooltipText;
+        label.append(description);
+      }
       layer.bindTooltip(label, { sticky: true, direction: 'auto' });
       layer.on('click', () => onSelect(feature.id));
       featureLayers.current.set(feature.id, layer);

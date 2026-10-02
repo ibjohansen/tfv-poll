@@ -3,13 +3,28 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
-import { activityFeatureRecord, activityGeometryKind, normalizeActivityFeatureInput, publicActivityFeatureRecord, smoothActivityGeometry } from '../lib/activity-map.js';
+import { activityFeatureRecord, normalizeActivityFeatureInput, publicActivityFeatureRecord, smoothActivityGeometry } from '../lib/activity-map.js';
 import { MapError } from '../lib/map/geo.js';
+import { DEFAULT_ACTIVITY_CATALOG, normalizeActivityCatalogInput, withActivityCatalog } from '../lib/activity-map-catalog.js';
 import { loadModule, request } from './helpers/load-module.mjs';
+import { activityMapStatements, migrateActivityMapSchema } from '../scripts/release-activity-map-schema.mjs';
 
 const polygon = { type: 'Feature', properties: { unsafe: 'discard me' }, geometry: { type: 'Polygon', coordinates: [[
   [9.493, 60.472], [9.495, 60.472], [9.495, 60.474], [9.493, 60.472],
 ]] } };
+const hikingLine = { type: 'LineString', coordinates: [[9.493, 60.472], [9.494, 60.473], [9.495, 60.474]] };
+
+test('custom categories and types are validated from the catalog, not hardcoded enums', () => {
+  const catalog = { categories: [{ id: 'winter', name: 'Vintertur', color: '#20636c' }],
+    types: [{ category: 'winter', id: 'snowshoe', name: 'Truger', geometryKind: 'line' }] };
+  const input = { action: 'create', category: 'winter', featureType: 'snowshoe', name: 'Runden', geometry: hikingLine };
+  assert.equal(normalizeActivityFeatureInput(input, catalog).geometry.type, 'LineString');
+  assert.throws(() => normalizeActivityFeatureInput({ ...input, geometry: polygon }, catalog), MapError);
+  assert.throws(() => normalizeActivityFeatureInput({ ...input, category: 'alpine' }, catalog), MapError);
+  assert.throws(() => normalizeActivityFeatureInput({ ...input, featureType: 'trail' }, catalog), MapError);
+  assert.throws(() => normalizeActivityCatalogInput({ kind: 'category', action: 'create', name: 'A', color: 'red' }), MapError);
+  assert.throws(() => normalizeActivityCatalogInput({ kind: 'type', action: 'create', category: 'winter', name: 'A', geometryKind: 'Area' }), MapError);
+});
 
 test('activity map validates category, geometry and alpine metadata', () => {
   const cycling = normalizeActivityFeatureInput({ action: 'create', name: '  Rundløypa  ', category: 'cycling', featureType: 'trail', geometry: polygon });
@@ -31,8 +46,16 @@ test('activity map validates category, geometry and alpine metadata', () => {
   const lift = normalizeActivityFeatureInput({ action: 'create', name: 'Testheis', category: 'alpine', featureType: 'lift',
     geometry: polygon, isDraft: false });
   assert.equal(lift.featureType, 'lift');
-  assert.equal(activityGeometryKind('lift'), 'polygon');
+  assert.equal(lift.geometry.type, 'Polygon');
+  const hike = normalizeActivityFeatureInput({ action: 'create', name: 'Utsiktsrunden', tooltipText: '  En fin tur med utsikt. ',
+    category: 'hiking', featureType: 'route', geometry: hikingLine, isDraft: false });
+  assert.equal(hike.geometry.type, 'LineString');
+  assert.equal(hike.tooltipText, 'En fin tur med utsikt.');
+  assert.deepEqual(hike.geometry, hikingLine);
   assert.throws(() => normalizeActivityFeatureInput({ ...lift, action: 'create', geometry: { type: 'Point', coordinates: [9.4936, 60.4723] } }), MapError);
+  assert.throws(() => normalizeActivityFeatureInput({ ...hike, action: 'create', geometry: polygon }), MapError);
+  assert.throws(() => normalizeActivityFeatureInput({ ...hike, action: 'create', featureType: 'trail' }), MapError);
+  assert.throws(() => normalizeActivityFeatureInput({ ...hike, action: 'create', tooltipText: 'x'.repeat(301) }), MapError);
   assert.throws(() => normalizeActivityFeatureInput({ ...draft, action: 'create', isDraft: false }), MapError);
   assert.throws(() => normalizeActivityFeatureInput({ ...cycling, action: 'create', activityNumber: '2' }), MapError);
   assert.throws(() => normalizeActivityFeatureInput({ ...draft, action: 'create', activityNumber: 0 }), MapError);
@@ -46,9 +69,10 @@ test('activity map accepts versioned deletes and exposes only public fields', ()
   const value = normalizeActivityFeatureInput({ action: 'delete', id: 'a'.repeat(32), version: 3 });
   assert.deepEqual(value, { action: 'delete', id: 'a'.repeat(32), version: 3 });
   const row = { id: 'b'.repeat(32), name: 'Blåløypa', category: 'alpine', feature_type: 'trail',
-    activity_number: '4A', alpine_color: 'blue', geometry: JSON.stringify(polygon.geometry), is_draft: true, version: '2', last_changed_by: 'private@example.test' };
+    tooltip_text: 'Kort omtale', activity_number: '4A', alpine_color: 'blue', geometry: JSON.stringify(polygon.geometry), is_draft: true, version: '2', last_changed_by: 'private@example.test' };
   const publicResult = publicActivityFeatureRecord(row);
-  assert.deepEqual(Object.keys(publicResult).sort(), ['activityNumber', 'alpineColor', 'category', 'featureType', 'geometry', 'id', 'name'].sort());
+  assert.deepEqual(Object.keys(publicResult).sort(), ['activityNumber', 'alpineColor', 'category', 'categoryName', 'categoryColor', 'typeName', 'geometryKind', 'featureType', 'geometry', 'id', 'name', 'tooltipText'].sort());
+  assert.equal(publicResult.tooltipText, 'Kort omtale');
   assert.doesNotMatch(JSON.stringify(publicResult), /private@example|version|isDraft/);
   assert.equal(activityFeatureRecord(row).version, 2); assert.equal(activityFeatureRecord(row).isDraft, true);
 });
@@ -69,10 +93,10 @@ test('activity map service performs audited, versioned create, update and soft d
   const calls = [];
   const sql = { query: async (text, values = []) => {
     calls.push({ text, values });
-    if (text.startsWith('INSERT')) return [{ id: 'c'.repeat(32), name: values[1], category: values[2], activity_number: values[3], feature_type: values[4],
-      alpine_color: values[5], geometry: values[6], is_draft: values[7], version: 1 }];
-    if (text.startsWith('UPDATE activity_map_features SET name')) return [{ id: 'c'.repeat(32), name: values[0], category: values[1], activity_number: values[2], feature_type: values[3],
-      alpine_color: values[4], geometry: values[5], is_draft: values[6], version: 2 }];
+    if (text.startsWith('INSERT')) return [{ id: 'c'.repeat(32), name: values[1], tooltip_text: values[2], category: values[3], activity_number: values[4], feature_type: values[5],
+      alpine_color: values[6], geometry: values[7], is_draft: values[8], version: 1 }];
+    if (text.startsWith('UPDATE activity_map_features SET name')) return [{ id: 'c'.repeat(32), name: values[0], tooltip_text: values[1], category: values[2], activity_number: values[3], feature_type: values[4],
+      alpine_color: values[5], geometry: values[6], is_draft: values[7], version: 2 }];
     if (text.startsWith('SELECT')) return [];
     return [{ id: 'c'.repeat(32), name: 'Test 2', category: 'alpine', activity_number: '7A', feature_type: 'trail', alpine_color: 'red', geometry: polygon.geometry, is_draft: false, version: 3 }];
   } };
@@ -83,13 +107,15 @@ test('activity map service performs audited, versioned create, update and soft d
     './member-self-service-utils.js': { randomId: () => 'c'.repeat(32) },
     './public-content-cache.js': { revalidatePublicActivityMap: () => { invalidated += 1; } },
     './activity-map.js': { activityFeatureRecord, normalizeActivityFeatureInput, publicActivityFeatureRecord }, './map/geo.js': { MapError },
+    './activity-map-catalog-service.js': { getActivityMapCatalog: async () => DEFAULT_ACTIVITY_CATALOG },
+    './activity-map-catalog.js': { withActivityCatalog },
   });
   await service.saveActivityMapFeature({ action: 'create', name: 'Test', category: 'cycling', featureType: 'trail', geometry: polygon, isDraft: false });
   await service.saveActivityMapFeature({ action: 'update', id: 'c'.repeat(32), version: 1, name: 'Test 2', category: 'alpine', activityNumber: '7A', featureType: 'trail', alpineColor: 'red', geometry: polygon, isDraft: false });
   await service.saveActivityMapFeature({ action: 'delete', id: 'c'.repeat(32), version: 2 });
   await service.getPublicActivityMapFeatures();
   assert.match(calls[0].text, /last_changed_by/); assert.equal(calls[0].values.at(-1), 'admin@example.test');
-  assert.match(calls[1].text, /version = \$10/); assert.equal(calls[1].values[9], 1);
+  assert.match(calls[1].text, /version = \$11/); assert.equal(calls[1].values[10], 1);
   assert.match(calls[2].text, /deleted_at = NOW\(\)/); assert.equal(calls[2].values[2], 2);
   assert.match(calls[3].text, /is_draft = FALSE AND geometry IS NOT NULL/);
   assert.equal(invalidated, 3);
@@ -102,6 +128,7 @@ test('activity map admin route inherits authentication, same-origin and private-
     './geo.js': { MapError }, './http.js': { readLimitedJson: async (response) => response.json() },
   });
   const route = await loadModule('app/api/admin/activity-map/features/route.js', {
+    '@/lib/activity-map-catalog-service': { getActivityMapCatalog: async () => DEFAULT_ACTIVITY_CATALOG },
     '@/lib/map/api': { handleMapRequest }, '@/lib/activity-map-service': {
       getAdminActivityMapFeatures: async () => [], saveActivityMapFeature: async () => ({ id: 'a'.repeat(32) }),
     },
@@ -110,16 +137,25 @@ test('activity map admin route inherits authentication, same-origin and private-
   assert.equal(get.status, 200); assert.match(get.headers.get('Cache-Control'), /private/);
   const crossSite = await route.POST(request('/api/admin/activity-map/features', { method: 'POST', body: { action: 'create' }, headers: { origin: 'https://evil.test' } }));
   assert.equal(crossSite.status, 403);
+  let catalogWrites = 0;
+  const catalogRoute = await loadModule('app/api/admin/activity-map/catalog/route.js', {
+    '@/lib/map/api': { handleMapRequest }, '@/lib/activity-map-catalog-service': { saveActivityMapCatalogEntry: async () => { catalogWrites++; return DEFAULT_ACTIVITY_CATALOG; } },
+  });
+  assert.equal((await catalogRoute.POST(request('/api/admin/activity-map/catalog', { method: 'POST', body: {}, headers: { origin: 'https://evil.test' } }))).status, 403);
+  assert.equal(catalogWrites, 0);
+  const allowed = await catalogRoute.POST(request('/api/admin/activity-map/catalog', { method: 'POST', body: {} }));
+  assert.equal(allowed.status, 200); assert.match(allowed.headers.get('Cache-Control'), /private/);
 });
 
 test('database schema constrains activity map combinations and adds audit triggers', async () => {
   const schema = await readFile(new URL('../database/schema.sql', import.meta.url), 'utf8');
   assert.match(schema, /CREATE TABLE IF NOT EXISTS activity_map_features/);
-  assert.match(schema, /category IN \('cycling', 'alpine'\)/);
-  assert.match(schema, /feature_type IN \('trail', 'park', 'sledding', 'lift'\)/);
+  assert.match(schema, /FOREIGN KEY \(category, feature_type\) REFERENCES activity_map_types/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS activity_map_categories/);
+  assert.match(schema, /tooltip_text TEXT/);
   assert.match(schema, /activity_number TEXT/);
   assert.match(schema, /ALTER COLUMN activity_number TYPE TEXT USING activity_number::TEXT/);
-  assert.match(schema, /CHECK \(is_draft OR geometry IS NOT NULL\)/);
+  assert.match(schema, /CHECK \(is_draft OR \(geometry IS NOT NULL AND geometry <> 'null'::jsonb\)\)/);
   assert.match(schema, /activity_map_feature_combination_check/);
   assert.match(schema, /activity_map_features_audit_trigger/);
   for (const name of ['Slåtteliløypa', 'Furuløypa', 'Dompappen', 'Blåbærløypa', 'Grønnfinken', 'Rødreven',
@@ -160,5 +196,67 @@ test('database schema seeds the requested alpine drafts idempotently', async () 
       (id, name, category, activity_number, feature_type, geometry, is_draft)
       VALUES ($1, 'Bokstavbakken', 'alpine', 'A1', 'trail', $2::jsonb, FALSE)`,
     ['d'.repeat(32), JSON.stringify(polygon.geometry)]);
+    await database.query(`INSERT INTO activity_map_features
+      (id, name, tooltip_text, category, feature_type, geometry, is_draft)
+      VALUES ($1, 'Utsiktsrunden', 'Kort omtale', 'hiking', 'route', $2::jsonb, FALSE)`,
+    ['c'.repeat(32), JSON.stringify(hikingLine)]);
+    await assert.rejects(database.query(`INSERT INTO activity_map_features
+      (id, name, category, feature_type, geometry, is_draft)
+      VALUES ($1, 'Ugyldig tur', 'hiking', 'route', $2::jsonb, FALSE)`,
+    ['b'.repeat(32), JSON.stringify(polygon.geometry)]));
+
+    let nextId = 0;
+    let invalidations = 0;
+    const service = await loadModule('lib/activity-map-catalog-service.js', {
+      './admin-access.js': { requirePermission: async (permission) => { assert.equal(permission, 'members'); return { email: 'ADMIN@EXAMPLE.TEST' }; } },
+      './db.js': { getSql: () => ({ query: async (...args) => (await database.query(...args)).rows }) },
+      './mock-store.js': { isMockMode: () => false }, './member-self-service-utils.js': { randomId: () => `custom-${++nextId}` },
+      './public-content-cache.js': { revalidatePublicActivityMap: () => { invalidations++; } },
+      './activity-map-catalog.js': { DEFAULT_ACTIVITY_CATALOG, normalizeActivityCatalogInput }, './map/geo.js': { MapError },
+    });
+    const categoryInput = { kind: 'category', action: 'create', name: 'Vintertur', color: '#20636c' };
+    let catalog = await service.saveActivityMapCatalogEntry(categoryInput);
+    const category = catalog.categories.find((item) => item.name === 'Vintertur');
+    catalog = await service.saveActivityMapCatalogEntry({ kind: 'type', action: 'create', category: category.id, name: 'Truger', geometryKind: 'line' });
+    const type = catalog.types.find((item) => item.name === 'Truger');
+    await database.query(`INSERT INTO activity_map_features (id, name, category, feature_type, geometry, is_draft)
+      VALUES ($1, 'Trugerunden', $2, $3, $4::jsonb, FALSE)`, ['a'.repeat(32), category.id, type.id, JSON.stringify(hikingLine)]);
+    await assert.rejects(service.saveActivityMapCatalogEntry({ ...categoryInput, name: 'vintertur' }), { code: 'errors.activityCatalogDuplicate' });
+    await assert.rejects(service.saveActivityMapCatalogEntry({ kind: 'type', action: 'create', category: 'missing', name: 'Feil', geometryKind: 'point' }), { code: 'errors.activityCategory' });
+    await service.saveActivityMapCatalogEntry({ ...category, kind: 'category', action: 'update', name: 'Vinteraktiviteter' });
+    await assert.rejects(service.saveActivityMapCatalogEntry({ ...category, kind: 'category', action: 'update', name: 'Gammelt navn' }), { code: 'errors.activityCatalogChanged' });
+    await service.saveActivityMapCatalogEntry({ ...type, kind: 'type', action: 'update', name: 'Trugetur' });
+    await assert.rejects(service.saveActivityMapCatalogEntry({ ...type, kind: 'type', action: 'update', geometryKind: 'polygon' }), { code: 'errors.activityCatalogChanged' });
+    await assert.rejects(database.query(`UPDATE activity_map_types SET geometry_kind = 'polygon' WHERE category = $1 AND id = $2`, [category.id, type.id]));
+    await assert.rejects(database.query(`UPDATE activity_map_features SET feature_type = 'trail' WHERE id = $1`, ['a'.repeat(32)]));
+    // A legacy draft used JSON null instead of SQL NULL. Preserve it without publishing it.
+    await database.query(`INSERT INTO activity_map_features (id, name, category, feature_type, geometry, is_draft)
+      VALUES ($1, 'Eldre kladd', 'alpine', 'trail', 'null'::jsonb, TRUE)`, ['9'.repeat(32)]);
+    await assert.rejects(database.query('UPDATE activity_map_features SET is_draft = FALSE WHERE id = $1', ['9'.repeat(32)]));
+    const before = (await database.query('SELECT * FROM activity_map_features ORDER BY id')).rows;
+    assert.ok(activityMapStatements(schema).every((statement) => !/ALTER TABLE (members|surveys)\b/.test(statement)));
+    const migration = await migrateActivityMapSchema(database, schema);
+    assert.equal(migration.activitiesPreserved, before.length);
+    assert.deepEqual((await database.query('SELECT * FROM activity_map_features ORDER BY id')).rows, before);
+    catalog = await service.getActivityMapCatalog();
+    assert.equal(catalog.categories.find((item) => item.id === category.id).name, 'Vinteraktiviteter');
+    assert.equal(catalog.types.find((item) => item.id === type.id).name, 'Trugetur');
+    assert.equal(invalidations, 4);
+    const featureService = await loadModule('lib/activity-map-service.js', {
+      './admin-access.js': { requirePermission: async () => ({ email: 'admin@example.test' }) },
+      './db.js': { getSql: () => ({ query: async (...args) => (await database.query(...args)).rows }) },
+      './mock-store.js': { isMockMode: () => false }, './member-self-service-utils.js': { randomId: () => '8'.repeat(32) },
+      './public-content-cache.js': { revalidatePublicActivityMap: () => {} },
+      './activity-map.js': { activityFeatureRecord, normalizeActivityFeatureInput, publicActivityFeatureRecord }, './map/geo.js': { MapError },
+      './activity-map-catalog-service.js': { getActivityMapCatalog: service.getActivityMapCatalog }, './activity-map-catalog.js': { withActivityCatalog },
+    });
+    const created = await featureService.saveActivityMapFeature({ action: 'create', name: 'Ny runde', category: category.id, featureType: type.id, geometry: hikingLine });
+    assert.equal(created.categoryName, 'Vinteraktiviteter'); assert.equal(created.typeName, 'Trugetur');
+    const publicFeatures = await featureService.getPublicActivityMapFeatures();
+    assert.equal(publicFeatures.find((item) => item.id === created.id).geometryKind, 'line');
+    assert.equal(publicFeatures.some((item) => item.id === '9'.repeat(32)), false);
+    assert.equal((await featureService.getAdminActivityMapFeatures()).find((item) => item.id === created.id).categoryColor, '#20636c');
+    const audit = (await database.query(`SELECT changed_by, row_id FROM audit_log WHERE table_name = 'activity_map_types' AND operation = 'UPDATE'`)).rows;
+    assert.deepEqual(audit, [{ changed_by: 'admin@example.test', row_id: `${category.id}:${type.id}` }]);
   } finally { await database.close(); }
 });

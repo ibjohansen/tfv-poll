@@ -3245,6 +3245,8 @@ body:has(.cookie-notice) { padding-bottom: 6rem; }
 .activity-admin-layout { display: grid; grid-template-columns: minmax(220px, .55fr) minmax(0, 1.6fr); gap: 1rem; align-items: start; min-width: 0; }
 .activity-feature-list, .activity-editor-panel { min-width: 0; padding: 1rem; border: 1px solid var(--line, #d7d2c9); border-radius: 12px; background: #fff; }
 .activity-feature-list-heading, .activity-save-row, .activity-drawing-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .65rem; }
+.activity-category-filter { display: grid; gap: .3rem; margin-top: .8rem; color: #665950; font-size: .8rem; font-weight: 650; }
+.activity-category-filter select { min-height: 40px; padding: .45rem .55rem; border: 1px solid #b8ad9f; border-radius: 7px; background: #fff; color: inherit; font: inherit; }
 .activity-feature-list h3, .activity-editor-panel h3 { margin: 0; font-size: 1.05rem; }
 .activity-feature-list ul { display: grid; gap: .45rem; max-height: 620px; margin: .85rem 0 0; padding: 0; overflow-y: auto; list-style: none; }
 .activity-feature-list li button { display: grid; gap: .2rem; width: 100%; min-height: 54px; padding: .65rem .75rem; border: 1px solid #e0d9cf; border-radius: 8px; background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer; }
@@ -3254,12 +3256,25 @@ body:has(.cookie-notice) { padding-bottom: 6rem; }
 .activity-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
 .activity-form-grid label { display: grid; gap: .35rem; min-width: 0; font-size: .85rem; font-weight: 650; }
 .activity-form-grid input, .activity-form-grid select { width: 100%; min-height: 44px; padding: .55rem .65rem; border: 1px solid #b8ad9f; border-radius: 7px; background: #fff; color: inherit; font: inherit; }
+.activity-catalog-manager { margin-bottom: 1rem; padding: 1rem; border: 1px solid #d7d0c7; border-radius: 10px; background: #fff; }
+.activity-catalog-manager summary { cursor: pointer; font-weight: 650; padding: .4rem 0; }
+.activity-catalog-forms { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 1rem; }
+.activity-catalog-forms form { min-width: 0; }
+.activity-catalog-forms fieldset { display: grid; gap: .8rem; min-width: 0; margin: 0; padding: 1rem; border: 1px solid #d7d0c7; border-radius: 7px; }
+.activity-catalog-forms legend { font-weight: 650; padding: 0 .3rem; }
+.activity-catalog-forms label { display: grid; gap: .35rem; min-width: 0; font-size: .85rem; font-weight: 650; }
+.activity-catalog-forms input, .activity-catalog-forms select { width: 100%; min-height: 44px; padding: .55rem .65rem; border: 1px solid #b8ad9f; border-radius: 7px; background: #fff; color: inherit; font: inherit; }
+.activity-catalog-forms input[type="color"] { max-width: 100px; padding: .25rem; }
+.activity-tooltip-field { grid-column: 1 / -1; }
 .activity-drawing-actions { justify-content: flex-start; }
 .activity-admin-map-frame { position: relative; min-width: 0; }
 .activity-admin-map { width: 100%; height: min(62vh, 640px); min-height: 390px; border: 1px solid #d7d2c9; border-radius: 12px; z-index: 0; }
+.activity-admin-map .leaflet-tooltip p { max-width: 260px; margin: 5px 0 0; white-space: normal; }
 .activity-admin-map.is-drawing, .activity-admin-map.is-drawing .leaflet-pane, .activity-admin-map.is-drawing .leaflet-interactive, .activity-admin-map.is-drawing .leaflet-marker-icon { cursor: crosshair !important; }
-.activity-polygon-vertex { display: grid; width: 24px !important; height: 24px !important; place-items: center; box-sizing: border-box; border: 2px solid #6b4ea0; border-radius: 50%; background: #fff; color: #6b4ea0; font: 800 19px/1 system-ui, sans-serif; box-shadow: 0 1px 4px rgba(30, 26, 21, .28); cursor: grab; }
-.activity-polygon-vertex span { transform: translateY(-.5px); }
+.activity-geometry-vertex, .activity-geometry-midpoint { display: grid; place-items: center; box-sizing: border-box; border-radius: 50%; background: #fff; color: #6b4ea0; font: 800 17px/1 system-ui, sans-serif; box-shadow: 0 1px 4px rgba(30, 26, 21, .28); }
+.activity-geometry-vertex { width: 24px !important; height: 24px !important; border: 2px solid #6b4ea0; cursor: grab; }
+.activity-geometry-midpoint { width: 22px !important; height: 22px !important; border: 2px dashed #6b4ea0; cursor: pointer; }
+.activity-geometry-vertex span, .activity-geometry-midpoint span { transform: translateY(-.5px); }
 .activity-admin button:focus-visible, .activity-admin input:focus-visible, .activity-admin select:focus-visible { outline: 2px solid #20636c; outline-offset: 3px; }
 .activity-admin .muted { margin: 0; color: #665950; font-size: .85rem; }
 .activity-draft-toggle { display: flex; align-items: flex-start; gap: .7rem; padding: .8rem; border: 1px solid #d7d2c9; border-radius: 9px; background: #faf8f4; cursor: pointer; }
@@ -3287,6 +3302,7 @@ body:has(.cookie-notice) { padding-bottom: 6rem; }
 .public-activity-filters input { width: 17px; height: 17px; accent-color: var(--brand-burgundy); }
 .activity-filter-dot, .activity-list-symbol { flex: 0 0 auto; width: 11px; height: 11px; border-radius: 50%; background: #7d3147; }
 .activity-filter-dot.is-cycling, .activity-list-symbol.is-cycling { background: #16745a; }
+.activity-filter-dot.is-hiking, .activity-list-symbol.is-hiking { background: #a66321; }
 .public-activity-map-shell, .public-activity-map-frame { position: relative; width: 100%; }
 .public-activity-map, .public-activity-map-loading { width: 100%; height: min(62vh, 650px); min-height: 390px; border: 1px solid var(--line); border-radius: 16px; background: #fff; z-index: 0; }
 .public-activity-map-loading { display: grid; place-items: center; color: var(--text-soft); }
@@ -3294,6 +3310,7 @@ body:has(.cookie-notice) { padding-bottom: 6rem; }
 .public-activity-map-frame:fullscreen .public-activity-map { width: 100%; height: 100%; min-height: 0; border: 0; border-radius: 0; }
 .public-activity-map-frame .leaflet-tooltip { padding: 8px 10px; border-radius: 7px; line-height: 1.4; }
 .public-activity-map-frame .leaflet-tooltip div { color: #665950; font-size: 12px; }
+.public-activity-map-frame .leaflet-tooltip p { max-width: 260px; margin: 5px 0 0; color: #493f39; white-space: normal; }
 .public-activity-status { min-height: 44px; padding: 11px 0; color: var(--text-soft); font-size: 12px; }
 .public-activity-status p { margin: 0; }
 .public-activity-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }

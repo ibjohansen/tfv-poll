@@ -186,6 +186,7 @@ const admin = {
       accounting_expenses: 'Kostnadsbilag',
       accounting_attachments: 'Regnskapsvedlegg',
       activity_map_features: 'Aktivitetskart',
+      activity_map_categories: 'Aktivitetskategorier', activity_map_types: 'Aktivitetstyper',
       admin_actions: 'Administrativ handling',
       email_campaigns: 'E-postkampanje',
       email_deliveries: 'Testmail',

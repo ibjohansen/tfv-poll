@@ -786,18 +786,24 @@ produksjonsbruk; den lokale 20/minutt-grensen er bare per-instans.
 Se [kartmodulens datakilder, begrensninger og bruk](docs/map-explorer.md).
 
 Aktivitetskartet ligger på `/admin/activity-map`, med beskyttet Node-rute
-`GET/POST /api/admin/activity-map/features`. Ruten bruker eksisterende
+`GET/POST /api/admin/activity-map/features` og `POST /api/admin/activity-map/catalog`. Rutene bruker eksisterende
 `members`-rettighet, same-origin-kontroll og pooled databaseforbindelse. Data
-lagres i den additive tabellen `activity_map_features`; sykkel- og alpinløyper
-samt heiser er polygoner, mens park og akebakke er alpine punkt.
+lagres i `activity_map_features`, med redigerbare kategorier og typer i
+`activity_map_categories` og `activity_map_types`. Under «Administrer kategorier og typer»
+kan administrator opprette kategorier, velge kategorifarge og opprette typer med
+polygon, linje eller punkt. Navn kan endres uten å endre aktivitetenes koblinger.
+Geometriformen låses ved opprettelse; en annen form krever en ny type.
+Standardkategoriene er Sykkel, Alpint og Tur; turer bruker linjer, sykkel- og
+alpinløyper samt heiser bruker polygoner, og park/akebakke bruker punkt.
 Alpinaktiviteter kan
 ha nummer som tekst (for eksempel `1`, `A` eller `1A`), og alpinløyper kan ha blå, gul, grønn, rød eller svart
 fargekategori. Nye aktiviteter lagres som kladd som standard og kan opprettes
 uten geometri. Bare aktiviteter som er tatt ut av kladd og har gyldig geometri
 vises på forsiden. De elleve navngitte alpinløypene ligger som en idempotent
-kladd-seed i skjemaet. Den offentlige presentasjonskomponenten leser bare ID, navn, nummer, kategori, type,
-eventuell farge og geometri, og kan vise én eller begge kategorier samt slå
-alpinfargene av/på. Aktivitetskartet er foreløpig ikke aktivert på forsiden.
+kladd-seed i skjemaet. Den offentlige presentasjonskomponenten leser bare ID, navn, nummer,
+kort tooltip-tekst, kategori-/typenavn, eventuell farge og geometri. Kategorier med
+publiserte aktiviteter får automatisk egne filtre; alpinfargene kan slås av/på.
+Aktivitetskartet vises foreløpig bare når forsiden åpnes med `?maps=turutrollet`.
 Admin- og forsidekartet kan veksle mellom Kartverkets
 topografiske kart og Esri World Imagery (satellitt- og flyfoto). Ingen
 personopplysninger eller ny miljøvariabel inngår.
@@ -806,6 +812,22 @@ additive produksjonsmigreringen ble kjørt og verifisert 30. september 2026; se
 [migreringsstatus](docs/database-migration-2026-09-30.md). Kodeversjonen ble
 publisert på Netlify 30. september 2026, med aktivitetskartet fortsatt skjult på
 forsiden.
+
+Før kodeversjonen med redigerbare kategorier og typer tas i bruk, migrer etter
+test på isolert Neon-gren og et kontrollert gjenopprettingspunkt.
+`scripts/release-activity-map-schema.mjs` velger bare aktivitetskartets SQL fra
+`database/schema.sql` (inkludert felles audit-funksjon), krever direkte `DATABASE_URL_UNPOOLED`,
+eksplisitt `--host`, `--environment`, `--confirmed` og testet `--schema-sha256`.
+Den kontrollerer databasens miljømerking og sjekksummen av alle eksisterende aktivitetsfelt
+før commit; feil ruller hele transaksjonen tilbake. `npm run db:setup` inkluderer
+også disse endringene ved vanlig fullstendig skjemaoppsett.
+Migreringen fjerner de gamle faste kategori-/typebegrensningene,
+oppretter katalogtabeller og fremmednøkler og beholder eksisterende aktiviteter og geometri.
+Den kan kjøres på nytt uten å overskrive egendefinerte navn, typer eller kategorier.
+Endringer i katalogen er versjonskontrollerte, loggføres og invaliderer offentlig kartcache.
+Produksjonsmigreringen er kjørt 2. oktober 2026; se
+[resultat og gjenopprettingspunkt](docs/database-migration-2026-10-02-activity-catalog.md).
+Dette er en databasemigrering, ikke en publisering av den tilhørende kodeversjonen.
 
 HTML-ruter rendres ved request-tid fordi den strenge CSP-en bruker en ny nonce
 per request. Next.js kan ikke legge denne nonce-en på scripts i statisk eller
@@ -1024,7 +1046,7 @@ ikke automatisk.
 
 Skjemaet oppretter også `audit_log` og triggere på `members`, `member_requests`,
 `surveys`, `survey_responses`, `survey_attachments`, `cms_pages` og
-`cms_attachments`, samt `activity_map_features`. Loggen starter
+`cms_attachments`, samt `activity_map_features`, `activity_map_categories` og `activity_map_types`. Loggen starter
 når migreringen kjøres; den rekonstruerer ikke historikk fra tidligere
 endringer. Tilgangstoken, verifiseringshash og interne lagringsnøkler utelates.
 
@@ -1448,6 +1470,11 @@ Utfør kontrollene i denne rekkefølgen:
   Netlify-loggen, samt det aggregerte resultatet i brukerloggen. Ufullstendige
   Kartverket-data eller en polygonversjon som endres under kjøringen skal ikke
   gi delvis rapportert suksess.
+- På `/admin/activity-map`, opprett en kategori og en type med linjegeometri i et isolert testmiljø.
+  Tegn, lagre og last aktiviteten på nytt. Endre kategori-/typenavn og kontroller at
+  geometri og koblinger beholdes, og at nye navn vises i filtre og tooltip på
+  `/?maps=turutrollet`. Kontroller også polygon/punkt, kladder, kategorier uten typer,
+  duplikatnavn og at en foreldet versjon ikke overskriver nyere endringer.
 - Logg inn med en godkjent administratorkonto og kontroller modulene Medlemsregister,
   Oppgaveliste, Undersøkelser, Web og Brukerendringer. Velg et medlem med gateadresse, og kontroller
   at eiendomskartet er lukket under adressefeltet i detaljpanelet og kan åpnes.
