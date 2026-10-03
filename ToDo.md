@@ -1,5 +1,23 @@
 # ToDo
 
+## Produksjonskontroll etter kodegjennomgang – 3. oktober 2026
+
+- [ ] Publiser gjennomgått kode samlet og bekreft deploy-ID/commit. Ingen
+  endring av Neon-hvile, abonnement, Entra-policy eller hemmeligheter inngår.
+- [ ] Verifiser aktivitetenes nettadresse/sesong, nb/en-eksporter, oversatte
+  jobbmeldinger, innlogging, kart og origin-/CSP-kontroller i produksjon.
+  Bruk godkjente testmottakere dersom e-posttesting er nødvendig.
+- [ ] Mål minst fem kalde/varme besøkspar etter 6, 15 og 30 minutters faktisk
+  inaktivitet. Registrer UTC, deploy-ID, request-ID, TTFB og total tid; korreler
+  med Netlify-funksjonsstart og Neon start-/suspend-hendelser. Kartlegg også
+  watchdog/cron: planlagt trafikk kan holde databasen våken uten besøkende.
+  Ikke logg token, medlemsdata eller full URL med query.
+- [ ] Anbefal eventuell hvileendring først etter måling og kontroll av faktisk
+  abonnementspris/compute-bruk. Oppgaven forblir åpen til resultat er dokumentert.
+
+Dette er prosjektets driftsoppgave, ikke en matrikkelkjøring. Admin-innboksen
+har foreløpig ingen generell driftsoppgavetype.
+
 ## Universell utforming – gjennomgang 19. september 2026
 
 De 35 norske minimumskravene for privat/frivillig sektor er vurdert og lagt inn

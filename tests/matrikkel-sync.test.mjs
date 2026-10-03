@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { loadModule, plain } from './helpers/load-module.mjs';
 import { parseCadastralNumber } from '../lib/member-self-service-utils.js';
+import { jobMessage } from '../lib/job-messages.js';
 
 const runId = 'a'.repeat(32);
 const member = { member_id: '7', h_number: 'H-7', street_address: 'Testvegen 7', cadastral_number: '10/20', section_number: null, title_holder: 'Tidligere eier', registration_date: '2020-01-01' };
@@ -33,7 +34,7 @@ async function setup(options = {}) {
     if (query.includes("AND status = 'pending' AND started_at IS NULL")) {
       if (!state.run || state.run.status !== 'pending' || state.run.started_at || state.run.deleted_at) return [];
       state.run.status = 'failed';
-      state.run.error_message = 'Bakgrunnsjobben kunne ikke startes.';
+      state.run.error_message = values[0];
       return [{ ...state.run }];
     }
     if (query.includes('SELECT id, status FROM matrikkel_sync_runs') && query.includes('deleted_at IS NULL')) {
@@ -65,8 +66,8 @@ async function setup(options = {}) {
       state.items.set(m.member_id, { status: values[8], proposed: JSON.parse(values[11]), matchType: values[10] });
       return [{ member_id: m.member_id }];
     }
-    if (query.includes("message = 'Medlemmet finnes ikke lenger.'")) {
-      state.items.set(values[1], { status: 'error', message: 'Medlemmet finnes ikke lenger.' });
+    if (query.includes("SET status = 'error', message = ?") && values[0] === jobMessage('MEMBER_MISSING')) {
+      state.items.set(values[2], { status: 'error', message: values[0] });
       return [];
     }
     if (query.includes('UPDATE matrikkel_sync_items SET status = ?')) {
@@ -182,7 +183,7 @@ test('failed dispatch marks only an unstarted pending run failed and preserves m
   assert.match(query.query, /status = 'pending' AND started_at IS NULL AND deleted_at IS NULL/);
   assert.match(query.query, /completed_at = NOW\(\)/);
   assert.doesNotMatch(query.query, /UPDATE members|DELETE|UPDATE matrikkel_sync_items/);
-  assert.deepEqual(query.values, [runId]);
+  assert.deepEqual(query.values, [jobMessage('JOB_START_FAILED'), runId]);
   assert.equal((await api.processMatrikkelRun(runId)).status, 'failed', 'late worker must not process a failed start');
   assert.equal(state.lookups.length, 0);
 });

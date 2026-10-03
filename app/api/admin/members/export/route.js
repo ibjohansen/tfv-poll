@@ -6,11 +6,11 @@ import { getRequestI18n } from '@/lib/i18n/request';
 export const runtime = 'nodejs';
 
 export async function POST(request) {
-  const { t } = getRequestI18n(request, 'backend');
+  const { t, locale } = getRequestI18n(request, 'backend');
   if (!isSameOriginRequest(request)) return Response.json({ ok: false, message: t('api.invalidRequest') }, { status: 403 });
   try {
     const input = await readJsonObject(request);
-    const result = await createMemberExport(input);
+    const result = await createMemberExport(input, { locale });
     const date = new Date().toISOString().slice(0, 10);
     return new Response(new Uint8Array(result.buffer), {
       status: 200,

@@ -102,7 +102,7 @@ test('survey charts and Excel export forward the same hamlet filter and reject i
     for (const filter of ['1', 'none', '']) {
       const response = await route.GET(request(`/api/admin/${path}?hamlet=${filter}`), routeContext());
       assert.equal(response.status, 200);
-      assert.deepEqual(plain(calls.at(-1).args), ['a'.repeat(32), filter]);
+      assert.deepEqual(plain(calls.at(-1).args), ['a'.repeat(32), filter, ...(path.endsWith('/export') ? [{ locale: 'nb' }] : [])]);
     }
     state.error = new Error('Invalid survey hamlet filter');
     const invalid = await route.GET(request(`/api/admin/${path}?hamlet=bad`), routeContext());

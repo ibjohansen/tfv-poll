@@ -63,21 +63,22 @@ kode må oppdateres og feltene verifiseres der før produksjonssaken kan lukkes.
 Ikke alle lokale konstanter/funksjoner bør flyttes til globale filer. Delte
 domeneregler og adaptere skilles ut; ren lokal rendering kan ligge med komponenten.
 
-## Språk: forbedret, ikke komplett
+## Språk: oppfølging av e-post, eksport og jobber
 
 CMS-editor/directory/preview, loading/error-visninger, filruter, nettverksfeil,
 surveytilgang og kartinformasjon har fått nb/en-variabler. En ugyldig URL-kodet
 språk-cookie krasjer ikke lenger request-håndteringen.
 
-Følgende gjenstår og er ikke fremstilt som fullført:
+De fire anbefalte oppfølgingspunktene er nå implementert lokalt. Se
+[format, kompatibilitet og testdekning](message-localization.md).
 
 | Område | Funn / anbefalt oppfølging |
 | --- | --- |
-| `lib/email-templates.js` | Systemtekst i e-post er fortsatt norske litteraler. Flytt til e-postordbøker; behold styregodkjent innhold som redaksjonelle data. |
-| `lib/member-workbook.js` og andre eksport-renderere | Enkelte kolonneoverskrifter, arkfaner og eksportetiketter er hardkodet. |
-| `lib/matrikkel-client.js`, `lib/matrikkel-sync.js` | Leverandørfeil og lagrede jobbmeldinger inneholder fritekst. Nye hendelser bør lagre kode/parametre og oversettes i UI. |
-| `lib/mailer-service.js` og bakgrunnsjobber | Enkelte diagnostiske/statusmeldinger er fritekst. Offentlige svar skal bruke trygg kodebasert oversettelse, ikke rå leverandørfeil. |
-| Databasehistorikk | Historiske fritekstmeldinger er ikke omskrevet eller slettet som språkrydding. |
+| `lib/email-templates.js` | nb/en-ordbøker for systemtekst; styregodkjent innhold og historiske spørsmål/svar beholdt. Norsk er fortsatt standard for mottakere uten valgt språk. |
+| `lib/member-workbook.js` og andre eksport-renderere | Medlem-, survey- og regnskapseksporter bruker språkvariabler. Eksport-ruter velger forespørselens språk. |
+| `lib/matrikkel-client.js`, `lib/matrikkel-sync.js` | Nye kontroll-/feilmeldinger lagres med tillatt kode/parametre i eksisterende tekstkolonner og oversettes i UI. Ingen skjemaendring. |
+| `lib/mailer-service.js` og bakgrunnsjobber | Trygge maskinkoder og lokaliserte statusmeldinger. Rå leverandørtekst er ikke offentlig svar; eksisterende beskyttet diagnostikk beholdes. |
+| Databasehistorikk | Ikke omskrevet/slettet. Kjente eldre meldinger oversettes ved lesing; ukjent fritekst får en trygg standardmelding. |
 
 Interne feilkoder/logghendelser, brukerskrevet innhold, adresser og stedsnavn er
 ikke UI-etiketter. Et tekstsøk alene skiller ikke disse sikkert fra visningstekst.
@@ -119,6 +120,11 @@ Etter deploy: mål flere besøk etter inaktivitet og korreler med funksjons-/com
 tidsstempler. Vurder deretter om mindre hvile er verdt mulig høyere kostnad.
 Ingen kostnadsdrivende produksjonsinnstillinger er endret.
 
+Se [alternativer, kostnadsoverslag og sikkerhetsvalg](operations-options-2026-10-03.md).
+Watchdog er planlagt hvert femte minutt og kan påvirke faktisk Neon-hvile.
+Produksjonskontroll står åpen i `ToDo.md`; ingen generell driftsoppgavetype
+finnes i dagens admin-innboks.
+
 ## Kontroll mot ToDo-security.md
 
 «Delvis» betyr ikke godkjent i produksjon. Originale avkrysningspunkter beholdes
@@ -131,7 +137,7 @@ til egne ferdigkriterier og nødvendig retest er oppfylt.
 | F-03 | Delvis: sentral origin-kontroll, proxyvern og bounded JSON. Full rute-/unntaksmatrise og staging-retest gjenstår. |
 | F-04 | Vertslåsing rettet/testet. Separate jobbhemmeligheter og rotasjon gjenstår. |
 | F-05 | Åpent: engangstoken kan forbrukes i GET-flyter; eksplisitt bekreftelses-POST og flyttester trengs. |
-| F-06 | Åpent: offentlig kart inneholder eiendomsidentifikatorer/adresser. Avklar produktnivå før fjerning. |
+| F-06 | Produktnivå avklart: adresse, H-nummer og gnr/bnr er tillatt offentlig. Felt-/tilgangstester og produksjonsverifikasjon gjenstår. |
 | F-07 | Delvis: bounded lokale tellere og IPv6 /64 rettet. Identifikatorkvoters utestengingsrisiko og distribuert policy gjenstår. |
 | F-08 | Åpent: innmelding gjør fortsatt arbeid før generisk 202; timingforskjeller er ikke fjernet. |
 | F-09 | Åpent: lokal suppression finnes, men offentlige flyter kan gjøre leverandøroppslag. |
@@ -144,7 +150,7 @@ til egne ferdigkriterier og nødvendig retest er oppfylt.
 | F-16 | Delvis: X-Powered-By deaktivert, proxyens produksjonstiming fjernet, kartiframe sandboxet. Reell Entra-/kartkompatibilitet og CSP/HSTS-policy trenger retest. |
 | F-17 | Delvis: lokal frekvensgrense og liten request-grense. Ingen ny distribuert WAF-policy. |
 | F-18a | Første tellende svar/hovedadressekvittering bevart; svindelvernet er ikke redusert. |
-| F-18b | Mottakerliste i invitasjon er uendret; personvern-/produktvalg gjenstår. |
+| F-18b | Produktvalg avklart: registrerte adresser på samme tomt kan se hverandre, aldri andre tomters adresser. Grensetester/informasjon gjenstår. |
 | F-18c | Surveyinnhold i audit er ikke slettet/omskrevet; retention/minimering må avklares. |
 | F-18d | Lokal rettelse: brukerinitiert adresseoppslag, begrenset adapter og personverninformasjon; syntetisk nettlesertest. |
 | F-19 | Eksisterende miljø-/lengdevalidering; ingen komplett ny placeholder-/gjenbrukspolicy for hemmeligheter. |
@@ -156,13 +162,14 @@ Ingen påstand om utnyttelse i denne appen.
 
 ## Verifikasjon
 
-- `npm run check`: lint, 402 tester og full produksjonsbuild bestått.
+- `npm run check` etter språkoppfølgingen: lint, 411 tester og full produksjonsbuild bestått.
 - Faktisk aktivitetstjeneste/SQL og fullt skjema er testet med PGlite, inklusive
   nettadresse/sesong-rundreise. Dette erstatter ikke Postgres-samtidighetstest.
-- Playwright desktop/mobil: 90 bestått, to planlagte hopp over desktop-spesifikke
-  tester på mobil. Alle 92 tester ferdig uten feil i siste kjøring.
-- Lokalt produksjonsytelsesbudsjett bestått: varm forside TTFB ca. 16 ms,
-  LCP 72 ms, JavaScript 581 795 byte; CMS-editor 936 208 byte. Ingen feilresponser,
+- Playwright desktop/mobil etter språkoppfølgingen: 92 bestått, to planlagte
+  hopp over desktop-spesifikke tester på mobil. Siste kjøring uten feil.
+- Lokalt produksjonsytelsesbudsjett bestått også etter språkoppfølgingen:
+  varm forside TTFB ca. 20 ms, LCP 144 ms, JavaScript 581 795 byte;
+  CMS-editor 936 208 byte. Ingen feilresponser,
   CSP-brudd eller nonce-avvik. Syntetiske data/loopback, ikke produksjons-SLA.
   Ingen sammenlignbar førmåling som beviser prosentvis forbedring.
 - `npm audit`: null kjente sårbarheter, inklusive utviklingsavhengigheter.
@@ -174,10 +181,10 @@ Ingen påstand om utnyttelse i denne appen.
 
 ## Avklaringer
 
-1. `PublicHomePage` bruker organisasjonsnummer 928968898, `AccountingReport`
-   bruker 928968899. Hvilket er riktig? Ingen gjetting er lagt inn.
-2. Ønskes endret Neon-hvile mot mulig høyere kostnad? Mål først etter deploy.
-3. Hvilke eiendomsidentifikatorer skal være offentlige (F-06), og skal
-   invitasjoner vise de andre mottakeradressene (F-18b)?
-4. Hvem godkjenner oid-/MFA-overgang, jobbhemmeligheter og retention?
-   Dette er egne utrullinger, ikke sideeffekter av kodeopprydding.
+1. Bekreftet organisasjonsnummer **928968898**; forside og regnskapsrapport
+   bruker nå samme konstant i `data/organization.js`.
+2. Deploy/retest og måling er ført som åpne oppgaver. Ingen hvile-/prisendring nå.
+3. F-06/F-18b er avklart som angitt over og i sikkerhetslisten.
+4. oid-/MFA-overgang, jobbhemmeligheter og retention er detaljert med ansvar,
+   konsekvenser, kostnader og anbefalt rekkefølge i
+   [beslutningsnotatet](operations-options-2026-10-03.md#detaljering-av-avklaring-4).

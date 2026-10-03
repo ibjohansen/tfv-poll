@@ -8,10 +8,12 @@ import RichTextEditor from '@/components/RichTextEditor';
 import RichTextContent from '@/components/RichTextContent';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { textToRichText } from '@/lib/rich-text';
+import { formatJobMessage } from '@/lib/job-messages';
 import { useI18n } from '@/components/LocaleProvider';
 
 const empty = () => ({ subject: '', body: textToRichText(''), group_ids: [], status: 'draft' });
 export default function AdminNewsletters({ initialData, groups }) {
+  const { t: jobT } = useI18n('jobs');
   const apiFetch = useApiClient();
   const { t, formatLocale } = useI18n('email.newsletters');
   const [data, setData] = useState(initialData);
@@ -91,7 +93,7 @@ export default function AdminNewsletters({ initialData, groups }) {
         <form className="admin-detail-form" onSubmit={(event) => { event.preventDefault(); action('test'); }}><label>{t('testRecipient')}<input type="email" value={recipient} onChange={(event) => setRecipient(event.target.value)} maxLength={254} required disabled={busy} /></label><button className="admin-button" disabled={busy || dirty}>{t('sendTest')}</button></form>
         {campaign.status !== 'completed' && <button type="button" className="primary-button" disabled={busy || dirty || !data.bulkEnabled || (editable && !preview?.recipientCount)} onClick={() => setConfirm(true)}>{editable ? t('start') : t('resume')}</button>}
         {!editable && <p role="status">{t('counts', {total: campaign.total_count || 0, sent: campaign.sent_count || 0, delivered: campaign.delivered_count || 0, failed: campaign.failed_count || 0, suppressed: campaign.suppressed_count || 0, pending: campaign.pending_count || 0})}</p>}
-        {campaign.error_message && <p role="alert">{campaign.error_message}</p>}
+        {campaign.error_message && <p role="alert">{formatJobMessage(campaign.error_message, jobT)}</p>}
         {data.deliveries.length > 0 && <details><summary>{t('history')}</summary><ul>{data.deliveries.map((delivery) => <li key={delivery.id}>{delivery.recipient_domain} · {delivery.email_type === 'newsletter_test' ? t('testEmail') : t('newsletter')} · {delivery.status}{delivery.failure_reason ? ` · ${delivery.failure_reason}` : ''}</li>)}</ul></details>}
       </>}
     </section>}

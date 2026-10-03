@@ -4,6 +4,12 @@ Statuskontroll 3. oktober 2026: se [kodegjennomgangen](codebase-review-2026-10-0
 Den skiller lokale rettelser, delvise tiltak og åpne produksjonsvalg. Punktene
 nedenfor er ikke automatisk ferdigmeldt av den lokale gjennomgangen.
 
+Produktavklaringer 3. oktober 2026: F-06 tillater offentlig gateadresse,
+H-nummer og gårds-/bruksnummer. F-18b tillater deling av registrerte
+e-postadresser bare mellom adresser på samme tomt. Dette gir ikke tillatelse
+til å vise navn/e-post offentlig eller blande mottakergrupper. Beslutningen
+lukker produktspørsmålet, ikke behovet for felt-/tilgangstester.
+
 Opprettet 21. september 2026 etter gjennomgang av
 `docs/ekstern-sikkerhetsgjennomgang-20-09-2026.md`.
 
@@ -151,10 +157,10 @@ gyldige POST fortsatt er atomisk og bare lykkes én gang.
 
 **Foreslått rettelse**
 
-- [ ] Avklar og dokumenter kartets offentlige formål før responsformatet endres.
-- [ ] Fjern H-nummer fra offentlig API. Vurder også å fjerne gnr./bnr. og eksakt
-  gateadresse til fordel for polygon, markør uten medlemsidentifikator eller
-  aggregerte antall.
+- [x] Produktnivå avklart: offentlig kart kan vise gateadresse, H-nummer og
+  gårds-/bruksnummer. Disse feltene skal ikke fjernes som del av F-06.
+- [ ] Test eksplisitt felt-allowlist: kontaktopplysninger, navn, interne
+  medlemsdata og tilgangstoken skal ikke følge med det offentlige kartet.
 - [ ] Vis bare tomter som etter vedtatt produktregel skal være offentlige;
   minst skal slettede og ikke-relevante medlemsstatuser filtreres bort.
 - [ ] Sørg for at opplysninger fra det offentlige kartet ikke kan brukes som en
@@ -406,12 +412,12 @@ personvernproblem.
 
 ### F-18b – mottakerlisten i selve invitasjonen
 
-- [ ] Avklar om ekstra mottakere trenger å se alle andre registrerte adresser.
-  Anbefalt standard er at hovedkontakten kan se godkjente adresser i sin innloggede
-  profil og i kontrollkvitteringen, mens invitasjonen til øvrige mottakere bare sier
-  «Invitasjonen kan være sendt til flere registrerte mottakere på samme tomt».
-- [ ] Dersom produktbeslutningen er at også ekstra mottakere skal se hele listen,
-  dokumenter formålet og informer hovedkontakten tydelig når adressene registreres.
+- [x] Produktvalg 3. oktober: både hovedadresse og tilleggsadresser kan se de
+  registrerte adressene på sin egen tomt, for å samordne svar og kontrollere
+  mottakerne. Adresser fra andre tomter skal aldri vises.
+- [ ] Informer hovedkontakten tydelig om denne delingen når adresser registreres.
+- [ ] Test tomtegrensen med to tomter, delt kontaktadresse, historiske leveranser
+  og eierskifte; hver utsending skal bare vise gjeldende adresser for sin tomt.
 - [ ] Test invitasjon med én og flere adresser, hoved-/ekstra mottaker og at
   kvitteringen fortsatt inneholder nødvendig svindelkontroll.
 

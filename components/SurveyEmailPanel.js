@@ -7,9 +7,11 @@ import SurveyRecipientPicker from '@/components/SurveyRecipientPicker';
 import SurveyMailOverview from '@/components/SurveyMailOverview';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import { formatJobMessage } from '@/lib/job-messages';
 import { useI18n } from '@/components/LocaleProvider';
 
 export default function SurveyEmailPanel({ surveyId, adminEmail }) {
+  const { t: jobT } = useI18n('jobs');
   const apiFetch = useApiClient();
   const { t } = useI18n('surveys.email');
   const [overview, setOverview] = useState(null);
@@ -140,7 +142,7 @@ export default function SurveyEmailPanel({ surveyId, adminEmail }) {
         <div className="progress-track" aria-label={t('progress', {count: progress})}><span className="progress-value" style={{ width: `${progress}%` }} /></div>
         {automaticallyPaused
           ? <p className="survey-email-warning" role="status">{t('jobPaused', {time: new Date(retryAt).toLocaleString()})}</p>
-          : campaign.error_message && <p className="form-error" role="alert">{t('jobStopped', {message: campaign.error_message})}</p>}
+          : campaign.error_message && <p className="form-error" role="alert">{t('jobStopped', {message: formatJobMessage(campaign.error_message, jobT)})}</p>}
         {['pending', 'failed'].includes(campaign.status) && <button className="admin-button" type="button" disabled={!canResume || Boolean(busy)} aria-describedby={blockedReason ? 'survey-email-blocked-reason' : undefined} onClick={() => { setSendAction('send'); setConfirmSend(true); }}>{t('restart')}</button>}
         {campaign.status === 'completed' && <button className="admin-button" type="button" disabled={!canReplace || Boolean(busy)} aria-describedby={blockedReason ? 'survey-email-blocked-reason' : undefined} onClick={() => { setSendAction('resend'); setConfirmSend(true); }}>{t('sendNewLinks')}</button>}
         <button className="primary-button" type="button" disabled={!canSelect || Boolean(busy)} onClick={() => { setSendAction('append'); setConfirmSend(true); }}>{t('addRecipients')}</button>

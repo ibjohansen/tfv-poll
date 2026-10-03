@@ -5,6 +5,7 @@ import { testAdmin, testAuthSecret, testOrigin, testTenant } from './environment
 import { surveyId } from '../../data/survey.js';
 import { validatePolygon } from '../../lib/map/geo.js';
 import { DEFAULT_ACTIVITY_CATALOG } from '../../lib/activity-map-catalog.js';
+import { jobMessage } from '../../lib/job-messages.js';
 
 test.beforeEach(async ({ context }) => {
   await context.route('**/*', (route) => new URL(route.request().url()).origin === testOrigin ? route.continue() : route.abort());
@@ -68,6 +69,21 @@ test('public map loads automatically and requests Kartverket tiles', async ({ pa
   await page.locator('.public-hamlet-map-mount').scrollIntoViewIfNeeded();
   await expect(page.locator('.public-hamlet-map-mount').getByTitle('Zoom inn')).toBeVisible();
   await expect.poll(() => tileRequests.length).toBeGreaterThan(0);
+});
+
+test('job errors translate new and legacy records without exposing unknown provider text', async ({ page, context }) => {
+  await authenticate(context);
+  await page.goto('/admin/browser-test');
+  const jobs = page.getByRole('region', { name: 'Test av oversatte jobbmeldinger' });
+  await expect(jobs).toContainText('Ekstern tjeneste svarte med HTTP 503.');
+  await expect(jobs).toContainText('Kjøringen ble stoppet manuelt.');
+  await expect(jobs).not.toContainText('private-provider-detail');
+  await page.getByRole('combobox', { name: 'Språk', exact: true }).click();
+  await page.getByRole('option', { name: 'English', exact: true }).click();
+  await expect(jobs).toContainText('The external service returned HTTP 503.');
+  await expect(jobs).toContainText('The run was stopped manually.');
+  await expect(jobs).toContainText('The operation could not be completed.');
+  await expect(jobs).not.toContainText('private-provider-detail');
 });
 
 test('private property map sends no address to a provider until explicitly opened', async ({ page, context }) => {
@@ -645,12 +661,12 @@ test('newsletter requires saved groups and preview, supports test errors and can
   expect(actions).toEqual(['save', 'preview', 'test']);
   await page.route('**/api/admin/newsletters*', (route) => {
     expect(route.request().postDataJSON().action).toBe('send');
-    return route.fulfill({ status: 503, json: { message: 'Oppstart ikke bekreftet.', campaign: { ...campaign, status: 'failed', error_message: 'Oppstart ikke bekreftet.', total_count: 2 } } });
+    return route.fulfill({ status: 503, json: { message: 'Oppstart ikke bekreftet.', campaign: { ...campaign, status: 'failed', error_message: jobMessage('JOB_START_FAILED'), total_count: 2 } } });
   });
   await section.getByRole('button', { name: 'Start utsending', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Bestill utsending' }).click();
   await expect(page.getByRole('alertdialog')).toHaveCount(0);
-  await expect(section.getByRole('alert')).toContainText('Oppstart ikke bekreftet.');
+  await expect(section.getByRole('alert')).toContainText('Bakgrunnsjobben kunne ikke startes. Kontroller Netlify-konfigurasjonen og prøv igjen.');
   await expect(section.getByRole('button', { name: 'Kontroller / gjenoppta jobb' })).toBeEnabled();
 });
 
@@ -797,7 +813,7 @@ test('survey email panel keeps failed dispatch status and offers safe restart', 
   await page.route(`**/api/admin/surveys/${surveyId}/email*`, (route) => {
     if (route.request().method() === 'GET') return route.fulfill({ json: { ok: true, overview } });
     expect(route.request().postDataJSON()).toEqual({ action: 'send', groupId: '71', includeOtherEmails: false, singleResponsePerProperty: true, memberIds: [] });
-    return route.fulfill({ status: 503, json: { ok: false, message: 'Bakgrunnsjobben kunne ikke startes.', campaign: { id: 'a'.repeat(32), status: 'failed', total_count: 2, sent_count: 0, failed_count: 0, suppressed_count: 0, delivered_count: 0, error_message: 'Oppstart ikke bekreftet.' } } });
+    return route.fulfill({ status: 503, json: { ok: false, message: 'Bakgrunnsjobben kunne ikke startes.', campaign: { id: 'a'.repeat(32), status: 'failed', total_count: 2, sent_count: 0, failed_count: 0, suppressed_count: 0, delivered_count: 0, error_message: jobMessage('JOB_START_FAILED') } } });
   });
   await page.goto('/admin/browser-test');
   const section = page.getByRole('region', { name: 'Send undersøkelsen', exact: true });
@@ -808,7 +824,7 @@ test('survey email panel keeps failed dispatch status and offers safe restart', 
   await expect(section.getByRole('table', { name: /Mottakere i valgt/ })).toContainText('kari@example.invalid');
   await section.getByRole('button', { name: 'Start utsendelse', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Start utsendelse' }).click();
-  await expect(section.getByRole('alert').filter({ hasText: 'Oppstart ikke bekreftet' })).toBeVisible();
+  await expect(section.getByRole('alert').filter({ hasText: 'Kontroller Netlify-konfigurasjonen og prøv igjen.' })).toBeVisible();
   await expect(section.getByRole('button', { name: 'Start bakgrunnsjobben på nytt' })).toBeEnabled();
 });
 

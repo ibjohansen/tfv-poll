@@ -1,4 +1,5 @@
 import general from './general.js';
+import jobs from './jobs.js';
 import publicMessages from './public.js';
 import members from './members.js';
 import map from './map.js';
@@ -10,5 +11,5 @@ import backend from './backend.js';
 import accounting from './accounting.js';
 import activityMap from './activity-map.js';
 
-const messages = { general, public: publicMessages, members, map, admin, surveys, cms, email, backend, accounting, activityMap };
+const messages = { jobs, general, public: publicMessages, members, map, admin, surveys, cms, email, backend, accounting, activityMap };
 export default messages;

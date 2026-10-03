@@ -36,7 +36,7 @@ export async function POST(request) {
         run = { ...run, ...await failPendingMatrikkelRun(run.id) };
         if (run.status === 'failed' || run.status === 'pending') {
           return NextResponse.json({ ok: false, run, backgroundStarted: false,
-            message: run.error_message || t('adminMatrikkel.startUnconfirmed'),
+            message: t('adminMatrikkel.startUnconfirmed'),
           }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
         }
         // Worker kan ha startet selv om kvitteringen gikk tapt. Ikke start

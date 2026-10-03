@@ -30,9 +30,9 @@ test('SOAP client sends the quoted SOAPAction required by Matrikkel', async () =
   assert.equal(requests[0].options.headers.Authorization, 'Basic dGVzdC11c2VyOnRlc3QtcGFzc3dvcmQ=');
 });
 
-test('SOAP errors identify the failing service and operation', async () => {
+test('SOAP errors expose a stable code and HTTP status, never provider response text', async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response('', { status: 401 });
+  globalThis.fetch = async () => new Response('secret provider detail', { status: 401 });
   try {
     const client = new MatrikkelClient({
       API_MATRIKKEL_BASE_URL: 'https://matrikkel.no/matrikkelapi/wsapi/v1',
@@ -41,7 +41,7 @@ test('SOAP errors identify the failing service and operation', async () => {
     });
     await assert.rejects(
       client.verifyAccess(),
-      /BrukerServiceWS\/getPaloggetBruker: HTTP 401/,
+      { code: 'UNAUTHORIZED', messageCode: 'MATRIKKEL_HTTP', messageParams: { httpStatus: 401 } },
     );
   } finally {
     globalThis.fetch = originalFetch;
@@ -60,10 +60,10 @@ test('escaped dollar signs in local env passwords are sent literally', () => {
 test('address matching accepts one exact property and rejects ambiguity', () => {
   const exact = { adressetekst: 'Turufjellvegen 382', kommunenummer: '3320', gardsnummer: 10, bruksnummer: 371 };
   assert.equal(chooseAddressCandidate([exact], 'Turufjellvegen 382').matchType, 'EXACT');
-  assert.throws(() => chooseAddressCandidate([exact, { ...exact, bruksnummer: 372 }], 'Turufjellvegen 382'), /flere forskjellige/);
+  assert.throws(() => chooseAddressCandidate([exact, { ...exact, bruksnummer: 372 }], 'Turufjellvegen 382'), { code: 'AMBIGUOUS_ADDRESS' });
   assert.equal(chooseAddressCandidate([exact, { ...exact, bruksnummer: 372 }], 'Turufjellvegen 382', { gnr: '10', bnr: '372' }).matchType, 'EXACT_PROPERTY');
-  assert.throws(() => chooseAddressCandidate([exact], 'Turufjellvegen 382', { gnr: '10', bnr: '999' }), /stemmer ikke/);
-  assert.throws(() => chooseAddressCandidate([{ ...exact, kommunenummer: '0301' }], 'Turufjellvegen 382'), /Ingen entydig/);
+  assert.throws(() => chooseAddressCandidate([exact], 'Turufjellvegen 382', { gnr: '10', bnr: '999' }), { code: 'PROPERTY_MISMATCH' });
+  assert.throws(() => chooseAddressCandidate([{ ...exact, kommunenummer: '0301' }], 'Turufjellvegen 382'), { code: 'ADDRESS_NOT_FOUND' });
 });
 
 test('SOAP parser retains active registered owners and their individual dates', () => {
@@ -72,5 +72,5 @@ test('SOAP parser retains active registered owners and their individual dates', 
 });
 
 test('SOAP parser blocks document types', () => {
-  assert.throws(() => parseMatrikkelXml('<!DOCTYPE foo><foo/>'), /blokkert dokumenttype/);
+  assert.throws(() => parseMatrikkelXml('<!DOCTYPE foo><foo/>'), { code: 'INVALID_XML', messageCode: 'MATRIKKEL_XML_BLOCKED' });
 });

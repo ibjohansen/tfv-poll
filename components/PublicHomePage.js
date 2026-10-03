@@ -9,6 +9,7 @@ import MemberSelfServiceEntry from '@/components/MemberSelfServiceEntry';
 import PublicHamletMap from '@/components/PublicHamletMap';
 import PublicActivityMap from '@/components/ActivityMap/PublicActivityMap';
 import { useI18n } from '@/components/LocaleProvider';
+import { ORGANIZATION_NUMBER_DISPLAY } from '@/data/organization';
 
 export default function PublicHomePage({ carouselImages, pages, hamlets, activityMapFeatures = null }) {
   const { t } = useI18n();
@@ -32,7 +33,7 @@ export default function PublicHomePage({ carouselImages, pages, hamlets, activit
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-x-7">
           <address className="not-italic"><span className="font-semibold text-foreground">{t('general.footer.address')}</span> Elvemo 18, 3539 Flå</address>
           <p><span className="font-semibold text-foreground">{t('general.footer.email')}</span> <a className="font-medium text-primary-dark hover:text-primary focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary" href="mailto:post@turufjellvel.no">post@turufjellvel.no</a></p>
-          <p><span className="font-semibold text-foreground">{t('general.footer.organizationNumber')}</span> 928 968 898</p>
+          <p><span className="font-semibold text-foreground">{t('general.footer.organizationNumber')}</span> {ORGANIZATION_NUMBER_DISPLAY}</p>
           <p><Link className="font-medium text-primary-dark hover:text-primary focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary" href="/informasjonskapsler">{t('general.footer.cookies')}</Link></p>
         </div>
         <Link href="/admin/login" className="inline-flex w-fit items-center gap-2 font-semibold text-primary-dark hover:text-primary focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">{t('general.navigation.boardLogin')} <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 fill-none stroke-current stroke-2"><path d="m9 18 6-6-6-6" /></svg></Link>

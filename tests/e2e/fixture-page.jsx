@@ -15,12 +15,19 @@ import PublicHamletMap from '@/components/PublicHamletMap';
 import PublicActivityMap from '@/components/ActivityMap/PublicActivityMap';
 import MemberPropertyMap from '@/components/MemberPropertyMap';
 import { surveyId } from '@/data/survey';
+import AdminMatrikkelTasks from '@/components/AdminMatrikkelTasks';
+import { jobMessage } from '@/lib/job-messages';
 
 export default async function BrowserFixtures() {
   await requirePermission('members');
   const member = { id: '7001', h_number: 'H-SYNTHETIC-1', street_address: 'Testvegen 1', cadastral_number: '10/7001',
     primary_contact_name: 'Syntetisk kontakt', primary_contact_email: 'fixture@example.invalid', other_contact_emails: [] };
   return <main className="admin-main"><h1>Isolerte komponenttester</h1>
+    <section aria-label="Test av oversatte jobbmeldinger"><AdminMatrikkelTasks canManage={false} tasks={[
+      { id: 'job-code', status: 'failed', scheduled_month: '2026-09-01', error_message: jobMessage('UPSTREAM_HTTP', { httpStatus: 503 }) },
+      { id: 'job-legacy', status: 'failed', scheduled_month: '2026-08-01', error_message: 'Kjøringen ble stoppet manuelt.' },
+      { id: 'job-unknown', status: 'failed', scheduled_month: '2026-07-01', error_message: 'private-provider-detail@example.invalid' },
+    ]} /></section>
     <MemberPropertyMap streetAddress="Testvegen 1" />
     <PublicArticleDirectory pages={[{
       id: '7201', slug: 'syntetisk-artikkel', category: 'aktuelt', title: 'Syntetisk artikkel',

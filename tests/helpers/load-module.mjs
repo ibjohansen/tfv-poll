@@ -7,6 +7,8 @@ import { LOCALE_COOKIE, normalizeLocale } from '../../lib/i18n/config.js';
 import { getApplicationOrigin, isSameOriginRequest, trustedJobOrigin } from '../../lib/request-origin.js';
 import * as surveyQuestions from '../../lib/survey-questions.js';
 import { isUsageRateLimited } from '../../lib/rate-limit.js';
+import * as jobMessages from '../../lib/job-messages.js';
+import { getExportI18n } from '../../lib/i18n/exports.js';
 
 // Execute the actual source with explicit dependencies. Never fall back to a
 // real database, mail provider, auth provider or network from a route test.
@@ -23,6 +25,8 @@ export async function loadModule(path, dependencies = {}, globals = {}) {
   const imports = {
     'server-only': {}, 'next/server': { NextResponse, after: () => {} }, '@/lib/api-errors': { apiErrorStatus, readJsonObject },
     '@/lib/survey-questions': surveyQuestions,
+    './job-messages.js': jobMessages, '@/lib/job-messages': jobMessages,
+    './i18n/exports.js': { getExportI18n },
     '@/lib/rate-limit': { isUsageRateLimited },
     '@/lib/i18n/request': { getRequestI18n }, './lib/i18n/request': { getRequestI18n },
     '@/lib/request-origin': { getApplicationOrigin, isSameOriginRequest },

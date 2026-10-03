@@ -22,8 +22,8 @@ async function exportResponse(request, input) {
     data.expenses = data.expenses.filter((expense) => requested.has(expense.id));
     if (data.expenses.length !== requested.size) throw new AccountingError('invalidInput');
   }
-  const { t } = getRequestI18n(request, 'accounting');
-  const buffer = await accountingWorkbook(data, t);
+  const { t, locale } = getRequestI18n(request, 'accounting');
+  const buffer = await accountingWorkbook(data, t, locale);
   await getSql()`INSERT INTO audit_log (table_name, row_id, operation, changed_by, after_value)
     VALUES ('admin_actions', ${randomUUID()}, 'INSERT', ${user.email.toLowerCase()},
       ${JSON.stringify({ action: 'accounting_export', year: data.year, count: data.expenses.length, scope: input.ids ? 'selection' : 'year' })}::jsonb)`;

@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { useI18n } from '@/components/LocaleProvider';
+import { formatJobMessage } from '@/lib/job-messages';
 
 function requestTitle(request, t) {
   if (request.request_type === 'map_import') return `Kartimport · ${request.h_number}`;
@@ -23,12 +24,13 @@ function decisionDescription(decision, t) {
   return `${warning}${t('membershipDescription')}`;
 }
 
-function reviewMessage(review, t) {
+function reviewMessage(review, t, jobT) {
   if (!review) return t('notChecked');
-  return t(`reviewCodes.${review.code}`, {}, review.message || t('manualRequired'));
+  return t(`reviewCodes.${review.code}`, {}, review.message ? formatJobMessage(review.message, jobT) : t('manualRequired'));
 }
 
 export default function AdminMemberRequests({ initialRequests, showEmpty = false }) {
+  const { t: jobT } = useI18n('jobs');
   const apiFetch = useApiClient();
   const { t } = useI18n('members.requests');
   const router = useRouter();
@@ -86,7 +88,7 @@ export default function AdminMemberRequests({ initialRequests, showEmpty = false
       setMessage(action === 'check_property' && body.request.matrikkel_review?.status === 'verified'
         ? t('verified')
         : action === 'confirm_property' ? t('confirmed')
-          : reviewMessage(body.request.matrikkel_review, t));
+          : reviewMessage(body.request.matrikkel_review, t, jobT));
       setMessageKind('success');
     } catch (error) { setMessage(error.message); setMessageKind('error'); }
     finally { setBusy(false); }
@@ -105,7 +107,7 @@ export default function AdminMemberRequests({ initialRequests, showEmpty = false
       <dl><div><dt>{t('cadastral')}</dt><dd>{request.cadastral_number || t('notProvided')}</dd></div><div><dt>{t('section')}</dt><dd>{request.section_number || t('notProvided')}</dd></div><div><dt>{t('newContact')}</dt><dd>{request.requested_contact_name}</dd></div><div><dt>{t('newEmail')}</dt><dd>{request.requested_primary_email}</dd></div><div><dt>{t('otherAddresses')}</dt><dd>{request.requested_other_emails?.join(', ') || t('none')}</dd></div></dl>
       {request.request_type === 'membership' && <section className={`admin-property-review is-${request.matrikkel_review?.status || 'pending'}`} aria-label={t('cadastralReview')}>
         <strong>{['verified', 'manual'].includes(request.matrikkel_review?.status) ? t('cadastralResolved') : t('cadastralRequired')}</strong>
-        <p>{reviewMessage(request.matrikkel_review, t)}</p>
+        <p>{reviewMessage(request.matrikkel_review, t, jobT)}</p>
         {request.matrikkel_review?.candidates?.length > 0 && <ul>{request.matrikkel_review.candidates.map((candidate) => <li key={`${candidate.gnr}/${candidate.bnr}/${candidate.snr}`}><button type="button" onClick={() => setPropertyDraft(request.id, { cadastral_number: `${candidate.gnr}/${candidate.bnr}`, section_number: candidate.snr === '0' ? '' : candidate.snr })}>{candidate.address}: {candidate.gnr}/{candidate.bnr}{candidate.snr !== '0' ? t('candidateSection', {number: candidate.snr}) : ''}</button></li>)}</ul>}
         <div className="admin-property-fields">
           <label>{t('cadastralNumber')}<input value={propertyDrafts[request.id]?.cadastral_number || ''} onChange={(event) => setPropertyDraft(request.id, { cadastral_number: event.target.value })} placeholder="10/770" /></label>

@@ -1367,6 +1367,11 @@ rettelsen.
 
 Ved utrulling av kodegjennomgangen fra 3. oktober 2026:
 
+- Publiser UI og workers samlet for det nye versjonerte jobbmeldingsformatet.
+  Ingen migrering kreves. Kontroller nb/en-eksport, nye og gamle jobbmeldinger
+  og trygg visning ved ukjent fritekst. Ved rollback behold dekoderstøtten;
+  gammel UI kan ellers vise meldingskonvolutten som råtekst. Se
+  [meldingsformat og kompatibilitet](docs/message-localization.md).
 - Verifiser aktivitetenes `season`/`website_url` ved lagring, ny innlasting og
   offentlig visning. Ikke gjenta den allerede gjennomførte aktivitetsimporten.
 - Verifiser CMS-publisering/avpublisering uten stale offentlig innhold.

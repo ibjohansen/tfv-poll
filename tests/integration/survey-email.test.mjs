@@ -1,5 +1,6 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { readJobMessage } from '../../lib/job-messages.js';
 import * as crypto from 'node:crypto';
 import { randomUUID } from 'node:crypto';
 import { createTestDatabase } from '../helpers/postgres.mjs';
@@ -106,7 +107,7 @@ test('MailerSend throttling returns the claimed delivery to the queue and pauses
   const result = await api.processSurveyEmailCampaign(f.campaignId, { delayMs: 0 });
   assert.equal(attempts, 1);
   assert.equal(result.status, 'pending');
-  assert.equal(result.error_message, 'MAILERSEND_RATE_LIMIT');
+  assert.equal(readJobMessage(result.error_message).code, 'MAILERSEND_RATE_LIMIT');
   assert.equal(new Date(result.retry_at).toISOString(), retryAt);
   const deliveries = await db.sql`SELECT status, failure_reason, processing_at, failed_at
     FROM email_deliveries WHERE campaign_id = ${f.campaignId}`;

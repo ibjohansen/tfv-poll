@@ -5,9 +5,9 @@ import { getRequestI18n } from '@/lib/i18n/request';
 export const runtime = 'nodejs';
 
 export async function GET(request, { params }) {
-  const { t } = getRequestI18n(request, 'backend.adminSurveys');
+  const { t, locale } = getRequestI18n(request, 'backend.adminSurveys');
   try {
-    const result = await createAdminSurveyResultsExport((await params).id, new URL(request.url).searchParams.get('hamlet') ?? '');
+    const result = await createAdminSurveyResultsExport((await params).id, new URL(request.url).searchParams.get('hamlet') ?? '', { locale });
     const date = new Date().toISOString().slice(0, 10);
     return new Response(new Uint8Array(result.buffer), {
       headers: {

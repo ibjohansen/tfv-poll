@@ -153,7 +153,7 @@ test('production start records a visible failure for login HTML, redirects, miss
     assert.equal(body.backgroundStarted, false);
     assert.equal(body.run.id, runId);
     assert.equal(body.run.status, 'failed');
-    assert.match(body.message, /kunne ikke startes/);
+    assert.equal(body.message, 'Kunne ikke bekrefte oppstart. Kontroller kjørestatus før du prøver igjen.');
     assert.equal(state.failed, 1);
     assert.ok(state.logs.length);
     assert.doesNotMatch(JSON.stringify({ body, logs: state.logs }), /synthetic-job|private/);

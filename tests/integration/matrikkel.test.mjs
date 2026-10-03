@@ -1,5 +1,6 @@
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
+import { readJobMessage } from '../../lib/job-messages.js';
 import { randomUUID } from 'node:crypto';
 import { createTestDatabase } from '../helpers/postgres.mjs';
 import { loadModule } from '../helpers/load-module.mjs';
@@ -84,7 +85,7 @@ test('monthly checks queue detected changes for manual approval without changing
   const [item] = await db.sql`SELECT status, message FROM matrikkel_sync_items WHERE run_id = ${f.runId}`;
   assert.equal(beforeApproval.title_holder, 'Syntetisk tidligere eier');
   assert.equal(item.status, 'review');
-  assert.match(item.message, /månedlige kontrollen/);
+  assert.equal(readJobMessage(item.message).code, 'MONTHLY_CHANGE_REVIEW');
   await f.api.approveMatrikkelItem(f.runId, f.memberId);
   const [afterApproval] = await db.sql`SELECT title_holder FROM members WHERE id = ${f.memberId}`;
   assert.equal(afterApproval.title_holder, 'Syntetisk ny eier');

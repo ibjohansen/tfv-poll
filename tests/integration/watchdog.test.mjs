@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createTestDatabase } from '../helpers/postgres.mjs';
 import { loadModule } from '../helpers/load-module.mjs';
+import { readJobMessage } from '../../lib/job-messages.js';
 
 const db = createTestDatabase();
 before(async () => { await db.migrate(); });
@@ -29,7 +30,7 @@ test('watchdog claims a stuck accepted job only once and caps automatic redispat
   assert.equal(dispatches, 3);
   const [run] = await db.sql`SELECT status, error_message FROM matrikkel_sync_runs WHERE id = ${runId}`;
   assert.equal(run.status, 'failed');
-  assert.match(run.error_message, /tre gjenopptakingsforsøk/);
+  assert.deepEqual(readJobMessage(run.error_message), { code: 'JOB_RECOVERY_EXHAUSTED', params: { attempts: '3' } });
 });
 
 test('watchdog does not steal live reservations or restart cancelled jobs', async () => {
