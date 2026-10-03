@@ -825,7 +825,8 @@ og vinteren. Eldre aktiviteter uten sesong holdes synlige til de er klassifisert
 Websiden vises som en lenke i kartets klikkbare informasjonsboks og i et
 tastaturtilgjengelig detaljpanel. Bare http/https uten innloggingsopplysninger tillates.
 Disse feltene krever additiv migrering før denne kodeversjonen tas i bruk.
-Aktivitetskartet vises foreløpig bare når forsiden åpnes med `?maps=turutrollet`.
+Aktivitetskartet vises på forsiden. Bare publiserte aktiviteter med gyldig
+geometri vises.
 Admin- og forsidekartet kan veksle mellom Kartverkets
 topografiske kart og Esri World Imagery (satellitt- og flyfoto). Ingen
 personopplysninger eller ny miljøvariabel inngår.
@@ -1113,6 +1114,9 @@ matrikkeltabeller. `audit_log` beskyttes mot UPDATE, DELETE og TRUNCATE;
 runtime-rolle uten skjemaeierskap: en skjemaeier kan deaktivere triggere.
 Lagringstid og vedlikeholdsrolle må avklares før en separat, kontrollert
 oppryddingsmigrering utformes; ingen logg slettes automatisk.
+Oppfølgingskolonnene for den månedlige matrikkeloppgavelisten ble lagt til og
+verifisert i produksjon 3. oktober 2026; se
+[migreringsrapporten](docs/database/database-migration-2026-10-03-matrikkel-followup.md).
 
 Sikkerhetsmigreringen er todelt. `db:setup` er additiv og kan kjøres før ny
 kode deployes. Etter at ny surveyflyt er publisert og gamle lenker er erstattet,
@@ -1524,7 +1528,7 @@ Utfør kontrollene i denne rekkefølgen:
 - På `/admin/activity-map`, opprett en kategori og en type med linjegeometri i et isolert testmiljø.
   Tegn, lagre og last aktiviteten på nytt. Endre kategori-/typenavn og kontroller at
   geometri og koblinger beholdes, og at nye navn vises i filtre og tooltip på
-  `/?maps=turutrollet`. Kontroller også polygon/punkt, kladder, kategorier uten typer,
+  forsiden. Kontroller også polygon/punkt, kladder, kategorier uten typer,
   duplikatnavn og at en foreldet versjon ikke overskriver nyere endringer.
 - Før aktivitetsimport: test migrering og import på en isolert Neon-gren, opprett
   produksjonssnapshot etter godkjenning, og verifiser vert, skjema-hash og importplan-hash.

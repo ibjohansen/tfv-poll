@@ -164,11 +164,11 @@ test('database schema constrains activity map combinations and adds audit trigge
     'Høgseterløypa', 'Harahopp', 'Plogen', 'Trollskogen', 'Eventyrskogen']) assert.match(schema, new RegExp(name));
 });
 
-test('activity map on the public home page is gated by the preview query parameter', async () => {
+test('activity map on the public home page loads published features without a query parameter', async () => {
   const homePage = await readFile(new URL('../app/page.js', import.meta.url), 'utf8');
   const publicHome = await readFile(new URL('../components/PublicHomePage.js', import.meta.url), 'utf8');
-  assert.match(homePage, /\(await searchParams\)\.maps === 'turutrollet'/);
-  assert.match(homePage, /showActivityMap \? safely\(getCachedPublicActivityMapFeatures\(\), \[\]\) : null/);
+  assert.match(homePage, /safely\(getCachedPublicActivityMapFeatures\(\), \[\]\)/);
+  assert.doesNotMatch(homePage, /maps === 'turutrollet'/);
   assert.match(publicHome, /activityMapFeatures !== null && <PublicActivityMap/);
 });
 

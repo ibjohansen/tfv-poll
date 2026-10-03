@@ -97,7 +97,7 @@ Produksjonsplanen må kontrolleres på nytt dersom data har endret seg.
    aktivitetskartets tabeller er endret. Offentlig kartcache må få utløpe eller
    invalideres via den vanlige applikasjonsmekanismen.
 6. Kodepublisering krever egen commit/push-instruksjon. Forsiden skal fortsatt
-   være bak `?maps=turutrollet`. Uten skjemamigreringen kan den nye kodeversjonen
+   vises på forsiden. Uten skjemamigreringen kan den nye kodeversjonen
    ikke lese de nye feltene.
 
 ## Gjenoppretting
@@ -117,7 +117,7 @@ Sesongfilter, websidefelt og lenkevisning er ferdig lokalt. De krever en egen
 kodepublisering før de er tilgjengelige på produksjonsnettstedet. Allerede publisert
 kode kan fortsatt vise/redigere geometrien fordi den leser typekatalogen dynamisk.
 Den offentlige kartcachen har 300 sekunders revalideringsintervall.
-Kartet beholdes bak `?maps=turutrollet`; nye kladder publiseres ikke automatisk.
+Kartet vises på forsiden; nye kladder publiseres ikke automatisk.
 
 Foreslått commitmelding:
 `feat(activity-map): import workbook activities with seasons and safe centerline conversion`
