@@ -11,7 +11,7 @@ til å vise navn/e-post offentlig eller blande mottakergrupper. Beslutningen
 lukker produktspørsmålet, ikke behovet for felt-/tilgangstester.
 
 Opprettet 21. september 2026 etter gjennomgang av
-`docs/ekstern-sikkerhetsgjennomgang-20-09-2026.md`.
+`docs/code-review/ekstern-sikkerhetsgjennomgang-20-09-2026.md`.
 
 Dette er arbeidslisten for funn F-01–F-19. Den eksterne rapporten er
 grunnlagsmateriale; formuleringene og tiltakene nedenfor er den anbefalte

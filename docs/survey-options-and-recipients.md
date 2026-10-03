@@ -3,7 +3,7 @@
 Status: migrert og publisert i produksjon 17. september 2026 etter eksplisitt
 godkjenning og testing på isolert Neon-schema-only-gren. Eksisterende data er
 verifisert bevart. Ingen ekte invitasjoner eller kvitteringer er sendt som del
-av arbeidet. Se [produksjonsrapporten](database-release-survey-options-2026-09-17.md).
+av arbeidet. Se [produksjonsrapporten](database/database-release-survey-options-2026-09-17.md).
 
 Kontrollert lokalt: 317 enhetstester, lint og produksjonsbygg uten database,
 44 isolerte nettlesertester på desktop/mobil samt fire ekstra regresjonstester
@@ -11,7 +11,7 @@ som verifiserer faktisk bildelasting og utsendelsespanelet. `npm audit` fant
 ingen kjente sårbarheter. Etter eksplisitt godkjenning er også **57 reelle
 Postgres-integrasjonstester bestått** på en midlertidig gren med bare syntetiske
 data. Gjentatt migrering, eldre svar/invitasjoner, samtidige svar og
-kvitteringskø er verifisert. Se [testrapporten](database-test-survey-options-2026-09-17.md).
+kvitteringskø er verifisert. Se [testrapporten](database/database-test-survey-options-2026-09-17.md).
 
 ## Bruk
 

@@ -448,9 +448,9 @@ og krev at saksbehandler har verifisert identiteten utenfor systemet.
   Mappen (57 MB) refereres ikke av noen kode. De publiserte varianten i `public/carousel`
   har ingen EXIF, så det er kun originalene som lekker.
 - **Driftsidentifikatorer i `docs/`:** produksjonsgrenen `br-misty-paper-b2tequav`
-  (`docs/database-release-survey-options-2026-09-17.md:30`,
-  `docs/database-test-survey-options-2026-09-17.md:13`), flere testgren-ID-er og seks
-  snapshot-ID-er (`docs/database-migration-*.md`), skjemaets SHA-256, tidspunkter og
+  (`docs/database/database-release-survey-options-2026-09-17.md:30`,
+  `docs/database/database-test-survey-options-2026-09-17.md:13`), flere testgren-ID-er og seks
+  snapshot-ID-er (`docs/database/database-migration-*.md`), skjemaets SHA-256, tidspunkter og
   tellinger.
 - **Navngitte privilegerte kontoer** i `tests/admin-policy.test.mjs:5,32` (`leder@`,
   `ib@`, `data@turufjellvel.no`) er trolig reelle adresser og peker ut hvem som er admin.

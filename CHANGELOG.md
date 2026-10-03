@@ -53,7 +53,7 @@
   Neon-schema-only-gren med syntetiske data. Produksjonsmigrering og deploy
   deretter godkjent og utført med gjenopprettingspunkt og bevarte data i
   14 kontrollerte tabeller; se
-  [produksjonsrapport](docs/database-release-survey-options-2026-09-17.md).
+  [produksjonsrapport](docs/database/database-release-survey-options-2026-09-17.md).
   Rettet kopiering av artikler uten riktekst, bevaring av svarregel ved kopiering
   og avvisning av eldre svarøkter når hoved-e-post er fjernet.
 - Felles tilgjengelige nedtrekkslister, umiddelbare filtre, mindre

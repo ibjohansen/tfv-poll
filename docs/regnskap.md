@@ -140,10 +140,10 @@ Nettlesertestene simulerer API-responser; de tester ikke Neon- eller S3-nettverk
 PGlite bruker én forbindelse og erstatter ikke en flerforbindelsestest på Neon.
 `tests/integration/accounting.test.mjs` dekker i tillegg samtidige registreringer
 og betalinger på ekte PostgreSQL. Fem slike tester bestod på en isolert Neon-gren
-før [produksjonsmigreringen 25. september](database-release-accounting-2026-09-25.md).
+før [produksjonsmigreringen 25. september](database/database-release-accounting-2026-09-25.md).
 
 Den opprinnelige regnskapsmigreringen og publiseringen ble gjennomført 25.
-september 2026; se [utrullingsrapporten](database-release-accounting-2026-09-25.md).
+september 2026; se [utrullingsrapporten](database/database-release-accounting-2026-09-25.md).
 Kontingentoppfølgingens additive kolonne og indeks er klargjort, men er ikke
 produksjonsmigrert eller deployet. Følg produksjonsprosedyren og sjekklisten i
 README ved senere utrulling. Ingen nye miljøvariabler, bøtter, Entra-roller eller
@@ -168,5 +168,5 @@ Endring av utlegger endrer ikke opplasters identitet. Eldre poster gis ikke
 automatisk dagens brukernavn: siste redigerer er ikke nødvendigvis utlegger.
 
 De to nye kolonnene ble migrert og verifisert i produksjon 26. september 2026;
-se [migreringsrapporten](database-release-claimants-2026-09-26.md). Eksisterende
+se [migreringsrapporten](database/database-release-claimants-2026-09-26.md). Eksisterende
 data er bevart. Ingen applikasjonsdeploy ble gjort i denne operasjonen.

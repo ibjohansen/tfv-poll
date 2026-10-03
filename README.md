@@ -2,6 +2,9 @@
 
 Siste brede kode-/sikkerhetskontroll: [3. oktober 2026](docs/codebase-review-2026-10-03.md).
 
+Se [dokumentoversikten](docs/README.md) for aktive arbeidsdokumenter,
+driftskostnader/sikkerhetsvalg og historikk fordelt på tema.
+
 En modulbasert medlemsservice bygget med Next.js, React, Node, Neon Postgres og
 Neon Object Storage. Den samler medlemsregister, selvbetjening, kartbasert
 registerkontroll, kommunikasjon, undersøkelser, bruksstatistikk og et strukturert
@@ -602,7 +605,7 @@ CLI og skrives ikke til disk eller konsoll. `TEST_NEON_HOST`, `TEST_NEON_BRANCH_
 og `TEST_NEON_RUN_ID` gis bare til underprosessen, aldri til Netlify.
 `.env.local` lastes eller endres ikke, og eksterne e-post-/lagringskall erstattes.
 Ingen deploy eller produksjonsmigrering inngår i kommandoen. Se
-[godkjent testkjøring 17. september](docs/database-test-survey-options-2026-09-17.md).
+[godkjent testkjøring 17. september](docs/database/database-test-survey-options-2026-09-17.md).
 Rollback-kjøreren krever i tillegg integrasjonstestmarkøren og avviser derfor en
 ny eller ubevoktet gren. Den destruktive rollback-filen er ikke en
 produksjonsprosedyre.
@@ -640,7 +643,7 @@ et runtime-flagg for Netlify. `pg` og `@playwright/test` er utviklingsavhengighe
 Tiptap (`@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`) brukes i editoren.
 `proj4` brukes server-side til WFS-koordinater; eksisterende XML-parser beholdes.
 
-[Kvalitetsgjennomgangen](docs/quality-review.md) beskriver rutedekning,
+[Kvalitetsgjennomgangen](docs/code-review/quality-review.md) beskriver rutedekning,
 begrensninger, anbefalte neste tester og vurderingen av hvilke hendelser som
 bør registreres. Modul- og nettlesertestene bruker ingen eksterne tjenester.
 Reelle transaksjoner testes i lokal Postgres eller en særskilt godkjent,
@@ -738,7 +741,7 @@ Den additive regnskapsmigreringen ble utført og verifisert i produksjon
 25. september 2026 etter eksplisitt godkjenning. Modulen ble publisert på
 Netlify samme dag. Kildekode, skjema, tester og utrullingsrapport følger
 regnskapsendringen i Git, slik at senere Git-baserte deployer beholder modulen. Se
-[utrullingsrapporten](docs/database-release-accounting-2026-09-25.md).
+[utrullingsrapporten](docs/database/database-release-accounting-2026-09-25.md).
 `accounting_years`, `accounting_expenses` og `accounting_attachments`, indekser,
 beløps-/datokontroller og audit-triggere er opprettet. Den avgrensede migreringen
 i `scripts/release-accounting-schema.mjs` velger de godkjente regnskapsoperasjonene fra
@@ -749,7 +752,7 @@ testes på isolert schema-only-gren og godkjennes eksplisitt etter punkt 2.
 «Lagt ut av» krever to nye additive tekstkolonner: `accounting_expenses.claimant_name`
 og `accounting_attachments.uploaded_by`. De ble migrert og verifisert i produksjon
 26. september 2026 etter eksplisitt godkjenning, schema-only-test og snapshot;
-se [migreringsrapporten](docs/database-release-claimants-2026-09-26.md).
+se [migreringsrapporten](docs/database/database-release-claimants-2026-09-26.md).
 Ingen applikasjonsdeploy ble gjort i denne operasjonen. Verifiser at ny opplasting foreslår innlogget navn,
 at navnet kan endres og beholdes etter lagring/utbetaling, og at Excel-eksporten
 viser navnet. Eldre bilag skal fortsatt vise «Ikke registrert» inntil navnet er kjent.
@@ -758,7 +761,7 @@ Kontingentoppfølgingen krever i tillegg den additive `member_annual_fees.invoic
 kolonnen og kandidatindeksen. Tilleggsmigreringen ble verifisert på en isolert
 schema-only-gren og utført i produksjon 25. september 2026 etter et eget
 snapshot. Den etterfølgende Netlify-deployen er dokumentert i
-[utrullingsrapporten](docs/database-release-accounting-2026-09-25.md).
+[utrullingsrapporten](docs/database/database-release-accounting-2026-09-25.md).
 Et fullt, idempotent databaseskjema og
 regnskapstransaksjonene testes også lokalt med PostgreSQL/WASM (PGlite) som del
 av `npm run check`; dette erstatter ikke produksjonsgrenens utrullingstest.
@@ -785,7 +788,7 @@ pooled databaseforbindelse. Automatisk rematch bruker
 `HAMLET_JOB_SECRET`; ingen ny Entra-rolle eller databasemigrering trengs. Den additive produksjonsmigreringen 16. september
 la til `polygon`, `polygon_reviewed`, `polygon_version`, `polygon_updated_at` og
 versjoneringstriggeren på `member_hamlets`; se
-[migreringsstatus](docs/database-migration-2026-09-16.md). Ingen grender eller
+[migreringsstatus](docs/database/database-migration-2026-09-16.md). Ingen grender eller
 kartgrenser ble opprettet automatisk. Godkjent deploy og funksjonell
 produksjonsverifikasjon gjenstår.
 De 11 digitaliserte grendene er nå lagret som kontrollerte polygoner i databasen;
@@ -828,7 +831,7 @@ topografiske kart og Esri World Imagery (satellitt- og flyfoto). Ingen
 personopplysninger eller ny miljøvariabel inngår.
 Adminkartet kan åpnes i fullskjerm med tegneverktøyene tilgjengelige. Den
 additive produksjonsmigreringen ble kjørt og verifisert 30. september 2026; se
-[migreringsstatus](docs/database-migration-2026-09-30.md). Kodeversjonen ble
+[migreringsstatus](docs/database/database-migration-2026-09-30.md). Kodeversjonen ble
 publisert på Netlify 30. september 2026, med aktivitetskartet fortsatt skjult på
 forsiden.
 
@@ -845,13 +848,13 @@ oppretter katalogtabeller og fremmednøkler og beholder eksisterende aktiviteter
 Den kan kjøres på nytt uten å overskrive egendefinerte navn, typer eller kategorier.
 Endringer i katalogen er versjonskontrollerte, loggføres og invaliderer offentlig kartcache.
 Produksjonsmigreringen er kjørt 2. oktober 2026; se
-[resultat og gjenopprettingspunkt](docs/database-migration-2026-10-02-activity-catalog.md).
+[resultat og gjenopprettingspunkt](docs/database/database-migration-2026-10-02-activity-catalog.md).
 Dette er en databasemigrering, ikke en publisering av den tilhørende kodeversjonen.
 
 Aktivitetsimporten fra `aktiviteter.xlsx` ble testet på en isolert Neon-gren og
 kjørt i produksjonsdatabasen 3. oktober 2026 etter eksplisitt godkjenning og nytt snapshot.
 Den tilhørende kodeversjonen er ikke publisert. Senere produksjonskjøringer krever ny godkjenning.
-Se [importplan, tester og gjenoppretting](docs/activity-import-2026-10-03.md).
+Se [importplan, tester og gjenoppretting](docs/imports/activity-import-2026-10-03.md).
 Importen konverterer eksisterende alpinpolygoner og Flytsti Slåttelia til linjer,
 beholder Ferdighetspark og Pumptrack som polygoner og oppretter nye aktiviteter som kladder.
 Katalogens alpin-løype/heis endres til linje i samme låste transaksjon som geometrien.
@@ -960,7 +963,7 @@ Reservasjon mot manuell deling med Turufjell AS bruker de additive kolonnene
 `members.turufjell_as_sharing_opt_out` og
 `members.turufjell_as_sharing_opt_out_updated_at`. Den avgrensede additive
 produksjonsmigreringen ble utført og verifisert 16. september 2026; se
-[migreringsstatus](docs/database-migration-2026-09-16.md). Eksisterende poster
+[migreringsstatus](docs/database/database-migration-2026-09-16.md). Eksisterende poster
 har standardverdien `FALSE`. Endringer logges av den eksisterende
 `members`-audittriggeren, og Excel-eksport utelater reserverte poster som standard.
 
@@ -1048,11 +1051,11 @@ følger [Neons anbefaling for pooling og migrering](https://neon.com/docs/connec
 Kontroller etterpå at forventede kolonner, tabeller, indekser og triggere finnes,
 og at eksisterende data er beholdt. Bruk radantall og kontrollsummer uten å
 skrive medlemsopplysninger til logger eller eksportfiler. Se
-[migreringsstatus 15. september 2026](docs/database-migration-2026-09-15.md),
-[migreringsstatus 16. september 2026](docs/database-migration-2026-09-16.md),
-[migreringsstatus 17. september 2026](docs/database-migration-2026-09-17.md) og
-[migreringsstatus 19. september 2026](docs/database-migration-2026-09-19.md),
-samt [migreringsstatus 30. september 2026](docs/database-migration-2026-09-30.md)
+[migreringsstatus 15. september 2026](docs/database/database-migration-2026-09-15.md),
+[migreringsstatus 16. september 2026](docs/database/database-migration-2026-09-16.md),
+[migreringsstatus 17. september 2026](docs/database/database-migration-2026-09-17.md) og
+[migreringsstatus 19. september 2026](docs/database/database-migration-2026-09-19.md),
+samt [migreringsstatus 30. september 2026](docs/database/database-migration-2026-09-30.md)
 for utført testing, bekreftede produksjonsmigreringer og gjenopprettingspunkter.
 
 For CMS-revisjoner skal den additive migreringen kjøres før kodeversjonen
@@ -1385,14 +1388,14 @@ Ved utrulling av kodegjennomgangen fra 3. oktober 2026:
 
 **Nye svaralternativer og mottakerregler er migrert og publisert i produksjon
 17. september 2026 etter eksplisitt godkjenning.** Se
-[produksjonsrapporten](docs/database-release-survey-options-2026-09-17.md) og
+[produksjonsrapporten](docs/database/database-release-survey-options-2026-09-17.md) og
 [migrerings- og testprosedyren](docs/survey-options-and-recipients.md).
 Migreringen erstatter tre unike indekser og ble kjørt med koordinert
 skrivesperre for svar/utsendelser, datakontroll og deploy av samme kode.
 Den midlertidige sperren er fjernet. Innlogget funksjonskontroll og ekte
 kvitteringslevering med godkjente testmottakere gjenstår.
 57 integrasjonstester, samtidige svar og gjentatt migrering bestod 17. september
-med syntetiske data; [testrapport](docs/database-test-survey-options-2026-09-17.md).
+med syntetiske data; [testrapport](docs/database/database-test-survey-options-2026-09-17.md).
 Kjør testene igjen dersom kode/skjema endres. Ingen nye produksjonsmiljøvariabler
 eller funksjonsnavn innføres.
 Den eksisterende `survey-email-background` behandler også kvitteringsutboksen;

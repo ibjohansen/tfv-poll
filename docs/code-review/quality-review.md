@@ -78,7 +78,7 @@ erstatning for disse avgrensningene.
 
 Alle 37 route.js-filer under app/api og app/survey/api er representert.
 Dette er rutefunksjons-/tjenestegrensetester, ikke full integrasjonsdekning.
-Kartets tjenester/kilder er dokumentert i [kartveiledningen](map-explorer.md).
+Kartets tjenester/kilder er dokumentert i [kartveiledningen](../map-explorer.md).
 
 | Ruter | Testfil | Dekning |
 | --- | --- | --- |

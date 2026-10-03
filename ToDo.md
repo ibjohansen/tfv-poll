@@ -52,14 +52,14 @@ samsvarserklæring eller juridisk vurdering.
 - [x] Godkjenn og kjør isolerte Postgres-integrasjonstester før produksjonssetting.
   57 tester bestått på midlertidig Neon-schema-only-gren 17. september, kun med
   syntetiske data. Gjentatt migrering bevarer eldre svar og invitasjoner; se
-  [testrapport](docs/database-test-survey-options-2026-09-17.md).
+  [testrapport](docs/database/database-test-survey-options-2026-09-17.md).
 - [x] Rett funn fra databasekjøringen: kopiering av artikler uten riktekst,
   svarregel ved undersøkelseskopiering og kontrollert avvisning av eldre
   svarøkter uten gjenværende hoved-e-post.
 - [x] Godkjenn og utfør koordinert produksjonsmigrering og deploy. Utført
   17. september 2026 med gjenopprettingspunkt og datakontroll av 14 tabeller.
   Publiseringsfeil for statiske filer ble rettet med komplett bygg/deploy; se
-  [produksjonsrapport](docs/database-release-survey-options-2026-09-17.md).
+  [produksjonsrapport](docs/database/database-release-survey-options-2026-09-17.md).
 - [ ] Commit og push de publiserte kildeendringene etter egen godkjenning, slik
   at neste Git-basert deploy ikke erstatter dem med eldre, inkompatibel kode.
 - [ ] Verifiser kvitteringer og første-svar-regelen med godkjente testmottakere.
@@ -69,16 +69,16 @@ migreringsprosedyre. Statusbeskrivelsen nedenfor gjelder tidligere endringer.
 
 Gjennomgått 14.–17. september 2026. Kvalitetsarbeidet nedenfor ble først
 implementert lokalt. Siste godkjente produksjonsdeploy er dokumentert i
-[produksjonsrapporten 17. september](docs/database-release-survey-options-2026-09-17.md);
+[produksjonsrapporten 17. september](docs/database/database-release-survey-options-2026-09-17.md);
 gjenstående funksjonelle kontroller beholdes nedenfor. Ingen GitHub-push
 eller Entra-endring er kjørt i denne produksjonsrunden.
 Databasemigreringene er testet på en isolert Neon-schema-only-gren og deretter
 kjørt i produksjon etter eksplisitt godkjenning. Gjenopprettingspunkter er
 opprettet, og eksisterende data er verifisert bevart; se migreringsstatus for
-[15. september](docs/database-migration-2026-09-15.md) og
-[16. september](docs/database-migration-2026-09-16.md), samt migreringen for
-[undersøkelsesvedlegg 17. september](docs/database-migration-2026-09-17.md).
-Se [kvalitetsgjennomgangen](docs/quality-review.md) for funn, testdekning,
+[15. september](docs/database/database-migration-2026-09-15.md) og
+[16. september](docs/database/database-migration-2026-09-16.md), samt migreringen for
+[undersøkelsesvedlegg 17. september](docs/database/database-migration-2026-09-17.md).
+Se [kvalitetsgjennomgangen](docs/code-review/quality-review.md) for funn, testdekning,
 vurdering av brukerloggen og begrensninger. Uferdige produktoppgaver beholdes.
 
 **Avklaringer før de siste punktene kan fullføres:** Delingspraksis/standardverdi
@@ -114,7 +114,7 @@ antatt eller aktivert.
   til en annen grend overskrives ikke, og handlingen loggføres uten medlemsliste.
 - [x] Godkjenne og utføre produksjonsmigrering for polygonkolonner og
   versjoneringstrigger. Utført og verifisert 16. september; se
-  [migreringsstatus](docs/database-migration-2026-09-16.md).
+  [migreringsstatus](docs/database/database-migration-2026-09-16.md).
 - [ ] Godkjent deploy og funksjonell produksjonsverifikasjon av lagring,
   versjonskonflikt og redigering av grendepolygon.
 
@@ -217,7 +217,7 @@ Dette er oppgaver som enten reduserer teknisk risiko, styrker kvaliteten eller l
   med testdobler. Postgres- og nettlesertester er nå også etablert. Fullt OAuth-forløp
   og plattformverifikasjon gjenstår;
   dette er ikke det samme som full integrasjonsdekning. Se oversikten i
-  `docs/quality-review.md`. Prompten nedenfor beholdes som akseptansekriterier.
+  `docs/code-review/quality-review.md`. Prompten nedenfor beholdes som akseptansekriterier.
 
   **Prompt:**
 
@@ -503,7 +503,7 @@ Dette er oppgaver som enten reduserer teknisk risiko, styrker kvaliteten eller l
   data. Gjentatt migrering, databevaring, nye felt/tabeller og audit-vern bestod.
 - [x] Ferskt gjenopprettingspunkt opprettet umiddelbart før produksjonsmigrering.
   Snapshot utløper 22. september 2026 kl. 21:50 UTC.
-  Se [migreringsstatus](docs/database-migration-2026-09-15.md).
+  Se [migreringsstatus](docs/database/database-migration-2026-09-15.md).
 - [x] Produksjonsmigrering kjørt etter eksplisitt godkjenning 15. september
   2026 kl. 21:50 UTC. Radantall og kontrollsummer for eksisterende kolonner
   er uendret i alle 23 opprinnelige tabeller; nye skjemaobjekter er verifisert.
@@ -538,7 +538,7 @@ Dette er viktige funksjoner som bygger videre på medlemsregisteret og prosjekte
   utløpt økt, versjonskonflikt, lagringsfeil, retry og avbrutt lasting er med.
   Test-fixtures finnes bare i den midlertidige appkopien, aldri i produksjonsbygget.
   Dette er prioritert regresjonsdekning, ikke full E2E mot Entra, Neon og
-  e-postleverandør. Se `docs/quality-review.md` for avgrensning.
+  e-postleverandør. Se `docs/code-review/quality-review.md` for avgrensning.
 
   **Prompt:**
 
@@ -751,7 +751,7 @@ Dette er viktige funksjoner som bygger videre på medlemsregisteret og prosjekte
   blind ny utsending. Plattformretry må fortsatt verifiseres ved godkjent deploy.
 
 Begrunnelse og sammenligning med GitHub og Microsoft Purview finnes i
-`docs/quality-review.md`. Vanlige sidevisninger er ikke del av brukerloggen.
+`docs/code-review/quality-review.md`. Vanlige sidevisninger er ikke del av brukerloggen.
 
 ---
 
@@ -1096,7 +1096,7 @@ Eventuelle funn fra sikkerhetsgjennomgangen legges inn som egne P1- eller P2-sak
   lagres i databasen, mens selve filen ligger i privat Object Storage.
 - [x] Additiv `survey_attachments`-migrering kjørt og verifisert i produksjon
   17. september 2026 etter schema-only-test og nytt gjenopprettingspunkt; se
-  [migreringsstatus](docs/database-migration-2026-09-17.md).
+  [migreringsstatus](docs/database/database-migration-2026-09-17.md).
 - [x] Lokalt produksjonsbygg og full `npm run check` bestod med 292 tester.
 - [x] Netlify-produksjonsdeploy `6aabcf7534ce877445bd1bb3` ble publisert
   17. september 2026 med seks tilgjengelige funksjoner. Offentlige røykprøver

@@ -89,6 +89,6 @@ skriver ikke `.env`-filer. Etter utløp kreves en ny, godkjent testgren.
   radkontroll før indeksbytte. Gammel svarkode er ikke kompatibel med nytt skjema.
 - [ ] Funksjonell Netlify-verifikasjon og levering til godkjente testmottakere.
 
-Følg [produksjonsprosedyren](survey-options-and-recipients.md#før-produksjonssetting).
+Følg [produksjonsprosedyren](../survey-options-and-recipients.md#før-produksjonssetting).
 Denne testen bekrefter SQL-oppførsel, ikke ekte e-postlevering, Entra-innlogging,
 Netlify-scheduling, produksjonsvolum eller migreringens låsetid i produksjon.
