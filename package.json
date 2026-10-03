@@ -41,7 +41,7 @@
     "@visx/responsive": "^4.0.0",
     "@visx/scale": "^4.0.0",
     "@visx/shape": "^4.0.0",
-    "csv-parse": "^7.0.2",
+    "csv-parse": "^7.0.3",
     "exceljs": "^4.4.0",
     "fast-xml-parser": "^5.11.1",
     "leaflet": "^1.9.4",
