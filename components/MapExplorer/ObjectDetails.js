@@ -1,6 +1,7 @@
 import { addressLabel, propertyLabel } from '@/lib/map/normalization';
 import { comparisonRowsForSelection } from '@/lib/map/selection';
 import { useI18n } from '@/components/LocaleProvider';
+import { useApiClient } from '@/components/useApiClient';
 import { useEffect, useState } from 'react';
 
 function display(value, fallback) {
@@ -16,6 +17,7 @@ function officialDataFor(selected, rows) {
 }
 
 export default function ObjectDetails({ selected, comparison, onClose, onSelect, onOpenMember }) {
+  const apiFetch = useApiClient();
   const { t, formatLocale } = useI18n('map.admin');
   const rows = comparisonRowsForSelection(selected, comparison);
   const members = [...new Map(rows.filter((row) => row.register?.id).map((row) => [String(row.register.id), row.register])).values()];
@@ -30,7 +32,7 @@ export default function ObjectDetails({ selected, comparison, onClose, onSelect,
     const memberIds = memberKey ? memberKey.split(',') : [];
     if (!memberIds.length) return () => controller.abort();
     Promise.all(memberIds.map(async (id) => {
-      const response = await fetch(`/api/admin/members/${encodeURIComponent(id)}`, {
+      const response = await apiFetch(`/api/admin/members/${encodeURIComponent(id)}`, {
         cache: 'no-store', signal: controller.signal,
       });
       const body = await response.json();
@@ -40,7 +42,7 @@ export default function ObjectDetails({ selected, comparison, onClose, onSelect,
       .then((entries) => { if (!controller.signal.aborted) setMemberState({ key: memberKey, status: 'loaded', details: Object.fromEntries(entries) }); })
       .catch(() => { if (!controller.signal.aborted) setMemberState({ key: memberKey, status: 'failed', details: {} }); });
     return () => controller.abort();
-  }, [memberKey]);
+  }, [apiFetch, memberKey]);
 
   if (!selected) return null;
   const isPropertyObject = ['address', 'property', 'boundary', 'comparison', 'register'].includes(selected.kind);

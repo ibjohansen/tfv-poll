@@ -13,6 +13,7 @@ import Select from '@/components/Select';
 import PublicArticleDirectory from '@/components/PublicArticleDirectory';
 import PublicHamletMap from '@/components/PublicHamletMap';
 import PublicActivityMap from '@/components/ActivityMap/PublicActivityMap';
+import MemberPropertyMap from '@/components/MemberPropertyMap';
 import { surveyId } from '@/data/survey';
 
 export default async function BrowserFixtures() {
@@ -20,6 +21,7 @@ export default async function BrowserFixtures() {
   const member = { id: '7001', h_number: 'H-SYNTHETIC-1', street_address: 'Testvegen 1', cadastral_number: '10/7001',
     primary_contact_name: 'Syntetisk kontakt', primary_contact_email: 'fixture@example.invalid', other_contact_emails: [] };
   return <main className="admin-main"><h1>Isolerte komponenttester</h1>
+    <MemberPropertyMap streetAddress="Testvegen 1" />
     <PublicArticleDirectory pages={[{
       id: '7201', slug: 'syntetisk-artikkel', category: 'aktuelt', title: 'Syntetisk artikkel',
       intro: 'Artikkel brukt til isolert tastaturtest.', published_at: '2026-09-19T10:00:00Z', image: null,

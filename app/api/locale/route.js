@@ -1,11 +1,11 @@
+import { isSameOriginRequest } from '@/lib/request-origin';
 import { NextResponse } from 'next/server';
 import { LOCALE_COOKIE, normalizeLocale } from '@/lib/i18n/config';
 
 export const runtime = 'nodejs';
 
 export async function POST(request) {
-  const origin = request.headers.get('origin');
-  if ((origin && origin !== request.nextUrl.origin) || request.headers.get('sec-fetch-site') === 'cross-site') {
+  if (!isSameOriginRequest(request)) {
     return NextResponse.json({ ok: false }, { status: 403 });
   }
   if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json')

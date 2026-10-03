@@ -1,6 +1,6 @@
 import { cache } from 'react';
 import { notFound, redirect } from 'next/navigation';
-import { getPublishedCmsPage } from '@/lib/cms-pages';
+import { getCachedPublishedCmsPage as getPublishedCmsPage } from '@/lib/public-queries';
 import { isValidCmsSlug } from '@/lib/cms-validation';
 import { getServerI18n } from '@/lib/i18n/server';
 

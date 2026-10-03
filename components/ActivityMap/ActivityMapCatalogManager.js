@@ -1,10 +1,13 @@
 'use client';
 
+import { useApiClient } from '@/components/useApiClient';
+
 import { useState } from 'react';
 import { useI18n } from '@/components/LocaleProvider';
 import { activityCatalogLabel } from '@/lib/activity-map-catalog';
 
 export default function ActivityMapCatalogManager({ catalog, onChange, disabled }) {
+  const apiFetch = useApiClient();
   const { t } = useI18n('activityMap.admin');
   const [category, setCategory] = useState({ id: '', name: '', color: '#20636c' });
   const [type, setType] = useState({ id: '', category: 'cycling', name: '', geometryKind: 'polygon' });
@@ -17,11 +20,11 @@ export default function ActivityMapCatalogManager({ catalog, onChange, disabled 
     event.preventDefault();
     setBusy(true); setError(''); setNotice('');
     try {
-      const response = await fetch('/api/admin/activity-map/catalog', {
+      const response = await apiFetch('/api/admin/activity-map/catalog', {
         method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...value, kind, action: value.id ? 'update' : 'create' }),
       });
-      const body = await response.json().catch(() => null);
+      const body = await response.json();
       if (!response.ok) throw new Error(body?.message || t('requestError'));
       onChange(body.catalog);
       // Keep the saved item selected, with its latest optimistic-lock version.

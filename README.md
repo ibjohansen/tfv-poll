@@ -1,5 +1,7 @@
 # Medlemsservice · Turufjell Vel
 
+Siste brede kode-/sikkerhetskontroll: [3. oktober 2026](docs/codebase-review-2026-10-03.md).
+
 En modulbasert medlemsservice bygget med Next.js, React, Node, Neon Postgres og
 Neon Object Storage. Den samler medlemsregister, selvbetjening, kartbasert
 registerkontroll, kommunikasjon, undersøkelser, bruksstatistikk og et strukturert
@@ -711,6 +713,17 @@ gjenopptas idempotent uten å sende ferdigbehandlede leveringer på nytt.
 
 ## Produksjonssetting: Netlify + Neon + Microsoft Entra ID
 
+Kodegjennomgangen 3. oktober 2026 innfører ingen nye miljøvariabler. Den
+strammer inn bruk av eksisterende `AUTH_URL`: i production/staging må den
+være den eksplisitte HTTPS-originen, uten brukernavn, sti, query eller fragment.
+Nettlesermutasjoner må sende samsvarende `Origin` og korrekt innholdstype;
+Auth.js, signerte webhooks og hemmelighetsbeskyttede jobber har egne kontroller.
+Bakgrunnsjobber sender aldri hemmeligheten til en request-avledet produksjonsvert.
+
+Offentlig CMS-/aktivitetscache er tag-basert, med fem minutters revalidering og
+umiddelbar invalidasjon ved CMS-/aktivitetsendring. Ikke legg personlig innhold
+eller HTML med CSP-nonce i delt CDN-cache for å redusere kaldstart.
+
 Økonomimodulen innfører `/admin/regnskap`, `/admin/regnskap/arsmote`,
 `GET/POST /api/admin/accounting`, `POST /api/admin/accounting/files`,
 `GET /api/admin/accounting/files/[id]`, `GET/POST /api/admin/accounting/export`,
@@ -1351,6 +1364,19 @@ må fortsatt committes og pushes før en senere Git-basert deploy skal inkludere
 rettelsen.
 
 ### 7. Verifiser produksjonen
+
+Ved utrulling av kodegjennomgangen fra 3. oktober 2026:
+
+- Verifiser aktivitetenes `season`/`website_url` ved lagring, ny innlasting og
+  offentlig visning. Ikke gjenta den allerede gjennomførte aktivitetsimporten.
+- Verifiser CMS-publisering/avpublisering uten stale offentlig innhold.
+- Kontroller at legitime adminmutasjoner virker, og at fremmed/manglende
+  `Origin` avvises. Kontroller også godkjente webhooks og bakgrunnsjobber.
+- Test Entra-innlogging og brukerinitiert eiendomskart i reell nettleser.
+- Mål første og gjentatte besøk etter inaktivitet. Skill Netlify-kaldstart,
+  Neon-oppvåkning og applikasjonstid før hvile/kostnader endres.
+- Kjør også den separate Postgres-integrasjonssuiten i isolert testdatabase
+  eller CI; PGlite- og mock-nettlesertester alene dekker ikke samtidighet.
 
 **Nye svaralternativer og mottakerregler er migrert og publisert i produksjon
 17. september 2026 etter eksplisitt godkjenning.** Se

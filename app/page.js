@@ -2,11 +2,8 @@ import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { unstable_cache } from 'next/cache';
 import PublicHomePage from '@/components/PublicHomePage';
-import { getPublicActivityMapFeatures } from '@/lib/activity-map-service';
-import { getPublishedCmsPageSummaries } from '@/lib/cms-pages';
-import { getPublicMapHamlets } from '@/lib/map/public-map-service';
+import { getCachedPublishedCmsPageSummaries, getCachedPublicMapHamlets, getCachedPublicActivityMapFeatures } from '@/lib/public-queries';
 import { carouselImagesFromFilenames } from '@/lib/public-carousel';
-import { PUBLIC_ACTIVITY_MAP_CACHE_TAG, PUBLIC_CMS_CACHE_TAG, PUBLIC_HAMLETS_CACHE_TAG } from '@/lib/public-content-cache';
 
 export const runtime = 'nodejs';
 
@@ -22,23 +19,9 @@ async function getCarouselImages() {
 }
 
 const getCachedCarouselImages = unstable_cache(getCarouselImages, ['home-carousel-images']);
-const getCachedPublishedCmsPageSummaries = unstable_cache(
-  () => getPublishedCmsPageSummaries(6),
-  ['home-published-cms-pages'],
-  { revalidate: 300, tags: [PUBLIC_CMS_CACHE_TAG] },
-);
-const getCachedPublicMapHamlets = unstable_cache(
-  getPublicMapHamlets,
-  ['home-public-map-hamlets'],
-  { revalidate: 300, tags: [PUBLIC_HAMLETS_CACHE_TAG] },
-);
-const getCachedPublicActivityMapFeatures = unstable_cache(
-  getPublicActivityMapFeatures,
-  ['home-public-activity-map-features'],
-  { revalidate: 300, tags: [PUBLIC_ACTIVITY_MAP_CACHE_TAG] },
-);
 async function safely(promise, fallback) {
-  try { return await promise; } catch { return fallback; }
+  try { return await promise; }
+  catch { console.error('Public home data unavailable'); return fallback; }
 }
 
 export default async function HomePage({ searchParams }) {

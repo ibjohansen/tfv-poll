@@ -1,3 +1,4 @@
+import { isSameOriginRequest } from '@/lib/request-origin';
 import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { deleteAdminCmsPage, getAdminCmsPage, updateAdminCmsPage } from '@/lib/cms-pages';
@@ -37,23 +38,23 @@ export async function GET(request, { params }) {
 
 export async function PATCH(request, { params }) {
   const { t } = getRequestI18n(request, 'backend');
-  if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return response({ ok: false, message: t('api.invalidRequest') }, 403);
+  if (!isSameOriginRequest(request)) return response({ ok: false, message: t('api.invalidRequest') }, 403);
   try {
     return response({ ok: true, page: await updateAdminCmsPage((await params).id, await readJsonObject(request)) });
   } catch (error) {
     const id = (await params).id;
     console.error('CMS page update failed', { id, code: error.code || error.cause?.code, message: error.message });
     if (error.code === 'CMS_VERSION_CONFLICT') {
-      return response({ ok: false, conflict: true, message: 'Siden er endret i en annen fane.', currentPage: await getAdminCmsPage(id).catch(() => null) }, 409);
+      return response({ ok: false, conflict: true, message: t('adminCms.conflict'), currentPage: await getAdminCmsPage(id).catch(() => null) }, 409);
     }
-    if (error.code === 'CMS_PUBLICATION_QUALITY') return response({ ok: false, message: 'Kvalitetskontrollen må løses før publisering.', ...error.details }, 422);
+    if (error.code === 'CMS_PUBLICATION_QUALITY') return response({ ok: false, message: t('adminCms.quality'), ...error.details }, 422);
     return response({ ok: false, message: messageFor(error, (key) => t(`adminCms.${key}`)) }, statusFor(error));
   }
 }
 
 export async function DELETE(request, { params }) {
   const { t } = getRequestI18n(request, 'backend');
-  if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return response({ ok: false, message: t('api.invalidRequest') }, 403);
+  if (!isSameOriginRequest(request)) return response({ ok: false, message: t('api.invalidRequest') }, 403);
   try {
     await deleteAdminCmsPage((await params).id);
     return response({ ok: true });

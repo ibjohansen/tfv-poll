@@ -54,8 +54,8 @@ test('shared select supports keyboard, ordinary form values, reset and language 
   await page.waitForLoadState('networkidle');
   const map = page.locator('.public-hamlet-map-mount');
   await map.scrollIntoViewIfNeeded();
-  await expect(page.getByTitle('Zoom inn')).toBeVisible();
-  await expect(page.getByTitle('Zoom ut')).toBeVisible();
+  await expect(map.getByTitle('Zoom inn')).toBeVisible();
+  await expect(map.getByTitle('Zoom ut')).toBeVisible();
 });
 
 test('public map loads automatically and requests Kartverket tiles', async ({ page, context }) => {
@@ -66,8 +66,29 @@ test('public map loads automatically and requests Kartverket tiles', async ({ pa
   await authenticate(context);
   await page.goto('/admin/browser-test');
   await page.locator('.public-hamlet-map-mount').scrollIntoViewIfNeeded();
-  await expect(page.getByTitle('Zoom inn')).toBeVisible();
+  await expect(page.locator('.public-hamlet-map-mount').getByTitle('Zoom inn')).toBeVisible();
   await expect.poll(() => tileRequests.length).toBeGreaterThan(0);
+});
+
+test('private property map sends no address to a provider until explicitly opened', async ({ page, context }) => {
+  const lookups = [];
+  await page.route('https://ws.geonorge.no/**', (route) => {
+    lookups.push(route.request().url());
+    return route.fulfill({ json: route.request().url().includes('/adresser/')
+      ? { adresser: [{ representasjonspunkt: { epsg: 'EPSG:4258', lon: 9.5, lat: 60.4 } }] }
+      : { x: 123, y: 456 } });
+  });
+  await page.route('https://www.norgeskart.no/**', (route) => route.fulfill({ contentType: 'text/html', body: '<p>Synthetic map</p>' }));
+  await authenticate(context);
+  await page.goto('/admin/browser-test');
+  const map = page.locator('details.member-map');
+  await expect(page.locator('.public-hamlet-map-mount').getByTitle('Zoom inn')).toBeVisible();
+  expect(lookups).toHaveLength(0);
+  await expect(map.locator('iframe')).toHaveCount(0);
+  await map.locator('summary').click();
+  await expect.poll(() => lookups.length).toBe(2);
+  await expect(map.locator('iframe')).toHaveAttribute('sandbox', 'allow-scripts allow-same-origin');
+  await expect(map.locator('iframe')).toHaveAttribute('referrerpolicy', 'no-referrer');
 });
 
 test('activity maps support satellite layers, editable polygons and hiking routes', async ({ page, context }, testInfo) => {
@@ -215,6 +236,8 @@ test('activity categories and types can be created, renamed and used after reloa
 
   await page.goto('/activity-map-browser-test');
   await expect(page.getByRole('button', { name: /Trugerunden/ })).toContainText('Vinteraktiviteter · Trugetur');
+  // SSR labels can appear before hydration; the Leaflet control proves mount.
+  await expect(page.getByTitle('Zoom inn')).toBeVisible();
   await page.getByRole('checkbox', { name: 'Vinteraktiviteter', exact: true }).uncheck();
   await expect(page.getByRole('button', { name: /Trugerunden/ })).toHaveCount(0);
   await page.getByRole('checkbox', { name: 'Vinteraktiviteter', exact: true }).check();
@@ -470,7 +493,7 @@ test('public pageviews send only coarse anonymous dimensions and usage dashboard
   await expect(carousel.getByText(/^Foto: /)).toBeVisible();
   await expect(carousel.getByRole('button', { name: /^Bilde 1 av / })).toHaveAttribute('aria-current', 'true');
   await expect(carousel.getByRole('button', { name: /^Bilde 2 av / })).toHaveAttribute('aria-current', 'true', { timeout: 6000 });
-  await carousel.getByRole('button', { name: 'Stopp automatisk bildebytte' }).click();
+  await carousel.getByRole('button', { name: 'Pause automatisk bildebytte' }).click();
   await carousel.getByRole('button', { name: /^Bilde 2 av / }).click();
   await expect(carousel.getByRole('button', { name: /^Bilde 2 av / })).toHaveAttribute('aria-current', 'true');
   await page.reload();
@@ -1215,7 +1238,7 @@ test('CMS uses explicit saves, uploads with progress, publishes and handles a st
   await editorPage.getByRole('button', { name: 'Gjenopprett' }).click();
   await expect(editorPage.getByText(/Revisjon 1 er gjenopprettet/)).toBeVisible();
   await editorPage.getByRole('button', { name: 'Avpubliser' }).click();
-  await expect(editorPage.getByText('Siden er avpublisert.')).toBeVisible();
+  await expect(editorPage.getByText('Siden er avpublisert og lagret som utkast.')).toBeVisible();
 });
 
 test('group creation, counts, member-directory link and safe deletion are wired to the protected API', async ({ page, context }) => {

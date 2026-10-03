@@ -23,6 +23,7 @@ export default function CookieInformation() {
       </section>
       <section><h2>{t('consentTitle')}</h2><p>{t('consentText')}</p></section>
       <section><h2>{t('controlTitle')}</h2><p>{t('controlText')}</p></section>
+      <section><h2>{t('mapsTitle')}</h2><p>{t('mapsText')}</p></section>
       <section><h2>{t('sourcesTitle')}</h2><p>{t('sourcesText')} <a href="https://lovdata.no/nav/lov/2024-12-13-76/kap3" target="_blank" rel="noreferrer">{t('lawSource')}</a> {t('and')} <a href="https://www.datatilsynet.no/personvern-pa-ulike-omrader/internett-og-apper/bruk-av-informasjonskapsler-og-andre-sporingsteknologier/" target="_blank" rel="noreferrer">{t('guidanceSource')}</a>.</p></section>
       <section><h2>{t('contactTitle')}</h2><p>{t('contactText')} <a href="mailto:post@turufjellvel.no">post@turufjellvel.no</a>.</p></section>
       <p><Link href="/">{t('back')}</Link></p>

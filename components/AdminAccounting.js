@@ -1,5 +1,7 @@
 'use client';
 
+import { useApiClient } from '@/components/useApiClient';
+
 import { useRef, useState } from 'react';
 import Link from 'next/link';
 import Select from '@/components/Select';
@@ -57,6 +59,7 @@ function validDraftRate(entry) {
 }
 
 export default function AdminAccounting({ initialData, canWrite, currentUserName = '' }) {
+  const apiFetch = useApiClient();
   const { t, formatLocale } = useI18n('accounting');
   const [data, setData] = useState(initialData);
   const [tab, setTab] = useState(initialData.settings.version ? 'overview' : 'budget');
@@ -90,13 +93,13 @@ export default function AdminAccounting({ initialData, canWrite, currentUserName
   const editPaid = editing && data.expenses.find((expense) => expense.id === editing)?.paid_on;
 
   async function api(body) {
-    const response = await fetch('/api/admin/accounting', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const response = await apiFetch('/api/admin/accounting', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.code || 'unavailable');
     return result;
   }
   async function refresh() {
-    const response = await fetch(`/api/admin/accounting?year=${data.year}`, { cache: 'no-store' });
+    const response = await apiFetch(`/api/admin/accounting?year=${data.year}`, { cache: 'no-store' });
     const result = await response.json();
     if (!response.ok) throw new Error(result.code || 'unavailable');
     setData(result.data); setFiles(result.data.attachments); setSelected([]);
@@ -133,7 +136,7 @@ export default function AdminAccounting({ initialData, canWrite, currentUserName
       try {
         if (file.size > 3 * 1024 * 1024) throw new Error('invalidFile');
         const form = new FormData(); form.set('file', file); form.set('year', data.year);
-        const response = await fetch('/api/admin/accounting/files', { method: 'POST', body: form });
+        const response = await apiFetch('/api/admin/accounting/files', { method: 'POST', body: form });
         const result = await response.json();
         if (!response.ok) throw new Error(result.code || 'unavailable');
         setFiles((current) => current.some((entry) => entry.id === result.file.id) ? current : [...current, result.file]);
@@ -177,7 +180,7 @@ export default function AdminAccounting({ initialData, canWrite, currentUserName
   }
   async function downloadExpenses() {
     await action(async () => {
-      const response = await fetch('/api/admin/accounting/export', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const response = await apiFetch('/api/admin/accounting/export', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ year: data.year, ids: exportEntries.map((entry) => entry.id) }) });
       if (!response.ok) {
         const result = await response.json().catch(() => ({}));
@@ -199,7 +202,7 @@ export default function AdminAccounting({ initialData, canWrite, currentUserName
       const form = new FormData();
       form.set('year', data.year); form.set('kind', feeImport.kind); form.set('date', feeImport.date);
       form.set('apply', String(apply)); form.set('file', feeImport.file);
-      const response = await fetch('/api/admin/accounting/fees/import', { method: 'POST', body: form });
+      const response = await apiFetch('/api/admin/accounting/fees/import', { method: 'POST', body: form });
       const result = await response.json();
       if (!response.ok) throw new Error(result.code || 'unavailable');
       if (apply) {

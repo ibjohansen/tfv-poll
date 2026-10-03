@@ -1,3 +1,4 @@
+import { isSameOriginRequest } from '@/lib/request-origin';
 import { getMemberGroups, changeMemberGroup } from '@/lib/member-groups';
 import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { getRequestI18n } from '@/lib/i18n/request';
@@ -11,8 +12,7 @@ export async function GET(request) {
 }
 export async function POST(request) {
   const { t } = getRequestI18n(request, 'backend');
-  const origin = request.headers.get('origin');
-  if (origin && origin !== request.nextUrl.origin) return Response.json({ message: t('api.invalidRequest') }, { status: 403, headers });
+  if (!isSameOriginRequest(request)) return Response.json({ message: t('api.invalidRequest') }, { status: 403, headers });
   try { return Response.json({ ok: true, group: await changeMemberGroup(await readJsonObject(request)) }, { headers }); }
   catch (error) { return Response.json({ message: t('adminGroups.save') }, { status: apiErrorStatus(error), headers }); }
 }

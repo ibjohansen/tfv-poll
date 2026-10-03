@@ -1,5 +1,7 @@
 'use client';
 
+import { useApiClient } from '@/components/useApiClient';
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -27,6 +29,7 @@ function reviewMessage(review, t) {
 }
 
 export default function AdminMemberRequests({ initialRequests, showEmpty = false }) {
+  const apiFetch = useApiClient();
   const { t } = useI18n('members.requests');
   const router = useRouter();
   const [requests, setRequests] = useState(initialRequests);
@@ -42,7 +45,7 @@ export default function AdminMemberRequests({ initialRequests, showEmpty = false
   async function resolve() {
     setBusy(true); setMessage(''); setMessageKind('');
     try {
-      const response = await fetch(`/api/admin/member-requests/${decision.request.id}`, {
+      const response = await apiFetch(`/api/admin/member-requests/${decision.request.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: decision.action }),
       });
       const body = await response.json();
@@ -58,7 +61,7 @@ export default function AdminMemberRequests({ initialRequests, showEmpty = false
   async function acknowledge(request) {
     setBusy(true); setMessage(''); setMessageKind('');
     try {
-      const response = await fetch(`/api/admin/member-requests/${request.id}`, {
+      const response = await apiFetch(`/api/admin/member-requests/${request.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'acknowledge_comment' }),
       });
       const body = await response.json();
@@ -73,7 +76,7 @@ export default function AdminMemberRequests({ initialRequests, showEmpty = false
     const draft = propertyDrafts[request.id] || {};
     setBusy(true); setMessage(''); setMessageKind('');
     try {
-      const response = await fetch(`/api/admin/member-requests/${request.id}`, {
+      const response = await apiFetch(`/api/admin/member-requests/${request.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, ...draft }),
       });

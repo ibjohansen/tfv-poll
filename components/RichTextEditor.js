@@ -59,7 +59,7 @@ export default function RichTextEditor({ value, plainText = '', onChange, disabl
         editor.chain().focus().setLink({ href }).run(); setMessage(t('linkAdded')); setLink('');
       }}>{t('addLink')}</button>
       <button className="admin-button" type="button" disabled={disabled || !editor} onClick={() => editor.chain().focus().extendMarkRange('link').unsetLink().run()}>{t('removeLink')}</button>
-    </div><small>{t('help')} {state?.characters || 0}/100 000 tegn.</small>
+    </div><small>{t('help')} {t('characters', { count: state?.characters || 0 })}</small>
     {message && <p role="status">{message}</p>}
   </div>;
 }

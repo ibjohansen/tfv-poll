@@ -1,5 +1,7 @@
 'use client';
 
+import { useApiClient } from '@/components/useApiClient';
+
 import Select from "@/components/Select";
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -25,6 +27,7 @@ function payload(form) {
 }
 
 export default function MapMemberDetails({ memberId, canMatrikkelSync = false, onClose }) {
+  const apiFetch = useApiClient();
   const { t } = useI18n('map.admin.memberDetails');
   const [member, setMember] = useState(null);
   const [form, setForm] = useState(null);
@@ -38,7 +41,7 @@ export default function MapMemberDetails({ memberId, canMatrikkelSync = false, o
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/admin/members/${encodeURIComponent(memberId)}`, { cache: 'no-store', signal: controller.signal })
+    apiFetch(`/api/admin/members/${encodeURIComponent(memberId)}`, { cache: 'no-store', signal: controller.signal })
       .then(async (response) => {
         const body = await response.json();
         if (!response.ok || !body.ok) throw new Error(body.message || t('fetchError'));
@@ -48,7 +51,7 @@ export default function MapMemberDetails({ memberId, canMatrikkelSync = false, o
       .catch((failure) => { if (!controller.signal.aborted) setError(failure.message || t('fetchError')); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [memberId, t]);
+  }, [apiFetch, memberId, t]);
 
   useEffect(() => { closeButton.current?.focus(); }, []);
   useEffect(() => () => saveRequest.current?.abort(), []);
@@ -60,7 +63,7 @@ export default function MapMemberDetails({ memberId, canMatrikkelSync = false, o
     saveRequest.current = controller;
     setSaveState('saving'); setError('');
     try {
-      const response = await fetch(`/api/admin/members/${encodeURIComponent(memberId)}`, {
+      const response = await apiFetch(`/api/admin/members/${encodeURIComponent(memberId)}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)]),
       });
@@ -72,7 +75,7 @@ export default function MapMemberDetails({ memberId, canMatrikkelSync = false, o
       if (controller.signal.aborted || version !== saveVersion.current) return;
       setError(failure.message || t('saveError')); setSaveState('error');
     } finally { if (version === saveVersion.current) saveRequest.current = null; }
-  }, [memberId, t]);
+  }, [apiFetch, memberId, t]);
 
   useEffect(() => {
     if (!form || !memberId) return undefined;

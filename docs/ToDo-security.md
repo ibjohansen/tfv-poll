@@ -1,5 +1,9 @@
 # ToDo – sikkerhetsforbedringer
 
+Statuskontroll 3. oktober 2026: se [kodegjennomgangen](codebase-review-2026-10-03.md).
+Den skiller lokale rettelser, delvise tiltak og åpne produksjonsvalg. Punktene
+nedenfor er ikke automatisk ferdigmeldt av den lokale gjennomgangen.
+
 Opprettet 21. september 2026 etter gjennomgang av
 `docs/ekstern-sikkerhetsgjennomgang-20-09-2026.md`.
 

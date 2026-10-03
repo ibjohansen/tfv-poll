@@ -21,3 +21,11 @@ Object.assign(backend.adminMatrikkel, { apiMissing: 'Matrikkel-API er ikke konfi
 Object.assign(backend.adminSurveys, { emailDisabled: 'E-postsending er deaktivert.', emailConfiguration: 'MailerSend er ikke ferdig konfigurert.', emailJobConfiguration: 'Masseutsendelse må startes fra produksjonssiden, og Netlify-jobben må være konfigurert.', bulkDisabled: 'Masseutsendelse er deaktivert inntil videre.', suppressed: 'Testmottakeren er undertrykt og kan ikke motta e-post.', invalidRequest: 'Ugyldig forespørsel.', storage: 'Fillagring er ikke konfigurert. Kjør Neon-oppsettet først.', fileTooLarge: 'Filen er for stor.', tooManyAttachments: 'En undersøkelse kan ha maksimalt 20 vedlegg.', unsupportedFile: 'Filtypen støttes ikke, eller filen er større enn 20 MB.', attachmentMissing: 'Vedlegget finnes ikke lenger.', attachmentName: 'Skriv inn et visningsnavn på maksimalt 200 tegn.', removeAttachment: 'Kunne ikke fjerne vedlegget.' });
 backend.adminSurveys.invalidHamlet = 'Velg en gyldig grend.';
 export default backend;
+backend.surveyAccess = {
+  invalid: 'Tilgangen er ugyldig eller utløpt. Åpne invitasjonslenken på nytt, eller be Turufjell Vel om en ny invitasjon hvis lenken ikke virker.',
+  ended: 'Undersøkelsen er avsluttet. Det er ikke lenger mulig å sende inn svar.',
+  answered: 'Det er allerede registrert en besvarelse for denne tomten i denne undersøkelsen. Skjemaet kan bare sendes inn én gang.',
+  ready: 'Tilgangen er gyldig. Kontroller tomteopplysningene nedenfor før du svarer.',
+};
+backend.files = { missing: 'Filen finnes ikke.', unavailable: 'Filen er midlertidig utilgjengelig.' };
+Object.assign(backend.adminCms, {"quality":"Kvalitetskontrollen må løses før publisering.","conflict":"Siden er endret i en annen fane.","mediaLoad":"Kunne ikke hente mediebiblioteket.","fileMissing":"Filen finnes ikke.","fileReuse":"Kunne ikke gjenbruke filen.","historyLoad":"Kunne ikke hente historikken.","revisionMissing":"Revisjonen finnes ikke.","revisionRestore":"Kunne ikke gjenopprette revisjonen."});

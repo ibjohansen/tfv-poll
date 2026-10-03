@@ -1,5 +1,7 @@
 'use client';
 
+import { useApiClient } from '@/components/useApiClient';
+
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import RichTextEditor from '@/components/RichTextEditor';
@@ -10,6 +12,7 @@ import { useI18n } from '@/components/LocaleProvider';
 
 const empty = () => ({ subject: '', body: textToRichText(''), group_ids: [], status: 'draft' });
 export default function AdminNewsletters({ initialData, groups }) {
+  const apiFetch = useApiClient();
   const { t, formatLocale } = useI18n('email.newsletters');
   const [data, setData] = useState(initialData);
   const [campaign, setCampaign] = useState(null);
@@ -23,7 +26,7 @@ export default function AdminNewsletters({ initialData, groups }) {
   const campaignId = campaign?.id;
   const running = ['pending', 'running'].includes(campaign?.status);
   async function load(id = campaignId) {
-    const response = await fetch(`/api/admin/newsletters${id ? `?id=${id}` : ''}`, { signal: AbortSignal.timeout(15000) });
+    const response = await apiFetch(`/api/admin/newsletters${id ? `?id=${id}` : ''}`, { signal: AbortSignal.timeout(15000) });
     if (!response.ok) throw new Error(t('loadError'));
     const body = await response.json(); setData(body);
     if (id) setCampaign(body.campaign);
@@ -35,21 +38,21 @@ export default function AdminNewsletters({ initialData, groups }) {
     let active = true;
     const timer = setInterval(async () => {
       try {
-        const response = await fetch(`/api/admin/newsletters?id=${campaignId}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]) });
+        const response = await apiFetch(`/api/admin/newsletters?id=${campaignId}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]) });
         if (!response.ok) throw new Error();
         const body = await response.json();
         if (active) { setData(body); setCampaign(body.campaign); }
       } catch { if (active) setMessage(t('refreshError')); }
     }, 5000);
     return () => { active = false; controller.abort(); clearInterval(timer); };
-  }, [campaignId, running, t]);
+  }, [apiFetch, campaignId, running, t]);
   function edit(values) { setCampaign((current) => ({ ...current, ...values })); setPreview(null); setDirty(true); }
   async function action(kind) {
     setBusy(true); setMessage('');
     try {
       const payload = kind === 'save' ? { action: kind, id: campaign.id, subject: campaign.subject, body: campaign.body, groupIds: campaign.group_ids }
         : { action: kind, id: campaign.id, recipient };
-      const response = await fetch('/api/admin/newsletters', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(kind === 'test' ? 60000 : 25000) });
+      const response = await apiFetch('/api/admin/newsletters', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), timeoutMs: kind === 'test' ? 60000 : 25000 });
       const body = await response.json();
       if (body.campaign) setCampaign(body.campaign);
       if (!response.ok) throw new Error(body.message || t('actionError'));

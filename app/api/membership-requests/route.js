@@ -1,22 +1,18 @@
+import { isSameOriginRequest } from '@/lib/request-origin';
 import { NextResponse } from 'next/server';
 import { createMembershipRequest } from '@/lib/member-self-service';
 import { isMemberAccessRateLimited } from '@/lib/rate-limit';
 import { getSql } from '@/lib/db';
 import { consumeMemberAccessLimits, getPublicBrowserMarker, PUBLIC_BROWSER_COOKIE } from '@/lib/shared-rate-limit';
-import { apiErrorStatus } from '@/lib/api-errors';
+import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { getRequestI18n } from '@/lib/i18n/request';
 
 export const runtime = 'nodejs';
 const SERVER_TIMEOUT_MS = 20_000;
 
-function sameOrigin(request) {
-  const origin = request.headers.get('origin');
-  return !origin || origin === request.nextUrl.origin;
-}
-
 export async function POST(request) {
   const { t } = getRequestI18n(request, 'backend');
-  if (!sameOrigin(request)) return NextResponse.json({ ok: false, message: t('api.invalidRequest') }, { status: 403 });
+  if (!isSameOriginRequest(request)) return NextResponse.json({ ok: false, message: t('api.invalidRequest') }, { status: 403 });
   if (isMemberAccessRateLimited(request)) return NextResponse.json({ ok: false, message: t('members.attempts') }, { status: 429 });
   const startedAt = Date.now();
   let stage = 'request_body';
@@ -26,7 +22,7 @@ export async function POST(request) {
     console.info('Membership request progress', { stage, elapsedMs: Date.now() - startedAt });
   };
   try {
-    const input = await request.json();
+    const input = await readJsonObject(request, 32_768);
     if (!input || typeof input !== 'object' || Array.isArray(input)) return NextResponse.json({ ok: false, message: t('api.invalidRequest') }, { status: 400 });
     const marker = getPublicBrowserMarker(request);
     const identifier = input.primary_contact_email || input.h_number || input.street_address;

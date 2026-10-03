@@ -1,3 +1,4 @@
+import { isSameOriginRequest } from '@/lib/request-origin';
 import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { resolveAdminMemberRequest, updateAdminMemberRequestProperty } from '@/lib/member-self-service';
@@ -5,14 +6,9 @@ import { getRequestI18n } from '@/lib/i18n/request';
 
 export const runtime = 'nodejs';
 
-function sameOrigin(request) {
-  const origin = request.headers.get('origin');
-  return !origin || origin === request.nextUrl.origin;
-}
-
 export async function PATCH(request, { params }) {
   const { t } = getRequestI18n(request, 'backend');
-  if (!sameOrigin(request)) return NextResponse.json({ ok: false, message: t('api.invalidRequest') }, { status: 403 });
+  if (!isSameOriginRequest(request)) return NextResponse.json({ ok: false, message: t('api.invalidRequest') }, { status: 403 });
   try {
     const input = await readJsonObject(request);
     const id = (await params).id;

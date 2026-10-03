@@ -4,8 +4,9 @@ import { NextRequest, NextResponse } from 'next/server.js';
 import { apiErrorStatus, readJsonObject } from '../../lib/api-errors.js';
 import { getRequestI18n } from '../../lib/i18n/request.js';
 import { LOCALE_COOKIE, normalizeLocale } from '../../lib/i18n/config.js';
-import { getApplicationOrigin, isSameOriginRequest } from '../../lib/request-origin.js';
+import { getApplicationOrigin, isSameOriginRequest, trustedJobOrigin } from '../../lib/request-origin.js';
 import * as surveyQuestions from '../../lib/survey-questions.js';
+import { isUsageRateLimited } from '../../lib/rate-limit.js';
 
 // Execute the actual source with explicit dependencies. Never fall back to a
 // real database, mail provider, auth provider or network from a route test.
@@ -22,8 +23,12 @@ export async function loadModule(path, dependencies = {}, globals = {}) {
   const imports = {
     'server-only': {}, 'next/server': { NextResponse, after: () => {} }, '@/lib/api-errors': { apiErrorStatus, readJsonObject },
     '@/lib/survey-questions': surveyQuestions,
+    '@/lib/rate-limit': { isUsageRateLimited },
     '@/lib/i18n/request': { getRequestI18n }, './lib/i18n/request': { getRequestI18n },
     '@/lib/request-origin': { getApplicationOrigin, isSameOriginRequest },
+    '../request-origin.js': { getApplicationOrigin, isSameOriginRequest, trustedJobOrigin },
+    './request-origin.js': { getApplicationOrigin, isSameOriginRequest, trustedJobOrigin },
+    './lib/request-origin': { getApplicationOrigin, isSameOriginRequest, trustedJobOrigin },
     '../../lib/request-origin.js': { getApplicationOrigin, isSameOriginRequest },
     './lib/i18n/config': { LOCALE_COOKIE, normalizeLocale }, ...dependencies,
   };

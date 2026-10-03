@@ -4,6 +4,7 @@ import { adminPermissions, isAllowedAdmin, isAuthConfigured } from './lib/admin-
 import { isPublicPath } from './lib/route-access';
 import { getRequestI18n } from './lib/i18n/request';
 import { LOCALE_COOKIE, normalizeLocale } from './lib/i18n/config';
+import { isSameOriginRequest } from './lib/request-origin';
 
 function permissionForPath(pathname) {
   if (pathname.startsWith('/api/admin/member-groups') || pathname.startsWith('/api/admin/newsletters')) return 'members';
@@ -42,6 +43,10 @@ function responseWithCsp(response, csp) {
 }
 
 function withTiming(response, name, startedAt) {
+  if (process.env.NODE_ENV === 'production') {
+    response.headers.delete('Server-Timing');
+    return response;
+  }
   response.headers.append('Server-Timing', `${name};dur=${Math.max(0, Date.now() - startedAt).toFixed(1)}`);
   return response;
 }
@@ -53,6 +58,10 @@ export async function proxy(request) {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const csp = contentSecurityPolicy(nonce);
   if (isPublicPath(request.nextUrl.pathname)) return withTiming(nextWithCsp(request, nonce, csp, requestedLocale), 'proxy', proxyStartedAt);
+  if (request.nextUrl.pathname.startsWith('/api/admin/') && !['GET', 'HEAD', 'OPTIONS'].includes(request.method)
+    && !isSameOriginRequest(request)) {
+    return responseWithCsp(NextResponse.json({ message: t('invalidRequest') }, { status: 403, headers: { 'Cache-Control': 'no-store' } }), csp);
+  }
   const authStartedAt = Date.now();
   const session = isAuthConfigured() ? await auth() : null;
   const authDuration = Date.now() - authStartedAt;

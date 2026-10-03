@@ -1,11 +1,14 @@
 'use client';
 
+import { useApiClient } from '@/components/useApiClient';
+
 import { useState } from 'react';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { useI18n } from '@/components/LocaleProvider';
 import { fileTypeLabel, formatFileSize } from '@/lib/file-format';
 
 export default function SurveyAttachments({ surveyId, attachments, disabled, onChange }) {
+  const apiFetch = useApiClient();
   const { t, formatLocale } = useI18n('surveys.admin');
   const [titles, setTitles] = useState({});
   const [busy, setBusy] = useState('');
@@ -23,7 +26,7 @@ export default function SurveyAttachments({ surveyId, attachments, disabled, onC
       for (const file of files) {
         const form = new FormData();
         form.set('file', file);
-        const response = await fetch(`/api/admin/surveys/${surveyId}/attachments`, { method: 'POST', body: form });
+        const response = await apiFetch(`/api/admin/surveys/${surveyId}/attachments`, { method: 'POST', body: form });
         const body = await response.json();
         if (!response.ok || !body.ok) throw new Error(body.message || t('attachmentUploadError', {name: file.name}));
         uploaded.push(body.attachment);
@@ -41,7 +44,7 @@ export default function SurveyAttachments({ surveyId, attachments, disabled, onC
   async function saveTitle(file) {
     setBusy(`title:${file.id}`); setMessage(''); setMessageKind('');
     try {
-      const response = await fetch(`/api/admin/surveys/${surveyId}/attachments/${file.id}`, {
+      const response = await apiFetch(`/api/admin/surveys/${surveyId}/attachments/${file.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: titles[file.id] || '' }),
       });
@@ -58,7 +61,7 @@ export default function SurveyAttachments({ surveyId, attachments, disabled, onC
     if (!file) return;
     setBusy(`delete:${file.id}`); setMessage(''); setMessageKind('');
     try {
-      const response = await fetch(`/api/admin/surveys/${surveyId}/attachments/${file.id}`, { method: 'DELETE' });
+      const response = await apiFetch(`/api/admin/surveys/${surveyId}/attachments/${file.id}`, { method: 'DELETE' });
       const body = await response.json().catch(() => ({}));
       if (!response.ok || !body.ok) throw new Error(body.message || t('attachmentRemoveError'));
       onChange(attachments.filter((item) => item.id !== file.id));

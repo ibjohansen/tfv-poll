@@ -19,6 +19,7 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  poweredByHeader: false,
   serverExternalPackages: ['pdfjs-dist'],
   // PDF.js loads its worker and optional Node canvas shim dynamically.
   outputFileTracingIncludes: {

@@ -1,5 +1,7 @@
 'use client';
 
+import { useApiClient } from '@/components/useApiClient';
+
 import Select from "@/components/Select";
 import { useEffect, useState } from 'react';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -24,6 +26,7 @@ function MatrikkelValues({ item, source, t }) {
 }
 
 export default function MatrikkelSyncPanel({ initialRuns, members = [], initialMemberId = '', initialMemberIds = [], initialRunId = '', configured, databaseReady }) {
+  const apiFetch = useApiClient();
   const { t, formatLocale } = useI18n('members.matrikkel');
   const [runs, setRuns] = useState(initialRuns);
   const [activeId, setActiveId] = useState(initialRunId || initialRuns.find((run) => ['pending', 'running'].includes(run.status))?.id || null);
@@ -52,7 +55,7 @@ export default function MatrikkelSyncPanel({ initialRuns, members = [], initialM
     let stopped = false;
     const refresh = async () => {
       try {
-        const response = await fetch(`/api/admin/matrikkel/runs?id=${activeId}`, { cache: 'no-store' });
+        const response = await apiFetch(`/api/admin/matrikkel/runs?id=${activeId}`, { cache: 'no-store' });
         const body = await response.json();
         if (!response.ok || !body.ok) throw new Error(body.message);
         if (stopped) return;
@@ -64,14 +67,14 @@ export default function MatrikkelSyncPanel({ initialRuns, members = [], initialM
     refresh();
     const timer = setInterval(refresh, 3000);
     return () => { stopped = true; clearInterval(timer); };
-  }, [activeId, t]);
+  }, [apiFetch, activeId, t]);
 
   async function processNext(runId) {
     setProcessingLocally(true);
     try {
       let status = 'running';
       while (['pending', 'running'].includes(status)) {
-        const response = await fetch(`/api/admin/matrikkel/runs/${runId}/process`, { method: 'POST' });
+        const response = await apiFetch(`/api/admin/matrikkel/runs/${runId}/process`, { method: 'POST' });
         const body = await response.json();
         if (!response.ok || !body.ok) throw new Error(body.message);
         status = body.run.status;
@@ -86,7 +89,7 @@ export default function MatrikkelSyncPanel({ initialRuns, members = [], initialM
     try {
       const input = { hNumber: scope === 'test' ? '25' : null, memberId: scope === 'member' ? selectedMemberId : null };
       if (scope === 'selection') input.memberIds = selectedMemberIds;
-      const response = await fetch('/api/admin/matrikkel/runs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+      const response = await apiFetch('/api/admin/matrikkel/runs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
       const body = await response.json();
       const isFinished = ['completed', 'failed', 'cancelled'].includes(body.run?.status);
       if (body.run) {
@@ -102,10 +105,10 @@ export default function MatrikkelSyncPanel({ initialRuns, members = [], initialM
   async function approve(item) {
     setMessage(''); setNotice('');
     try {
-      const response = await fetch(`/api/admin/matrikkel/runs/${active.id}/items/${item.member_id}/approve`, { method: 'POST' });
+      const response = await apiFetch(`/api/admin/matrikkel/runs/${active.id}/items/${item.member_id}/approve`, { method: 'POST' });
       const body = await response.json();
       if (!response.ok || !body.ok) throw new Error(body.message);
-      const detailResponse = await fetch(`/api/admin/matrikkel/runs?id=${active.id}`, { cache: 'no-store' });
+      const detailResponse = await apiFetch(`/api/admin/matrikkel/runs?id=${active.id}`, { cache: 'no-store' });
       const detail = await detailResponse.json();
       if (!detailResponse.ok || !detail.ok) throw new Error(detail.message);
       setActive(detail.data);
@@ -117,7 +120,7 @@ export default function MatrikkelSyncPanel({ initialRuns, members = [], initialM
     if (!current) return;
     setStarting(true); setMessage(''); setNotice('');
     try {
-      const response = await fetch(`/api/admin/matrikkel/runs/${current.id}`, {
+      const response = await apiFetch(`/api/admin/matrikkel/runs/${current.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'complete_followup' }),
       });
       const body = await response.json();
@@ -134,7 +137,7 @@ export default function MatrikkelSyncPanel({ initialRuns, members = [], initialM
     if (!activeId) return;
     setStarting(true); setMessage('');
     try {
-      const response = await fetch(`/api/admin/matrikkel/runs/${activeId}?action=cancel`, { method: 'DELETE' });
+      const response = await apiFetch(`/api/admin/matrikkel/runs/${activeId}?action=cancel`, { method: 'DELETE' });
       const body = await response.json();
       if (!response.ok || !body.ok) throw new Error(body.message);
       setActive(body.run);
@@ -148,7 +151,7 @@ export default function MatrikkelSyncPanel({ initialRuns, members = [], initialM
     if (!deleteCandidate) return;
     setStarting(true); setMessage('');
     try {
-      const response = await fetch(`/api/admin/matrikkel/runs/${deleteCandidate.id}`, { method: 'DELETE' });
+      const response = await apiFetch(`/api/admin/matrikkel/runs/${deleteCandidate.id}`, { method: 'DELETE' });
       const body = await response.json();
       if (!response.ok || !body.ok) throw new Error(body.message);
       setRuns((current) => current.filter((run) => run.id !== deleteCandidate.id));

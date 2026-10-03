@@ -1,4 +1,6 @@
 'use client';
+
+import { useApiClient } from '@/components/useApiClient';
 import { surveyAnswerLabel } from '@/lib/survey-questions';
 
 import { useState } from 'react';
@@ -15,6 +17,7 @@ function formatDate(value, formatLocale, t) {
 }
 
 export default function MemberSelfServiceProfile({ initialProfile }) {
+  const apiFetch = useApiClient();
   const { t, formatLocale } = useI18n('members.profile');
   const statusLabel = (status) => t(`statuses.${status}`, {}, status);
   const changedFieldLabel = (field) => t(`fields.${field}`, {}, field);
@@ -37,7 +40,7 @@ export default function MemberSelfServiceProfile({ initialProfile }) {
   async function submit(action, values) {
     setBusy(action); setMessage(''); setIsError(false);
     try {
-      const response = await fetch('/api/member-access/profile', {
+      const response = await apiFetch('/api/member-access/profile', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(20000),
         body: JSON.stringify({ action, ...values, memberId: member.id, other_contact_emails: values.other_contact_emails.split(/[\n,;]+/).map((email) => email.trim()).filter(Boolean) }),
       });
@@ -54,7 +57,7 @@ export default function MemberSelfServiceProfile({ initialProfile }) {
 
   async function logout() {
     setBusy('logout');
-    try { await fetch('/api/member-access/logout', { method: 'POST' }); }
+    try { await apiFetch('/api/member-access/logout', { method: 'POST' }); }
     finally { router.push('/#medlemsopplysninger'); router.refresh(); }
   }
 

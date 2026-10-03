@@ -1,25 +1,21 @@
+import { isSameOriginRequest } from '@/lib/request-origin';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { createOwnershipTransferRequest, requestMemberEmailChange, updateMemberSelfServiceProfile } from '@/lib/member-self-service';
 import { memberSessionCookieName } from '@/lib/member-self-service-utils';
 import { isMemberMutationRateLimited } from '@/lib/rate-limit';
-import { apiErrorStatus } from '@/lib/api-errors';
+import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { getRequestI18n } from '@/lib/i18n/request';
 
 export const runtime = 'nodejs';
 
-function sameOrigin(request) {
-  const origin = request.headers.get('origin');
-  return !origin || origin === request.nextUrl.origin;
-}
-
 export async function PATCH(request) {
   const { t } = getRequestI18n(request, 'backend');
-  if (!sameOrigin(request)) return NextResponse.json({ ok: false, message: t('api.invalidRequest') }, { status: 403 });
+  if (!isSameOriginRequest(request)) return NextResponse.json({ ok: false, message: t('api.invalidRequest') }, { status: 403 });
   if (isMemberMutationRateLimited(request)) return NextResponse.json({ ok: false, message: t('members.changes') }, { status: 429 });
   const secret = (await cookies()).get(memberSessionCookieName())?.value;
   try {
-    const input = await request.json().catch(() => ({}));
+    const input = await readJsonObject(request, 32_768);
     if (!input || typeof input !== 'object' || Array.isArray(input)) return NextResponse.json({ ok: false, message: t('api.invalidRequest') }, { status: 400 });
     if (input.action === 'ownership_transfer') {
       const result = await createOwnershipTransferRequest(secret, input);

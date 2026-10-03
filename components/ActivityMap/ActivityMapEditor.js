@@ -1,9 +1,11 @@
 'use client';
 
+import { useApiClient } from '@/components/useApiClient';
+
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/components/LocaleProvider';
-import { ACTIVITY_SEASONS, ALPINE_COLORS, normalizeActivityNumber } from '@/lib/activity-map';
+import { ACTIVITY_SEASONS, ALPINE_COLORS, normalizeActivityNumber } from '@/lib/activity-map-display';
 import { activityCatalogLabel, activityCategoryLabel, activityTypeLabel, findActivityType, withActivityCatalog } from '@/lib/activity-map-catalog';
 import ActivityMapCatalogManager from './ActivityMapCatalogManager';
 
@@ -26,6 +28,7 @@ function compareFeatures(a, b) {
 }
 
 export default function ActivityMapEditor() {
+  const apiFetch = useApiClient();
   const { t } = useI18n('activityMap.admin');
   const [features, setFeatures] = useState([]);
   const [catalog, setCatalog] = useState({ categories: [], types: [] });
@@ -55,14 +58,14 @@ export default function ActivityMapEditor() {
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
-    const response = await fetch('/api/admin/activity-map/features', {
+    const response = await apiFetch('/api/admin/activity-map/features', {
       credentials: 'same-origin', cache: 'no-store', signal: controller.signal,
       ...options, headers: options.body ? { 'Content-Type': 'application/json' } : undefined,
     });
-    const body = await response.json().catch(() => null);
+    const body = await response.json();
     if (!response.ok) throw new Error(body?.message || t('requestError'));
     return body;
-  }, [t]);
+  }, [apiFetch, t]);
 
   useEffect(() => {
     let active = true;

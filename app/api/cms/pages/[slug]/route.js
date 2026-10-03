@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getPublishedCmsPage } from '@/lib/cms-pages';
+import { getCachedPublishedCmsPage as getPublishedCmsPage } from '@/lib/public-queries';
 import { isValidCmsSlug } from '@/lib/cms-validation';
 import { getRequestI18n } from '@/lib/i18n/request';
 

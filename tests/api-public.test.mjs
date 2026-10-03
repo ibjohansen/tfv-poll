@@ -6,6 +6,7 @@ import { loadModule, request, routeContext } from './helpers/load-module.mjs';
 import * as memberUtils from '../lib/member-self-service-utils.js';
 import * as cmsValidation from '../lib/cms-validation.js';
 import * as webhookUtils from '../lib/mailersend-webhook.js';
+import { isSameOriginRequest } from '../lib/request-origin.js';
 
 const secret = 'a'.repeat(64);
 const methods = ['requestMemberAccess', 'verifyMemberAccess', 'verifyMemberEmailChange', 'createMembershipRequest', 'verifyMembershipRequest', 'getMemberSelfServiceProfile', 'getMemberSelfServiceExport', 'updateMemberSelfServiceProfile', 'requestMemberEmailChange', 'createOwnershipTransferRequest', 'revokeMemberSession'];
@@ -28,6 +29,7 @@ async function memberRoute(path, options = {}) {
       consumeMemberAccessLimits: async () => { if (state.sharedError) throw state.sharedError; return state.sharedLimited; },
     },
     '@/lib/request-origin': {
+      isSameOriginRequest,
       getApplicationOrigin: requestValue => options.applicationOrigin || new URL(requestValue.url).origin,
     },
   });
@@ -37,7 +39,7 @@ async function memberRoute(path, options = {}) {
 test('member access requests have one generic response, even for missing or invalid identifiers', async () => {
   const { route, calls, callbacks } = await memberRoute('member-access/request');
   let expected;
-  for (const body of [{ identifier: 'H-7' }, { identifier: 'unknown@example.test' }, {}, { identifier: [] }, null]) {
+  for (const body of [{ identifier: 'H-7' }, { identifier: 'unknown@example.test' }, {}, { identifier: [] }]) {
     const response = await route.POST(request('/api/member-access/request', { method: 'POST', body }));
     assert.equal(response.status, 202);
     const payload = await response.json();
@@ -47,7 +49,19 @@ test('member access requests have one generic response, even for missing or inva
   }
   assert.equal(calls.length, 0, 'Delivery waits until after the response');
   for (const callback of callbacks) await callback();
-  assert.equal(calls.length, 5);
+  assert.equal(calls.length, 4);
+});
+
+test('member access rejects malformed, non-JSON and oversized requests before delivery', async () => {
+  const { route, callbacks } = await memberRoute('member-access/request');
+  for (const [body, headers, status] of [
+    [null, {}, 400], [{}, { 'content-type': 'text/plain' }, 415],
+    [{ identifier: 'a'.repeat(5000) }, {}, 413],
+  ]) {
+    const response = await route.POST(request('/api/member-access/request', { method: 'POST', body, headers }));
+    assert.equal(response.status, status);
+  }
+  assert.equal(callbacks.length, 0);
 });
 
 test('request origin, local/shared throttling and unavailable rate store prevent delivery', async () => {
@@ -190,7 +204,7 @@ test('public CMS exposes published pages only, validates slug and masks storage 
   let result = { title: 'Publisert' }, error, calls = 0;
   const route = await loadModule('app/api/cms/pages/[slug]/route.js', {
     '@/lib/cms-validation': cmsValidation,
-    '@/lib/cms-pages': { getPublishedCmsPage: async () => { calls++; if (error) throw error; return result; } },
+    '@/lib/public-queries': { getCachedPublishedCmsPage: async () => { calls++; if (error) throw error; return result; } },
   });
   assert.equal((await route.GET(null, routeContext({ slug: '../private' }))).status, 404);
   assert.equal(calls, 0);

@@ -1,3 +1,4 @@
+import { isSameOriginRequest } from '@/lib/request-origin';
 import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { deleteAdminCmsFile, updateAdminCmsAttachment } from '@/lib/cms-files';
@@ -10,7 +11,7 @@ function response(body, status = 200) {
 }
 export async function PATCH(request, { params }) {
   const { t } = getRequestI18n(request, 'backend');
-  if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return response({ ok: false, message: t('api.invalidRequest') }, 403);
+  if (!isSameOriginRequest(request)) return response({ ok: false, message: t('api.invalidRequest') }, 403);
   try {
     const route = await params;
     const { title } = await readJsonObject(request);
@@ -24,7 +25,7 @@ export async function PATCH(request, { params }) {
 
 export async function DELETE(request, { params }) {
   const { t } = getRequestI18n(request, 'backend');
-  if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return response({ ok: false, message: t('api.invalidRequest') }, 403);
+  if (!isSameOriginRequest(request)) return response({ ok: false, message: t('api.invalidRequest') }, 403);
   try {
     const route = await params;
     const result = await deleteAdminCmsFile(route.id, route.attachmentId);

@@ -1,5 +1,5 @@
 import AdminLoadingShell from '@/components/AdminLoadingShell';
 
 export default function Loading() {
-  return <AdminLoadingShell title="Laster medlemsregister …" />;
+  return <AdminLoadingShell titleKey="members" />;
 }

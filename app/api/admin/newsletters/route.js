@@ -1,3 +1,4 @@
+import { isSameOriginRequest } from '@/lib/request-origin';
 import { getNewsletters, saveNewsletter, previewNewsletter, queueNewsletter, failPendingNewsletter, sendNewsletterTest } from '@/lib/newsletters';
 import { dispatchNewsletter } from '@/lib/newsletter-background';
 import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
@@ -13,8 +14,7 @@ export async function GET(request) {
 }
 export async function POST(request) {
   const { t } = getRequestI18n(request, 'backend');
-  const origin = request.headers.get('origin');
-  if (origin && origin !== request.nextUrl.origin) return Response.json({ message: t('api.invalidRequest') }, { status: 403, headers });
+  if (!isSameOriginRequest(request)) return Response.json({ message: t('api.invalidRequest') }, { status: 403, headers });
   try {
     const input = await readJsonObject(request);
     if (input.action === 'save') return Response.json({ ok: true, campaign: await saveNewsletter(input) }, { headers });

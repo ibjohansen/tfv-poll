@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { ACTIVITY_MAP_CENTER } from '@/lib/activity-map';
+import { ACTIVITY_MAP_CENTER } from '@/lib/activity-map-display';
 import { activityCategoryColor } from '@/lib/activity-map-catalog';
 import { BACKGROUND_MAP, SATELLITE_MAP } from '@/lib/map/sources';
 

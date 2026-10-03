@@ -1,5 +1,7 @@
 'use client';
+import { useI18n } from '@/components/LocaleProvider';
 
 export default function CmsEditorError({ reset }) {
-  return <section className="admin-content"><h2>Kunne ikke åpne redigeringen</h2><p>Prøv å laste siden på nytt. Ingen endringer er gjort.</p><button className="primary-button" type="button" onClick={reset}>Prøv igjen</button></section>;
+  const { t } = useI18n('cms.admin');
+  return <section className="admin-content"><h2>{t('openError')}</h2><p>{t('reloadHelp')}</p><button className="primary-button" type="button" onClick={reset}>{t('retry')}</button></section>;
 }

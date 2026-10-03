@@ -10,6 +10,7 @@ import { getRequestI18n } from '@/lib/i18n/request';
 import { hasValidSurveyAnswers } from '@/lib/survey-questions';
 import { dispatchSurveyReceipts, isSurveyEmailBackgroundConfigured } from '@/lib/survey-email-background';
 import { getApplicationOrigin, isSameOriginRequest } from '@/lib/request-origin';
+import { readJsonObject, apiErrorStatus } from '@/lib/api-errors';
 
 export const runtime = 'nodejs';
 
@@ -36,9 +37,10 @@ export async function POST(request) {
     return reply({ ok: false, code: 'SURVEY_ORIGIN_REJECTED', message: t('survey.browserRejected') }, 403);
   }
   if (isRateLimited(request)) return reply({ ok: false, message: t('api.tooManyRequests') }, 429);
-  const body = await request.json().catch(() => null);
-  if (!body || typeof body !== 'object' || Array.isArray(body)) {
-    return reply({ ok: false, code: 'SURVEY_INVALID_BODY', message: t('api.invalidRequest') }, 400);
+  let body;
+  try { body = await readJsonObject(request, 65_536); }
+  catch (error) {
+    return reply({ ok: false, code: 'SURVEY_INVALID_BODY', message: t('api.invalidRequest') }, apiErrorStatus(error));
   }
 
   try {
@@ -47,7 +49,7 @@ export async function POST(request) {
       ? await getMockSurveyAccess(body.mockToken, body.mockSurveyId)
       : await getSurveyAccess(secret);
     if (access.status !== 'ready') {
-      return reply({ ok: false, message: access.message }, accessErrorStatus(access.status));
+      return reply({ ok: false, message: access.messageKey ? t(`surveyAccess.${access.messageKey}`) : t('members.invalidAccess') }, accessErrorStatus(access.status));
     }
     if (body.website) return reply({ ok: true }, 200);
     if (!Number.isSafeInteger(body.questionVersion) || body.questionVersion < 1 || body.questionVersion > 2147483647) {

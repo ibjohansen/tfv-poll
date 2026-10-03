@@ -74,3 +74,4 @@ Object.assign(members.requests, {
   monthlyStatuses: { completed: 'Follow-up required', failed: 'Check failed', cancelled: 'Check stopped' },
 });
 export default members;
+members.propertyMap.privacy = 'Opening the map shares the street address with Kartverket’s Geonorge and Norgeskart to locate the property.';

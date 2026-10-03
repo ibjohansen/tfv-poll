@@ -41,4 +41,12 @@ const general = {
   tooltips: { logout: 'Logg ut av administrasjonen.', close: 'Lukk detaljpanelet.', search: 'Bruk valgte filtre og søketeksten.', fetchAddresses: 'Hent offisielle adressepunkter innenfor søkepolygonet.', fetchRoads: 'Hent og beregn veier og stier innenfor søkepolygonet.', fetchBoundaries: 'Hent tilgjengelige eiendomsgrenser innenfor søkepolygonet.', compare: 'Sammenlign medlemsregisteret med de offisielle adressene i området.', reloadHamlets: 'Hent lagrede grender fra databasen på nytt.', newHamlet: 'Vis feltene for å opprette og lagre en ny grend.', generic: 'Utfør handlingen «{label}».' },
 };
 
+general.network = {
+  failed: 'Kunne ikke kontakte serveren. Kontroller forbindelsen og prøv igjen.',
+  timeout: 'Forespørselen tok for lang tid. Kontroller om endringen ble lagret før du prøver igjen.',
+  invalid: 'Serveren ga et ugyldig svar. Last inn siden på nytt og kontroller status.',
+};
 export default general;
+general.cookies.mapsTitle = 'Eksterne karttjenester';
+general.cookies.mapsText = 'Forsidens kart henter kartbilder fra Kartverket og eventuelt Esri. Eiendomskartet i medlemsopplysningene kontakter ikke Geonorge eller Norgeskart før du selv åpner kartet. Da deles gateadressen for å finne eiendommen. Eksterne lenker og kart sendes uten henvisningsadresse.';
+general.loading = { admin: 'Laster administrasjon …', members: 'Laster medlemsregister …', inbox: 'Laster innboks …', usage: 'Laster statistikk …', web: 'Laster nettsider …', editor: 'Laster redigering …' };

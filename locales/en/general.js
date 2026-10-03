@@ -41,4 +41,12 @@ const general = {
   tooltips: { logout: 'Log out of the administration portal.', close: 'Close the details panel.', search: 'Apply the selected filters and search text.', fetchAddresses: 'Load official address points inside the search polygon.', fetchRoads: 'Load and calculate roads and paths inside the search polygon.', fetchBoundaries: 'Load available property boundaries inside the search polygon.', compare: 'Compare the member register with official addresses in the area.', reloadHamlets: 'Reload saved hamlets from the database.', newHamlet: 'Show the fields for creating and saving a new hamlet.', generic: 'Perform the action “{label}”.' },
 };
 
+general.network = {
+  failed: 'Could not contact the server. Check your connection and try again.',
+  timeout: 'The request timed out. Check whether the change was saved before trying again.',
+  invalid: 'The server returned an invalid response. Reload the page and check its status.',
+};
 export default general;
+general.cookies.mapsTitle = 'External map services';
+general.cookies.mapsText = 'The public map loads map images from Kartverket and optionally Esri. The property map in member details does not contact Geonorge or Norgeskart until you open it. The street address is then shared to locate the property. External links and maps use no-referrer.';
+general.loading = { admin: 'Loading administration …', members: 'Loading members …', inbox: 'Loading inbox …', usage: 'Loading statistics …', web: 'Loading web pages …', editor: 'Loading editor …' };

@@ -1,5 +1,7 @@
 'use client';
 
+import { useApiClient } from '@/components/useApiClient';
+
 import Select from "@/components/Select";
 import { useState } from 'react';
 import Link from 'next/link';
@@ -7,6 +9,7 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import { useI18n } from '@/components/LocaleProvider';
 
 export default function AdminMemberGroups({ initialGroups }) {
+  const apiFetch = useApiClient();
   const { t } = useI18n('admin.groups');
   const [groups, setGroups] = useState(initialGroups);
   const [selected, setSelected] = useState(null);
@@ -19,10 +22,10 @@ export default function AdminMemberGroups({ initialGroups }) {
   async function change(values) {
     setBusy(true); setMessage('');
     try {
-      const response = await fetch('/api/admin/member-groups', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values), signal: AbortSignal.timeout(20000) });
+      const response = await apiFetch('/api/admin/member-groups', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values), signal: AbortSignal.timeout(20000) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.message);
-      const refreshed = await fetch('/api/admin/member-groups', { signal: AbortSignal.timeout(15000) });
+      const refreshed = await apiFetch('/api/admin/member-groups', { signal: AbortSignal.timeout(15000) });
       if (!refreshed.ok) throw new Error(t('refreshError'));
       setGroups((await refreshed.json()).groups);
       if (values.action === 'create') { setSelected({ ...body.group, kind: values.kind }); setRename(body.group.name); setName(''); }

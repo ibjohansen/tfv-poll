@@ -1,5 +1,7 @@
 'use client';
 
+import { useApiClient } from '@/components/useApiClient';
+
 import Select from "@/components/Select";
 import SurveyRecipientPicker from '@/components/SurveyRecipientPicker';
 import SurveyMailOverview from '@/components/SurveyMailOverview';
@@ -8,6 +10,7 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import { useI18n } from '@/components/LocaleProvider';
 
 export default function SurveyEmailPanel({ surveyId, adminEmail }) {
+  const apiFetch = useApiClient();
   const { t } = useI18n('surveys.email');
   const [overview, setOverview] = useState(null);
   const [state, setState] = useState('loading');
@@ -31,7 +34,7 @@ export default function SurveyEmailPanel({ surveyId, adminEmail }) {
       query.set('groupId', groupId);
       query.set('includeOtherEmails', String(includeOtherEmails));
       if (memberIds) query.set('memberIds', memberIds);
-      const response = await fetch(`/api/admin/surveys/${surveyId}/email?${query}`, { signal });
+      const response = await apiFetch(`/api/admin/surveys/${surveyId}/email?${query}`, { signal });
       const body = await response.json();
       if (signal?.aborted || version !== requestVersion.current) return;
       if (!response.ok || !body.ok) throw new Error(body.message || t('loadError'));
@@ -41,7 +44,7 @@ export default function SurveyEmailPanel({ surveyId, adminEmail }) {
     } catch (error) {
       if (error.name !== 'AbortError' && version === requestVersion.current) { setMessage(error.message); setMessageKind('error'); setState('error'); }
     }
-  }, [groupId, surveyId, t, includeOtherEmails, memberIds]);
+  }, [apiFetch, groupId, surveyId, t, includeOtherEmails, memberIds]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -60,7 +63,7 @@ export default function SurveyEmailPanel({ surveyId, adminEmail }) {
     setBusy(action);
     setMessage(''); setMessageKind('');
     try {
-      const response = await fetch(`/api/admin/surveys/${surveyId}/email`, {
+      const response = await apiFetch(`/api/admin/surveys/${surveyId}/email`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...extra }),
       });
       const body = await response.json();

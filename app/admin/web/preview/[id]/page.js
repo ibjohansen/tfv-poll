@@ -21,7 +21,7 @@ export default async function CmsPreviewPage({ params, searchParams }) {
   if (!page) notFound();
   return (
     <main id="main-content" className="cms-preview-page" tabIndex={-1}>
-      <div className="cms-preview-bar"><div><strong>{t('title')}</strong><span>{page.status === 'published' ? t('published') : t('draft')}</span><span>Revisjon {page.version}</span></div><Link href={`/admin/web/${page.id}`}>{t('back')}</Link></div>
+      <div className="cms-preview-bar"><div><strong>{t('title')}</strong><span>{page.status === 'published' ? t('published') : t('draft')}</span><span>{t('revision', { revision: page.version })}</span></div><Link href={`/admin/web/${page.id}`}>{t('back')}</Link></div>
       <CmsPreviewFrame page={page} />
     </main>
   );

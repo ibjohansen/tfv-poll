@@ -17,15 +17,13 @@ export default function MemberInfo({ access }) {
     <section className={`member-section${access.status !== "ready" ? " member-section-error" : ""}`} aria-labelledby="member-heading">
       <p className="eyebrow">{t('members.info.eyebrow')}</p>
       <h2 id="member-heading">{t('members.info.title')}</h2>
-      <p className="member-message" role="status">{access.message}</p>
+      <p className="member-message" role="status">{access.messageKey ? t(`backend.surveyAccess.${access.messageKey}`) : access.message}</p>
       {member && (
         <dl className="member-details">
           {fields.map(([label, value]) => (
             <div className={label === t('members.info.streetAddress') ? "member-address-detail" : undefined} key={label}>
               <dt>{label}</dt>
-              <dd>{label === "Hjemmelshaver" && value
-                ? value.split(" / ").map((name, index) => <span className="owner-line" key={index}>{name}</span>)
-                : value || t('general.states.notRegistered')}</dd>
+              <dd>{value || t('general.states.notRegistered')}</dd>
               {label === t('members.info.streetAddress') && value && <MemberPropertyMap streetAddress={value} />}
             </div>
           ))}

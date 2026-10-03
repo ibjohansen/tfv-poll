@@ -1,3 +1,4 @@
+import { isSameOriginRequest } from '@/lib/request-origin';
 import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { createAdminCmsPage, copyAdminCmsPage, getAdminCmsPages } from '@/lib/cms-pages';
@@ -13,7 +14,7 @@ function errorResponse(error, t) {
   if (error.message === 'Unauthorized') return response({ ok: false, message: t('login') }, 401);
   if (code === '23505') return response({ ok: false, message: t('duplicateUrl') }, 409);
   if (error.message === 'Mock data cannot be changed') return response({ ok: false, message: t('mock') }, 409);
-  if (code === 'CMS_PUBLICATION_QUALITY') return response({ ok: false, message: 'Kvalitetskontrollen må løses før publisering.', ...error.details }, 422);
+  if (code === 'CMS_PUBLICATION_QUALITY') return response({ ok: false, message: t('quality'), ...error.details }, 422);
   return response({ ok: false, message: t('check') }, apiErrorStatus(error, 400));
 }
 
@@ -30,7 +31,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   const { t } = getRequestI18n(request, 'backend');
-  if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return response({ ok: false, message: t('api.invalidRequest') }, 403);
+  if (!isSameOriginRequest(request)) return response({ ok: false, message: t('api.invalidRequest') }, 403);
   try {
     const input = await readJsonObject(request);
     return response({ ok: true, page: input.action === 'copy' ? await copyAdminCmsPage(input.sourceId) : await createAdminCmsPage(input) }, 201);

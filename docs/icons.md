@@ -13,7 +13,7 @@ Oppgi ikonnavn og hvor det skal brukes; vi kan gjenbruke SVG uten en ny pakke.
 | Administrasjonsmeny og oversiktskort | `components/AdminNavigation.js`, `ModuleIcon` |
 | Karusellpiler og pause | `components/HomeHeroCarousel.js` |
 | Språkvelger | `components/LanguageSwitcher.js` |
-| Meny på forsiden | `components/SiteMenu.js` |
+| Navigasjon på forsiden | `components/SiteHeader.js` |
 | Artikkelkort uten bilde | `components/PublicArticleDirectory.js` |
 | Opplasting av artikkelbilde | `components/CmsPageDirectory.js` |
 | Felles dropdownpil | `components/Select.js` og `.shared-select-chevron` i `app/globals.css` |

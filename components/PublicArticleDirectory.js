@@ -1,5 +1,7 @@
 'use client';
 
+import { useApiClient } from '@/components/useApiClient';
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -13,6 +15,7 @@ function dateTimeValue(value) {
 }
 
 export default function PublicArticleDirectory({ pages, initialPage = null }) {
+  const apiFetch = useApiClient();
   const { t, formatLocale } = useI18n('public.articles');
   const { t: categoryLabel } = useI18n('cms.categories');
   const formatDate = (value) => value ? new Intl.DateTimeFormat(formatLocale, {
@@ -32,7 +35,7 @@ export default function PublicArticleDirectory({ pages, initialPage = null }) {
     setLoadingSlug(slug);
     setError('');
     try {
-      const response = await fetch(`/api/cms/pages/${encodeURIComponent(slug)}`, { headers: { Accept: 'application/json' } });
+      const response = await apiFetch(`/api/cms/pages/${encodeURIComponent(slug)}`, { headers: { Accept: 'application/json' } });
       const body = await response.json();
       if (!response.ok || !body.ok) throw new Error(body.message || t('unavailable'));
       if (request !== requestNumber.current) return;
@@ -43,7 +46,7 @@ export default function PublicArticleDirectory({ pages, initialPage = null }) {
     } finally {
       if (request === requestNumber.current) setLoadingSlug('');
     }
-  }, [t]);
+  }, [apiFetch, t]);
 
   const closeArticle = useCallback(() => {
     requestNumber.current += 1;

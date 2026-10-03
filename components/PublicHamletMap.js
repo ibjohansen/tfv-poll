@@ -1,5 +1,7 @@
 'use client';
 
+import { useApiClient } from '@/components/useApiClient';
+
 import dynamic from 'next/dynamic';
 import Select from '@/components/Select';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
@@ -16,6 +18,7 @@ const PublicHamletMapView = dynamic(() => import('./PublicHamletMapView'), {
 });
 
 export default function PublicHamletMap({hamlets}) {
+  const apiFetch = useApiClient();
   const {t} = useI18n('map.public');
   const [activeId, setActiveId] = useState('');
   const [showProperties, setShowProperties] = useState(false);
@@ -38,7 +41,7 @@ export default function PublicHamletMap({hamlets}) {
     setProperties([]);
     setSelectedProperty(null);
     try {
-      const response = await fetch(`/api/map/hamlets/${encodeURIComponent(hamletId)}/properties`, {
+      const response = await apiFetch(`/api/map/hamlets/${encodeURIComponent(hamletId)}/properties`, {
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(30_000)]),
       });
       const body = await response.json();
@@ -52,7 +55,7 @@ export default function PublicHamletMap({hamlets}) {
         setLoading(false);
       }
     }
-  }, [t]);
+  }, [apiFetch, t]);
 
   useEffect(() => () => controllerRef.current?.abort(), []);
 

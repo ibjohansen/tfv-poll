@@ -1,3 +1,4 @@
+import { getRequestI18n } from '@/lib/i18n/request';
 import { downloadCmsObject } from '@/lib/cms-storage';
 import { getAdminCmsFile, getPublicCmsFile } from '@/lib/cms-files';
 
@@ -13,12 +14,13 @@ function publicEtag(file) {
 }
 
 export async function GET(request, { params }) {
+  const { t } = getRequestI18n(request, 'backend.files');
   try {
     const { id } = await params;
     const variant = request.nextUrl.searchParams.get('variant') === 'thumbnail' ? 'thumbnail' : '';
     let file = await getPublicCmsFile(id, variant);
     if (!file) file = await getAdminCmsFile(id, variant).catch(() => null);
-    if (!file) return new Response('Filen finnes ikke.', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+    if (!file) return new Response(t('missing'), { status: 404, headers: { 'Cache-Control': 'no-store' } });
     const etag = file.is_public ? publicEtag(file) : null;
     if (etag && request.headers.get('if-none-match')?.split(',').map((value) => value.trim()).includes(etag)) {
       return new Response(null, { status: 304, headers: {
@@ -41,6 +43,6 @@ export async function GET(request, { params }) {
     });
   } catch (error) {
     console.error('CMS file download failed', { code: error.code || error.cause?.code, message: error.message });
-    return new Response('Filen er midlertidig utilgjengelig.', { status: 503, headers: { 'Cache-Control': 'no-store' } });
+    return new Response(t('unavailable'), { status: 503, headers: { 'Cache-Control': 'no-store' } });
   }
 }

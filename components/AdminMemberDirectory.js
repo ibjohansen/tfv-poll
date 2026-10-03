@@ -1,5 +1,7 @@
 'use client';
 
+import { useApiClient } from '@/components/useApiClient';
+
 import Select from "@/components/Select";
 import Link from 'next/link';
 import AutoFilterForm from '@/components/AutoFilterForm';
@@ -56,6 +58,7 @@ function annualFeesFor(member, currentYear) {
 }
 
 export default function AdminMemberDirectory({ data, search, sort, direction, incompleteContact, hasComment = false, initialSelected = null, membershipStatus = '', hamletId = '', groupId = '', turufjellAsSharing = '', groups = [], canMatrikkelSync = false }) {
+  const apiFetch = useApiClient();
   const { t } = useI18n('members.adminDirectory');
   const [selected, setSelected] = useState(initialSelected);
   const [form, setForm] = useState(() => initialSelected ? formFromMember(initialSelected) : null);
@@ -115,7 +118,7 @@ export default function AdminMemberDirectory({ data, search, sort, direction, in
       setLoadingMore(true); setLoadError('');
       try {
         const query = new URLSearchParams({ q: search, page: String(page + 1), sort, dir: direction, ...activeFilters });
-        const response = await fetch(`/api/admin/members?${query}`);
+        const response = await apiFetch(`/api/admin/members?${query}`);
         const next = await response.json();
         if (!response.ok) throw new Error(next.message);
         setMemberResult((current) => {
@@ -127,7 +130,7 @@ export default function AdminMemberDirectory({ data, search, sort, direction, in
     }, { rootMargin: '240px' });
     observer.observe(target);
     return () => observer.disconnect();
-  }, [activeFilters, data.members, direction, hasMore, loadingMore, page, resultKey, search, sort, t]);
+  }, [apiFetch, activeFilters, data.members, direction, hasMore, loadingMore, page, resultKey, search, sort, t]);
   useEffect(() => {
     if (!exportOpen) return undefined;
     exportCancelButton.current?.focus();
@@ -146,7 +149,7 @@ export default function AdminMemberDirectory({ data, search, sort, direction, in
     const request = ++saveRequest.current;
     setSaving(true); setSaveState('saving'); setMessage('');
     try {
-      const response = await fetch(wasNew ? '/api/admin/members' : `/api/admin/members/${memberId}`, { method: wasNew ? 'POST' : 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)]) });
+      const response = await apiFetch(wasNew ? '/api/admin/members' : `/api/admin/members/${memberId}`, { method: wasNew ? 'POST' : 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)]) });
       const body = await response.json();
       if (request !== saveRequest.current) return false;
       if (!response.ok || !body.ok) { setMessage(body.message || t('saveError')); setSaveState('error'); return false; }
@@ -168,7 +171,7 @@ export default function AdminMemberDirectory({ data, search, sort, direction, in
     finally {
       if (request === saveRequest.current) { saveController.current = null; setSaving(false); }
     }
-  }, [t, updateMembers]);
+  }, [apiFetch, t, updateMembers]);
   useEffect(() => () => saveController.current?.abort(), []);
   async function save(event) {
     event.preventDefault();
@@ -187,7 +190,7 @@ export default function AdminMemberDirectory({ data, search, sort, direction, in
   async function remove() {
     setDeleting(true);
     try {
-      const response = await fetch(`/api/admin/members/${selected.id}`, { method: 'DELETE' });
+      const response = await apiFetch(`/api/admin/members/${selected.id}`, { method: 'DELETE' });
       const body = await response.json().catch(() => ({}));
       if (!response.ok || !body.ok) { setConfirmDelete(false); setMessage(body.message || t('deleteError')); return; }
       updateMembers((current) => current.filter((item) => String(item.id) !== String(selected.id)));
@@ -206,7 +209,7 @@ export default function AdminMemberDirectory({ data, search, sort, direction, in
   async function changeGroupMembership(group, action, memberIds, busyKey) {
     setGroupBusy(busyKey); setGroupMessage(null);
     try {
-      const response = await fetch('/api/admin/member-groups', {
+      const response = await apiFetch('/api/admin/member-groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kind: group.kind, id: group.id, action, memberIds }),
@@ -252,7 +255,7 @@ export default function AdminMemberDirectory({ data, search, sort, direction, in
     const memberId = selected.id;
     setAnnualFeeBusy(true); setAnnualFeeMessage(null);
     try {
-      const response = await fetch(`/api/admin/members/${memberId}`, {
+      const response = await apiFetch(`/api/admin/members/${memberId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'set_annual_fee', year, paid }),
@@ -278,7 +281,7 @@ export default function AdminMemberDirectory({ data, search, sort, direction, in
     event.preventDefault();
     setExporting(true); setExportMessage('');
     try {
-      const response = await fetch('/api/admin/members/export', {
+      const response = await apiFetch('/api/admin/members/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scope: exportScope, membershipStatus, memberIds: [...checked], excludeTurufjellAsOptOut }),

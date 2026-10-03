@@ -74,3 +74,4 @@ Object.assign(members.requests, {
   monthlyStatuses: { completed: 'Krever oppfølging', failed: 'Kontrollen feilet', cancelled: 'Kontrollen ble stoppet' },
 });
 export default members;
+members.propertyMap.privacy = 'Når du åpner kartet, sendes gateadressen til Kartverkets Geonorge og Norgeskart for å finne eiendommen.';

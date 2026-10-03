@@ -1,8 +1,11 @@
 'use client';
+
+import { useApiClient } from '@/components/useApiClient';
 import { useEffect, useState } from 'react';
 import { useI18n } from '@/components/LocaleProvider';
 
 export default function SurveyRecipientPicker({ surveyId, selected, onChange, disabled }) {
+  const apiFetch = useApiClient();
   const { t } = useI18n('surveys.email');
   const [query, setQuery] = useState('');
   const [members, setMembers] = useState([]);
@@ -12,7 +15,7 @@ export default function SurveyRecipientPicker({ surveyId, selected, onChange, di
     const timer = setTimeout(async () => {
       if (!query.trim()) { setMembers([]); return; }
       try {
-        const response = await fetch(`/api/admin/surveys/${surveyId}/email?${new URLSearchParams({ search: query })}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) });
+        const response = await apiFetch(`/api/admin/surveys/${surveyId}/email?${new URLSearchParams({ search: query })}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) });
         if (!response.ok) throw new Error();
         const body = await response.json();
         if (controller.signal.aborted) return;
@@ -20,7 +23,7 @@ export default function SurveyRecipientPicker({ surveyId, selected, onChange, di
       } catch { if (!controller.signal.aborted) setError(t('propertySearchError')); }
     }, 300);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [query, surveyId, t]);
+  }, [apiFetch, query, surveyId, t]);
   function toggle(member) {
     onChange(selected.some((item) => item.id === member.id) ? selected.filter((item) => item.id !== member.id) : [...selected, member]);
   }

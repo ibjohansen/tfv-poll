@@ -1,3 +1,4 @@
+import { isSameOriginRequest } from '@/lib/request-origin';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { revokeMemberSession } from '@/lib/member-self-service';
@@ -6,8 +7,7 @@ import { memberSessionCookieName } from '@/lib/member-self-service-utils';
 export const runtime = 'nodejs';
 
 export async function POST(request) {
-  const origin = request.headers.get('origin');
-  if (origin && origin !== request.nextUrl.origin) return NextResponse.json({ ok: false }, { status: 403 });
+  if (!isSameOriginRequest(request)) return NextResponse.json({ ok: false }, { status: 403 });
   const cookieName = memberSessionCookieName();
   const secret = (await cookies()).get(cookieName)?.value;
   try { await revokeMemberSession(secret); } catch {}

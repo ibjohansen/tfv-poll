@@ -1,3 +1,4 @@
+import { isSameOriginRequest } from '@/lib/request-origin';
 import { apiErrorStatus, readJsonObject } from '@/lib/api-errors';
 import { NextResponse } from 'next/server';
 import { deleteAdminCmsFile, uploadAdminCmsFile } from '@/lib/cms-files';
@@ -17,7 +18,7 @@ function uploadError(error, t) {
 
 export async function POST(request, { params }) {
   const { t } = getRequestI18n(request, 'backend');
-  if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return response({ ok: false, message: t('api.invalidRequest') }, 403);
+  if (!isSameOriginRequest(request)) return response({ ok: false, message: t('api.invalidRequest') }, 403);
   if (Number(request.headers.get('content-length') || 0) > 11 * 1024 * 1024) return response({ ok: false, message: t('adminCms.imageTooLarge') }, 413);
   try {
     const form = await request.formData();
@@ -31,7 +32,7 @@ export async function POST(request, { params }) {
 
 export async function DELETE(request, { params }) {
   const { t } = getRequestI18n(request, 'backend');
-  if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return response({ ok: false, message: t('api.invalidRequest') }, 403);
+  if (!isSameOriginRequest(request)) return response({ ok: false, message: t('api.invalidRequest') }, 403);
   try {
     const { imageId } = await readJsonObject(request);
     const result = await deleteAdminCmsFile((await params).id, imageId, 'image');

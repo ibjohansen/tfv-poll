@@ -1,3 +1,4 @@
+import { getRequestI18n } from '@/lib/i18n/request';
 import { cookies } from 'next/headers';
 import { downloadCmsObject } from '@/lib/cms-storage';
 import { getSurveyAccess, surveySessionCookieName } from '@/lib/membership';
@@ -12,6 +13,7 @@ function contentDisposition(filename, download) {
 }
 
 export async function GET(request, { params }) {
+  const { t } = getRequestI18n(request, 'backend.files');
   try {
     const { id } = await params;
     const secret = (await cookies()).get(surveySessionCookieName())?.value;
@@ -24,7 +26,7 @@ export async function GET(request, { params }) {
       if (access.survey?.id) file = await getMemberSurveyAttachment(id, access.survey.id);
     }
     if (!file && !preview) file = await getAdminSurveyAttachment(id).catch(() => null);
-    if (!file) return new Response('Filen finnes ikke.', { status: 404, headers: { 'Cache-Control': 'private, no-store' } });
+    if (!file) return new Response(t('missing'), { status: 404, headers: { 'Cache-Control': 'private, no-store' } });
     const object = await downloadCmsObject(file.storage_key);
     if (!object.Body) throw new Error('Missing object body');
     const bytes = await object.Body.transformToByteArray();
@@ -37,6 +39,6 @@ export async function GET(request, { params }) {
     } });
   } catch (error) {
     console.error('Survey attachment download failed', { code: error.code || error.cause?.code, message: error.message });
-    return new Response('Filen er midlertidig utilgjengelig.', { status: 503, headers: { 'Cache-Control': 'private, no-store' } });
+    return new Response(t('unavailable'), { status: 503, headers: { 'Cache-Control': 'private, no-store' } });
   }
 }

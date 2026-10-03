@@ -1,5 +1,7 @@
 'use client';
 
+import { useApiClient } from '@/components/useApiClient';
+
 import {useState} from 'react';
 import {useSearchParams} from 'next/navigation';
 import {useI18n} from '@/components/LocaleProvider';
@@ -10,6 +12,7 @@ const emptyMembership = {
 };
 
 export default function MemberSelfServiceEntry() {
+  const apiFetch = useApiClient();
     const {t} = useI18n('members.entry');
     const searchParams = useSearchParams();
     const membershipStatus = String(searchParams.get('membership') || '');
@@ -28,7 +31,7 @@ export default function MemberSelfServiceEntry() {
         setMessage('');
         setIsError(false);
         try {
-            const response = await fetch('/api/member-access/request', {
+            const response = await apiFetch('/api/member-access/request', {
                 method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({identifier}),
             });
             const body = await response.json();
@@ -49,7 +52,7 @@ export default function MemberSelfServiceEntry() {
         setMessage('');
         setIsError(false);
         try {
-            const response = await fetch('/api/membership-requests', {
+            const response = await apiFetch('/api/membership-requests', {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 signal: AbortSignal.timeout(25_000),
                 body: JSON.stringify({

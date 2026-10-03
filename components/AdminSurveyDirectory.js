@@ -1,5 +1,7 @@
 'use client';
 
+import { useApiClient } from '@/components/useApiClient';
+
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -12,7 +14,7 @@ import { normalizeSurveyQuestions, questionOptions } from '@/lib/survey-question
 import { useI18n } from '@/components/LocaleProvider';
 
 const blankQuestion = (number) => ({ id: `q${number}`, number, text: '' });
-const chartColors = ['#15803d', '#b91c1c', '#a16207', '#2563eb', '#7c3aed', '#be185d', '#0e7490'];
+import { SURVEY_CHART_COLORS as chartColors } from '@/lib/survey-chart-style';
 
 function normalizeQuestions(questions) {
   return questions.map((question, index) => ({ ...question, number: index + 1 }));
@@ -108,6 +110,7 @@ function SurveyResults({ data, state, surveyId, hamletId, t, formatLocale, onRet
 }
 
 export default function AdminSurveyDirectory({ surveys, surveyHamlets = [], sort, direction, adminEmail }) {
+  const apiFetch = useApiClient();
   const { t, formatLocale } = useI18n('surveys.admin');
   const router = useRouter();
   const [selected, setSelected] = useState(null);
@@ -136,7 +139,7 @@ export default function AdminSurveyDirectory({ surveys, surveyHamlets = [], sort
   useEffect(() => {
     if (!selectedId) return undefined;
     const controller = new AbortController();
-    fetch(`/api/admin/surveys/${selectedId}/results${hamletId ? `?hamlet=${encodeURIComponent(hamletId)}` : ''}`, { signal: controller.signal })
+    apiFetch(`/api/admin/surveys/${selectedId}/results${hamletId ? `?hamlet=${encodeURIComponent(hamletId)}` : ''}`, { signal: controller.signal })
       .then(async (response) => {
         const body = await response.json();
         if (controller.signal.aborted) return;
@@ -149,7 +152,7 @@ export default function AdminSurveyDirectory({ surveys, surveyHamlets = [], sort
         if (!controller.signal.aborted && error.name !== 'AbortError') setResultsState('error');
       });
     return () => controller.abort();
-  }, [selectedId, resultsReload, hamletId, surveyHamlets, t]);
+  }, [apiFetch, selectedId, resultsReload, hamletId, surveyHamlets, t]);
 
   function select(survey) {
     setHamletId(''); setResultHamlets(surveyHamlets);
@@ -199,7 +202,7 @@ export default function AdminSurveyDirectory({ surveys, surveyHamlets = [], sort
     setMessage('');
     const endpoint = wasNew ? '/api/admin/surveys' : `/api/admin/surveys/${surveyId}`;
     try {
-      const response = await fetch(endpoint, { method: wasNew ? 'POST' : 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const response = await apiFetch(endpoint, { method: wasNew ? 'POST' : 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const body = await response.json();
       if (!response.ok || !body.ok) throw new Error(body.message || t('saveError'));
       const returnedPayload = surveyPayload(body.survey.title, body.survey.is_open, body.survey.ends_on || '', body.survey.questions || []);
@@ -213,7 +216,7 @@ export default function AdminSurveyDirectory({ surveys, surveyHamlets = [], sort
       setResults(null); setResultsState('loading'); setResultsReload((value) => value + 1); router.refresh();
     } catch (error) { setMessage(error.message || t('saveError')); setSaveState('error'); }
     finally { setSaving(false); }
-  }, [router, t]);
+  }, [apiFetch, router, t]);
 
   async function save(event) {
     event.preventDefault();
@@ -223,7 +226,7 @@ export default function AdminSurveyDirectory({ surveys, surveyHamlets = [], sort
   async function copy() {
     setSaving(true); setMessage('');
     try {
-      const response = await fetch('/api/admin/surveys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'copy', sourceId: selected.id }), signal: AbortSignal.timeout(60000) });
+      const response = await apiFetch('/api/admin/surveys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'copy', sourceId: selected.id }), timeoutMs: 60000 });
       const body = await response.json();
       if (!response.ok || !body.ok) throw new Error(body.message || t('saveError'));
       select(body.survey); setMessage(t('copiedDraft')); router.refresh();
@@ -244,7 +247,7 @@ export default function AdminSurveyDirectory({ surveys, surveyHamlets = [], sort
   async function remove() {
     setDeleting(true);
     try {
-      const response = await fetch(`/api/admin/surveys/${selected.id}`, { method: 'DELETE' });
+      const response = await apiFetch(`/api/admin/surveys/${selected.id}`, { method: 'DELETE' });
       const body = await response.json().catch(() => ({}));
       if (!response.ok || !body.ok) {
         setConfirmDelete(false);

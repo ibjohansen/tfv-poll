@@ -1,11 +1,14 @@
 "use client";
 
+import { useApiClient } from '@/components/useApiClient';
+
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { questionOptions } from '@/lib/survey-questions';
 import { useI18n } from '@/components/LocaleProvider';
 
 export default function SurveyForm({ mockToken, mockSurveyId, preview = false, questions, questionVersion, singleResponsePerProperty = true }) {
+  const apiFetch = useApiClient();
   const { t } = useI18n('surveys.form');
   const router = useRouter();
   const [answers, setAnswers] = useState(() => Object.fromEntries(questions.map(({ id }) => [id, ""])));
@@ -52,7 +55,7 @@ export default function SurveyForm({ mockToken, mockSurveyId, preview = false, q
     setErrorMessage("");
 
     try {
-      const response = await fetch("/survey/api/responses", {
+      const response = await apiFetch("/survey/api/responses", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

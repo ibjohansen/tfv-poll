@@ -21,3 +21,11 @@ Object.assign(backend.adminMatrikkel, { apiMissing: 'The cadastral API is not co
 Object.assign(backend.adminSurveys, { emailDisabled: 'Email sending is disabled.', emailConfiguration: 'MailerSend is not fully configured.', emailJobConfiguration: 'Bulk mailing must be started from the production site, and the Netlify job must be configured.', bulkDisabled: 'Bulk mailing is currently disabled.', suppressed: 'The test recipient is suppressed and cannot receive email.', invalidRequest: 'Invalid request.', storage: 'File storage is not configured. Complete the Neon setup first.', fileTooLarge: 'The file is too large.', tooManyAttachments: 'A survey can have no more than 20 attachments.', unsupportedFile: 'The file type is unsupported or the file is larger than 20 MB.', attachmentMissing: 'The attachment no longer exists.', attachmentName: 'Enter a display name of no more than 200 characters.', removeAttachment: 'Could not remove the attachment.' });
 backend.adminSurveys.invalidHamlet = 'Select a valid hamlet.';
 export default backend;
+backend.surveyAccess = {
+  invalid: 'Your access is invalid or expired. Open the invitation again or contact Turufjell Vel for a new invitation.',
+  ended: 'The survey has closed. Responses can no longer be submitted.',
+  answered: 'A response has already been registered for this property in this survey. The form can only be submitted once.',
+  ready: 'Your access is valid. Check the property details below before responding.',
+};
+backend.files = { missing: 'The file was not found.', unavailable: 'The file is temporarily unavailable.' };
+Object.assign(backend.adminCms, {"quality":"Resolve the quality checks before publishing.","conflict":"The page has been changed in another tab.","mediaLoad":"Could not load the media library.","fileMissing":"The file was not found.","fileReuse":"Could not reuse the file.","historyLoad":"Could not load revision history.","revisionMissing":"The revision was not found.","revisionRestore":"Could not restore the revision."});
