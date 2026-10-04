@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/components/LocaleProvider';
 import { activityCategoryColor, activityCategoryLabel, activityTypeLabel } from '@/lib/activity-map-catalog';
 import { ACTIVITY_SEASONS, activityMatchesSeason, activityMatchesTurufjell } from '@/lib/activity-map-display';
@@ -25,7 +25,11 @@ export default function PublicActivityMap({ features }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const explorerRef = useRef(null);
   const selectedButtonRef = useRef(null);
+  const selectAllCategoriesRef = useRef(null);
   const categories = useMemo(() => [...new Map(features.map((feature) => [feature.category, feature])).values()], [features]);
+  const allCategoriesSelected = categories.length > 0 && categories.every((feature) => !hiddenCategories.includes(feature.category));
+  const someCategoriesSelected = categories.some((feature) => !hiddenCategories.includes(feature.category));
+  const crossCountrySelected = categories.some((feature) => feature.category === 'cross_country') && !hiddenCategories.includes('cross_country');
   const visible = useMemo(() => features.filter((feature) => !hiddenCategories.includes(feature.category)
     && activityMatchesSeason(feature, season)
     && (feature.category !== 'cross_country' || !turufjellOnly
@@ -46,6 +50,10 @@ export default function PublicActivityMap({ features }) {
     if (selected) selectedButtonRef.current?.scrollIntoView({ block: 'nearest' });
   }, [selected]);
 
+  useEffect(() => {
+    if (selectAllCategoriesRef.current) selectAllCategoriesRef.current.indeterminate = someCategoriesSelected && !allCategoriesSelected;
+  }, [allCategoriesSelected, someCategoriesSelected]);
+
   async function toggleFullscreen() {
     try {
       if (document.fullscreenElement === explorerRef.current) await document.exitFullscreen();
@@ -58,12 +66,14 @@ export default function PublicActivityMap({ features }) {
     <div ref={explorerRef} className="public-activity-explorer">
       <div className="public-activity-toolbar">
         <fieldset className="public-activity-filters"><legend>{t('filters')}</legend>
-          {categories.map((feature) => <Fragment key={feature.category}><label><input type="checkbox" checked={!hiddenCategories.includes(feature.category)} onChange={(event) => {
+          <label className="is-select-all"><input ref={selectAllCategoriesRef} type="checkbox" checked={allCategoriesSelected} onChange={(event) => {
+            setHiddenCategories(event.target.checked ? [] : categories.map((feature) => feature.category));
+          }} />{t('selectAll')}</label>
+          {categories.map((feature) => <label key={feature.category}><input type="checkbox" checked={!hiddenCategories.includes(feature.category)} onChange={(event) => {
               const checked = event.target.checked;
               setHiddenCategories((current) => checked ? current.filter((category) => category !== feature.category) : [...current, feature.category]);
-            }} /> <span className="activity-filter-dot" style={{ backgroundColor: activityCategoryColor(feature) }} aria-hidden="true" />{activityCategoryLabel(feature, t)}</label>
-            {feature.category === 'cross_country' && !hiddenCategories.includes('cross_country') && <label className="is-primary-filter"><input type="checkbox" checked={turufjellOnly} onChange={(event) => setTurufjellOnly(event.target.checked)} />{t('filterTurufjell')}</label>}
-          </Fragment>)}
+            }} /> <span className="activity-filter-dot" style={{ backgroundColor: activityCategoryColor(feature) }} aria-hidden="true" />{activityCategoryLabel(feature, t)}</label>)}
+          {crossCountrySelected && <label className="is-primary-filter"><input type="checkbox" checked={turufjellOnly} onChange={(event) => setTurufjellOnly(event.target.checked)} />{t('filterTurufjell')}</label>}
           {showAlpine && <label><input type="checkbox" checked={showAlpineColors} onChange={(event) => setShowAlpineColors(event.target.checked)} /> {t('showColors')}</label>}
         </fieldset>
         <label className="activity-season-filter">{t('season')}<select value={season} onChange={(event) => setSeason(event.target.value)}>

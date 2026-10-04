@@ -20,8 +20,8 @@ const selectedGeometryHaloStyle = {
   fillOpacity: 0, interactive: false, lineCap: 'round', lineJoin: 'round',
 };
 const selectedGeometryStyle = {
-  className: 'activity-map-selected-geometry', color: '#5f358f', weight: 6, opacity: 1,
-  fillColor: '#ad96d7', fillOpacity: .28, lineCap: 'round', lineJoin: 'round',
+  className: 'activity-map-selected-geometry', color: '#c92f2f', weight: 6, opacity: 1,
+  fillColor: '#ef8f8f', fillOpacity: .28, lineCap: 'round', lineJoin: 'round',
 };
 
 function verticesForGeometry(geometry) {

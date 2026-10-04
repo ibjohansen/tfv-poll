@@ -54,6 +54,16 @@ overskrives automatisk.
 Forsiden viser bare godkjente aktiviteter gjennom dagens publiseringsregel:
 `is_draft = FALSE`, gyldig geometri og ikke slettet. Filteret «Langrenn» kommer
 automatisk fra aktivitetskatalogen på samme måte som de øvrige kategoriene.
+Kategoriene kan slås av og på enkeltvis eller samlet med «Velg alle» både på
+forsiden og i administrasjonen. Når langrenn er valgt på forsiden, vises også
+standardfilteret «Nærhet til Turufjell», som omfatter egne aktiviteter og
+importerte løyper med Turufjell i navn eller kort tekst, eller Vassfarfjellet
+løypelag i kort tekst.
+
+Kart og liste er synkronisert i begge grensesnitt. En valgt aktivitet markeres
+rødt i kartet. I offentlig fullskjermvisning vises kortinformasjon som tooltip
+ved hover, mens full informasjon om den valgte aktiviteten vises i et eget felt
+over aktivitetslisten til høyre.
 
 ## Kilder og prioritet
 

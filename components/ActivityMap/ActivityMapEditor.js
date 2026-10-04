@@ -34,7 +34,7 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
   const { t } = useI18n('activityMap.admin');
   const [features, setFeatures] = useState([]);
   const [catalog, setCatalog] = useState({ categories: [], types: [] });
-  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [hiddenCategories, setHiddenCategories] = useState([]);
   const [sourceFilter, setSourceFilter] = useState('all');
   const [turufjellOnly, setTurufjellOnly] = useState(false);
   const [previewCandidates, setPreviewCandidates] = useState([]);
@@ -49,15 +49,18 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
   const controllerRef = useRef(null);
   const mapFrameRef = useRef(null);
   const selectedFeatureButtonRef = useRef(null);
+  const selectAllCategoriesRef = useRef(null);
 
   const selected = useMemo(() => features.find((feature) => feature.id === draft.id) || null, [draft.id, features]);
   const decoratedFeatures = useMemo(() => features.map((feature) => withActivityCatalog(feature, catalog)), [features, catalog]);
   const filteredFeatures = useMemo(() => decoratedFeatures.filter((feature) => {
     const sourceMatches = sourceFilter === 'all' || (sourceFilter === 'manual' && !feature.sources?.length)
       || feature.sources?.some((source) => source.id === sourceFilter);
-    return (categoryFilter === 'all' || feature.category === categoryFilter) && sourceMatches
+    return !hiddenCategories.includes(feature.category) && sourceMatches
       && (!turufjellOnly || activityMatchesTurufjell(feature));
-  }), [categoryFilter, decoratedFeatures, sourceFilter, turufjellOnly]);
+  }), [decoratedFeatures, hiddenCategories, sourceFilter, turufjellOnly]);
+  const allCategoriesSelected = catalog.categories.length > 0 && catalog.categories.every((item) => !hiddenCategories.includes(item.id));
+  const someCategoriesSelected = catalog.categories.some((item) => !hiddenCategories.includes(item.id));
   const mapLabels = useMemo(() => ({
     canvas: t('mapCanvasLabel'), zoomIn: t('zoomIn'), zoomOut: t('zoomOut'), tileError: t('tileError'),
     geometryPoint: (number) => t('geometryPoint', { number }), addGeometryPoint: t('addGeometryPoint'),
@@ -103,6 +106,10 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
   useEffect(() => {
     if (draft.id) selectedFeatureButtonRef.current?.scrollIntoView({ block: 'nearest' });
   }, [draft.id, filteredFeatures]);
+
+  useEffect(() => {
+    if (selectAllCategoriesRef.current) selectAllCategoriesRef.current.indeterminate = someCategoriesSelected && !allCategoriesSelected;
+  }, [allCategoriesSelected, someCategoriesSelected]);
 
   function selectFeature(feature) {
     if ((drawing || editing) && !window.confirm(t('confirmDiscard'))) return;
@@ -205,9 +212,15 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
     <div className="activity-admin-layout">
       <aside className="activity-feature-list" aria-label={t('savedFeatures')}>
         <div className="activity-feature-list-heading"><h3>{t('savedFeatures')}</h3><button type="button" className="admin-button" onClick={newFeature}>{t('new')}</button></div>
-        <label className="activity-category-filter">{t('filterCategory')}<select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
-          <option value="all">{t('allCategories')}</option>{catalog.categories.map((item) => <option key={item.id} value={item.id}>{activityCatalogLabel(item, 'categories', t)}</option>)}
-        </select></label>
+        <fieldset className="activity-admin-category-filters"><legend>{t('filterCategory')}</legend>
+          <label className="is-select-all"><input ref={selectAllCategoriesRef} type="checkbox" checked={allCategoriesSelected} onChange={(event) => {
+            setHiddenCategories(event.target.checked ? [] : catalog.categories.map((item) => item.id));
+          }} /><span>{t('selectAll')}</span></label>
+          {catalog.categories.map((item) => <label key={item.id}><input type="checkbox" checked={!hiddenCategories.includes(item.id)} onChange={(event) => {
+            const checked = event.target.checked;
+            setHiddenCategories((current) => checked ? current.filter((category) => category !== item.id) : [...current, item.id]);
+          }} /><span>{activityCatalogLabel(item, 'categories', t)}</span></label>)}
+        </fieldset>
         <label className="activity-category-filter">{t('filterSource')}<select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}>
           <option value="all">{t('allSources')}</option><option value="manual">{t('manualSource')}</option>
           {ACTIVITY_MAP_SOURCE_IDS.map((id) => <option key={id} value={id}>{ACTIVITY_MAP_SOURCES[id].name}</option>)}

@@ -14,7 +14,7 @@ const latLng = ([longitude, latitude]) => [latitude, longitude];
 const alpineColors = { blue: '#2166ac', yellow: '#d6a900', green: '#238b45', red: '#c92f2f', black: '#202124' };
 
 function featureStyle(feature, colors, selected) {
-  const color = colors && feature.alpineColor ? alpineColors[feature.alpineColor] : activityCategoryColor(feature);
+  const color = selected ? '#c92f2f' : colors && feature.alpineColor ? alpineColors[feature.alpineColor] : activityCategoryColor(feature);
   return { className: `public-activity-feature${selected ? ' is-selected' : ''}`,
     color, fillColor: color, weight: selected ? 7 : 4, fillOpacity: selected ? .38 : .2, opacity: 1 };
 }
@@ -134,12 +134,12 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
         link.rel = 'noopener noreferrer';
         popup.append(link);
       }
-      layer.bindPopup(popup, { autoPan: false });
+      if (!isFullscreen) layer.bindPopup(popup, { autoPan: false });
       layer.on('click', () => onSelect(feature.id));
       layer.eachLayer((item) => item.getElement()?.setAttribute('data-feature-id', feature.id));
       featureLayers.current.set(feature.id, layer);
     }
-  }, [features, onSelect, selectedId, showAlpineColors, t]);
+  }, [features, isFullscreen, onSelect, selectedId, showAlpineColors, t]);
 
   useEffect(() => { fitVisibleFeatures(mapRef.current, layers.current); }, [features]);
 
@@ -147,8 +147,8 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
     const layer = featureLayers.current.get(selectedId);
     if (!layer) return;
     revealLeafletLayerWithoutZoom(mapRef.current, layer);
-    layer.openPopup();
-  }, [selectedId]);
+    if (!isFullscreen) layer.openPopup();
+  }, [isFullscreen, selectedId]);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
