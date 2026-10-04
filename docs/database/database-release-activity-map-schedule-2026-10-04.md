@@ -2,8 +2,8 @@
 
 Status: produksjonsdatabasen er migrert og verifisert. Alle aktiviteter med
 lagret Kartverket-kobling er publisert. Den månedlige kontrollflyten er
-implementert og produksjonshemmeligheten er konfigurert i Netlify. Kodeutrulling
-og funksjonskontroll føres nedenfor når deployen er ferdig.
+implementert, produksjonshemmeligheten er konfigurert i Netlify og kodeversjonen
+er rullet ut i produksjon.
 
 ## Gjenopprettingspunkt
 
@@ -76,4 +76,13 @@ Sluttresultatet er:
 
 ## Deploy
 
-Fylles ut med commit og Netlify-verifikasjon etter produksjonsutrullingen.
+- Commit `d0d7215` ble pushet til `main` og fikk terminal Netlify-status
+  `ready` 4. oktober 2026 kl. 14:58 UTC.
+- Deployen inneholder `activity-map-import-background` og den eksisterende
+  `background-watchdog`, fortsatt med femminuttersplanen `*/5 * * * *`.
+- Produksjonsforsiden svarte med HTTP 200 og rendret både aktivitetskartet og en
+  publisert Kartverket-løype.
+- Netlify returnerer en umiddelbar plattform-202 for Background Functions før
+  worker-resultatet er kjent. Autentiserings- og valideringsavslag verifiseres
+  derfor med automatiserte handler-tester, ikke ved å tolke den ytre
+  202-responsen som workerens resultat.
