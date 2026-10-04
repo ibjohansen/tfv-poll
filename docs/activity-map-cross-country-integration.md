@@ -1,9 +1,12 @@
 # Implementasjon: import av langrennsløyper til aktivitetskartet
 
-Status 4. oktober 2026: løsningen er implementert, testet på en isolert
-schema-only Neon-gren, migrert og importert i produksjon. Alle de 316 importerte
-aktivitetene er kladder; ingen nye langrennsløyper er publisert på forsiden.
-Se [migrerings- og importresultatet](database/database-migration-2026-10-04-cross-country.md).
+Status 4. oktober 2026: løsningen er implementert, testet på isolerte Neon-grener,
+migrert og importert i produksjon. De 75 aktivitetene med en lagret
+Kartverket-kobling er publisert. OSM-only-aktivitetene er fortsatt kladder.
+Månedlig, kontrollert forhåndsvisning er implementert uten automatisk
+aktivitetsskriving. Se
+[migrerings- og importresultatet](database/database-migration-2026-10-04-cross-country.md)
+og [publiserings- og schedulerresultatet](database/database-release-activity-map-schedule-2026-10-04.md).
 
 Den implementerte tørrkjøringen mot de faktiske endepunktene fant 84 kildelinjer
 fra Kartverket og 322 fra OpenStreetMap. Etter klipping, splitting og validering
@@ -265,8 +268,17 @@ uten en ny leverandøravtale.
 
 ## Synkronisering og manuelle endringer
 
-Første leveranse bør være en eksplisitt import, ikke en automatisk jobb. Når
-arbeidsflyten er kontrollert kan månedlig forhåndsvisning vurderes.
+Første import ble utført eksplisitt. Den videre kontrollen oppretter nå én
+månedlig forhåndsvisning på den første kalenderdagen i måneden, beregnet i
+`Europe/Oslo`. Netlifys eksisterende `background-watchdog` starter en separat
+bakgrunnsfunksjon med en egen jobbhemmelighet. En unik månedsnøkkel og en
+atomisk database-claim hindrer doble uttrekk ved samtidige scheduler-kall.
+
+Den månedlige kjøringen gjør ingen endringer i aktivitetene. Nye, endrede,
+matchede og manglende kildeobjekter vises som en oppgave i admininnboksen. Derfra
+kan administrator åpne hele kandidatlisten, velge eventuelle endringer som skal
+anvendes, og markere kontrollen som fullført uten å slette historikken. En
+kontroll uten relevante avvik avsluttes automatisk uten oppgave.
 
 Ved senere kjøringer:
 
@@ -330,18 +342,18 @@ nettleserens tegnetid før hele området publiseres.
 4. Importer godkjente kandidater som kladder på en isolert Neon-gren.
 5. Gjenta den kontrollerte, snapshot-beskyttede kladdeimporten i produksjon.
 
-### Fase 3 – offentlig visning (kode implementert, ingen løyper publisert)
+### Fase 3 – offentlig visning (implementert; Kartverket-løyper publisert)
 
 1. Mål nyttelast og tegnetid med det kontrollerte utvalget.
 2. Vis permanent kreditering og kilde per aktivitet.
 3. Vis eksterne lenker til større løypekart under aktivitetskartet.
-4. Publiser et kontrollert utvalg, og kontroller mobil, tastatur og skjermleser.
-5. Publiser flere løyper først etter visuell kontroll av overlapp og navn.
+4. Publiser de 75 aktivitetene med Kartverket-kobling.
+5. Behold OSM-only-aktivitetene som kladder til separat kontroll.
 
-### Fase 4 – kontrollert oppdatering
+### Fase 4 – kontrollert oppdatering (implementert)
 
 1. Kjør en ny forhåndsvisning og bekreft idempotens/endringsdeteksjon.
-2. Innfør eventuelt månedlig opprettelse av endringsforslag.
+2. Opprett endringsforslag automatisk én gang per måned.
 3. Behold eksplisitt godkjenning før publisert geometri endres eller arkiveres.
 
 ## Testkrav
@@ -373,6 +385,6 @@ nettleserens tegnetid før hele området publiseres.
 
 ## Neste beslutning
 
-Gjennomgå kladdene visuelt i admin og velg hvilke aktiviteter som eventuelt skal
-publiseres. Publisering er fortsatt en separat handling per aktivitet; denne
-importen har ikke gjort noen langrennsløype offentlig.
+Gjennomgå OSM-only-kladdene visuelt i admin og velg hvilke aktiviteter som
+eventuelt skal publiseres. Månedlige endringsforslag skal fortsatt godkjennes
+eksplisitt; scheduler-en publiserer aldri en aktivitet på egen hånd.

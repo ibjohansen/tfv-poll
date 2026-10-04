@@ -95,6 +95,7 @@ test('watchdog isolates receipt errors from Matrikkel recovery and rejects non-p
       recoverStalledMatrikkelRuns: async () => { recovered++; return { result: 'idle' }; },
       startDueMonthlyMatrikkelRun: async () => ({ result: 'idle' }),
     },
+    '../../lib/activity-map-import-background.js': { startDueMonthlyActivityImport: async () => ({ result: 'idle' }) },
     '../../lib/survey-email-background.js': { dispatchSurveyReceipts: async () => assert.fail('unexpected dispatch') },
   }, { process: { env: { APP_ENVIRONMENT: 'production' } } });
   await api.default({}, { deploy: { context: 'deploy-preview' } });

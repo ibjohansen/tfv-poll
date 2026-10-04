@@ -1,4 +1,11 @@
 const activityMap = {
+  tasks: {
+    eyebrow: 'Automatisk kontroll', title: 'Oppfølging av løypekart', task: 'Månedlig løypekontroll · {month}',
+    summary: 'Kartverket og OpenStreetMap har endringer som må vurderes.', failedSummary: 'Den automatiske innhentingen kunne ikke fullføres.',
+    new: 'Nye', changed: 'Endrede', missing: 'Ikke funnet', matched: 'Matchede', open: 'Åpne kontrollresultatet',
+    permission: 'En administrator med medlemstilgang må følge opp kontrollen.',
+    statuses: { preview: 'Krever oppfølging', applied: 'Kontroll pågår', failed: 'Kontrollen feilet' },
+  },
   public: {
     eyebrow: 'Aktiviteter på Turufjell', title: 'Aktivitetskart',
     introduction: 'Utforsk sykkelområder, alpintilbud og turer. Velg kategoriene du vil vise, og slå løypefargene av eller på.',
@@ -49,6 +56,8 @@ const activityMap = {
     import: {
       title: 'Importer løypedata', help: 'Hent en skrivebeskyttet forhåndsvisning. Valgte løyper lagres som kladder og må publiseres separat.',
       sources: 'Datakilder', area: 'Området er låst til 20 km rundt Turufjell skisenter.', preview: 'Hent forhåndsvisning',
+      scheduledRun: 'Dette er en automatisk månedskontroll. Ingen endringer utføres før de godkjennes.',
+      runFailed: 'Den automatiske innhentingen feilet. Kontroller kildene eller hent en ny manuell forhåndsvisning.',
       working: 'Arbeider …', previewReady: '{count} kandidater er kontrollert.', fetchedAt: 'Hentet', fingerprint: 'Kildeavtrykk',
       sourceFilter: 'Kilde', statusFilter: 'Importstatus', allSources: 'Alle kilder', allStatuses: 'Alle statuser',
       selectVisible: 'Velg synlige kandidater', clearSelection: 'Fjern valgene',
@@ -56,8 +65,10 @@ const activityMap = {
       candidateCaption: 'Kontrollerte løypekandidater', select: 'Velg', candidate: 'Løype', source: 'Kilde', status: 'Status', match: 'Treff',
       selectCandidate: 'Velg {name} for import', pairedSource: 'Koblet til foretrukket kilde', score: '{score} % geografisk samsvar',
       reject: 'Avvis', rejected: '«{name}» er avvist i denne importplanen.',
-      apply: 'Godkjenn som kladd ({count})', applied: '{imported} kladder opprettet, {updated} geometrier oppdatert og {linked} koblet til eksisterende aktiviteter.',
+      apply: 'Godkjenn som kladd ({count})', applied: '{imported} kladder opprettet, {updated} aktiviteter oppdatert og {linked} koblet til eksisterende aktiviteter.',
       requestError: 'Importen kunne ikke gjennomføres.', previewMapLabel: '{name} · forhåndsvisning fra {source}',
+      completeFollowup: 'Merk kontrollen som fullført', followupHelp: 'Merk kontrollen som fullført når resultatet er vurdert. Kjøringen og historikken beholdes.',
+      followupCompleted: 'Kontrollen er markert som fullført.', followupCompletedDetails: 'Kontrollen ble fullført av {user} {date}.',
       statuses: { new: 'Ny', matched: 'Matchet', changed: 'Endret', unchanged: 'Uendret', rejected: 'Avvist', missing: 'Ikke funnet' },
     },
   },

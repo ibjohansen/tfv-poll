@@ -29,7 +29,7 @@ function compareFeatures(a, b) {
   return a.name.localeCompare(b.name, 'nb', { numeric: true });
 }
 
-export default function ActivityMapEditor() {
+export default function ActivityMapEditor({ initialImportRunId = null }) {
   const apiFetch = useApiClient();
   const { t } = useI18n('activityMap.admin');
   const [features, setFeatures] = useState([]);
@@ -201,7 +201,7 @@ export default function ActivityMapEditor() {
   return <div className="activity-admin">
     <header className="activity-admin-heading"><p className="eyebrow">{t('eyebrow')}</p><h2>{t('title')}</h2><p>{t('introduction')}</p></header>
     <ActivityMapCatalogManager catalog={catalog} onChange={setCatalog} disabled={busy || !catalog.categories.length} />
-    <ActivityMapImportPanel disabled={busy} onApplied={loadFeatures} onPreviewChange={setPreviewCandidates} />
+    <ActivityMapImportPanel disabled={busy} initialRunId={initialImportRunId} onApplied={loadFeatures} onPreviewChange={setPreviewCandidates} />
     <div className="activity-admin-layout">
       <aside className="activity-feature-list" aria-label={t('savedFeatures')}>
         <div className="activity-feature-list-heading"><h3>{t('savedFeatures')}</h3><button type="button" className="admin-button" onClick={newFeature}>{t('new')}</button></div>

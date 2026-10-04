@@ -12,6 +12,7 @@ import { buildActivityImportPlan } from '../lib/activity-map-import/plan.js';
 import { applyActivityImportCore, createActivityImportPreviewCore } from '../lib/activity-map-import/core.js';
 import { ACTIVITY_MAP_SOURCE_IDS, CROSS_COUNTRY_CATEGORY } from '../lib/activity-map-sources.js';
 import { MapError } from '../lib/map/errors.js';
+import { publishKartverketActivities } from '../scripts/publish-kartverket-activities.mjs';
 
 const kartverketFixture = Buffer.from('UEsDBAoAAAAAALhSRF0iCxhEXQEAAF0BAAALAAAAZml4dHVyZS5ncHg8P3htbCB2ZXJzaW9uPSIxLjAiPz48Z3B4IHZlcnNpb249IjEuMSI+PHJ0ZT48bmFtZT5za2ktMTwvbmFtZT48ZGVzYz5UZXN0bMO4eXBhPC9kZXNjPjxzcmM+VGVzdGxhZ2V0PC9zcmM+PHR5cGU+U2tpbMO4eXBlPC90eXBlPjxydGVwdCBsYXQ9IjYwLjQ3MjAiIGxvbj0iOS40OTMwIi8+PHJ0ZXB0IGxhdD0iNjAuNDczMCIgbG9uPSI5LjQ5NDAiLz48L3J0ZT48cnRlPjxuYW1lPndhbGstMTwvbmFtZT48ZGVzYz5Gb3R0dXI8L2Rlc2M+PHR5cGU+Rm90cnV0ZTwvdHlwZT48cnRlcHQgbGF0PSI2MC40NzIwIiBsb249IjkuNDkzMCIvPjxydGVwdCBsYXQ9IjYwLjQ3MzAiIGxvbj0iOS40OTQwIi8+PC9ydGU+PC9ncHg+UEsBAhQACgAAAAAAuFJEXSILGERdAQAAXQEAAAsAAAAAAAAAAAAAAAAAAAAAAGZpeHR1cmUuZ3B4UEsFBgAAAAABAAEAOQAAAIYBAAAAAA==', 'base64');
 
@@ -75,6 +76,31 @@ test('repeat plan detects unchanged and missing source objects without deleting 
   assert.equal(repeated.candidates.find((candidate) => candidate.externalId === 'ski-2').status, 'missing');
 });
 
+test('monthly activity preview is claimed once and remains pending when changes need review', async () => {
+  const database = new PGlite({ extensions: { pg_trgm } });
+  try {
+    await database.exec(await readFile(new URL('../database/schema.sql', import.meta.url), 'utf8'));
+    const sql = neonLike(database);
+    const sourceResult = { sourceId: 'kartverket', rawSha256: 'a'.repeat(64), fetchedAt: '2026-10-04T10:00:00.000Z', lines: [{
+      sourceId: 'kartverket', externalId: 'monthly-test', sourceUrl: 'https://example.test/source', name: 'Månedsløypa',
+      operator: 'Testlaget', coordinates: [[9.493, 60.472], [9.494, 60.473]],
+    }] };
+    const first = await createActivityImportPreviewCore({ action: 'preview', sourceIds: ['kartverket'] }, {
+      sql, actor: 'system:monthly-activity-map', runType: 'monthly', scheduledMonth: '2026-10-01',
+      idGenerator: () => '7'.repeat(32), sourceFetcher: async () => sourceResult,
+    });
+    assert.equal(first.status, 'preview'); assert.equal(first.runType, 'monthly'); assert.equal(first.summary.new, 1);
+    const duplicate = await createActivityImportPreviewCore({ action: 'preview', sourceIds: ['kartverket'] }, {
+      sql, actor: 'system:monthly-activity-map', runType: 'monthly', scheduledMonth: '2026-10-01',
+      idGenerator: () => '8'.repeat(32), sourceFetcher: async () => assert.fail('A claimed month must not fetch twice'),
+    });
+    assert.equal(duplicate.existing, true); assert.equal(duplicate.id, first.id);
+    const run = (await database.query(`SELECT run_type, scheduled_month::text, followup_completed_at
+      FROM activity_map_source_runs WHERE id = $1`, [first.id])).rows[0];
+    assert.deepEqual(run, { run_type: 'monthly', scheduled_month: '2026-10-01', followup_completed_at: null });
+  } finally { await database.close(); }
+});
+
 function neonLike(database) {
   return {
     query: async (text, values = []) => (await database.query(text, values)).rows,
@@ -136,5 +162,28 @@ test('approved source candidates are stored as drafts with idempotent source lin
     await assert.rejects(createActivityImportPreviewCore({ action: 'preview', sourceIds: ['kartverket'] }, options), { code: 'errors.sourceBusy' });
     const failed = (await database.query(`SELECT status, error_code FROM activity_map_source_runs WHERE id = $1`, ['5'.repeat(32)])).rows[0];
     assert.deepEqual(failed, { status: 'failed', error_code: 'errors.sourceBusy' });
+  } finally { await database.close(); }
+});
+
+test('Kartverket publishing only removes draft status from linked cross-country routes', async () => {
+  const database = new PGlite({ extensions: { pg_trgm } });
+  try {
+    await database.exec(await readFile(new URL('../database/schema.sql', import.meta.url), 'utf8'));
+    const featureId = '6'.repeat(32);
+    await database.query(`INSERT INTO activity_map_features
+      (id, name, category, feature_type, geometry, is_draft, season, geometry_origin, last_changed_by)
+      VALUES ($1, 'Kildeløype', 'cross_country', 'route', $2::jsonb, TRUE, 'winter', 'external', 'system:test')`,
+    [featureId, JSON.stringify({ type: 'LineString', coordinates: [[9.493, 60.472], [9.494, 60.473]] })]);
+    await database.query(`INSERT INTO activity_map_feature_sources
+      (feature_id, source_id, external_id, source_url, fingerprint, last_changed_by)
+      VALUES ($1, 'kartverket', 'gpx:test', 'https://example.test', $2, 'system:test')`, [featureId, 'a'.repeat(64)]);
+    assert.deepEqual(await publishKartverketActivities(database, {
+      actor: 'system:test-publish', expectedTargets: 1, expectedDrafts: 1,
+    }), { targets: 1, published: 1, remainingDrafts: 0 });
+    const feature = (await database.query('SELECT is_draft, version FROM activity_map_features WHERE id = $1', [featureId])).rows[0];
+    assert.deepEqual(feature, { is_draft: false, version: 2 });
+    assert.deepEqual(await publishKartverketActivities(database, {
+      actor: 'system:test-publish', expectedTargets: 1, expectedDrafts: 0,
+    }), { targets: 1, published: 0, remainingDrafts: 0 });
   } finally { await database.close(); }
 });

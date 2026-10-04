@@ -701,7 +701,9 @@ ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, priority = EXCLUDED.priorit
 
 CREATE TABLE IF NOT EXISTS activity_map_source_runs (
   id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
-  status TEXT NOT NULL CHECK (status IN ('preview', 'applying', 'applied', 'failed')),
+  status TEXT NOT NULL CHECK (status IN ('fetching', 'preview', 'applying', 'applied', 'failed')),
+  run_type TEXT NOT NULL DEFAULT 'manual' CHECK (run_type IN ('manual', 'monthly')),
+  scheduled_month DATE,
   source_ids JSONB NOT NULL CHECK (jsonb_typeof(source_ids) = 'array'),
   center JSONB NOT NULL CHECK (jsonb_typeof(center) = 'array' AND jsonb_array_length(center) = 2),
   radius_km INTEGER NOT NULL CHECK (radius_km = 20),
@@ -713,9 +715,32 @@ CREATE TABLE IF NOT EXISTS activity_map_source_runs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_by TEXT NOT NULL,
   applied_at TIMESTAMPTZ,
-  applied_by TEXT
+  applied_by TEXT,
+  followup_completed_at TIMESTAMPTZ,
+  followup_completed_by TEXT,
+  CONSTRAINT activity_map_source_runs_schedule_check CHECK (
+    (run_type = 'manual' AND scheduled_month IS NULL)
+    OR (run_type = 'monthly' AND scheduled_month = date_trunc('month', scheduled_month)::date)
+  )
+);
+ALTER TABLE activity_map_source_runs ADD COLUMN IF NOT EXISTS run_type TEXT NOT NULL DEFAULT 'manual';
+ALTER TABLE activity_map_source_runs ADD COLUMN IF NOT EXISTS scheduled_month DATE;
+ALTER TABLE activity_map_source_runs ADD COLUMN IF NOT EXISTS followup_completed_at TIMESTAMPTZ;
+ALTER TABLE activity_map_source_runs ADD COLUMN IF NOT EXISTS followup_completed_by TEXT;
+ALTER TABLE activity_map_source_runs DROP CONSTRAINT IF EXISTS activity_map_source_runs_status_check;
+ALTER TABLE activity_map_source_runs ADD CONSTRAINT activity_map_source_runs_status_check
+  CHECK (status IN ('fetching', 'preview', 'applying', 'applied', 'failed'));
+ALTER TABLE activity_map_source_runs DROP CONSTRAINT IF EXISTS activity_map_source_runs_run_type_check;
+ALTER TABLE activity_map_source_runs ADD CONSTRAINT activity_map_source_runs_run_type_check
+  CHECK (run_type IN ('manual', 'monthly'));
+ALTER TABLE activity_map_source_runs DROP CONSTRAINT IF EXISTS activity_map_source_runs_schedule_check;
+ALTER TABLE activity_map_source_runs ADD CONSTRAINT activity_map_source_runs_schedule_check CHECK (
+  (run_type = 'manual' AND scheduled_month IS NULL)
+  OR (run_type = 'monthly' AND scheduled_month = date_trunc('month', scheduled_month)::date)
 );
 CREATE INDEX IF NOT EXISTS activity_map_source_runs_created_idx ON activity_map_source_runs (created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS activity_map_source_runs_monthly_idx
+  ON activity_map_source_runs (scheduled_month) WHERE run_type = 'monthly';
 
 CREATE TABLE IF NOT EXISTS activity_map_source_items (
   id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),

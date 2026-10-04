@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useApiClient } from '@/components/useApiClient';
 import { useI18n } from '@/components/LocaleProvider';
 import { ACTIVITY_MAP_SOURCE_IDS, ACTIVITY_MAP_SOURCES } from '@/lib/activity-map-sources';
@@ -8,7 +8,7 @@ import { ACTIVITY_MAP_SOURCE_IDS, ACTIVITY_MAP_SOURCES } from '@/lib/activity-ma
 const selectableStatuses = new Set(['new', 'matched', 'changed']);
 const effectiveStatus = (candidate) => candidate.decision === 'rejected' ? 'rejected' : candidate.status;
 
-export default function ActivityMapImportPanel({ disabled, onApplied, onPreviewChange }) {
+export default function ActivityMapImportPanel({ disabled, initialRunId = null, onApplied, onPreviewChange }) {
   const apiFetch = useApiClient();
   const { t } = useI18n('activityMap.admin.import');
   const [sourceIds, setSourceIds] = useState(ACTIVITY_MAP_SOURCE_IDS);
@@ -16,12 +16,29 @@ export default function ActivityMapImportPanel({ disabled, onApplied, onPreviewC
   const [selected, setSelected] = useState([]);
   const [sourceFilter, setSourceFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(Boolean(initialRunId));
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const candidates = useMemo(() => run?.candidates || [], [run]);
   const filtered = useMemo(() => candidates.filter((candidate) => (sourceFilter === 'all' || candidate.sourceId === sourceFilter)
     && (statusFilter === 'all' || effectiveStatus(candidate) === statusFilter)), [candidates, sourceFilter, statusFilter]);
+
+  useEffect(() => {
+    if (!initialRunId) return undefined;
+    let active = true;
+    apiFetch(`/api/admin/activity-map/import?run=${encodeURIComponent(initialRunId)}`, { credentials: 'same-origin', cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || !data.run) throw new Error(data?.message || t('requestError'));
+        if (!active) return;
+        setRun(data.run); setSelected([]);
+        onPreviewChange((data.run.candidates || []).filter((candidate) => candidate.geometry)
+          .map((candidate) => ({ ...candidate, sourceName: ACTIVITY_MAP_SOURCES[candidate.sourceId]?.name || candidate.sourceId })));
+      })
+      .catch((failure) => { if (active) { setError(failure.message); onPreviewChange([]); } })
+      .finally(() => { if (active) setBusy(false); });
+    return () => { active = false; };
+  }, [apiFetch, initialRunId, onPreviewChange, t]);
 
   function showCandidates(currentRun, nextSourceFilter = sourceFilter, nextStatusFilter = statusFilter) {
     onPreviewChange((currentRun?.candidates || []).filter((candidate) => candidate.geometry
@@ -55,8 +72,21 @@ export default function ActivityMapImportPanel({ disabled, onApplied, onPreviewC
     setBusy(true); setError(''); setNotice('');
     try {
       const { result } = await request({ action: 'apply', runId: run.id, planSha256: run.planSha256, itemIds: selected });
+      setRun((current) => ({ ...current, status: result.status }));
       setNotice(t('applied', result)); setSelected([]); onPreviewChange([]);
       await onApplied();
+    } catch (failure) { setError(failure.message); }
+    finally { setBusy(false); }
+  }
+
+  async function completeFollowup() {
+    if (!run || run.runType !== 'monthly' || run.followupCompletedAt) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const { result } = await request({ action: 'complete_followup', runId: run.id });
+      setRun((current) => ({ ...current, followupCompletedAt: result.followup_completed_at,
+        followupCompletedBy: result.followup_completed_by }));
+      setNotice(t('followupCompleted'));
     } catch (failure) { setError(failure.message); }
     finally { setBusy(false); }
   }
@@ -99,6 +129,8 @@ export default function ActivityMapImportPanel({ disabled, onApplied, onPreviewC
         {busy ? t('working') : t('preview')}
       </button>
       {run && <>
+        {run.runType === 'monthly' && <p className="muted">{t('scheduledRun')}</p>}
+        {run.status === 'failed' && <p className="error-message" role="alert">{t('runFailed')}</p>}
         <dl className="activity-import-summary">
           <div><dt>{t('fetchedAt')}</dt><dd>{new Date(run.fetchedAt).toLocaleString()}</dd></div>
           <div><dt>{t('fingerprint')}</dt><dd><code>{run.rawSha256.slice(0, 12)}</code></dd></div>
@@ -115,7 +147,7 @@ export default function ActivityMapImportPanel({ disabled, onApplied, onPreviewC
         <div className="activity-import-table-wrap"><table className="activity-import-table"><caption>{t('candidateCaption')}</caption>
           <thead><tr><th scope="col">{t('select')}</th><th scope="col">{t('candidate')}</th><th scope="col">{t('source')}</th><th scope="col">{t('status')}</th><th scope="col">{t('match')}</th></tr></thead>
           <tbody>{filtered.map((candidate) => {
-            const canSelect = selectableStatuses.has(candidate.status) && !candidate.matchedItemId && candidate.decision !== 'rejected';
+            const canSelect = run.status === 'preview' && selectableStatuses.has(candidate.status) && !candidate.matchedItemId && candidate.decision !== 'rejected';
             return <tr key={candidate.id}><td><input type="checkbox" aria-label={t('selectCandidate', { name: candidate.name })}
               disabled={!canSelect || busy} checked={selected.includes(candidate.id)} onChange={(event) => toggleItem(candidate.id, event.target.checked)} /></td>
               <th scope="row">{candidate.name}</th><td>{ACTIVITY_MAP_SOURCES[candidate.sourceId]?.name}</td><td>{t(`statuses.${effectiveStatus(candidate)}`)}</td>
@@ -123,13 +155,19 @@ export default function ActivityMapImportPanel({ disabled, onApplied, onPreviewC
                 {canSelect && <button type="button" className="table-link-button" disabled={busy} onClick={() => reject(candidate)}>{t('reject')}</button>}</td></tr>;
           })}</tbody>
         </table></div>
-        <div className="activity-import-selection-actions"><button type="button" className="admin-button" disabled={busy}
+        <div className="activity-import-selection-actions"><button type="button" className="admin-button" disabled={busy || run.status !== 'preview'}
           onClick={() => setSelected((current) => [...new Set([...current, ...filtered.filter((candidate) => selectableStatuses.has(candidate.status) && !candidate.matchedItemId && candidate.decision !== 'rejected').map((candidate) => candidate.id)])])}>{t('selectVisible')}</button>
           <button type="button" className="admin-button" disabled={busy || !selected.length} onClick={() => setSelected([])}>{t('clearSelection')}</button></div>
         <p className="muted">{t('keepHelp')}</p>
         <button type="button" className="primary-button" disabled={busy || disabled || !selected.length || run.status !== 'preview'} onClick={apply}>
           {t('apply', { count: selected.length })}
         </button>
+        {run.runType === 'monthly' && !run.followupCompletedAt && ['preview', 'applied', 'failed'].includes(run.status)
+          && <div className="activity-import-followup"><p className="muted">{t('followupHelp')}</p>
+            <button type="button" className="admin-button" disabled={busy || disabled} onClick={completeFollowup}>{t('completeFollowup')}</button></div>}
+        {run.followupCompletedAt && <p className="muted">{t('followupCompletedDetails', {
+          user: run.followupCompletedBy, date: new Date(run.followupCompletedAt).toLocaleString(),
+        })}</p>}
       </>}
       {error && <p className="error-message" role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
     </div>

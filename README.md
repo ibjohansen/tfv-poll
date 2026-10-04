@@ -832,15 +832,18 @@ Admin- og forsidekartet kan veksle mellom Kartverkets
 topografiske kart og Esri World Imagery (satellitt- og flyfoto). Ingen
 personopplysninger eller ny miljøvariabel inngår.
 
-Løypeimporten henter bare ved en eksplisitt adminhandling. Kartverket leses fra
-Geonorges ferdig genererte GPX/WGS84-uttrekk for Buskerud og OpenStreetMap fra en
-fast, serverdefinert Overpass-spørring. Begge klippes til 20 km rundt
-aktivitetskartets sentrum, forenkles eller deles til maksimalt 200 punkter og
-lagres først som private kandidater. Ingen kilde kalles fra forsiden. Administrator
-må velge kandidater og godkjenne dem som kladder; publisering er fortsatt en egen
-handling. Kartverket prioriteres ved sikre navn-/geometritreff, mens begge kilder
-beholdes for kreditering. Avviste kandidater og objekter som ikke finnes i et nytt
-uttrekk slettes ikke automatisk.
+Løypeimporten kan startes manuelt av en administrator. I tillegg oppretter
+`background-watchdog` én månedlig forhåndsvisning på den første kalenderdagen i
+måneden, beregnet i `Europe/Oslo`. Kartverket leses fra Geonorges ferdig genererte
+GPX/WGS84-uttrekk for Buskerud og OpenStreetMap fra en fast, serverdefinert
+Overpass-spørring. Begge klippes til 20 km rundt aktivitetskartets sentrum,
+forenkles eller deles til maksimalt 200 punkter og lagres først som private
+kandidater. Ingen kilde kalles fra forsiden. Den automatiske kjøringen oppretter
+bare et kontrollgrunnlag: en administrator må vurdere kandidatene og eksplisitt
+godkjenne dem som kladder. Publisering er fortsatt en separat handling. Kartverket
+prioriteres ved sikre navn-/geometritreff, mens begge kilder beholdes for
+kreditering. Avviste kandidater og objekter som ikke finnes i et nytt uttrekk
+slettes ikke automatisk.
 
 Kildesporingen bruker `activity_map_sources`, `activity_map_source_runs`,
 `activity_map_source_items` og `activity_map_feature_sources`. Rå kildegeometri
@@ -849,11 +852,15 @@ serverdefinert kilde-ID med faste, sikre kilde- og lisenslenker. Krediteringen
 vises både i kartet (også i fullskjerm) og i aktivitetsdetaljene. Lenker til
 Sporet, Norgeskart og OpenSnowMap er ordinære eksterne lenker; ingen data hentes
 fra Sporet. Runtime må kunne nå `nedlasting.geonorge.no` og
-`overpass-api.de` over HTTPS. Importen innfører ingen miljøvariabler.
+`overpass-api.de` over HTTPS. Den månedlige jobben krever den separate
+Functions-hemmeligheten `ACTIVITY_MAP_JOB_SECRET`.
 Den additive migreringen for disse fire kildetabellene og `geometry_origin` er
 kjørt i produksjon 4. oktober 2026. Samme release importerte 316 aktiviteter som
 kladd med 320 kildekoblinger; ingen langrennsløype ble publisert. Se
 [migrerings- og importresultatet](docs/database/database-migration-2026-10-04-cross-country.md).
+Senere samme dag ble alle 75 aktiviteter med Kartverket-kobling publisert, mens
+241 OSM-only-aktiviteter ble beholdt som kladder; se
+[publiserings- og schedulerresultatet](docs/database/database-release-activity-map-schedule-2026-10-04.md).
 Adminkartet kan åpnes i fullskjerm med tegneverktøyene tilgjengelige. Den
 additive produksjonsmigreringen ble kjørt og verifisert 30. september 2026; se
 [migreringsstatus](docs/database/database-migration-2026-09-30.md). Kodeversjonen ble
@@ -979,8 +986,18 @@ Matrikkelen. Når oppfølgingen er ferdig, kan administratoren merke den som
 fullført. Kjøringen og audit-historikken beholdes, mens oppgaven fjernes fra
 oppgavelisten.
 Den bruker eksisterende `DATABASE_URL`, `MATRIKKEL_JOB_SECRET` og Netlifys `URL`.
-Ingen ny produksjonsvariabel skal opprettes. Funksjonen kan ikke startes via
+Funksjonen kan ikke startes via
 en offentlig URL; se [Netlify Scheduled Functions](https://docs.netlify.com/build/functions/scheduled-functions/).
+
+På samme kalenderdag forsøker watchdog-en også å opprette høyst én månedlig
+forhåndsvisning av aktivitetsdata fra Kartverket og OpenStreetMap. En unik
+månedsnøkkel hindrer doble kjøringer. En fastlåst innhenting kan tas opp igjen
+etter 20 minutter; en fullført eller feilet månedskjøring overskrives ikke.
+Kjøringen endrer, avpubliserer eller sletter aldri aktiviteter automatisk.
+Endringer og kildeobjekter som ikke lenger finnes, vises som en oppgave i
+`/admin/inbox` med lenke til hele kontrollgrunnlaget. Oppgaven kan markeres som
+fullført uten at importloggen slettes. Dette krever `ACTIVITY_MAP_JOB_SECRET`,
+som skal være forskjellig fra de andre jobbhemmelighetene.
 
 Medlemsstatus og medlemskommentarer krever også den additive migreringen før
 ny kode publiseres. Eksisterende tomter får `membership_status = 'member'`;
@@ -1266,6 +1283,19 @@ MailerSend-hemmelighetene. Den må være tilgjengelig for både Next.js-ruten og
 `NEXT_PUBLIC_`-prefiks. Funksjonen bruker eksisterende pooled `DATABASE_URL`;
 ingen databasemigrering er nødvendig.
 
+#### Påkrevd for månedlig løypekontroll
+
+| Variabel | Produksjonsverdi |
+| --- | --- |
+| `ACTIVITY_MAP_JOB_SECRET` | Egen tilfeldig intern hemmelighet på minst 32 bytes |
+
+Generer hemmeligheten separat fra `AUTH_SECRET`, `MATRIKKEL_JOB_SECRET`,
+`HAMLET_JOB_SECRET` og MailerSend-hemmelighetene. Den må være tilgjengelig for
+`background-watchdog` og `activity-map-import-background` i produksjonens
+`builds/functions/runtime`-scope, uten `NEXT_PUBLIC_`-prefiks. Jobben bruker
+eksisterende pooled `DATABASE_URL`; `DATABASE_URL_UNPOOLED` skal ikke legges inn
+i Netlify.
+
 #### Påkrevd for MailerSend
 
 | Variabel | Produksjonsverdi |
@@ -1352,7 +1382,8 @@ URI i Entra oppdateres. Utløs en ny deploy etter endringen.
    hvis forrige bygg ble kjørt før miljøvariablene ble lagt inn.
 4. Kontroller at byggeloggen avsluttes uten feil.
 5. Kontroller at Next.js-funksjonene og
-   `matrikkel-sync-background`, `hamlet-member-sync-background`, `survey-email-background`, `newsletter-background` og `background-watchdog` finnes i Netlifys
+   `matrikkel-sync-background`, `hamlet-member-sync-background`, `survey-email-background`,
+   `newsletter-background`, `activity-map-import-background` og `background-watchdog` finnes i Netlifys
    funksjonsoversikt. Kontroller også at edge-funksjonen
    `public-member-rate-limit` er oppdaget og aktivert i deployloggen.
 6. Kontroller at den publiserte deployen bruker committen som var godkjent i
@@ -1633,7 +1664,8 @@ Utfør kontrollene i denne rekkefølgen:
   i isolert testmiljø først; en stoppet kjøring skal beholde statusen etterpå.
 - For matrikkeljobben: kontroller at funksjonskallet går direkte til
   `/.netlify/functions/matrikkel-sync-background`, uten `Location: /admin/login`.
-  Bare de fire eksakte bakgrunnsrutene for matrikkel, grendekobling, survey-e-post og nyhetsbrev skal omgå Next-innlogging; `/admin` og
+  Bare de fem eksakte bakgrunnsrutene for matrikkel, grendekobling, survey-e-post,
+  nyhetsbrev og aktivitetsimport skal omgå Next-innlogging; `/admin` og
   `/api/admin/matrikkel/*` skal fortsatt kreve innlogging og riktig rolle.
   Jobbhemmeligheten kontrolleres inne i funksjonen før databasebehandling.
 - Kontroller at `hamlet-member-sync-background` avviser feil metode, ugyldig
@@ -1651,6 +1683,12 @@ Utfør kontrollene i denne rekkefølgen:
   Simuler også to samtidige kall den første i en måned: bare én månedskjøring
   skal opprettes, snapshotet skal omfatte alle aktive tomter, og foreslåtte
   endringer skal vises i oppgavelisten uten automatisk å endre medlemmet.
+- I samme isolerte testmiljø: simuler to samtidige månedlige aktivitetsimporter.
+  Bare én kjøring skal hente kildene. Nye, endrede og manglende kildeobjekter
+  skal vises i oppgavelisten uten automatisk aktivitetsskriving, avpublisering
+  eller sletting. Kontroller at feil `ACTIVITY_MAP_JOB_SECRET` avvises, at bare
+  direkte `202` godtas ved oppstart, og at «Merk kontrollen som fullført» fjerner
+  oppgaven uten å slette kjøringen eller kandidatene.
 - Kontroller grender/e-postgrupper med syntetiske tomter: tilordning, flytting,
   filtrering, antall medlemmer og unike adresser. Sletting av en gruppe skal
   beholde medlemsdata og logges med administratorens identitet.

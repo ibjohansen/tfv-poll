@@ -8,9 +8,11 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const generateMetadata = () => adminPageMetadata('activityMap');
 
-export default async function ActivityMapAdminPage() {
+export default async function ActivityMapAdminPage({ searchParams }) {
   if (!isAuthConfigured()) redirect('/admin/login');
   const session = await getAdminSession();
   if (!adminPermissions(session?.user).has('members')) redirect('/admin');
-  return <section className="admin-content"><ActivityMapEditor /></section>;
+  const runId = (await searchParams)?.run;
+  const initialImportRunId = typeof runId === 'string' && /^[a-f0-9]{32}$/.test(runId) ? runId : null;
+  return <section className="admin-content"><ActivityMapEditor initialImportRunId={initialImportRunId} /></section>;
 }

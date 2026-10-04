@@ -1,4 +1,11 @@
 const activityMap = {
+  tasks: {
+    eyebrow: 'Automatic check', title: 'Trail map follow-up', task: 'Monthly trail check · {month}',
+    summary: 'Kartverket and OpenStreetMap have changes that need review.', failedSummary: 'The automatic fetch could not be completed.',
+    new: 'New', changed: 'Changed', missing: 'Not found', matched: 'Matched', open: 'Open check results',
+    permission: 'An administrator with member access must follow up the check.',
+    statuses: { preview: 'Follow-up required', applied: 'Review in progress', failed: 'Check failed' },
+  },
   public: {
     eyebrow: 'Mountain activities', title: 'Activity map',
     introduction: 'Explore cycling areas, alpine activities and hikes. Select the categories to show and toggle alpine trail colours.',
@@ -49,6 +56,8 @@ const activityMap = {
     import: {
       title: 'Import trail data', help: 'Load a read-only preview. Selected trails are saved as drafts and must be published separately.',
       sources: 'Data sources', area: 'The area is fixed to 20 km around Turufjell ski centre.', preview: 'Load preview',
+      scheduledRun: 'This is an automatic monthly check. No changes are made until they are approved.',
+      runFailed: 'The automatic fetch failed. Check the sources or load a new manual preview.',
       working: 'Working …', previewReady: '{count} candidates have been checked.', fetchedAt: 'Fetched', fingerprint: 'Source fingerprint',
       sourceFilter: 'Source', statusFilter: 'Import status', allSources: 'All sources', allStatuses: 'All statuses',
       selectVisible: 'Select visible candidates', clearSelection: 'Clear selection',
@@ -56,8 +65,10 @@ const activityMap = {
       candidateCaption: 'Validated trail candidates', select: 'Select', candidate: 'Trail', source: 'Source', status: 'Status', match: 'Match',
       selectCandidate: 'Select {name} for import', pairedSource: 'Linked to preferred source', score: '{score}% geographic match',
       reject: 'Reject', rejected: '“{name}” was rejected in this import plan.',
-      apply: 'Approve as drafts ({count})', applied: '{imported} drafts created, {updated} geometries updated and {linked} linked to existing activities.',
+      apply: 'Approve as drafts ({count})', applied: '{imported} drafts created, {updated} activities updated and {linked} linked to existing activities.',
       requestError: 'The import could not be completed.', previewMapLabel: '{name} · preview from {source}',
+      completeFollowup: 'Mark check as completed', followupHelp: 'Mark the check as completed after reviewing the result. The run and its history are retained.',
+      followupCompleted: 'The check was marked as completed.', followupCompletedDetails: 'The check was completed by {user} {date}.',
       statuses: { new: 'New', matched: 'Matched', changed: 'Changed', unchanged: 'Unchanged', rejected: 'Rejected', missing: 'Not found' },
     },
   },

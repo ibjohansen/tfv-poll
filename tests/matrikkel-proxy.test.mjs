@@ -22,12 +22,16 @@ test('only the exact machine-authenticated background functions bypass the brows
     '/.netlify/functions/newsletter-background', '/.netlify/functions/newsletter-background/']) assert.equal(matches(path), false, path);
   for (const path of ['/.netlify/functions/hamlet-member-sync-background',
     '/.netlify/functions/hamlet-member-sync-background/',
-    '/.netlify/functions/hamlet-member-sync-background?test=1']) assert.equal(matches(path), false, path);
+    '/.netlify/functions/hamlet-member-sync-background?test=1',
+    '/.netlify/functions/activity-map-import-background',
+    '/.netlify/functions/activity-map-import-background/',
+    '/.netlify/functions/activity-map-import-background?test=1']) assert.equal(matches(path), false, path);
   for (const path of ['/admin', '/admin/members/matrikkel', '/api/admin/matrikkel/runs',
     '/api/admin/matrikkel/runs/abc/process', '/admin/map', '/api/admin/map/search',
     '/.netlify/functions/other', '/.netlify/functions/newsletter-background-evil', '/.netlify/functions/newsletter-background/private', '/.netlify/functions/survey-email-background-evil', '/.netlify/functions/survey-email-background/private',
     '/.netlify/functions/matrikkel-sync-background-evil', '/.netlify/functions/matrikkel-sync-background/private',
     '/.netlify/functions/hamlet-member-sync-background-evil', '/.netlify/functions/hamlet-member-sync-background/private',
+    '/.netlify/functions/activity-map-import-background-evil', '/.netlify/functions/activity-map-import-background/private',
     '/xnetlify/functions/matrikkel-sync-background', '/private/.netlify/functions/matrikkel-sync-background']) {
     assert.equal(matches(path), true, path);
     assert.equal(isPublicPath(path), false, path);

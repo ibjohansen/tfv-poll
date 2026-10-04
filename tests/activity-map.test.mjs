@@ -180,7 +180,8 @@ test('activity map admin route inherits authentication, same-origin and private-
   const importRoute = await loadModule('app/api/admin/activity-map/import/route.js', {
     '@/lib/map/api': { handleMapRequest }, '@/lib/map/errors': { MapError },
     '@/lib/activity-map-import-service': {
-      getActivityImportRuns: async () => [], applyActivityImport: async () => ({}), rejectActivityImportItems: async () => ({}),
+      getActivityImportRuns: async () => [], getActivityImportRun: async (id) => ({ id }),
+      applyActivityImport: async () => ({}), rejectActivityImportItems: async () => ({}), completeActivityImportFollowup: async () => ({}),
       createActivityImportPreview: async () => { previews += 1; return { id: 'b'.repeat(32) }; },
     },
   });
@@ -189,6 +190,8 @@ test('activity map admin route inherits authentication, same-origin and private-
   assert.equal(blockedImport.status, 403); assert.equal(previews, 0);
   const preview = await importRoute.POST(request('/api/admin/activity-map/import', { method: 'POST', body: { action: 'preview' } }));
   assert.equal(preview.status, 200); assert.equal(previews, 1); assert.match(preview.headers.get('Cache-Control'), /private/);
+  const stored = await importRoute.GET(request(`/api/admin/activity-map/import?run=${'c'.repeat(32)}`));
+  assert.equal((await stored.json()).run.id, 'c'.repeat(32));
 });
 
 test('database schema constrains activity map combinations and adds audit triggers', async () => {

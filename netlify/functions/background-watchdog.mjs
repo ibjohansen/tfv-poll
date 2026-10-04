@@ -1,6 +1,7 @@
 import { recoverDueSurveyEmailCampaigns, recoverStalledMatrikkelRuns, startDueMonthlyMatrikkelRun } from '../../lib/background-watchdog.js';
 import { getSql } from '../../lib/db.js';
 import { dispatchSurveyReceipts } from '../../lib/survey-email-background.js';
+import { startDueMonthlyActivityImport } from '../../lib/activity-map-import-background.js';
 
 // Netlify scheduled functions cannot be invoked through their public URL.
 // Preview/manual test invocations additionally fail closed on environment.
@@ -28,6 +29,13 @@ export default async function handler(request, context) {
     if (!['idle', 'not_configured'].includes(result.result)) console.info('Monthly Matrikkel watchdog', result);
   } catch {
     console.error('Monthly Matrikkel watchdog failed', { occurredAt: new Date().toISOString() });
+    failed = true;
+  }
+  try {
+    const result = await startDueMonthlyActivityImport(process.env.URL);
+    if (!['idle', 'not_configured'].includes(result.result)) console.info('Monthly activity map import watchdog', result);
+  } catch {
+    console.error('Monthly activity map import watchdog failed', { occurredAt: new Date().toISOString() });
     failed = true;
   }
   try {

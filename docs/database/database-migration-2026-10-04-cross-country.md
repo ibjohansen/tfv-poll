@@ -3,6 +3,10 @@
 Status: fullført og verifisert. Databaseskjemaet er migrert og det kontrollerte
 utvalget er importert som kladder. Ingen langrennsløype er publisert.
 
+Etterfølgende publisering av de 75 aktivitetene med Kartverket-kobling og
+innføring av månedlig kontroll er dokumentert i
+[den separate releaserapporten](database-release-activity-map-schedule-2026-10-04.md).
+
 ## Gjenopprettingspunkt
 
 - Produksjonsgren: `br-misty-paper-b2tequav`.
