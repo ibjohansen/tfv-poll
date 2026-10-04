@@ -2,7 +2,7 @@ const activityMap = {
   public: {
     eyebrow: 'Aktiviteter på Turufjell', title: 'Aktivitetskart',
     introduction: 'Utforsk sykkelområder, alpintilbud og turer. Velg kategoriene du vil vise, og slå løypefargene av eller på.',
-    filters: 'Vis aktiviteter', showColors: 'Vis fargekategorier for alpinløyper',
+    filters: 'Vis aktiviteter', filterTurufjell: 'Turufjell', showColors: 'Vis fargekategorier for alpinløyper',
     season: 'Sesong', allSeasons: 'Alle sesonger', seasons: { summer: 'Sommer', winter: 'Vinter', all_year: 'Helårs' },
     activityDetails: 'Aktivitetsinformasjon', visitWebsite: 'Besøk webside (åpnes i ny fane)',
     sourceLabel: 'Kilde: {source}', trailDataAttribution: 'Løypedata', moreTrails: 'Se flere langrennsløyper',
@@ -34,7 +34,7 @@ const activityMap = {
     savedFeatures: 'Lagrede aktiviteter', new: 'Ny aktivitet', loading: 'Laster aktiviteter …', empty: 'Ingen aktiviteter er lagret.',
     createTitle: 'Opprett aktivitet', editTitle: 'Rediger «{name}»', name: 'Navn', tooltipText: 'Kort tekst i kartmarkør', number: 'Nummer', category: 'Kategori', type: 'Type', color: 'Alpinfarge', noColor: 'Ingen farge', ordinaryTrail: 'Ingen særtype',
     filterCategory: 'Filtrer på kategori', allCategories: 'Alle kategorier', filterSource: 'Filtrer på kilde',
-    allSources: 'Alle kilder', manualSource: 'Manuelt registrert',
+    allSources: 'Alle kilder', manualSource: 'Manuelt registrert', filterTurufjell: 'Turufjell',
     categories: { cycling: 'Sykkel', alpine: 'Alpint', hiking: 'Tur', cross_country: 'Langrenn' }, types: { trail: 'Løype', park: 'Park', sledding: 'Akebakke', lift: 'Heis', route: 'Turrute', cross_country_route: 'Løype' },
     colors: { blue: 'Blå', yellow: 'Gul', green: 'Grønn', red: 'Rød', black: 'Svart' },
     geometryTools: 'Verktøy for kartgeometri', drawPolygon: 'Tegn polygon', drawLine: 'Tegn linje', placePoint: 'Plasser punkt', finish: 'Fullfør', editGeometry: 'Rediger geometri', finishEditing: 'Fullfør redigering', clearGeometry: 'Fjern geometri',

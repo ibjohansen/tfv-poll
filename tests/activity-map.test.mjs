@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
-import { activityFeatureRecord, activityMatchesSeason, normalizeActivityWebsite, normalizeActivityFeatureInput, publicActivityFeatureRecord, smoothActivityGeometry } from '../lib/activity-map.js';
+import { activityFeatureRecord, activityMatchesSeason, activityMatchesTurufjell, normalizeActivityWebsite, normalizeActivityFeatureInput, publicActivityFeatureRecord, smoothActivityGeometry } from '../lib/activity-map.js';
 import { MapError } from '../lib/map/geo.js';
+import { revealLeafletLayerWithoutZoom } from '../lib/map/leaflet-viewport.js';
 import { DEFAULT_ACTIVITY_CATALOG, normalizeActivityCatalogInput, withActivityCatalog } from '../lib/activity-map-catalog.js';
 import { loadModule, request } from './helpers/load-module.mjs';
 import { activityMapStatements, migrateActivityMapSchema } from '../scripts/release-activity-map-schema.mjs';
@@ -13,6 +14,30 @@ const polygon = { type: 'Feature', properties: { unsafe: 'discard me' }, geometr
   [9.493, 60.472], [9.495, 60.472], [9.495, 60.474], [9.493, 60.472],
 ]] } };
 const hikingLine = { type: 'LineString', coordinates: [[9.493, 60.472], [9.494, 60.473], [9.495, 60.474]] };
+
+test('selecting a visible map activity preserves the viewport and an off-screen activity only pans', () => {
+  const center = { lat: 60.47, lng: 9.49 };
+  const inside = { isValid: () => true, getCenter: () => center };
+  let panned = null;
+  const map = { getBounds: () => ({ intersects: (bounds) => bounds === inside }),
+    panTo: (...args) => { panned = args; }, fitBounds: () => assert.fail('selection must not change zoom') };
+  assert.equal(revealLeafletLayerWithoutZoom(map, { getBounds: () => inside }), false);
+  assert.equal(panned, null);
+
+  const outside = { isValid: () => true, getCenter: () => center };
+  assert.equal(revealLeafletLayerWithoutZoom(map, { getBounds: () => outside }), true);
+  assert.deepEqual(panned, [center, { animate: false }]);
+});
+
+test('Turufjell filter matches names, tooltip text and the trail-operator marker', () => {
+  assert.equal(activityMatchesTurufjell({ name: 'Turufjell-runden' }), true);
+  assert.equal(activityMatchesTurufjell({ name: 'Runden', tooltipText: 'Løype på Turufjell' }), true);
+  assert.equal(activityMatchesTurufjell({ name: 'Runden', tooltipText: 'Prepareres av Vassfarfjellet løypelag' }), true);
+  assert.equal(activityMatchesTurufjell({ name: 'Runden', tooltipText: 'Preparert skiløype' }), false);
+  assert.equal(activityMatchesTurufjell({ name: 'Egen løype', sources: [] }, { includeManual: true }), true);
+  assert.equal(activityMatchesTurufjell({ name: 'Importert løype', sources: [{ id: 'kartverket' }] }, { includeManual: true }), false);
+  assert.equal(activityMatchesTurufjell({}), false);
+});
 
 test('custom categories and types are validated from the catalog, not hardcoded enums', () => {
   const catalog = { categories: [{ id: 'winter', name: 'Vintertur', color: '#20636c' }],

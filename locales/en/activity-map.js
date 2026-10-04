@@ -2,7 +2,7 @@ const activityMap = {
   public: {
     eyebrow: 'Mountain activities', title: 'Activity map',
     introduction: 'Explore cycling areas, alpine activities and hikes. Select the categories to show and toggle alpine trail colours.',
-    filters: 'Show activities', showColors: 'Show alpine trail colour categories',
+    filters: 'Show activities', filterTurufjell: 'Turufjell', showColors: 'Show alpine trail colour categories',
     season: 'Season', allSeasons: 'All seasons', seasons: { summer: 'Summer', winter: 'Winter', all_year: 'Year-round' },
     activityDetails: 'Activity details', visitWebsite: 'Visit website (opens in a new tab)',
     sourceLabel: 'Source: {source}', trailDataAttribution: 'Trail data', moreTrails: 'See more cross-country ski trails',
@@ -34,7 +34,7 @@ const activityMap = {
     savedFeatures: 'Saved activities', new: 'New activity', loading: 'Loading activities …', empty: 'No activities have been saved.',
     createTitle: 'Create activity', editTitle: 'Edit “{name}”', name: 'Name', tooltipText: 'Short map tooltip text', number: 'Number', category: 'Category', type: 'Type', color: 'Alpine colour', noColor: 'No colour', ordinaryTrail: 'No special type',
     filterCategory: 'Filter by category', allCategories: 'All categories', filterSource: 'Filter by source',
-    allSources: 'All sources', manualSource: 'Manually registered',
+    allSources: 'All sources', manualSource: 'Manually registered', filterTurufjell: 'Turufjell',
     categories: { cycling: 'Cycling', alpine: 'Alpine', hiking: 'Hike', cross_country: 'Cross-country skiing' }, types: { trail: 'Trail', park: 'Park', sledding: 'Sledding hill', lift: 'Lift', route: 'Hiking route', cross_country_route: 'Trail' },
     colors: { blue: 'Blue', yellow: 'Yellow', green: 'Green', red: 'Red', black: 'Black' },
     geometryTools: 'Geometry tools', drawPolygon: 'Draw polygon', drawLine: 'Draw line', placePoint: 'Place point', finish: 'Finish', editGeometry: 'Edit geometry', finishEditing: 'Finish editing', clearGeometry: 'Clear geometry',

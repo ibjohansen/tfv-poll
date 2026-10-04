@@ -65,6 +65,9 @@ ferdig genererte GPX/WGS84-filen for Buskerud, leser ZIP og XML strømmet med
 størrelsesgrenser og klipper deretter lokalt til 20-kilometerssirkelen. GPX ble
 valgt fordi første leveranse trenger geometri, navn og vedlikeholdskilde, og
 fordi dette unngår å gjøre importen avhengig av den ustabile WFS-tjenesten.
+Aktivitetens navnefelt settes til `desc (name)` fra GPX-dataene. Dersom ett av
+feltene mangler, brukes det tilgjengelige feltet alene. `src` brukes som kort
+tekst og vedlikeholdsansvarlig.
 
 Kilder:
 
@@ -270,7 +273,8 @@ Ved senere kjøringer:
 - ny ekstern ID opprettes som ny kandidat
 - endret kildefingeravtrykk opprettes som endringsforslag
 - uendret objekt gir ingen aktivitetsskriving
-- navn, tooltip, nettsted og publiseringsstatus overskrives ikke automatisk
+- et kildeforvaltet navn kan oppdateres etter eksplisitt godkjenning; tooltip,
+  nettsted og publiseringsstatus overskrives ikke automatisk
 - kildeforvaltet geometri kan erstattes først etter godkjenning
 - manuelt frikoblet geometri skal aldri erstattes av en synkronisering
 

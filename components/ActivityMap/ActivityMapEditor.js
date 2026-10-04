@@ -5,7 +5,7 @@ import { useApiClient } from '@/components/useApiClient';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/components/LocaleProvider';
-import { ACTIVITY_SEASONS, ALPINE_COLORS, normalizeActivityNumber } from '@/lib/activity-map-display';
+import { ACTIVITY_SEASONS, ALPINE_COLORS, activityMatchesTurufjell, normalizeActivityNumber } from '@/lib/activity-map-display';
 import { activityCatalogLabel, activityCategoryLabel, activityTypeLabel, findActivityType, withActivityCatalog } from '@/lib/activity-map-catalog';
 import ActivityMapCatalogManager from './ActivityMapCatalogManager';
 import ActivityMapImportPanel from './ActivityMapImportPanel';
@@ -36,6 +36,7 @@ export default function ActivityMapEditor() {
   const [catalog, setCatalog] = useState({ categories: [], types: [] });
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
+  const [turufjellOnly, setTurufjellOnly] = useState(false);
   const [previewCandidates, setPreviewCandidates] = useState([]);
   const [draft, setDraft] = useState(emptyDraft);
   const [drawing, setDrawing] = useState(false);
@@ -47,14 +48,16 @@ export default function ActivityMapEditor() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const controllerRef = useRef(null);
   const mapFrameRef = useRef(null);
+  const selectedFeatureButtonRef = useRef(null);
 
   const selected = useMemo(() => features.find((feature) => feature.id === draft.id) || null, [draft.id, features]);
   const decoratedFeatures = useMemo(() => features.map((feature) => withActivityCatalog(feature, catalog)), [features, catalog]);
   const filteredFeatures = useMemo(() => decoratedFeatures.filter((feature) => {
     const sourceMatches = sourceFilter === 'all' || (sourceFilter === 'manual' && !feature.sources?.length)
       || feature.sources?.some((source) => source.id === sourceFilter);
-    return (categoryFilter === 'all' || feature.category === categoryFilter) && sourceMatches;
-  }), [categoryFilter, decoratedFeatures, sourceFilter]);
+    return (categoryFilter === 'all' || feature.category === categoryFilter) && sourceMatches
+      && (!turufjellOnly || activityMatchesTurufjell(feature));
+  }), [categoryFilter, decoratedFeatures, sourceFilter, turufjellOnly]);
   const mapLabels = useMemo(() => ({
     canvas: t('mapCanvasLabel'), zoomIn: t('zoomIn'), zoomOut: t('zoomOut'), tileError: t('tileError'),
     geometryPoint: (number) => t('geometryPoint', { number }), addGeometryPoint: t('addGeometryPoint'),
@@ -96,6 +99,10 @@ export default function ActivityMapEditor() {
     document.addEventListener('fullscreenchange', handleFullscreen);
     return () => document.removeEventListener('fullscreenchange', handleFullscreen);
   }, []);
+
+  useEffect(() => {
+    if (draft.id) selectedFeatureButtonRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [draft.id, filteredFeatures]);
 
   function selectFeature(feature) {
     if ((drawing || editing) && !window.confirm(t('confirmDiscard'))) return;
@@ -205,8 +212,9 @@ export default function ActivityMapEditor() {
           <option value="all">{t('allSources')}</option><option value="manual">{t('manualSource')}</option>
           {ACTIVITY_MAP_SOURCE_IDS.map((id) => <option key={id} value={id}>{ACTIVITY_MAP_SOURCES[id].name}</option>)}
         </select></label>
+        <label className="activity-checkbox-filter"><input type="checkbox" checked={turufjellOnly} onChange={(event) => setTurufjellOnly(event.target.checked)} /><span>{t('filterTurufjell')}</span></label>
         {busy && !features.length ? <p role="status">{t('loading')}</p> : filteredFeatures.length ? <ul>{filteredFeatures.map((feature) => <li key={feature.id}>
-          <button type="button" aria-pressed={draft.id === feature.id} onClick={() => selectFeature(feature)}>
+          <button ref={draft.id === feature.id ? selectedFeatureButtonRef : null} type="button" aria-pressed={draft.id === feature.id} onClick={() => selectFeature(feature)}>
             <strong>{feature.activityNumber ? `${feature.activityNumber}. ${feature.name}` : feature.name}</strong><span>{activityCategoryLabel(feature, t)} · {activityTypeLabel(feature, t)}{feature.isDraft ? ` · ${t('draft')}` : ''}</span>
           </button></li>)}</ul> : <p className="muted">{t('empty')}</p>}
       </aside>

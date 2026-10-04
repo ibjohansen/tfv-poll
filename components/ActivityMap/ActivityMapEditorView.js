@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import { ACTIVITY_MAP_CENTER } from '@/lib/activity-map-display';
 import { activityCategoryColor } from '@/lib/activity-map-catalog';
 import { BACKGROUND_MAP, SATELLITE_MAP } from '@/lib/map/sources';
+import { revealLeafletLayerWithoutZoom } from '@/lib/map/leaflet-viewport';
 
 const latLng = ([longitude, latitude]) => [latitude, longitude];
 const geometryVertexIcon = L.divIcon({
@@ -14,6 +15,14 @@ const geometryVertexIcon = L.divIcon({
 const geometryMidpointIcon = L.divIcon({
   className: 'activity-geometry-midpoint', html: '<span aria-hidden="true">+</span>', iconSize: [22, 22], iconAnchor: [11, 11],
 });
+const selectedGeometryHaloStyle = {
+  className: 'activity-map-selected-halo', color: '#fffdf8', weight: 11, opacity: .95,
+  fillOpacity: 0, interactive: false, lineCap: 'round', lineJoin: 'round',
+};
+const selectedGeometryStyle = {
+  className: 'activity-map-selected-geometry', color: '#5f358f', weight: 6, opacity: 1,
+  fillColor: '#ad96d7', fillOpacity: .28, lineCap: 'round', lineJoin: 'round',
+};
 
 function verticesForGeometry(geometry) {
   if (geometry.type === 'LineString') return geometry.coordinates;
@@ -27,11 +36,19 @@ function geometryWithVertices(type, vertices, closed) {
     : { type, coordinates: vertices };
 }
 
+function fitVisibleGeometry(map, bounds) {
+  if (!map || !bounds) return;
+  if (bounds.isValid()) map.fitBounds(bounds, { animate: false, maxZoom: 17, padding: [42, 42] });
+  else map.setView(latLng(ACTIVITY_MAP_CENTER), 16, { animate: false });
+}
+
 export default function ActivityMapEditorView({ features, previewFeatures = [], draft, drawing, editing, onSelect, onGeometryChange, onError, labels }) {
   const container = useRef(null);
   const mapRef = useRef(null);
   const baseLayers = useRef(null);
   const layers = useRef(null);
+  const featureLayers = useRef(new Map());
+  const visibleBoundsRef = useRef(null);
   const [baseMap, setBaseMap] = useState('topographic');
   const labelsRef = useRef(labels);
   const latest = useRef({ draft, drawing, onGeometryChange, onError });
@@ -52,6 +69,9 @@ export default function ActivityMapEditorView({ features, previewFeatures = [], 
     topographic.on('tileerror', warn);
     satellite.on('tileerror', warn);
     layers.current = L.featureGroup().addTo(map);
+    const syncZoomLevel = () => { map.getContainer().dataset.zoomLevel = String(map.getZoom()); };
+    map.on('zoomend', syncZoomLevel);
+    syncZoomLevel();
     map.on('click', ({ latlng }) => {
       const current = latest.current;
       if (!current.drawing) return;
@@ -67,7 +87,7 @@ export default function ActivityMapEditorView({ features, previewFeatures = [], 
     const resize = new ResizeObserver(() => map.invalidateSize());
     resize.observe(container.current);
     requestAnimationFrame(() => map.invalidateSize());
-    return () => { resize.disconnect(); map.remove(); mapRef.current = null; baseLayers.current = null; };
+    return () => { resize.disconnect(); map.off('zoomend', syncZoomLevel); map.remove(); mapRef.current = null; baseLayers.current = null; };
   }, []);
 
   useEffect(() => {
@@ -83,12 +103,17 @@ export default function ActivityMapEditorView({ features, previewFeatures = [], 
   useEffect(() => {
     const group = layers.current;
     group.clearLayers();
+    featureLayers.current.clear();
+    const visibleBounds = L.latLngBounds();
     for (const feature of features) {
       if (feature.id === draft.id || !feature.geometry) continue;
       const layer = L.geoJSON({ type: 'Feature', properties: {}, geometry: feature.geometry }, {
-        style: { color: activityCategoryColor(feature), weight: 3, fillOpacity: .18 },
+        style: { className: 'activity-map-visible-feature', color: activityCategoryColor(feature), weight: 3, fillOpacity: .18 },
         pointToLayer: (_item, point) => L.circleMarker(point, { radius: 8, color: activityCategoryColor(feature), fillColor: '#fff', fillOpacity: .95, weight: 3 }),
       }).addTo(group);
+      visibleBounds.extend(layer.getBounds());
+      layer.eachLayer((item) => item.getElement()?.setAttribute('data-feature-id', feature.id));
+      featureLayers.current.set(feature.id, layer);
       const tooltip = document.createElement('div');
       const name = document.createElement('strong');
       name.textContent = feature.name;
@@ -109,12 +134,23 @@ export default function ActivityMapEditorView({ features, previewFeatures = [], 
       }).addTo(group);
       layer.bindTooltip(labels.importPreview({ name: candidate.name, source: candidate.sourceName }));
     }
-    if (!draft.geometry) return;
-    const currentStyle = { color: '#6b4ea0', weight: 4, fillColor: '#ad96d7', fillOpacity: .24, dashArray: drawing ? '7 5' : undefined };
+    if (!draft.geometry) {
+      visibleBoundsRef.current = visibleBounds;
+      return;
+    }
     L.geoJSON({ type: 'Feature', properties: {}, geometry: draft.geometry }, {
-      style: currentStyle,
-      pointToLayer: (_item, point) => L.circleMarker(point, { ...currentStyle, radius: 10, fillOpacity: .9 }),
+      style: selectedGeometryHaloStyle,
+      pointToLayer: (_item, point) => L.circleMarker(point, {
+        ...selectedGeometryHaloStyle, radius: 15, fillColor: '#fffdf8', fillOpacity: .95, weight: 3,
+      }),
     }).addTo(group);
+    const currentStyle = { ...selectedGeometryStyle, dashArray: drawing ? '7 5' : undefined };
+    const selectedLayer = L.geoJSON({ type: 'Feature', properties: {}, geometry: draft.geometry }, {
+      style: currentStyle,
+      pointToLayer: (_item, point) => L.circleMarker(point, { ...currentStyle, radius: 10, fillOpacity: .95 }),
+    }).addTo(group);
+    visibleBounds.extend(selectedLayer.getBounds());
+    if (draft.id) featureLayers.current.set(draft.id, selectedLayer);
     if ((drawing || editing) && (draft.geometry.type === 'Polygon' || draft.geometry.type === 'LineString')) {
       const vertices = verticesForGeometry(draft.geometry);
       const closed = editing && draft.geometry.type === 'Polygon';
@@ -150,7 +186,16 @@ export default function ActivityMapEditorView({ features, previewFeatures = [], 
       L.marker(latLng(draft.geometry.coordinates), { draggable: true, title: draft.name || labels.activityPoint }).addTo(group)
         .on('dragend', (event) => { const point = event.target.getLatLng(); onGeometryChange({ type: 'Point', coordinates: [point.lng, point.lat] }); });
     }
+    visibleBoundsRef.current = visibleBounds;
   }, [draft, drawing, editing, features, labels, onGeometryChange, onSelect, previewFeatures]);
+
+  useEffect(() => {
+    if (!drawing && !editing && visibleBoundsRef.current) fitVisibleGeometry(mapRef.current, visibleBoundsRef.current);
+  }, [drawing, editing, features]);
+
+  useEffect(() => {
+    if (!drawing && !editing && draft.id) revealLeafletLayerWithoutZoom(mapRef.current, featureLayers.current.get(draft.id));
+  }, [draft.id, drawing, editing]);
 
   useEffect(() => {
     const map = mapRef.current;

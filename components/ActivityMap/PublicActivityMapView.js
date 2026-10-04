@@ -8,18 +8,26 @@ import { BACKGROUND_MAP, SATELLITE_MAP } from '@/lib/map/sources';
 import { useI18n } from '@/components/LocaleProvider';
 import { activityCategoryColor, activityCategoryLabel, activityTypeLabel } from '@/lib/activity-map-catalog';
 import { ACTIVITY_MAP_SOURCES } from '@/lib/activity-map-sources';
+import { revealLeafletLayerWithoutZoom } from '@/lib/map/leaflet-viewport';
 
 const latLng = ([longitude, latitude]) => [latitude, longitude];
 const alpineColors = { blue: '#2166ac', yellow: '#d6a900', green: '#238b45', red: '#c92f2f', black: '#202124' };
 
 function featureStyle(feature, colors, selected) {
   const color = colors && feature.alpineColor ? alpineColors[feature.alpineColor] : activityCategoryColor(feature);
-  return { color, fillColor: color, weight: selected ? 6 : 4, fillOpacity: selected ? .34 : .2, opacity: 1 };
+  return { className: `public-activity-feature${selected ? ' is-selected' : ''}`,
+    color, fillColor: color, weight: selected ? 7 : 4, fillOpacity: selected ? .38 : .2, opacity: 1 };
 }
 
-export default function PublicActivityMapView({ features, showAlpineColors, selectedId, onSelect, onError }) {
+function fitVisibleFeatures(map, group) {
+  if (!map || !group) return;
+  const bounds = group.getBounds();
+  if (bounds.isValid()) map.fitBounds(bounds, { animate: false, maxZoom: 17, padding: [42, 42] });
+  else map.setView(latLng(ACTIVITY_MAP_CENTER), 13, { animate: false });
+}
+
+export default function PublicActivityMapView({ features, showAlpineColors, selectedId, isFullscreen, onSelect, onError }) {
   const { t } = useI18n('activityMap.public');
-  const frame = useRef(null);
   const container = useRef(null);
   const mapRef = useRef(null);
   const baseLayers = useRef(null);
@@ -27,8 +35,6 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
   const featureLayers = useRef(new Map());
   const sourceControl = useRef(null);
   const latestError = useRef(onError);
-  const [fullscreenSupported, setFullscreenSupported] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [baseMap, setBaseMap] = useState('topographic');
   useEffect(() => { latestError.current = onError; }, [onError]);
 
@@ -45,6 +51,9 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
     topographic.on('tileerror', warn);
     satellite.on('tileerror', warn);
     layers.current = L.featureGroup().addTo(map);
+    const syncZoomLevel = () => { map.getContainer().dataset.zoomLevel = String(map.getZoom()); };
+    map.on('zoomend', syncZoomLevel);
+    syncZoomLevel();
     const attribution = L.control({ position: 'bottomright' });
     attribution.onAdd = () => {
       const element = L.DomUtil.create('div', 'activity-data-attribution leaflet-control');
@@ -55,7 +64,7 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
     sourceControl.current = attribution;
     const resize = new ResizeObserver(() => map.invalidateSize());
     resize.observe(container.current);
-    return () => { resize.disconnect(); map.remove(); mapRef.current = null; baseLayers.current = null; sourceControl.current = null; };
+    return () => { resize.disconnect(); map.off('zoomend', syncZoomLevel); map.remove(); mapRef.current = null; baseLayers.current = null; sourceControl.current = null; };
   }, [t]);
 
   useEffect(() => {
@@ -87,18 +96,6 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
       else layer.removeFrom(map);
     }
   }, [baseMap]);
-
-  useEffect(() => {
-    setFullscreenSupported(Boolean(frame.current?.requestFullscreen && document.exitFullscreen));
-    const handler = () => { setIsFullscreen(document.fullscreenElement === frame.current); window.requestAnimationFrame(() => mapRef.current?.invalidateSize()); };
-    document.addEventListener('fullscreenchange', handler);
-    return () => document.removeEventListener('fullscreenchange', handler);
-  }, []);
-
-  async function toggleFullscreen() {
-    try { if (document.fullscreenElement === frame.current) await document.exitFullscreen(); else await frame.current?.requestFullscreen(); }
-    catch { latestError.current(t('fullscreenError')); }
-  }
 
   useEffect(() => {
     const group = layers.current;
@@ -137,28 +134,32 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
         link.rel = 'noopener noreferrer';
         popup.append(link);
       }
-      layer.bindPopup(popup);
+      layer.bindPopup(popup, { autoPan: false });
       layer.on('click', () => onSelect(feature.id));
+      layer.eachLayer((item) => item.getElement()?.setAttribute('data-feature-id', feature.id));
       featureLayers.current.set(feature.id, layer);
     }
-    const bounds = group.getBounds();
-    if (bounds.isValid()) mapRef.current.fitBounds(bounds, { maxZoom: 17, padding: [42, 42] });
   }, [features, onSelect, selectedId, showAlpineColors, t]);
+
+  useEffect(() => { fitVisibleFeatures(mapRef.current, layers.current); }, [features]);
 
   useEffect(() => {
     const layer = featureLayers.current.get(selectedId);
     if (!layer) return;
-    const bounds = layer.getBounds();
-    if (bounds.isValid()) mapRef.current.fitBounds(bounds, { maxZoom: 18, padding: [42, 42] });
+    revealLeafletLayerWithoutZoom(mapRef.current, layer);
     layer.openPopup();
   }, [selectedId]);
 
-  return <div ref={frame} className="public-activity-map-frame"><div ref={container} className="public-activity-map" aria-label={t('canvasLabel')} />
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      mapRef.current?.invalidateSize();
+      if (mapRef.current && layers.current) fitVisibleFeatures(mapRef.current, layers.current);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isFullscreen]);
+
+  return <div className="public-activity-map-frame"><div ref={container} className="public-activity-map" aria-label={t('canvasLabel')} />
     <label className="activity-map-layer-control"><span>{t('baseMap')}</span><select value={baseMap} onChange={(event) => setBaseMap(event.target.value)}>
       <option value="topographic">{t('topographicMap')}</option><option value="satellite">{t('satelliteMap')}</option>
-    </select></label>
-    {fullscreenSupported && <button type="button" className="public-map-fullscreen" title={isFullscreen ? t('exitFullscreen') : t('enterFullscreen')} onClick={toggleFullscreen}>
-      <span className="visually-hidden">{isFullscreen ? t('exitFullscreen') : t('enterFullscreen')}</span>
-      <svg viewBox="0 0 24 24" aria-hidden="true">{isFullscreen ? <path d="M9 3v6H3m12-6v6h6M9 21v-6H3m12 6v-6h6" /> : <path d="M9 3H3v6m12-6h6v6M9 21H3v-6m12 6h6v-6" />}</svg>
-    </button>}</div>;
+    </select></label></div>;
 }

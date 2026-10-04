@@ -201,6 +201,107 @@ test('activity maps support satellite layers, editable polygons and hiking route
   expect(savedActivity.geometry.type).toBe('LineString');
   expect(savedActivity.season).toBe('summer');
   expect(savedActivity.websiteUrl).toBe('https://example.test/tur');
+  const selectionHalo = hikingMap.locator('path.activity-map-selected-halo');
+  const selectedGeometry = hikingMap.locator('path.activity-map-selected-geometry');
+  await expect(selectionHalo).toHaveCount(1);
+  await expect(selectedGeometry).toHaveCount(1);
+  await expect(selectionHalo).toHaveAttribute('stroke-width', '11');
+  await expect(selectedGeometry).toHaveAttribute('stroke-width', '6');
+});
+
+test('admin activity map can filter the Turufjell trail subset', async ({ page, context }) => {
+  await page.route(/^https:\/\/(cache\.kartverket\.no|services\.arcgisonline\.com)\//, (route) => route.fulfill({
+    contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#dce8d2"/></svg>',
+  }));
+  await authenticate(context);
+  const feature = (id, name, tooltipText) => ({
+    id, version: 1, name, tooltipText, category: 'cross_country', featureType: 'route',
+    geometry: { type: 'LineString', coordinates: [[9.49, 60.47], [9.496, 60.475]] }, isDraft: true, season: 'winter', websiteUrl: null, activityNumber: null,
+    alpineColor: null, sources: [],
+  });
+  await page.route('**/api/admin/activity-map/features', (route) => route.fulfill({ json: {
+    ok: true, catalog: DEFAULT_ACTIVITY_CATALOG, features: [
+      feature('trail-local-name', 'Turufjell-runden', 'Preparert skiløype'),
+      feature('trail-local-operator', 'Løypelagsrunden', 'Prepareres av Vassfarfjellet løypelag'),
+      feature('trail-elsewhere', 'Fjellrunden', 'Preparert skiløype i naboområdet'),
+    ],
+  } }));
+  await page.goto('/admin/activity-map');
+  const list = page.getByRole('complementary', { name: 'Lagrede aktiviteter' });
+  await expect(list.getByRole('button', { name: /Fjellrunden/ })).toBeVisible();
+  await list.getByRole('checkbox', { name: 'Turufjell' }).check();
+  await expect(list.getByRole('button', { name: /Turufjell-runden/ })).toBeVisible();
+  await expect(list.getByRole('button', { name: /Løypelagsrunden/ })).toBeVisible();
+  await expect(list.getByRole('button', { name: /Fjellrunden/ })).toHaveCount(0);
+  await page.locator('.activity-admin-map [data-feature-id="trail-local-operator"]').dispatchEvent('click');
+  await expect(list.getByRole('button', { name: /Løypelagsrunden/ })).toHaveAttribute('aria-pressed', 'true');
+  const adminMap = page.locator('.activity-admin-map');
+  const initialAdminZoom = await adminMap.getAttribute('data-zoom-level');
+  await adminMap.getByTitle('Zoom inn').click();
+  await expect(adminMap).not.toHaveAttribute('data-zoom-level', initialAdminZoom);
+  const chosenAdminZoom = await adminMap.getAttribute('data-zoom-level');
+  await list.getByRole('button', { name: /Turufjell-runden/ }).click();
+  await expect(adminMap).toHaveAttribute('data-zoom-level', chosenAdminZoom);
+  await expect(page.locator('.activity-admin-map path.activity-map-selected-geometry')).toHaveCount(1);
+});
+
+test('public activity explorer defaults to Turufjell and keeps map, filters and list synchronized', async ({ page }) => {
+  await page.route(/^https:\/\/(cache\.kartverket\.no|services\.arcgisonline\.com)\//, (route) => route.fulfill({
+    contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#dce8d2"/></svg>',
+  }));
+  await page.goto('/activity-map-browser-test');
+  const explorer = page.locator('.public-activity-explorer');
+  const turufjell = explorer.getByRole('checkbox', { name: 'Turufjell' });
+  await expect(turufjell).toBeChecked();
+  await expect(explorer.getByRole('button', { name: /Sykkelrunden/ })).toBeVisible();
+  await expect(explorer.getByRole('button', { name: /Testløypa/ })).toBeVisible();
+  await expect(explorer.getByRole('button', { name: /Fjernløypa/ })).toHaveCount(0);
+  await explorer.getByRole('checkbox', { name: 'Langrenn', exact: true }).uncheck();
+  await expect(explorer.getByRole('checkbox', { name: 'Turufjell' })).toHaveCount(0);
+  await expect(explorer.getByRole('button', { name: /Sykkelrunden/ })).toBeVisible();
+  await explorer.getByRole('checkbox', { name: 'Langrenn', exact: true }).check();
+  await expect(explorer.getByRole('checkbox', { name: 'Turufjell' })).toBeChecked();
+  const publicMap = explorer.locator('.public-activity-map');
+  const localButton = explorer.getByRole('button', { name: /Testløypa/ });
+  await localButton.click();
+  const initialPublicZoom = await publicMap.getAttribute('data-zoom-level');
+  await publicMap.getByTitle('Zoom inn').click();
+  await expect(publicMap).not.toHaveAttribute('data-zoom-level', initialPublicZoom);
+  const chosenPublicZoom = await publicMap.getAttribute('data-zoom-level');
+  await explorer.getByRole('button', { name: /Blåløypa/ }).click();
+  await expect(publicMap).toHaveAttribute('data-zoom-level', chosenPublicZoom);
+
+  await turufjell.uncheck();
+  const remoteButton = explorer.getByRole('button', { name: /Fjernløypa/ });
+  await expect(remoteButton).toBeVisible();
+  await localButton.click();
+  await expect(localButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(explorer.locator('[data-feature-id="cross-country-activity"]')).toHaveClass(/is-selected/);
+
+  await explorer.locator('[data-feature-id="remote-cross-country"]').dispatchEvent('click');
+  await expect(remoteButton).toHaveAttribute('aria-pressed', 'true');
+  const mapBounds = await explorer.locator('.public-activity-map').boundingBox();
+  for (const id of ['cross-country-activity', 'remote-cross-country']) {
+    const geometryBounds = await explorer.locator(`[data-feature-id="${id}"]`).boundingBox();
+    const center = { x: geometryBounds.x + geometryBounds.width / 2, y: geometryBounds.y + geometryBounds.height / 2 };
+    expect(center.x).toBeGreaterThanOrEqual(mapBounds.x);
+    expect(center.x).toBeLessThanOrEqual(mapBounds.x + mapBounds.width);
+    expect(center.y).toBeGreaterThanOrEqual(mapBounds.y);
+    expect(center.y).toBeLessThanOrEqual(mapBounds.y + mapBounds.height);
+  }
+  const listBounds = await explorer.locator('.public-activity-panel').boundingBox();
+  const selectedBounds = await remoteButton.boundingBox();
+  expect(selectedBounds.y).toBeGreaterThanOrEqual(listBounds.y - 1);
+  expect(selectedBounds.y + selectedBounds.height).toBeLessThanOrEqual(listBounds.y + listBounds.height + 1);
+
+  const fullscreen = explorer.getByRole('button', { name: 'Vis kartet i fullskjerm' });
+  await fullscreen.click();
+  await expect.poll(() => page.evaluate(() => document.fullscreenElement?.classList.contains('public-activity-explorer'))).toBe(true);
+  await expect(explorer.getByRole('checkbox', { name: 'Turufjell' })).toBeVisible();
+  await expect(explorer.getByRole('list', { name: 'Synlige aktiviteter' })).toBeVisible();
+  await expect(explorer.locator('.public-activity-map')).toBeVisible();
+  await explorer.getByRole('button', { name: 'Avslutt fullskjerm' }).click();
+  await expect.poll(() => page.evaluate(() => document.fullscreenElement)).toBeNull();
 });
 
 test('activity categories and types can be created, renamed and used after reload', async ({ page, context }) => {

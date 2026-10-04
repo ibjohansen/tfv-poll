@@ -19,7 +19,8 @@ test('Kartverket GPX adapter keeps ski routes and stable source metadata', async
   const routes = await parseKartverketGpxZip(kartverketFixture);
   assert.equal(routes.length, 1);
   assert.equal(routes[0].externalId, 'gpx:ski-1');
-  assert.equal(routes[0].name, 'Testløypa');
+  assert.equal(routes[0].name, 'Testløypa (ski-1)');
+  assert.equal(routes[0].matchName, 'Testløypa');
   assert.equal(routes[0].operator, 'Testlaget');
   assert.deepEqual(routes[0].coordinates, [[9.493, 60.472], [9.494, 60.473]]);
 });
@@ -48,7 +49,7 @@ test('plan prefers Kartverket for confirmed overlap and keeps both source links'
   const coordinates = [[9.493, 60.472], [9.494, 60.473], [9.495, 60.474]];
   const plan = buildActivityImportPlan({ runId: 'a'.repeat(32), sourceResults: [
     { sourceId: 'kartverket', rawSha256: 'b'.repeat(64), fetchedAt: '2026-10-04T10:00:00.000Z',
-      lines: [{ sourceId: 'kartverket', externalId: 'ski-1', name: 'Runden', coordinates }] },
+      lines: [{ sourceId: 'kartverket', externalId: 'ski-1', name: 'Runden (ski-1)', matchName: 'Runden', coordinates }] },
     { sourceId: 'openstreetmap', rawSha256: 'c'.repeat(64), fetchedAt: '2026-10-04T10:01:00.000Z',
       lines: [{ sourceId: 'openstreetmap', externalId: 'way:8', name: 'Runden', coordinates }] },
   ] });
@@ -122,9 +123,18 @@ test('approved source candidates are stored as drafts with idempotent source lin
     assert.equal((await database.query('SELECT status FROM activity_map_source_runs WHERE id = $1', [preview.id])).rows[0].status, 'applied');
     await assert.rejects(applyActivityImportCore({ action: 'apply', runId: preview.id,
       planSha256: preview.planSha256, itemIds: [preview.candidates[0].id] }, options), { code: 'errors.activityImportChanged' });
-    ids.push('4'.repeat(32)); sourceFailure = true;
+    sourceResult.lines[0].name = 'Testløypa (ski-test)';
+    ids.push('4'.repeat(32));
+    const changed = await createActivityImportPreviewCore({ action: 'preview', sourceIds: ['kartverket'] }, options);
+    assert.equal(changed.summary.changed, 1);
+    const updated = await applyActivityImportCore({ action: 'apply', runId: changed.id,
+      planSha256: changed.planSha256, itemIds: [changed.candidates[0].id] }, options);
+    assert.equal(updated.updated, 1);
+    assert.equal((await database.query('SELECT name FROM activity_map_features WHERE id = $1', ['3'.repeat(32)])).rows[0].name,
+      'Testløypa (ski-test)');
+    ids.push('5'.repeat(32)); sourceFailure = true;
     await assert.rejects(createActivityImportPreviewCore({ action: 'preview', sourceIds: ['kartverket'] }, options), { code: 'errors.sourceBusy' });
-    const failed = (await database.query(`SELECT status, error_code FROM activity_map_source_runs WHERE id = $1`, ['4'.repeat(32)])).rows[0];
+    const failed = (await database.query(`SELECT status, error_code FROM activity_map_source_runs WHERE id = $1`, ['5'.repeat(32)])).rows[0];
     assert.deepEqual(failed, { status: 'failed', error_code: 'errors.sourceBusy' });
   } finally { await database.close(); }
 });
