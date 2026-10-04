@@ -2,6 +2,11 @@
 import PublicActivityMap from '@/components/ActivityMap/PublicActivityMap';
 
 const features = [
+  { id: 'cross-country-activity', name: 'Testløypa', category: 'cross_country', categoryName: 'Langrenn', categoryColor: '#2f6fb0',
+    featureType: 'route', typeName: 'Løype', geometryKind: 'line', season: 'winter',
+    sources: [{ id: 'kartverket', name: 'Kartverket', sourceUrl: 'https://kartverket.no/api-og-data/friluftsliv',
+      licenseName: 'CC BY 4.0', licenseUrl: 'https://creativecommons.org/licenses/by/4.0/deed.no' }],
+    geometry: { type: 'LineString', coordinates: [[9.49, 60.47], [9.496, 60.475]] } },
   { id: 'custom-activity', name: 'Trugerunden', category: 'custom-category', categoryName: 'Vinteraktiviteter', categoryColor: '#20636c',
     featureType: 'custom-type', typeName: 'Trugetur', geometryKind: 'line', tooltipText: 'Følg vintermerkingen.',
     geometry: { type: 'LineString', coordinates: [[9.493, 60.472], [9.495, 60.474]] } },

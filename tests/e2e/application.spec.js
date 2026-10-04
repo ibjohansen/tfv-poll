@@ -123,6 +123,14 @@ test('activity maps support satellite layers, editable polygons and hiking route
   await page.getByRole('combobox', { name: 'Kartlag' }).selectOption('satellite');
   await expect.poll(() => satelliteRequests.length).toBeGreaterThan(0);
   await expect(page.locator('.leaflet-control-attribution')).toContainText('Esri');
+  const trailAttribution = page.locator('.activity-data-attribution');
+  await expect(trailAttribution).toContainText('Løypedata: © Kartverket (CC BY 4.0)');
+  await expect(trailAttribution.getByRole('link', { name: '© Kartverket' })).toHaveAttribute('href', 'https://kartverket.no/api-og-data/friluftsliv');
+  const moreTrails = page.getByRole('region', { name: 'Se flere langrennsløyper' });
+  for (const name of ['Sporet', 'Norgeskart', 'OpenSnowMap']) {
+    await expect(moreTrails.getByRole('link', { name })).toHaveAttribute('rel', 'noopener noreferrer');
+    await expect(moreTrails.getByRole('link', { name })).toHaveAttribute('target', '_blank');
+  }
 
   let savedActivity;
   await authenticate(context);

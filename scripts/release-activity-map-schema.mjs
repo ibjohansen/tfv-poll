@@ -9,15 +9,16 @@ import { splitSqlStatements } from './split-sql-statements.mjs';
 
 export function activityMapStatements(schema) {
   return splitSqlStatements(schema).filter((statement) =>
-    /(?:CREATE TABLE IF NOT EXISTS|ALTER TABLE|INSERT INTO) activity_map_(?:features|categories|types|import_runs)\b/.test(statement)
+    /(?:CREATE TABLE IF NOT EXISTS|ALTER TABLE|INSERT INTO) activity_map_(?:features|categories|types|import_runs|sources|source_runs|source_items|feature_sources)\b/.test(statement)
     || /(?:CREATE (?:UNIQUE )?INDEX IF NOT EXISTS|DROP INDEX IF EXISTS|CREATE TRIGGER|DROP TRIGGER IF EXISTS) activity_map_\w+\b/.test(statement)
     || /CREATE OR REPLACE FUNCTION (?:increment_activity_map_feature_version|validate_activity_map_geometry|preserve_activity_map_type_geometry|record_audit_change)\(\)/.test(statement));
 }
 
 const quote = (value) => `"${value.replaceAll('"', '""')}"`;
-async function fingerprint(db, columns) {
+async function fingerprint(db, columns, existingIds) {
   return (await db.query(`SELECT count(*)::int AS count, md5(COALESCE(string_agg(h, '' ORDER BY h), '')) AS checksum
-    FROM (SELECT md5(to_jsonb(t)::text) h FROM (SELECT ${columns.map(quote).join(', ')} FROM activity_map_features) t) hashes`)).rows[0];
+    FROM (SELECT md5(to_jsonb(t)::text) h FROM (SELECT ${columns.map(quote).join(', ')} FROM activity_map_features
+      WHERE id = ANY($1::text[])) t) hashes`, [existingIds])).rows[0];
 }
 
 export async function migrateActivityMapSchema(db, schema) {
@@ -29,10 +30,11 @@ export async function migrateActivityMapSchema(db, schema) {
     await db.query('LOCK TABLE activity_map_features IN SHARE ROW EXCLUSIVE MODE');
     const columns = (await db.query(`SELECT column_name FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = 'activity_map_features' ORDER BY ordinal_position`)).rows.map((row) => row.column_name);
-    const before = await fingerprint(db, columns);
+    const existingIds = (await db.query('SELECT id FROM activity_map_features ORDER BY id')).rows.map((row) => row.id);
+    const before = await fingerprint(db, columns, existingIds);
     const statements = activityMapStatements(schema);
     for (const statement of statements) await db.query(statement);
-    assert.deepEqual(await fingerprint(db, columns), before, 'Existing activities must remain unchanged');
+    assert.deepEqual(await fingerprint(db, columns, existingIds), before, 'Existing activities must remain unchanged');
     const invalid = (await db.query(`SELECT count(*)::int AS count FROM activity_map_features f
       LEFT JOIN activity_map_types t ON t.category = f.category AND t.id = f.feature_type
       WHERE t.id IS NULL OR (NULLIF(f.geometry, 'null'::jsonb) IS NOT NULL AND f.geometry->>'type' IS DISTINCT FROM
@@ -47,9 +49,12 @@ export async function migrateActivityMapSchema(db, schema) {
 
 async function main() {
   const { values } = parseArgs({ options: { host: { type: 'string' }, environment: { type: 'string' },
-    confirmed: { type: 'boolean' }, 'schema-sha256': { type: 'string' } } });
+    confirmed: { type: 'boolean' }, snapshot: { type: 'string' }, 'schema-sha256': { type: 'string' } } });
   assert.equal(values.confirmed, true, 'Migration requires explicit confirmation');
   assert.ok(['development', 'production'].includes(values.environment));
+  if (values.environment === 'production') {
+    assert.match(values.snapshot || '', /^snap-[a-z0-9-]+$/, 'A verified restore snapshot is required');
+  }
   const url = new URL(process.env.DATABASE_URL_UNPOOLED);
   assert.equal(url.hostname, values.host, 'Unexpected database host');
   assert.ok(!url.hostname.includes('-pooler'), 'Use a direct connection');
@@ -62,7 +67,8 @@ async function main() {
   try {
     await db.connect();
     assert.equal((await db.query('SELECT environment FROM application_environment WHERE singleton=TRUE')).rows[0]?.environment, values.environment);
-    console.log(JSON.stringify({ migrated: true, ...await migrateActivityMapSchema(db, schema), schemaHash: hash, occurredAt: new Date().toISOString() }));
+    console.log(JSON.stringify({ migrated: true, ...await migrateActivityMapSchema(db, schema), schemaHash: hash,
+      snapshot: values.snapshot || null, occurredAt: new Date().toISOString() }));
   } finally { await db.end(); }
 }
 

@@ -801,15 +801,16 @@ passende delt/WAF-rate-limit på kartrutene ved
 produksjonsbruk; den lokale 20/minutt-grensen er bare per-instans.
 Se [kartmodulens datakilder, begrensninger og bruk](docs/map-explorer.md).
 
-Aktivitetskartet ligger på `/admin/activity-map`, med beskyttet Node-rute
-`GET/POST /api/admin/activity-map/features` og `POST /api/admin/activity-map/catalog`. Rutene bruker eksisterende
+Aktivitetskartet ligger på `/admin/activity-map`, med beskyttede Node-ruter
+`GET/POST /api/admin/activity-map/features`, `POST /api/admin/activity-map/catalog` og
+`GET/POST /api/admin/activity-map/import`. Rutene bruker eksisterende
 `members`-rettighet, same-origin-kontroll og pooled databaseforbindelse. Data
 lagres i `activity_map_features`, med redigerbare kategorier og typer i
 `activity_map_categories` og `activity_map_types`. Under «Administrer kategorier og typer»
 kan administrator opprette kategorier, velge kategorifarge og opprette typer med
 polygon, linje eller punkt. Navn kan endres uten å endre aktivitetenes koblinger.
 Geometriformen låses ved opprettelse; en annen form krever en ny type.
-Standardkategoriene er Sykkel, Alpint og Tur; turer bruker linjer, sykkel- og
+Standardkategoriene er Sykkel, Alpint, Tur og Langrenn; turer og langrenn bruker linjer, sykkel- og
 alpinløyper samt heiser bruker polygoner, og park/akebakke bruker punkt.
 Alpinaktiviteter kan
 ha nummer som tekst (for eksempel `1`, `A` eller `1A`), og alpinløyper kan ha blå, gul, grønn, rød eller svart
@@ -830,24 +831,52 @@ geometri vises.
 Admin- og forsidekartet kan veksle mellom Kartverkets
 topografiske kart og Esri World Imagery (satellitt- og flyfoto). Ingen
 personopplysninger eller ny miljøvariabel inngår.
+
+Løypeimporten henter bare ved en eksplisitt adminhandling. Kartverket leses fra
+Geonorges ferdig genererte GPX/WGS84-uttrekk for Buskerud og OpenStreetMap fra en
+fast, serverdefinert Overpass-spørring. Begge klippes til 20 km rundt
+aktivitetskartets sentrum, forenkles eller deles til maksimalt 200 punkter og
+lagres først som private kandidater. Ingen kilde kalles fra forsiden. Administrator
+må velge kandidater og godkjenne dem som kladder; publisering er fortsatt en egen
+handling. Kartverket prioriteres ved sikre navn-/geometritreff, mens begge kilder
+beholdes for kreditering. Avviste kandidater og objekter som ikke finnes i et nytt
+uttrekk slettes ikke automatisk.
+
+Kildesporingen bruker `activity_map_sources`, `activity_map_source_runs`,
+`activity_map_source_items` og `activity_map_feature_sources`. Rå kildegeometri
+og importdiagnostikk er private. Offentlig respons inneholder bare en
+serverdefinert kilde-ID med faste, sikre kilde- og lisenslenker. Krediteringen
+vises både i kartet (også i fullskjerm) og i aktivitetsdetaljene. Lenker til
+Sporet, Norgeskart og OpenSnowMap er ordinære eksterne lenker; ingen data hentes
+fra Sporet. Runtime må kunne nå `nedlasting.geonorge.no` og
+`overpass-api.de` over HTTPS. Importen innfører ingen miljøvariabler.
+Den additive migreringen for disse fire kildetabellene og `geometry_origin` er
+kjørt i produksjon 4. oktober 2026. Samme release importerte 316 aktiviteter som
+kladd med 320 kildekoblinger; ingen langrennsløype ble publisert. Se
+[migrerings- og importresultatet](docs/database/database-migration-2026-10-04-cross-country.md).
 Adminkartet kan åpnes i fullskjerm med tegneverktøyene tilgjengelige. Den
 additive produksjonsmigreringen ble kjørt og verifisert 30. september 2026; se
 [migreringsstatus](docs/database/database-migration-2026-09-30.md). Kodeversjonen ble
 publisert på Netlify 30. september 2026, med aktivitetskartet fortsatt skjult på
 forsiden.
 
-Før kodeversjonen med redigerbare kategorier og typer tas i bruk, migrer etter
-test på isolert Neon-gren og et kontrollert gjenopprettingspunkt.
+Ved senere skjemaendringer i aktivitetskartet skal migreringen først testes på
+isolert Neon-gren og kjøres etter et kontrollert gjenopprettingspunkt.
 `scripts/release-activity-map-schema.mjs` velger bare aktivitetskartets SQL fra
 `database/schema.sql` (inkludert felles audit-funksjon), krever direkte `DATABASE_URL_UNPOOLED`,
-eksplisitt `--host`, `--environment`, `--confirmed` og testet `--schema-sha256`.
+eksplisitt `--host`, `--environment`, `--confirmed`, testet `--schema-sha256` og
+verifisert `--snapshot` i produksjon.
 Den kontrollerer databasens miljømerking og sjekksummen av alle eksisterende aktivitetsfelt
 før commit; feil ruller hele transaksjonen tilbake. `npm run db:setup` inkluderer
 også disse endringene ved vanlig fullstendig skjemaoppsett.
 Migreringen fjerner de gamle faste kategori-/typebegrensningene,
-oppretter katalogtabeller og fremmednøkler og beholder eksisterende aktiviteter og geometri.
+oppretter katalog- og kildetabeller samt fremmednøkler og beholder eksisterende aktiviteter og geometri.
 Den kan kjøres på nytt uten å overskrive egendefinerte navn, typer eller kategorier.
 Endringer i katalogen er versjonskontrollerte, loggføres og invaliderer offentlig kartcache.
+`scripts/import-cross-country-activities.mjs` gir en separat `preview`, `apply`
+og `verify`-flyt over direkte forbindelse. Produksjonsanvendelse krever lagret
+run-ID, kontrollert plan-hash, eksplisitt `all-reviewable`-utvalg, aktør,
+bekreftelse og snapshot-ID. Importerte aktiviteter forblir kladder.
 Produksjonsmigreringen er kjørt 2. oktober 2026; se
 [resultat og gjenopprettingspunkt](docs/database/database-migration-2026-10-02-activity-catalog.md).
 Dette er en databasemigrering, ikke en publisering av den tilhørende kodeversjonen.
@@ -1491,10 +1520,18 @@ Utfør kontrollene i denne rekkefølgen:
   elleve forhåndsdefinerte alpinløypene finnes som kladder med riktig nummer og
   farge. Kontroller redigering, versjonskonflikt, sletting og revisjonslogg.
   Uten sesjon skal både GET og POST mot `/api/admin/activity-map/features` gi
-  401; konto uten `members`-rettighet skal få 403. Åpne deretter forsiden uten
+  401; det samme gjelder `/api/admin/activity-map/import`, og konto uten
+  `members`-rettighet skal få 403. Hent en forhåndsvisning fra hver løypekilde,
+  kontroller kilde-/statusfiltre, sikre dublettforslag, avvisning og at ingen
+  kandidater er forhåndsvalgt. Godkjenn én syntetisk kandidat og bekreft at den
+  lagres som kladd med privat kildegrunnlag og uten automatisk publisering.
+  Åpne deretter forsiden uten
   innlogging og kontroller nøyaktig kartsenter, kategori-filtre, alpinfarger av/på,
-  tastatur og mobilbredde 320 px. Offentlig data skal bare inneholde ID, navn,
-  nummer, kategori, type, eventuell farge og geometri.
+  tastatur og mobilbredde 320 px. Offentlig data skal bare inneholde kontrollerte
+  aktivitetsfelt og faste kilde-/lisensopplysninger – aldri rå kildegeometri,
+  importstatus, fingeravtrykk, administrator eller leverandørfeil. Kontroller at
+  løypekreditering vises med både topografisk og satellittkart, også i fullskjerm,
+  og at Sporet/Norgeskart/OpenSnowMap åpnes som ordinære eksterne lenker.
 - Kontroller at alle `/api/admin/map/*`-rutene, inkludert både GET og POST for
   `/api/admin/map/hamlets`, svarer 401 uten sesjon og 403
   med rolle uten `members`-rettighet. Test feil fra ekstern karttjeneste og

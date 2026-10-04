@@ -6,6 +6,10 @@ Filnavnene er beholdt, slik at dato og opprinnelig sammenheng er gjenkjennelige.
 
 ## Pågående arbeid og beslutninger
 
+- [Integrasjon av langrennsløyper i aktivitetskartet](activity-map-cross-country-integration.md) –
+  implementert og produksjonsmigrert kontrollert import fra Kartverket og
+  OpenStreetMap, med kildeprioritet, kreditering og trinnvis publisering. Alle
+  importerte aktiviteter er fortsatt kladder.
 - [Driftskostnader og sikkerhetsvalg](operations-options-2026-10-03.md) –
   alternativer for Neon/Netlify, kostnadsoverslag, sikkerhetsfunn og avklaringer
   om MFA, hemmeligheter og lagringstid.
@@ -32,7 +36,7 @@ Filnavnene er beholdt, slik at dato og opprinnelig sammenheng er gjenkjennelige.
 | Mappe | Innhold |
 | --- | --- |
 | [imports/](imports/) | Rapporter fra gjennomførte importer, inkludert aktivitetsimporten 3. oktober 2026. |
-| [database/](database/) | Historiske migrerings-, utrullings- og databasetestrapporter. |
+| [database/](database/) | Historiske migrerings-, utrullings- og databasetestrapporter, inkludert [langrennsimporten 4. oktober 2026](database/database-migration-2026-10-04-cross-country.md). |
 | [code-review/](code-review/) | Eldre kvalitets- og sikkerhetsgjennomganger som grunnlagsmateriale. |
 | [other/](other/) | Avsluttede forbedringsprompter merket `SOLVED` og øvrig historikk. |
 

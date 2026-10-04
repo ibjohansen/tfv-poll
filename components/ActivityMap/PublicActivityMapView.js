@@ -7,6 +7,7 @@ import { ACTIVITY_MAP_CENTER, smoothActivityGeometry } from '@/lib/activity-map-
 import { BACKGROUND_MAP, SATELLITE_MAP } from '@/lib/map/sources';
 import { useI18n } from '@/components/LocaleProvider';
 import { activityCategoryColor, activityCategoryLabel, activityTypeLabel } from '@/lib/activity-map-catalog';
+import { ACTIVITY_MAP_SOURCES } from '@/lib/activity-map-sources';
 
 const latLng = ([longitude, latitude]) => [latitude, longitude];
 const alpineColors = { blue: '#2166ac', yellow: '#d6a900', green: '#238b45', red: '#c92f2f', black: '#202124' };
@@ -24,6 +25,7 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
   const baseLayers = useRef(null);
   const layers = useRef(null);
   const featureLayers = useRef(new Map());
+  const sourceControl = useRef(null);
   const latestError = useRef(onError);
   const [fullscreenSupported, setFullscreenSupported] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -43,10 +45,38 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
     topographic.on('tileerror', warn);
     satellite.on('tileerror', warn);
     layers.current = L.featureGroup().addTo(map);
+    const attribution = L.control({ position: 'bottomright' });
+    attribution.onAdd = () => {
+      const element = L.DomUtil.create('div', 'activity-data-attribution leaflet-control');
+      L.DomEvent.disableClickPropagation(element);
+      return element;
+    };
+    attribution.addTo(map);
+    sourceControl.current = attribution;
     const resize = new ResizeObserver(() => map.invalidateSize());
     resize.observe(container.current);
-    return () => { resize.disconnect(); map.remove(); mapRef.current = null; baseLayers.current = null; };
+    return () => { resize.disconnect(); map.remove(); mapRef.current = null; baseLayers.current = null; sourceControl.current = null; };
   }, [t]);
+
+  useEffect(() => {
+    const element = sourceControl.current?.getContainer();
+    if (!element) return;
+    element.replaceChildren();
+    const sourceIds = [...new Set(features.flatMap((item) => item.sources || []).map((source) => source.id))];
+    if (!sourceIds.length) { element.hidden = true; return; }
+    element.hidden = false;
+    element.append(`${t('trailDataAttribution')}: `);
+    sourceIds.map((id) => ACTIVITY_MAP_SOURCES[id]).filter(Boolean).forEach((source, index) => {
+      if (index) element.append(' · ');
+      const sourceLink = document.createElement('a');
+      sourceLink.href = source.sourceUrl; sourceLink.target = '_blank'; sourceLink.rel = 'noopener noreferrer';
+      sourceLink.textContent = `© ${source.name}`;
+      const licenseLink = document.createElement('a');
+      licenseLink.href = source.licenseUrl; licenseLink.target = '_blank'; licenseLink.rel = 'noopener noreferrer';
+      licenseLink.textContent = source.licenseName;
+      element.append(sourceLink, ' (', licenseLink, ')');
+    });
+  }, [features, t]);
 
   useEffect(() => {
     const map = mapRef.current;

@@ -3240,6 +3240,25 @@ body:has(.cookie-notice) { padding-bottom: 6rem; }
 
 /* Aktivitetskart: separat administrasjon og offentlig presentasjon. */
 .activity-admin { display: grid; gap: 1.25rem; min-width: 0; }
+.activity-import-panel { padding: 1rem; border: 1px solid #d7d0c7; border-radius: 10px; background: #fff; }
+.activity-import-panel > summary { cursor: pointer; font-weight: 700; }
+.activity-import-content { display: grid; gap: 1rem; padding-top: 1rem; }
+.activity-import-sources { display: flex; flex-wrap: wrap; gap: .8rem 1.2rem; margin: 0; padding: .8rem; border: 1px solid #ddd4ca; border-radius: 8px; }
+.activity-import-sources legend { padding: 0 .3rem; font-weight: 700; }
+.activity-import-sources label { display: flex; align-items: center; gap: .4rem; }
+.activity-import-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: .6rem; margin: 0; }
+.activity-import-summary div { padding: .65rem; border: 1px solid #e0d9cf; border-radius: 7px; background: #faf8f4; }
+.activity-import-summary dt { color: #665950; font-size: .75rem; font-weight: 700; }
+.activity-import-summary dd { margin: .2rem 0 0; overflow-wrap: anywhere; }
+.activity-import-filters { display: flex; flex-wrap: wrap; gap: .8rem; }
+.activity-import-selection-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
+.activity-import-filters label { display: grid; gap: .3rem; font-size: .8rem; font-weight: 700; }
+.activity-import-filters select { min-height: 40px; padding: .45rem .55rem; border: 1px solid #b8ad9f; border-radius: 7px; background: #fff; }
+.activity-import-table-wrap { max-height: 430px; overflow: auto; border: 1px solid #ddd4ca; border-radius: 8px; }
+.activity-import-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.activity-import-table caption { padding: .7rem; font-weight: 700; text-align: left; }
+.activity-import-table th, .activity-import-table td { padding: .55rem .65rem; border-top: 1px solid #ece6df; text-align: left; vertical-align: top; }
+.activity-import-table thead th { position: sticky; top: 0; z-index: 1; background: #f7f4ef; }
 .activity-admin-heading { max-width: 72ch; }
 .activity-admin-heading h2 { margin: .2rem 0 .5rem; font-size: clamp(1.55rem, 3vw, 2.25rem); }
 .activity-admin-layout { display: grid; grid-template-columns: minmax(220px, .55fr) minmax(0, 1.6fr); gap: 1rem; align-items: start; min-width: 0; }
@@ -3311,6 +3330,8 @@ body:has(.cookie-notice) { padding-bottom: 6rem; }
 .public-activity-map-frame .leaflet-tooltip { padding: 8px 10px; border-radius: 7px; line-height: 1.4; }
 .public-activity-map-frame .leaflet-tooltip div { color: #665950; font-size: 12px; }
 .public-activity-map-frame .leaflet-tooltip p { max-width: 260px; margin: 5px 0 0; color: #493f39; white-space: normal; }
+.activity-data-attribution { max-width: min(70vw, 540px); padding: 4px 7px; border-radius: 4px; background: rgba(255, 255, 255, .92); color: #3f3a34; font-size: 10px; line-height: 1.35; }
+.activity-data-attribution a, .public-map-source a { color: inherit; text-decoration: underline; }
 .public-activity-status { min-height: 44px; padding: 11px 0; color: var(--text-soft); font-size: 12px; }
 .public-activity-status p { margin: 0; }
 .activity-season-filter { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; font-weight: 700; }
@@ -3325,6 +3346,10 @@ body:has(.cookie-notice) { padding-bottom: 6rem; }
 .public-activity-list small { color: var(--text-soft); }
 .activity-list-symbol.is-blue { background: #2166ac; }.activity-list-symbol.is-yellow { background: #d6a900; }.activity-list-symbol.is-green { background: #238b45; }.activity-list-symbol.is-red { background: #c92f2f; }.activity-list-symbol.is-black { background: #202124; }
 .public-activity-empty { color: var(--text-soft); }
+.public-activity-external { margin-top: 24px; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.public-activity-external h3 { margin: 0 0 8px; color: var(--brand-brown); }
+.public-activity-external p { margin: 0 0 10px; color: var(--text-soft); }
+.public-activity-external ul { display: flex; flex-wrap: wrap; gap: 10px 20px; margin: 0; padding-left: 20px; }
 
 @media (max-width: 820px) {
   .activity-admin-layout, .activity-form-grid { grid-template-columns: 1fr; }

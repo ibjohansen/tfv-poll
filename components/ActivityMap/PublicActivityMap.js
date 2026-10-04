@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { useI18n } from '@/components/LocaleProvider';
 import { activityCategoryColor, activityCategoryLabel, activityTypeLabel } from '@/lib/activity-map-catalog';
 import { ACTIVITY_SEASONS, activityMatchesSeason } from '@/lib/activity-map-display';
+import { ACTIVITY_MAP_EXTERNAL_LINKS, ACTIVITY_MAP_SOURCES } from '@/lib/activity-map-sources';
 
 function MapLoading() {
   const { t } = useI18n('activityMap.public');
@@ -23,6 +24,8 @@ export default function PublicActivityMap({ features }) {
   const visible = useMemo(() => features.filter((feature) => !hiddenCategories.includes(feature.category) && activityMatchesSeason(feature, season)), [features, hiddenCategories, season]);
   const showAlpine = categories.some((feature) => feature.category === 'alpine') && !hiddenCategories.includes('alpine');
   const selected = visible.find((feature) => feature.id === selectedId) || null;
+  const visibleSources = useMemo(() => [...new Set(visible.flatMap((feature) => feature.sources || []).map((source) => source.id))]
+    .map((id) => ACTIVITY_MAP_SOURCES[id]).filter(Boolean), [visible]);
 
   return <section className="public-activity-section" aria-labelledby="public-activity-map-title">
     <div className="public-activity-heading"><p className="eyebrow">{t('eyebrow')}</p><h2 id="public-activity-map-title">{t('title')}</h2><p>{t('introduction')}</p></div>
@@ -42,6 +45,7 @@ export default function PublicActivityMap({ features }) {
       <h3>{selected.activityNumber ? `${selected.activityNumber}. ${selected.name}` : selected.name}</h3>
       {selected.season && <p>{t(`seasons.${selected.season}`)}</p>}
       {selected.tooltipText && <p>{selected.tooltipText}</p>}
+      {selected.sources?.map((source) => <p key={source.id}>{t('sourceLabel', { source: source.name })}</p>)}
       {selected.websiteUrl && <a href={selected.websiteUrl} target="_blank" rel="noopener noreferrer">{t('visitWebsite')}</a>}
     </section>}
     <ul className="public-activity-list" aria-label={t('visibleActivities')}>{visible.map((feature) => <li key={feature.id}>
@@ -50,6 +54,10 @@ export default function PublicActivityMap({ features }) {
         <span><strong>{feature.activityNumber ? `${feature.activityNumber}. ${feature.name}` : feature.name}</strong><small>{activityCategoryLabel(feature, t)} · {activityTypeLabel(feature, t)}{feature.alpineColor && showAlpineColors ? ` · ${t(`colors.${feature.alpineColor}`)}` : ''}</small></span>
       </button></li>)}</ul>
     {!visible.length && <p className="public-activity-empty">{features.length ? t('noCategories') : t('empty')}</p>}
-    <p className="public-map-source">{t('source')}</p>
+    <p className="public-map-source">{t('source')}{visibleSources.length ? <> {t('trailDataAttribution')}: {visibleSources.map((source, index) => <span key={source.id}>{index ? ' · ' : ''}
+      <a href={source.sourceUrl} target="_blank" rel="noopener noreferrer">© {source.name}</a> (<a href={source.licenseUrl} target="_blank" rel="noopener noreferrer">{source.licenseName}</a>)</span>)}</> : null}</p>
+    <section className="public-activity-external" aria-labelledby="more-cross-country-trails"><h3 id="more-cross-country-trails">{t('moreTrails')}</h3>
+      <p>{t('externalLinksHelp')}</p><ul>{ACTIVITY_MAP_EXTERNAL_LINKS.map((link) => <li key={link.id}><a href={link.url} target="_blank" rel="noopener noreferrer">{t(`externalLinks.${link.id}`)}</a></li>)}</ul>
+    </section>
   </section>;
 }

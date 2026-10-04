@@ -69,10 +69,13 @@ test('activity map accepts versioned deletes and exposes only public fields', ()
   const value = normalizeActivityFeatureInput({ action: 'delete', id: 'a'.repeat(32), version: 3 });
   assert.deepEqual(value, { action: 'delete', id: 'a'.repeat(32), version: 3 });
   const row = { id: 'b'.repeat(32), name: 'Blåløypa', category: 'alpine', feature_type: 'trail',
-    tooltip_text: 'Kort omtale', activity_number: '4A', alpine_color: 'blue', geometry: JSON.stringify(polygon.geometry), is_draft: true, version: '2', last_changed_by: 'private@example.test' };
+    tooltip_text: 'Kort omtale', activity_number: '4A', alpine_color: 'blue', geometry: JSON.stringify(polygon.geometry), is_draft: true, version: '2',
+    source_ids: ['kartverket', 'not-allowed'], last_changed_by: 'private@example.test' };
   const publicResult = publicActivityFeatureRecord(row);
-  assert.deepEqual(Object.keys(publicResult).sort(), ['activityNumber', 'alpineColor', 'category', 'categoryName', 'categoryColor', 'typeName', 'geometryKind', 'featureType', 'geometry', 'id', 'name', 'tooltipText', 'season', 'websiteUrl'].sort());
+  assert.deepEqual(Object.keys(publicResult).sort(), ['activityNumber', 'alpineColor', 'category', 'categoryName', 'categoryColor', 'typeName', 'geometryKind', 'featureType', 'geometry', 'id', 'name', 'tooltipText', 'season', 'websiteUrl', 'sources'].sort());
   assert.equal(publicResult.tooltipText, 'Kort omtale');
+  assert.deepEqual(publicResult.sources.map((source) => source.id), ['kartverket']);
+  assert.equal(Object.hasOwn(publicResult.sources[0], 'priority'), false);
   assert.doesNotMatch(JSON.stringify(publicResult), /private@example|version|isDraft/);
   assert.equal(activityFeatureRecord(row).version, 2); assert.equal(activityFeatureRecord(row).isDraft, true);
 });
@@ -147,6 +150,20 @@ test('activity map admin route inherits authentication, same-origin and private-
   assert.equal(catalogWrites, 0);
   const allowed = await catalogRoute.POST(request('/api/admin/activity-map/catalog', { method: 'POST', body: {} }));
   assert.equal(allowed.status, 200); assert.match(allowed.headers.get('Cache-Control'), /private/);
+
+  let previews = 0;
+  const importRoute = await loadModule('app/api/admin/activity-map/import/route.js', {
+    '@/lib/map/api': { handleMapRequest }, '@/lib/map/errors': { MapError },
+    '@/lib/activity-map-import-service': {
+      getActivityImportRuns: async () => [], applyActivityImport: async () => ({}), rejectActivityImportItems: async () => ({}),
+      createActivityImportPreview: async () => { previews += 1; return { id: 'b'.repeat(32) }; },
+    },
+  });
+  assert.equal(importRoute.maxDuration, 60);
+  const blockedImport = await importRoute.POST(request('/api/admin/activity-map/import', { method: 'POST', body: { action: 'preview' }, headers: { origin: 'https://evil.test' } }));
+  assert.equal(blockedImport.status, 403); assert.equal(previews, 0);
+  const preview = await importRoute.POST(request('/api/admin/activity-map/import', { method: 'POST', body: { action: 'preview' } }));
+  assert.equal(preview.status, 200); assert.equal(previews, 1); assert.match(preview.headers.get('Cache-Control'), /private/);
 });
 
 test('database schema constrains activity map combinations and adds audit triggers', async () => {
@@ -159,6 +176,12 @@ test('database schema constrains activity map combinations and adds audit trigge
   assert.match(schema, /ALTER COLUMN activity_number TYPE TEXT USING activity_number::TEXT/);
   assert.match(schema, /CHECK \(is_draft OR \(geometry IS NOT NULL AND geometry <> 'null'::jsonb\)\)/);
   assert.match(schema, /activity_map_feature_combination_check/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS activity_map_sources/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS activity_map_source_runs/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS activity_map_source_items/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS activity_map_feature_sources/);
+  assert.match(schema, /'cross_country', 'Langrenn', '#2f6fb0'/);
+  assert.match(schema, /geometry_origin IN \('manual', 'external'\)/);
   assert.match(schema, /activity_map_features_audit_trigger/);
   for (const name of ['Slåtteliløypa', 'Furuløypa', 'Dompappen', 'Blåbærløypa', 'Grønnfinken', 'Rødreven',
     'Høgseterløypa', 'Harahopp', 'Plogen', 'Trollskogen', 'Eventyrskogen']) assert.match(schema, new RegExp(name));

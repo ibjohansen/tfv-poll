@@ -142,6 +142,13 @@ Object.assign(map.backend.errors, {
   activityPoint: 'Plasser et gyldig punkt i kartet.', activityCombination: 'Kategori, aktivitetstype, farge og geometri kan ikke kombineres slik.',
   activityDraft: 'Kladdestatusen er ugyldig.', activityPublishedGeometry: 'En publisert aktivitet må ha gyldig geometri.',
   activityChanged: 'Aktiviteten er endret av en annen bruker. Last siden på nytt og prøv igjen.', activityMock: 'Aktiviteter kan ikke lagres i demonstrasjonsmodus.',
+  activityImportAction: 'Velg en gyldig importhandling.', activityImportSources: 'Velg minst én gyldig løypedatakilde.',
+  activityImportSelection: 'Velg gyldige kandidater fra denne forhåndsvisningen.', activityImportChanged: 'Importplanen er endret eller allerede behandlet. Hent en ny forhåndsvisning.',
+  activityImportMock: 'Løypedata kan ikke importeres i demonstrasjonsmodus.', activityImportTooLarge: 'Kildeuttrekket er for stort til å behandles trygt.',
+  activityImportSourceData: 'Kilden returnerte løypedata som ikke kunne valideres.', activityImportOsmIncomplete: 'OpenStreetMap returnerte et ufullstendig løypeuttrekk. Prøv igjen senere.',
+  activityImportKartverketFormat: 'Kartverkets forventede GPX-format for Buskerud er ikke tilgjengelig.',
+  activityImportKartverketUnavailable: 'Kartverkets løypeuttrekk er ikke klart for nedlasting. Prøv igjen senere.',
+  activityImportFailed: 'Løypeimporten kunne ikke fullføres. Prøv igjen senere.',
 });
 
 export default map;

@@ -141,6 +141,13 @@ Object.assign(map.backend.errors, {
   activityPoint: 'Place a valid point on the map.', activityCombination: 'Category, activity type, colour and geometry cannot be combined in this way.',
   activityDraft: 'The draft status is invalid.', activityPublishedGeometry: 'A published activity must have valid geometry.',
   activityChanged: 'The activity was changed by another user. Reload and try again.', activityMock: 'Activities cannot be saved in demo mode.',
+  activityImportAction: 'Select a valid import action.', activityImportSources: 'Select at least one valid trail data source.',
+  activityImportSelection: 'Select valid candidates from this preview.', activityImportChanged: 'The import plan changed or has already been processed. Load a new preview.',
+  activityImportMock: 'Trail data cannot be imported in demo mode.', activityImportTooLarge: 'The source extract is too large to process safely.',
+  activityImportSourceData: 'The source returned trail data that could not be validated.', activityImportOsmIncomplete: 'OpenStreetMap returned an incomplete trail extract. Please try again later.',
+  activityImportKartverketFormat: 'Kartverket’s expected GPX format for Buskerud is unavailable.',
+  activityImportKartverketUnavailable: 'Kartverket’s trail extract is not ready for download. Please try again later.',
+  activityImportFailed: 'The trail import could not be completed. Please try again later.',
 });
 
 export default map;

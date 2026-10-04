@@ -8,6 +8,8 @@ import { useI18n } from '@/components/LocaleProvider';
 import { ACTIVITY_SEASONS, ALPINE_COLORS, normalizeActivityNumber } from '@/lib/activity-map-display';
 import { activityCatalogLabel, activityCategoryLabel, activityTypeLabel, findActivityType, withActivityCatalog } from '@/lib/activity-map-catalog';
 import ActivityMapCatalogManager from './ActivityMapCatalogManager';
+import ActivityMapImportPanel from './ActivityMapImportPanel';
+import { ACTIVITY_MAP_SOURCE_IDS, ACTIVITY_MAP_SOURCES } from '@/lib/activity-map-sources';
 
 function MapLoading() {
   const { t } = useI18n('activityMap.admin');
@@ -33,6 +35,8 @@ export default function ActivityMapEditor() {
   const [features, setFeatures] = useState([]);
   const [catalog, setCatalog] = useState({ categories: [], types: [] });
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('all');
+  const [previewCandidates, setPreviewCandidates] = useState([]);
   const [draft, setDraft] = useState(emptyDraft);
   const [drawing, setDrawing] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -46,12 +50,17 @@ export default function ActivityMapEditor() {
 
   const selected = useMemo(() => features.find((feature) => feature.id === draft.id) || null, [draft.id, features]);
   const decoratedFeatures = useMemo(() => features.map((feature) => withActivityCatalog(feature, catalog)), [features, catalog]);
-  const filteredFeatures = useMemo(() => categoryFilter === 'all' ? decoratedFeatures : decoratedFeatures.filter((feature) => feature.category === categoryFilter), [categoryFilter, decoratedFeatures]);
+  const filteredFeatures = useMemo(() => decoratedFeatures.filter((feature) => {
+    const sourceMatches = sourceFilter === 'all' || (sourceFilter === 'manual' && !feature.sources?.length)
+      || feature.sources?.some((source) => source.id === sourceFilter);
+    return (categoryFilter === 'all' || feature.category === categoryFilter) && sourceMatches;
+  }), [categoryFilter, decoratedFeatures, sourceFilter]);
   const mapLabels = useMemo(() => ({
     canvas: t('mapCanvasLabel'), zoomIn: t('zoomIn'), zoomOut: t('zoomOut'), tileError: t('tileError'),
     geometryPoint: (number) => t('geometryPoint', { number }), addGeometryPoint: t('addGeometryPoint'),
     removeGeometryPoint: (number) => t('removeGeometryPoint', { number }), activityPoint: t('activityPoint'), baseMap: t('baseMap'),
     topographicMap: t('topographicMap'), satelliteMap: t('satelliteMap'),
+    importPreview: ({ name, source }) => t('import.previewMapLabel', { name, source }),
   }), [t]);
 
   const request = useCallback(async (options = {}) => {
@@ -66,6 +75,12 @@ export default function ActivityMapEditor() {
     if (!response.ok) throw new Error(body?.message || t('requestError'));
     return body;
   }, [apiFetch, t]);
+
+  const loadFeatures = useCallback(async () => {
+    const body = await request();
+    setFeatures([...(body.features || [])].sort(compareFeatures));
+    setCatalog(body.catalog);
+  }, [request]);
 
   useEffect(() => {
     let active = true;
@@ -179,11 +194,16 @@ export default function ActivityMapEditor() {
   return <div className="activity-admin">
     <header className="activity-admin-heading"><p className="eyebrow">{t('eyebrow')}</p><h2>{t('title')}</h2><p>{t('introduction')}</p></header>
     <ActivityMapCatalogManager catalog={catalog} onChange={setCatalog} disabled={busy || !catalog.categories.length} />
+    <ActivityMapImportPanel disabled={busy} onApplied={loadFeatures} onPreviewChange={setPreviewCandidates} />
     <div className="activity-admin-layout">
       <aside className="activity-feature-list" aria-label={t('savedFeatures')}>
         <div className="activity-feature-list-heading"><h3>{t('savedFeatures')}</h3><button type="button" className="admin-button" onClick={newFeature}>{t('new')}</button></div>
         <label className="activity-category-filter">{t('filterCategory')}<select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
           <option value="all">{t('allCategories')}</option>{catalog.categories.map((item) => <option key={item.id} value={item.id}>{activityCatalogLabel(item, 'categories', t)}</option>)}
+        </select></label>
+        <label className="activity-category-filter">{t('filterSource')}<select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}>
+          <option value="all">{t('allSources')}</option><option value="manual">{t('manualSource')}</option>
+          {ACTIVITY_MAP_SOURCE_IDS.map((id) => <option key={id} value={id}>{ACTIVITY_MAP_SOURCES[id].name}</option>)}
         </select></label>
         {busy && !features.length ? <p role="status">{t('loading')}</p> : filteredFeatures.length ? <ul>{filteredFeatures.map((feature) => <li key={feature.id}>
           <button type="button" aria-pressed={draft.id === feature.id} onClick={() => selectFeature(feature)}>
@@ -217,7 +237,7 @@ export default function ActivityMapEditor() {
           {draft.geometry && <button type="button" className="admin-button" onClick={clearGeometry}>{t('clearGeometry')}</button>}
         </div>
         <p className="muted">{t(kind === 'polygon' ? 'polygonHelp' : kind === 'line' ? 'lineHelp' : 'pointHelp')}</p>
-        <div ref={mapFrameRef} className="activity-admin-map-frame"><ActivityMapEditorView features={filteredFeatures} draft={{ ...draft, geometryKind: kind }} drawing={drawing} editing={editing}
+        <div ref={mapFrameRef} className="activity-admin-map-frame"><ActivityMapEditorView features={filteredFeatures} previewFeatures={previewCandidates} draft={{ ...draft, geometryKind: kind }} drawing={drawing} editing={editing}
           onSelect={selectFeature} onGeometryChange={(geometry) => setDraft((current) => ({ ...current, geometry }))} onError={setError} labels={mapLabels} />
           <div className="activity-map-floating-actions">
             {isFullscreen && !drawing && <button type="button" className="admin-button" disabled={busy || !kind} onClick={startDrawing}>{t(kind === 'polygon' ? 'drawPolygon' : kind === 'line' ? 'drawLine' : 'placePoint')}</button>}

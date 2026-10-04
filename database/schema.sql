@@ -549,12 +549,14 @@ CREATE TABLE IF NOT EXISTS activity_map_types (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS activity_map_types_name_idx ON activity_map_types (category, lower(btrim(name)));
 INSERT INTO activity_map_categories (id, name, color) VALUES
-  ('cycling', 'Sykkel', '#16745a'), ('alpine', 'Alpint', '#7d3147'), ('hiking', 'Tur', '#a66321')
+  ('cycling', 'Sykkel', '#16745a'), ('alpine', 'Alpint', '#7d3147'), ('hiking', 'Tur', '#a66321'),
+  ('cross_country', 'Langrenn', '#2f6fb0')
 ON CONFLICT (id) DO NOTHING;
 INSERT INTO activity_map_types (category, id, name, geometry_kind) VALUES
   ('cycling', 'trail', 'Løype', 'polygon'), ('alpine', 'trail', 'Løype', 'polygon'),
   ('alpine', 'lift', 'Heis', 'polygon'), ('alpine', 'park', 'Park', 'point'),
-  ('alpine', 'sledding', 'Akebakke', 'point'), ('hiking', 'route', 'Turrute', 'line')
+  ('alpine', 'sledding', 'Akebakke', 'point'), ('hiking', 'route', 'Turrute', 'line'),
+  ('cross_country', 'route', 'Løype', 'line')
 ON CONFLICT (category, id) DO NOTHING;
 
 -- Geometri valideres også i applikasjonen.
@@ -578,6 +580,10 @@ ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS activity_number TEXT;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS tooltip_text TEXT;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS season TEXT;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS website_url TEXT;
+ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS geometry_origin TEXT NOT NULL DEFAULT 'manual';
+ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_geometry_origin_check;
+ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_geometry_origin_check
+  CHECK (geometry_origin IN ('manual', 'external'));
 ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_season_check;
 ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_season_check
   CHECK (season IS NULL OR season IN ('summer', 'winter', 'all_year'));
@@ -676,6 +682,81 @@ CREATE TABLE IF NOT EXISTS activity_map_import_runs (
   types_before JSONB NOT NULL,
   summary JSONB NOT NULL
 );
+
+-- Kontrollerte kilder og forhåndsvisninger for eksterne aktivitetslinjer.
+-- Rå kildegeometri er privat og returneres aldri fra offentlig API.
+CREATE TABLE IF NOT EXISTS activity_map_sources (
+  id TEXT PRIMARY KEY CHECK (id IN ('kartverket', 'openstreetmap')),
+  name TEXT NOT NULL,
+  priority INTEGER NOT NULL CHECK (priority > 0),
+  source_url TEXT NOT NULL,
+  license_name TEXT NOT NULL,
+  license_url TEXT NOT NULL
+);
+INSERT INTO activity_map_sources (id, name, priority, source_url, license_name, license_url) VALUES
+  ('kartverket', 'Kartverket', 10, 'https://kartverket.no/api-og-data/friluftsliv', 'CC BY 4.0', 'https://creativecommons.org/licenses/by/4.0/deed.no'),
+  ('openstreetmap', 'OpenStreetMap', 20, 'https://www.openstreetmap.org/copyright', 'ODbL', 'https://opendatacommons.org/licenses/odbl/1-0/')
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, priority = EXCLUDED.priority,
+  source_url = EXCLUDED.source_url, license_name = EXCLUDED.license_name, license_url = EXCLUDED.license_url;
+
+CREATE TABLE IF NOT EXISTS activity_map_source_runs (
+  id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
+  status TEXT NOT NULL CHECK (status IN ('preview', 'applying', 'applied', 'failed')),
+  source_ids JSONB NOT NULL CHECK (jsonb_typeof(source_ids) = 'array'),
+  center JSONB NOT NULL CHECK (jsonb_typeof(center) = 'array' AND jsonb_array_length(center) = 2),
+  radius_km INTEGER NOT NULL CHECK (radius_km = 20),
+  fetched_at TIMESTAMPTZ NOT NULL,
+  raw_sha256 TEXT NOT NULL CHECK (raw_sha256 ~ '^[a-f0-9]{64}$'),
+  plan_sha256 TEXT NOT NULL CHECK (plan_sha256 ~ '^[a-f0-9]{64}$'),
+  summary JSONB NOT NULL CHECK (jsonb_typeof(summary) = 'object'),
+  error_code TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_by TEXT NOT NULL,
+  applied_at TIMESTAMPTZ,
+  applied_by TEXT
+);
+CREATE INDEX IF NOT EXISTS activity_map_source_runs_created_idx ON activity_map_source_runs (created_at DESC);
+
+CREATE TABLE IF NOT EXISTS activity_map_source_items (
+  id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{32}$'),
+  run_id TEXT NOT NULL REFERENCES activity_map_source_runs(id) ON DELETE CASCADE,
+  source_id TEXT NOT NULL REFERENCES activity_map_sources(id) ON DELETE RESTRICT,
+  external_id TEXT NOT NULL CHECK (length(external_id) BETWEEN 1 AND 300),
+  source_external_id TEXT NOT NULL CHECK (length(source_external_id) BETWEEN 1 AND 300),
+  source_url TEXT,
+  fingerprint TEXT NOT NULL CHECK (fingerprint ~ '^[a-f0-9]{64}$'),
+  name TEXT NOT NULL CHECK (length(btrim(name)) BETWEEN 1 AND 160),
+  tooltip_text TEXT,
+  operator_name TEXT,
+  website_url TEXT,
+  source_geometry JSONB,
+  display_geometry JSONB,
+  status TEXT NOT NULL CHECK (status IN ('new', 'matched', 'changed', 'unchanged', 'rejected', 'missing')),
+  matched_feature_id TEXT REFERENCES activity_map_features(id) ON DELETE SET NULL,
+  matched_item_id TEXT REFERENCES activity_map_source_items(id) DEFERRABLE INITIALLY DEFERRED,
+  match_score NUMERIC(5,4),
+  match_reason TEXT,
+  decision TEXT CHECK (decision IS NULL OR decision IN ('imported', 'linked', 'updated', 'rejected')),
+  feature_id TEXT REFERENCES activity_map_features(id) ON DELETE SET NULL,
+  reviewed_at TIMESTAMPTZ,
+  reviewed_by TEXT,
+  UNIQUE (run_id, source_id, external_id)
+);
+CREATE INDEX IF NOT EXISTS activity_map_source_items_run_idx ON activity_map_source_items (run_id, status, source_id);
+
+CREATE TABLE IF NOT EXISTS activity_map_feature_sources (
+  feature_id TEXT NOT NULL REFERENCES activity_map_features(id) ON DELETE CASCADE,
+  source_id TEXT NOT NULL REFERENCES activity_map_sources(id) ON DELETE RESTRICT,
+  external_id TEXT NOT NULL CHECK (length(external_id) BETWEEN 1 AND 300),
+  source_url TEXT,
+  fingerprint TEXT NOT NULL CHECK (fingerprint ~ '^[a-f0-9]{64}$'),
+  first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_changed_by TEXT NOT NULL,
+  PRIMARY KEY (source_id, external_id),
+  UNIQUE (feature_id, source_id, external_id)
+);
+CREATE INDEX IF NOT EXISTS activity_map_feature_sources_feature_idx ON activity_map_feature_sources (feature_id, source_id);
 CREATE INDEX IF NOT EXISTS members_hamlet_idx ON members (hamlet_id) WHERE deleted_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS member_email_groups (

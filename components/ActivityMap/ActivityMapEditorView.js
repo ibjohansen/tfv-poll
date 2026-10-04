@@ -27,7 +27,7 @@ function geometryWithVertices(type, vertices, closed) {
     : { type, coordinates: vertices };
 }
 
-export default function ActivityMapEditorView({ features, draft, drawing, editing, onSelect, onGeometryChange, onError, labels }) {
+export default function ActivityMapEditorView({ features, previewFeatures = [], draft, drawing, editing, onSelect, onGeometryChange, onError, labels }) {
   const container = useRef(null);
   const mapRef = useRef(null);
   const baseLayers = useRef(null);
@@ -101,6 +101,14 @@ export default function ActivityMapEditorView({ features, draft, drawing, editin
       layer.bindTooltip(tooltip);
       layer.on('click', () => { if (!drawing && !editing) onSelect(feature); });
     }
+    for (const candidate of previewFeatures) {
+      if (!candidate.geometry) continue;
+      const color = candidate.sourceId === 'kartverket' ? '#2563a8' : '#7a4c9e';
+      const layer = L.geoJSON({ type: 'Feature', properties: {}, geometry: candidate.geometry }, {
+        interactive: false, style: { color, weight: 4, opacity: .8, dashArray: '8 6' },
+      }).addTo(group);
+      layer.bindTooltip(labels.importPreview({ name: candidate.name, source: candidate.sourceName }));
+    }
     if (!draft.geometry) return;
     const currentStyle = { color: '#6b4ea0', weight: 4, fillColor: '#ad96d7', fillOpacity: .24, dashArray: drawing ? '7 5' : undefined };
     L.geoJSON({ type: 'Feature', properties: {}, geometry: draft.geometry }, {
@@ -142,7 +150,7 @@ export default function ActivityMapEditorView({ features, draft, drawing, editin
       L.marker(latLng(draft.geometry.coordinates), { draggable: true, title: draft.name || labels.activityPoint }).addTo(group)
         .on('dragend', (event) => { const point = event.target.getLatLng(); onGeometryChange({ type: 'Point', coordinates: [point.lng, point.lat] }); });
     }
-  }, [draft, drawing, editing, features, labels, onGeometryChange, onSelect]);
+  }, [draft, drawing, editing, features, labels, onGeometryChange, onSelect, previewFeatures]);
 
   useEffect(() => {
     const map = mapRef.current;
