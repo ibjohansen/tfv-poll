@@ -28,10 +28,12 @@ const activityMap = {
   },
   admin: {
     catalog: {
-      title: 'Manage categories and types', help: 'Create your own categories and types, or rename existing ones. Activities keep their associations when names change.',
-      categoryForm: 'Activity categories', typeForm: 'Activity types', chooseCategory: 'Select category to edit', chooseType: 'Select type to edit',
-      newCategory: 'New category', newType: 'New type', categoryName: 'Category name', typeName: 'Type name', categoryColor: 'Category map colour',
-      saveCategory: 'Save category', saveType: 'Save type', saved: 'Categories and types have been updated.',
+      title: 'Manage categories, types and subtypes', help: 'Create your own categories, types and subtypes, or rename existing ones. Activities keep their associations when names change.',
+      categoryForm: 'Activity categories', typeForm: 'Activity types', subtypeForm: 'Activity subtypes', chooseCategory: 'Select category to edit', chooseType: 'Select type to edit', chooseSubtype: 'Select subtype to edit',
+      newCategory: 'New category', newType: 'New type', newSubtype: 'New subtype', categoryName: 'Category name', typeName: 'Type name', subtypeName: 'Subtype name', categoryColor: 'Category map colour',
+      saveCategory: 'Save category', saveType: 'Save type', saveSubtype: 'Save subtype', saved: 'Categories, types and subtypes have been updated.',
+      icon: 'Icon', iconPreview: 'Icon preview', iconUpload: 'Upload SVG icon', iconHelp: 'Optional. SVG files are validated before storage.', removeIcon: 'Remove uploaded icon', iconRemoved: 'The uploaded icon was removed.',
+      iconFile: 'Choose a valid SVG file no larger than 150 kB.', iconMissing: 'The icon no longer exists.', iconStorage: 'Icon storage is unavailable.', iconChanged: 'The category, type or subtype was changed by another user. Reload the page.', iconUnauthorized: 'Sign in to manage icons.', iconInvalidRequest: 'The request could not be accepted.',
       geometry: 'Geometry', geometries: { polygon: 'Polygon (area)', line: 'Line (route)', point: 'Point' },
       geometryHelp: 'Geometry is fixed after creation. Create a new type if you need a different geometry.',
       selectType: 'Select type', noTypes: 'Create a type for this category under “Manage categories and types” before saving the activity.',

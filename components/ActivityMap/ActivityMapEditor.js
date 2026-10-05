@@ -57,7 +57,7 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
     const sourceMatches = sourceFilter === 'all' || (sourceFilter === 'manual' && !feature.sources?.length)
       || feature.sources?.some((source) => source.id === sourceFilter);
     return !hiddenCategories.includes(feature.category) && sourceMatches
-      && (!turufjellOnly || activityMatchesTurufjell(feature));
+      && (!turufjellOnly || activityMatchesTurufjell(feature, { includeManual: true }));
   }), [decoratedFeatures, hiddenCategories, sourceFilter, turufjellOnly]);
   const allCategoriesSelected = catalog.categories.length > 0 && catalog.categories.every((item) => !hiddenCategories.includes(item.id));
   const someCategoriesSelected = catalog.categories.some((item) => !hiddenCategories.includes(item.id));
@@ -262,7 +262,7 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
           {draft.geometry && <button type="button" className="admin-button" onClick={clearGeometry}>{t('clearGeometry')}</button>}
         </div>
         <p className="muted">{t(kind === 'polygon' ? 'polygonHelp' : kind === 'line' ? 'lineHelp' : 'pointHelp')}</p>
-        <div ref={mapFrameRef} className="activity-admin-map-frame"><ActivityMapEditorView features={filteredFeatures} previewFeatures={previewCandidates} draft={{ ...draft, geometryKind: kind }} drawing={drawing} editing={editing}
+        <div ref={mapFrameRef} className="activity-admin-map-frame"><ActivityMapEditorView features={filteredFeatures} previewFeatures={previewCandidates} draft={{ ...withActivityCatalog(draft, catalog), geometryKind: kind }} drawing={drawing} editing={editing}
           onSelect={selectFeature} onGeometryChange={(geometry) => setDraft((current) => ({ ...current, geometry }))} onError={setError} labels={mapLabels} />
           <div className="activity-map-floating-actions">
             {isFullscreen && !drawing && <button type="button" className="admin-button" disabled={busy || !kind} onClick={startDrawing}>{t(kind === 'polygon' ? 'drawPolygon' : kind === 'line' ? 'drawLine' : 'placePoint')}</button>}

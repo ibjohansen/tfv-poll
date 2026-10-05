@@ -61,9 +61,12 @@ importerte løyper med Turufjell i navn eller kort tekst, eller Vassfarfjellet
 løypelag i kort tekst.
 
 Kart og liste er synkronisert i begge grensesnitt. En valgt aktivitet markeres
-rødt i kartet. På forsiden vises kartinformasjon bare som tooltip ved hover;
-valg åpner aldri en kartpopup. Full informasjon om den valgte aktiviteten vises
-i et sticky felt over aktivitetslisten til høyre.
+rødt i kartet. Bare aktivitetsikonet er interaktivt; selve linjen, polygonet
+eller punktgeometrien kan ikke klikkes. Klikk på ikonet velger aktiviteten og
+viser detaljene. Tooltip vises når ikonet har vært under peker eller
+tastaturfokus i 500 millisekunder uten klikk. Valg åpner aldri en kartpopup.
+Full informasjon om den valgte aktiviteten vises i et sticky felt over
+aktivitetslisten til høyre.
 
 Hver aktivitet får også et lite SVG-symbol like ved geometrien i kartet. Det
 prosjektspesifikke ikonsettet bruker alpinski for Alpint, langrennsløper for

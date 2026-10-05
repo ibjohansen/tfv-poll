@@ -6,7 +6,7 @@ import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { activityFeatureRecord, activityMatchesSeason, activityMatchesTurufjell, normalizeActivityWebsite, normalizeActivityFeatureInput, publicActivityFeatureRecord, smoothActivityGeometry } from '../lib/activity-map.js';
 import { MapError } from '../lib/map/geo.js';
 import { revealLeafletLayerWithoutZoom } from '../lib/map/leaflet-viewport.js';
-import { DEFAULT_ACTIVITY_CATALOG, normalizeActivityCatalogInput, withActivityCatalog } from '../lib/activity-map-catalog.js';
+import { DEFAULT_ACTIVITY_CATALOG, normalizeActivityCatalogInput, withActivityCatalog, withActivityMapCatalogIcon } from '../lib/activity-map-catalog.js';
 import { activityMapIconAnchor, activityMapIconCoordinate, activityMapIconKind, activityMapIconMarkup } from '../lib/activity-map-icons.js';
 import { loadModule, request } from './helpers/load-module.mjs';
 import { activityMapStatements, migrateActivityMapSchema } from '../scripts/release-activity-map-schema.mjs';
@@ -128,7 +128,7 @@ test('activity map accepts versioned deletes and exposes only public fields', ()
     tooltip_text: 'Kort omtale', activity_number: '4A', alpine_color: 'blue', feature_subtype: null, geometry: JSON.stringify(polygon.geometry), is_draft: true, version: '2',
     source_ids: ['kartverket', 'not-allowed'], last_changed_by: 'private@example.test' };
   const publicResult = publicActivityFeatureRecord(row);
-  assert.deepEqual(Object.keys(publicResult).sort(), ['activityNumber', 'alpineColor', 'category', 'categoryName', 'categoryColor', 'typeName', 'subtypeName', 'geometryKind', 'featureType', 'featureSubtype', 'geometry', 'id', 'name', 'tooltipText', 'season', 'websiteUrl', 'sources'].sort());
+  assert.deepEqual(Object.keys(publicResult).sort(), ['activityNumber', 'alpineColor', 'category', 'categoryName', 'categoryColor', 'typeName', 'subtypeName', 'geometryKind', 'featureType', 'featureSubtype', 'geometry', 'iconUrl', 'id', 'name', 'tooltipText', 'season', 'websiteUrl', 'sources'].sort());
   assert.equal(publicResult.tooltipText, 'Kort omtale');
   assert.deepEqual(publicResult.sources.map((source) => source.id), ['kartverket']);
   assert.equal(Object.hasOwn(publicResult.sources[0], 'priority'), false);
@@ -302,7 +302,7 @@ test('database schema seeds the requested alpine drafts idempotently', async () 
       './db.js': { getSql: () => ({ query: async (...args) => (await database.query(...args)).rows }) },
       './mock-store.js': { isMockMode: () => false }, './member-self-service-utils.js': { randomId: () => `custom-${++nextId}` },
       './public-content-cache.js': { revalidatePublicActivityMap: () => { invalidations++; } },
-      './activity-map-catalog.js': { DEFAULT_ACTIVITY_CATALOG, normalizeActivityCatalogInput }, './map/geo.js': { MapError },
+      './activity-map-catalog.js': { DEFAULT_ACTIVITY_CATALOG, normalizeActivityCatalogInput, withActivityMapCatalogIcon }, './map/geo.js': { MapError },
     });
     const categoryInput = { kind: 'category', action: 'create', name: 'Vintertur', color: '#20636c' };
     let catalog = await service.saveActivityMapCatalogEntry(categoryInput);

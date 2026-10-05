@@ -106,8 +106,8 @@ export default function PublicActivityMap({ features }) {
         </div>
       </div>
     </div>
-    <section className="public-activity-external" aria-labelledby="more-cross-country-trails"><h3 id="more-cross-country-trails">{t('moreTrails')}</h3>
+    {crossCountrySelected && <section className="public-activity-external" aria-labelledby="more-cross-country-trails"><h3 id="more-cross-country-trails">{t('moreTrails')}</h3>
       <p>{t('externalLinksHelp')}</p><ul>{ACTIVITY_MAP_EXTERNAL_LINKS.map((link) => <li key={link.id}><a href={link.url} target="_blank" rel="noopener noreferrer">{t(`externalLinks.${link.id}`)}</a></li>)}</ul>
-    </section>
+    </section>}
   </section>;
 }

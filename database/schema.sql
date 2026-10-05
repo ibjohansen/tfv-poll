@@ -532,6 +532,7 @@ CREATE TABLE IF NOT EXISTS activity_map_categories (
   id TEXT PRIMARY KEY CHECK (id ~ '^[a-z0-9][a-z0-9_-]{0,63}$'),
   name TEXT NOT NULL CHECK (length(btrim(name)) BETWEEN 1 AND 80),
   color TEXT NOT NULL CHECK (color ~ '^#[0-9a-fA-F]{6}$'),
+  icon_key TEXT,
   version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_changed_by TEXT
@@ -542,6 +543,7 @@ CREATE TABLE IF NOT EXISTS activity_map_types (
   id TEXT NOT NULL CHECK (id ~ '^[a-z0-9][a-z0-9_-]{0,63}$'),
   name TEXT NOT NULL CHECK (length(btrim(name)) BETWEEN 1 AND 80),
   geometry_kind TEXT NOT NULL CHECK (geometry_kind IN ('polygon', 'line', 'point')),
+  icon_key TEXT,
   version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_changed_by TEXT,
@@ -553,6 +555,7 @@ CREATE TABLE IF NOT EXISTS activity_map_subtypes (
   feature_type TEXT NOT NULL,
   id TEXT NOT NULL CHECK (id ~ '^[a-z0-9][a-z0-9_-]{0,63}$'),
   name TEXT NOT NULL CHECK (length(btrim(name)) BETWEEN 1 AND 80),
+  icon_key TEXT,
   version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_changed_by TEXT,
@@ -560,6 +563,18 @@ CREATE TABLE IF NOT EXISTS activity_map_subtypes (
   FOREIGN KEY (category, feature_type) REFERENCES activity_map_types(category, id) ON DELETE RESTRICT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS activity_map_subtypes_name_idx ON activity_map_subtypes (category, feature_type, lower(btrim(name)));
+ALTER TABLE activity_map_categories ADD COLUMN IF NOT EXISTS icon_key TEXT;
+ALTER TABLE activity_map_types ADD COLUMN IF NOT EXISTS icon_key TEXT;
+ALTER TABLE activity_map_subtypes ADD COLUMN IF NOT EXISTS icon_key TEXT;
+ALTER TABLE activity_map_categories DROP CONSTRAINT IF EXISTS activity_map_categories_icon_key_check;
+ALTER TABLE activity_map_categories ADD CONSTRAINT activity_map_categories_icon_key_check
+  CHECK (icon_key IS NULL OR icon_key ~ '^activity-map/icons/[a-f0-9]{32}\.svg$');
+ALTER TABLE activity_map_types DROP CONSTRAINT IF EXISTS activity_map_types_icon_key_check;
+ALTER TABLE activity_map_types ADD CONSTRAINT activity_map_types_icon_key_check
+  CHECK (icon_key IS NULL OR icon_key ~ '^activity-map/icons/[a-f0-9]{32}\.svg$');
+ALTER TABLE activity_map_subtypes DROP CONSTRAINT IF EXISTS activity_map_subtypes_icon_key_check;
+ALTER TABLE activity_map_subtypes ADD CONSTRAINT activity_map_subtypes_icon_key_check
+  CHECK (icon_key IS NULL OR icon_key ~ '^activity-map/icons/[a-f0-9]{32}\.svg$');
 INSERT INTO activity_map_categories (id, name, color) VALUES
   ('cycling', 'Sykkel', '#16745a'), ('alpine', 'Alpint', '#7d3147'), ('hiking', 'Tur', '#a66321'),
   ('cross_country', 'Langrenn', '#2f6fb0'), ('retail', 'Utsalg', '#00546c'), ('training', 'Trening', '#326981'),

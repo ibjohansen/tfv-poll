@@ -802,14 +802,20 @@ produksjonsbruk; den lokale 20/minutt-grensen er bare per-instans.
 Se [kartmodulens datakilder, begrensninger og bruk](docs/map-explorer.md).
 
 Aktivitetskartet ligger på `/admin/activity-map`, med beskyttede Node-ruter
-`GET/POST /api/admin/activity-map/features`, `POST /api/admin/activity-map/catalog` og
-`GET/POST /api/admin/activity-map/import`. Rutene bruker eksisterende
+`GET/POST /api/admin/activity-map/features`, `POST /api/admin/activity-map/catalog`,
+`POST/DELETE /api/admin/activity-map/catalog/icon`, `GET /api/activity-map/icons/*` og
+`GET/POST /api/admin/activity-map/import`. Adminrutene bruker eksisterende
 `members`-rettighet, same-origin-kontroll og pooled databaseforbindelse. Data
-lagres i `activity_map_features`, med redigerbare kategorier og typer i
-`activity_map_categories` og `activity_map_types`. Under «Administrer kategorier og typer»
-kan administrator opprette kategorier, velge kategorifarge og opprette typer med
-polygon, linje eller punkt. Navn kan endres uten å endre aktivitetenes koblinger.
+lagres i `activity_map_features`, med redigerbare kategorier, typer og undertyper i
+`activity_map_categories`, `activity_map_types` og `activity_map_subtypes`. Under
+«Administrer kategorier, typer og undertyper» kan administrator opprette katalogoppføringer,
+velge kategorifarge og velge geometri for nye typer. Navn kan endres uten å endre aktivitetenes koblinger.
 Geometriformen låses ved opprettelse; en annen form krever en ny type.
+Et valgfritt SVG-ikon kan lastes opp på kategori-, type- eller undertypenivå. SVG-en
+valideres mot en streng elementliste og avviser aktive eller eksterne SVG-funksjoner før privat lagring. Det vises gjennom
+en offentlig, cachet innholdsroute med CSP-sandbox; ikonets private lagringsnøkkel returneres aldri.
+Undertypeikon overstyrer typeikon, som overstyrer kategoriikon; uten opplastet ikon brukes
+det innebygde standardikonet.
 Standardkategoriene er Sykkel, Alpint, Tur og Langrenn; turer og langrenn bruker linjer, sykkel- og
 alpinløyper samt heiser bruker polygoner, og park/akebakke bruker punkt.
 Alpinaktiviteter kan
@@ -1602,7 +1608,9 @@ Utfør kontrollene i denne rekkefølgen:
 - På `/admin/activity-map`, opprett en kategori og en type med linjegeometri i et isolert testmiljø.
   Tegn, lagre og last aktiviteten på nytt. Endre kategori-/typenavn og kontroller at
   geometri og koblinger beholdes, og at nye navn vises i filtre og tooltip på
-  forsiden. Kontroller også polygon/punkt, kladder, kategorier uten typer,
+  forsiden. Opprett også en undertype, last opp og fjern et gyldig SVG-ikon og kontroller
+  at det vises både i admin og på forsiden. Ugyldige SVG-er, en foreldet katalogversjon og
+  opplasting uten medlemsøkt skal avvises. Kontroller også polygon/punkt, kladder, kategorier uten typer,
   duplikatnavn og at en foreldet versjon ikke overskriver nyere endringer.
 - Før aktivitetsimport: test migrering og import på en isolert Neon-gren, opprett
   produksjonssnapshot etter godkjenning, og verifiser vert, skjema-hash og importplan-hash.

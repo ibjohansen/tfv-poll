@@ -28,10 +28,12 @@ const activityMap = {
   },
   admin: {
     catalog: {
-      title: 'Administrer kategorier og typer', help: 'Opprett egne kategorier og typer, eller endre navn på eksisterende. Aktivitetene beholder koblingene sine ved navneendring.',
-      categoryForm: 'Aktivitetskategorier', typeForm: 'Aktivitetstyper', chooseCategory: 'Velg kategori å redigere', chooseType: 'Velg type å redigere',
-      newCategory: 'Ny kategori', newType: 'Ny type', categoryName: 'Kategorinavn', typeName: 'Typenavn', categoryColor: 'Kategorifarge i kartet',
-      saveCategory: 'Lagre kategori', saveType: 'Lagre type', saved: 'Kategorier og typer er oppdatert.',
+      title: 'Administrer kategorier, typer og undertyper', help: 'Opprett egne kategorier, typer og undertyper, eller endre navn på eksisterende. Aktivitetene beholder koblingene sine ved navneendring.',
+      categoryForm: 'Aktivitetskategorier', typeForm: 'Aktivitetstyper', subtypeForm: 'Aktivitetsundertyper', chooseCategory: 'Velg kategori å redigere', chooseType: 'Velg type å redigere', chooseSubtype: 'Velg undertype å redigere',
+      newCategory: 'Ny kategori', newType: 'Ny type', newSubtype: 'Ny undertype', categoryName: 'Kategorinavn', typeName: 'Typenavn', subtypeName: 'Undertypenavn', categoryColor: 'Kategorifarge i kartet',
+      saveCategory: 'Lagre kategori', saveType: 'Lagre type', saveSubtype: 'Lagre undertype', saved: 'Kategorier, typer og undertyper er oppdatert.',
+      icon: 'Ikon', iconPreview: 'Forhåndsvisning av ikon', iconUpload: 'Last opp SVG-ikon', iconHelp: 'Valgfritt. SVG-er valideres før de lagres.', removeIcon: 'Fjern opplastet ikon', iconRemoved: 'Det opplastede ikonet er fjernet.',
+      iconFile: 'Velg en gyldig SVG-fil på maksimalt 150 kB.', iconMissing: 'Ikonet finnes ikke lenger.', iconStorage: 'Ikonlagringen er ikke tilgjengelig.', iconChanged: 'Kategorien, typen eller undertypen er endret av en annen bruker. Last inn siden på nytt.', iconUnauthorized: 'Du må logge inn for å administrere ikoner.', iconInvalidRequest: 'Forespørselen kunne ikke godtas.',
       geometry: 'Geometriform', geometries: { polygon: 'Polygon (område)', line: 'Linje (rute)', point: 'Punkt' },
       geometryHelp: 'Geometriformen låses etter opprettelse. Opprett en ny type dersom du trenger en annen geometriform.',
       selectType: 'Velg type', noTypes: 'Opprett en type for denne kategorien under «Administrer kategorier og typer» før du lagrer aktiviteten.',

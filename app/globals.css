@@ -3291,6 +3291,16 @@ body:has(.cookie-notice) { padding-bottom: 6rem; }
 .activity-catalog-forms label { display: grid; gap: .35rem; min-width: 0; font-size: .85rem; font-weight: 650; }
 .activity-catalog-forms input, .activity-catalog-forms select { width: 100%; min-height: 44px; padding: .55rem .65rem; border: 1px solid #b8ad9f; border-radius: 7px; background: #fff; color: inherit; font: inherit; }
 .activity-catalog-forms input[type="color"] { max-width: 100px; padding: .25rem; }
+.activity-catalog-icon-fields { display: grid; grid-template-columns: auto 38px minmax(0, 1fr); align-items: center; gap: .5rem .7rem; }
+.activity-catalog-icon-label { font-size: .85rem; font-weight: 650; }
+.activity-catalog-icon-preview { display: grid; place-items: center; width: 34px; height: 34px; overflow: hidden; border: 1px solid #d7d0c7; border-radius: 50%; background: #fffdf8; color: #20636c; }
+.activity-catalog-icon-preview svg, .activity-catalog-icon-preview img { display: block; width: 30px; height: 30px; padding: 5px; object-fit: contain; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.9; }
+.activity-catalog-icon-preview.is-serving, .activity-catalog-icon-preview.is-parking, .activity-catalog-icon-preview.is-restroom, .activity-catalog-icon-preview.is-evCharging { border-radius: 4px; background: #00546c; color: #fff; }
+.activity-catalog-icon-preview.is-bowlLift, .activity-catalog-icon-preview.is-tBar { border: 3px solid #ef9400; background: #fffdf8; color: #262626; }
+.activity-catalog-icon-preview.is-bowlLift svg, .activity-catalog-icon-preview.is-tBar svg { width: 28px; height: 28px; padding: 4px; }
+.activity-catalog-icon-fields > label { grid-column: 1 / -1; }
+.activity-catalog-icon-fields > small { grid-column: 1 / -1; color: #665950; font-size: .78rem; line-height: 1.4; }
+.activity-catalog-icon-fields > button { grid-column: 1 / -1; justify-self: start; }
 .activity-tooltip-field { grid-column: 1 / -1; }
 .activity-drawing-actions { justify-content: flex-start; }
 .activity-admin-map-frame { position: relative; min-width: 0; }
@@ -3349,8 +3359,10 @@ body:has(.cookie-notice) { padding-bottom: 6rem; }
 .public-activity-map-frame .leaflet-tooltip { padding: 8px 10px; border-radius: 7px; line-height: 1.4; }
 .public-activity-map-frame .leaflet-tooltip div { color: #665950; font-size: 12px; }
 .public-activity-map-frame .leaflet-tooltip p { max-width: 260px; margin: 5px 0 0; color: #493f39; white-space: normal; }
-.activity-map-category-icon { width: 30px !important; height: 30px !important; border: 0 !important; border-radius: 50%; background: #fffdf8; color: #20636c; filter: drop-shadow(0 2px 3px rgba(54, 43, 34, .28)); pointer-events: none; }
+.activity-map-category-icon { width: 30px !important; height: 30px !important; border: 0 !important; border-radius: 50%; background: #fffdf8; color: #20636c; filter: drop-shadow(0 2px 3px rgba(54, 43, 34, .28)); }
+.activity-map-category-icon.leaflet-interactive:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 .activity-map-category-icon svg { display: block; width: 30px; height: 30px; padding: 5px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.9; }
+.activity-map-category-icon img { display: block; width: 30px; height: 30px; padding: 3px; object-fit: contain; }
 .activity-map-category-icon svg text { font-family: Arial, sans-serif; font-size: 14px; font-weight: 800; }.activity-map-category-icon.is-restroom svg text { font-size: 10px; }
 .activity-map-category-icon.is-alpine { color: #7d3147; }.activity-map-category-icon.is-crossCountry { background: #a34391; color: #fff; }.activity-map-category-icon.is-cycling { color: #16745a; }.activity-map-category-icon.is-training { color: #6b478c; }.activity-map-category-icon.is-hiking { color: #a66321; }.activity-map-category-icon.is-retail { color: #805c2f; }
 .activity-map-category-icon.is-serving, .activity-map-category-icon.is-parking, .activity-map-category-icon.is-restroom, .activity-map-category-icon.is-evCharging { border-radius: 3px; background: #00546c; color: #fff; }.activity-map-category-icon.is-bowlLift, .activity-map-category-icon.is-tBar { border: 3px solid #ef9400 !important; background: #fffdf8; color: #262626; }.activity-map-category-icon.is-bowlLift svg, .activity-map-category-icon.is-tBar svg { width: 24px; height: 24px; padding: 4px; }.activity-map-category-icon.is-lift { background: #ef9400; color: #fffdf8; }.activity-map-category-icon.is-chairlift, .activity-map-category-icon.is-gondola { color: #ef9400; }

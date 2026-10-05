@@ -8,6 +8,7 @@ import { BACKGROUND_MAP, SATELLITE_MAP } from '@/lib/map/sources';
 import { useI18n } from '@/components/LocaleProvider';
 import { activityCategoryColor, activityCategoryLabel, activitySubtypeLabel, activityTypeLabel } from '@/lib/activity-map-catalog';
 import { ACTIVITY_MAP_SOURCES } from '@/lib/activity-map-sources';
+import { bindActivityIconInteraction } from '@/lib/map/leaflet-icon-interaction';
 import { revealLeafletLayerWithoutZoom } from '@/lib/map/leaflet-viewport';
 import { activityMapIconAnchor, activityMapIconCoordinate, activityMapIconKind, activityMapIconMarkup } from '@/lib/activity-map-icons';
 
@@ -114,11 +115,10 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
       const selected = feature.id === selectedId;
       const style = featureStyle(feature, showAlpineColors, selected);
       const layer = L.geoJSON({ type: 'Feature', properties: {}, geometry: smoothActivityGeometry(feature.geometry) }, {
+        interactive: false,
         style,
-        pointToLayer: (_item, point) => L.circleMarker(point, { ...style, radius: selected ? 12 : 9, fillOpacity: .92 }),
+        pointToLayer: (_item, point) => L.circleMarker(point, { ...style, interactive: false, radius: selected ? 12 : 9, fillOpacity: .92 }),
       }).addTo(group);
-      const iconCoordinate = activityMapIconCoordinate(feature.geometry);
-      if (iconCoordinate) L.marker(latLng(iconCoordinate), { icon: activityCategoryIcon(feature, selected), interactive: false, keyboard: false }).addTo(group);
       const label = document.createElement('div');
       const name = document.createElement('strong');
       name.textContent = feature.activityNumber ? `${feature.activityNumber}. ${feature.name}` : feature.name;
@@ -130,8 +130,18 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
         description.textContent = feature.tooltipText;
         label.append(description);
       }
-      layer.bindTooltip(label, { sticky: true, direction: 'auto' });
-      layer.on('click', () => onSelect(feature.id));
+      const iconCoordinate = activityMapIconCoordinate(feature.geometry);
+      if (iconCoordinate) {
+        const iconMarker = L.marker(latLng(iconCoordinate), {
+          icon: activityCategoryIcon(feature, selected), interactive: true, keyboard: true, bubblingMouseEvents: false,
+        }).addTo(group);
+        const iconElement = iconMarker.getElement();
+        iconElement?.setAttribute('data-activity-icon-id', feature.id);
+        iconElement?.setAttribute('aria-label', feature.name);
+        bindActivityIconInteraction({ marker: iconMarker, map: mapRef.current,
+          tooltip: L.tooltip({ direction: 'auto', offset: [0, -18] }).setContent(label),
+          onSelect: () => onSelect(feature.id) });
+      }
       layer.eachLayer((item) => item.getElement()?.setAttribute('data-feature-id', feature.id));
       featureLayers.current.set(feature.id, layer);
     }

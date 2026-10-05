@@ -177,9 +177,9 @@ test('activity maps support satellite layers, editable polygons and hiking route
   await expect(adminMap.locator('.activity-map-category-icon.is-tBar svg')).toHaveCSS('height', '24px');
   await expect(adminMap.locator('.activity-map-category-icon.is-tBar svg')).toHaveCSS('padding', '4px');
   await page.getByRole('checkbox', { name: 'Alpint', exact: true }).uncheck();
-  await expect(page.getByRole('button', { name: /Slåtteliheisen/ })).toHaveCount(0);
+  await expect(page.locator('.activity-feature-list').getByRole('button', { name: /Slåtteliheisen/ })).toHaveCount(0);
   await page.getByRole('checkbox', { name: 'Alpint', exact: true }).check();
-  await expect(page.getByRole('button', { name: /Slåtteliheisen/ })).toBeVisible();
+  await expect(page.locator('.activity-feature-list').getByRole('button', { name: /Slåtteliheisen/ })).toBeVisible();
   await page.getByRole('button', { name: 'Rediger geometri' }).click();
   await expect(adminMap.locator('div.activity-geometry-midpoint')).toHaveCount(3);
   await adminMap.locator('div.activity-geometry-midpoint').first().click();
@@ -247,7 +247,10 @@ test('admin activity map can filter the Turufjell trail subset', async ({ page, 
   await expect(list.getByRole('button', { name: /Turufjell-runden/ })).toBeVisible();
   await expect(list.getByRole('button', { name: /Løypelagsrunden/ })).toBeVisible();
   await expect(list.getByRole('button', { name: /Fjellrunden/ })).toHaveCount(0);
-  await page.locator('.activity-admin-map [data-feature-id="trail-local-operator"]').dispatchEvent('click');
+  const adminGeometry = page.locator('.activity-admin-map [data-feature-id="trail-local-operator"]');
+  await adminGeometry.dispatchEvent('click');
+  await expect(list.getByRole('button', { name: /Løypelagsrunden/ })).toHaveAttribute('aria-pressed', 'false');
+  await page.locator('.activity-admin-map [data-activity-icon-id="trail-local-operator"]').dispatchEvent('click');
   await expect(list.getByRole('button', { name: /Løypelagsrunden/ })).toHaveAttribute('aria-pressed', 'true');
   const adminMap = page.locator('.activity-admin-map');
   const initialAdminZoom = await adminMap.getAttribute('data-zoom-level');
@@ -265,38 +268,41 @@ test('public activity explorer defaults to Turufjell and keeps map, filters and 
   }));
   await page.goto('/activity-map-browser-test');
   const explorer = page.locator('.public-activity-explorer');
+  const activityList = explorer.getByRole('list', { name: 'Synlige aktiviteter' });
   const turufjell = explorer.getByRole('checkbox', { name: 'Nærhet til Turufjell' });
   await expect(turufjell).toBeChecked();
-  await expect(explorer.getByRole('button', { name: /Sykkelrunden/ })).toBeVisible();
-  await expect(explorer.getByRole('button', { name: /Testløypa/ })).toBeVisible();
-  await expect(explorer.getByRole('button', { name: /Fjernløypa/ })).toHaveCount(0);
+  await expect(activityList.getByRole('button', { name: /Sykkelrunden/ })).toBeVisible();
+  await expect(activityList.getByRole('button', { name: /Testløypa/ })).toBeVisible();
+  await expect(activityList.getByRole('button', { name: /Fjernløypa/ })).toHaveCount(0);
   await explorer.getByRole('checkbox', { name: 'Langrenn', exact: true }).uncheck();
   await expect(explorer.getByRole('checkbox', { name: 'Nærhet til Turufjell' })).toHaveCount(0);
-  await expect(explorer.getByRole('button', { name: /Sykkelrunden/ })).toBeVisible();
+  await expect(activityList.getByRole('button', { name: /Sykkelrunden/ })).toBeVisible();
   await explorer.getByRole('checkbox', { name: 'Langrenn', exact: true }).check();
   await expect(explorer.getByRole('checkbox', { name: 'Nærhet til Turufjell' })).toBeChecked();
   await explorer.getByRole('checkbox', { name: 'Velg alle', exact: true }).uncheck();
-  await expect(explorer.getByRole('list', { name: 'Synlige aktiviteter' }).getByRole('button')).toHaveCount(0);
+  await expect(activityList.getByRole('button')).toHaveCount(0);
   await explorer.getByRole('checkbox', { name: 'Velg alle', exact: true }).check();
-  await expect(explorer.getByRole('button', { name: /Testløypa/ })).toBeVisible();
+  await expect(activityList.getByRole('button', { name: /Testløypa/ })).toBeVisible();
   const publicMap = explorer.locator('.public-activity-map');
-  const localButton = explorer.getByRole('button', { name: /Testløypa/ });
+  const localButton = activityList.getByRole('button', { name: /Testløypa/ });
   await localButton.click();
   const initialPublicZoom = await publicMap.getAttribute('data-zoom-level');
   await publicMap.getByTitle('Zoom inn').click();
   await expect(publicMap).not.toHaveAttribute('data-zoom-level', initialPublicZoom);
   const chosenPublicZoom = await publicMap.getAttribute('data-zoom-level');
-  await explorer.getByRole('button', { name: /Blåløypa/ }).click();
+  await activityList.getByRole('button', { name: /Blåløypa/ }).click();
   await expect(publicMap).toHaveAttribute('data-zoom-level', chosenPublicZoom);
 
   await turufjell.uncheck();
-  const remoteButton = explorer.getByRole('button', { name: /Fjernløypa/ });
+  const remoteButton = activityList.getByRole('button', { name: /Fjernløypa/ });
   await expect(remoteButton).toBeVisible();
   await localButton.click();
   await expect(localButton).toHaveAttribute('aria-pressed', 'true');
   await expect(explorer.locator('[data-feature-id="cross-country-activity"]')).toHaveClass(/is-selected/);
 
   await explorer.locator('[data-feature-id="remote-cross-country"]').dispatchEvent('click');
+  await expect(localButton).toHaveAttribute('aria-pressed', 'true');
+  await explorer.locator('[data-activity-icon-id="remote-cross-country"]').dispatchEvent('click');
   await expect(remoteButton).toHaveAttribute('aria-pressed', 'true');
   await expect(explorer.locator('[data-feature-id="remote-cross-country"]')).toHaveAttribute('stroke', '#c92f2f');
   const mapBounds = await explorer.locator('.public-activity-map').boundingBox();
@@ -321,8 +327,11 @@ test('public activity explorer defaults to Turufjell and keeps map, filters and 
   await expect(explorer.locator('.public-activity-map')).toBeVisible();
   await expect(explorer.locator('.leaflet-popup')).toHaveCount(0);
   await expect(explorer.getByRole('region', { name: 'Aktivitetsinformasjon' }).getByRole('heading', { name: 'Fjernløypa' })).toBeVisible();
-  await explorer.locator('[data-feature-id="remote-cross-country"]').hover();
-  await expect(explorer.locator('.leaflet-tooltip')).toBeVisible();
+  const remoteIcon = explorer.locator('[data-activity-icon-id="remote-cross-country"]');
+  await remoteIcon.hover();
+  await page.waitForTimeout(300);
+  await expect(explorer.locator('.leaflet-tooltip')).toHaveCount(0);
+  await expect(explorer.locator('.leaflet-tooltip')).toBeVisible({ timeout: 1_000 });
   await explorer.getByRole('button', { name: 'Avslutt fullskjerm' }).click();
   await expect.poll(() => page.evaluate(() => document.fullscreenElement)).toBeNull();
 });
@@ -345,7 +354,7 @@ test('activity categories and types can be created, renamed and used after reloa
     return route.fulfill({ json: { catalog } });
   });
   await page.goto('/admin/activity-map');
-  await page.getByText('Administrer kategorier og typer', { exact: true }).click();
+  await page.getByText('Administrer kategorier, typer og undertyper', { exact: true }).click();
   const categories = page.getByRole('form', { name: 'Aktivitetskategorier' });
   const types = page.getByRole('form', { name: 'Aktivitetstyper' });
   const editor = page.locator('.activity-editor-panel');
@@ -376,14 +385,15 @@ test('activity categories and types can be created, renamed and used after reloa
   await types.getByRole('button', { name: 'Lagre type' }).click();
   await expect(page.locator('.activity-feature-list')).toContainText('Vinteraktiviteter · Trugetur');
   await page.reload();
-  await page.getByRole('button', { name: /Trugerunden/ }).click();
+  await page.locator('.activity-feature-list').getByRole('button', { name: /Trugerunden/ }).click();
   await expect(editor.getByRole('combobox', { name: 'Kategori', exact: true })).toHaveValue('custom-category');
   await expect(editor.getByRole('combobox', { name: 'Type', exact: true })).toHaveValue('custom-type');
   expect(features[0].geometry).toEqual(geometry);
   await expect(editor.getByLabel('Kort tekst i kartmarkør')).toHaveValue('Følg vintermerkingen.');
 
   await page.goto('/activity-map-browser-test');
-  await expect(page.getByRole('button', { name: /Trugerunden/ })).toContainText('Vinteraktiviteter · Trugetur');
+  const publicActivityList = page.getByRole('list', { name: 'Synlige aktiviteter' });
+  await expect(publicActivityList.getByRole('button', { name: /Trugerunden/ })).toContainText('Vinteraktiviteter · Trugetur');
   // SSR labels can appear before hydration; the Leaflet control proves mount.
   await expect(page.getByTitle('Zoom inn')).toBeVisible();
   for (const icon of ['alpine', 'crossCountry', 'cycling', 'hiking', 'training', 'serving', 'bowlLift', 'tBar', 'parking', 'restroom', 'evCharging']) {
@@ -392,9 +402,9 @@ test('activity categories and types can be created, renamed and used after reloa
   await expect(page.locator('.activity-map-category-icon.is-evCharging')).toHaveCSS('margin-left', '-15px');
   await expect(page.locator('.activity-map-category-icon.is-evCharging')).toHaveCSS('margin-top', '-30px');
   await page.getByRole('checkbox', { name: 'Vinteraktiviteter', exact: true }).uncheck();
-  await expect(page.getByRole('button', { name: /Trugerunden/ })).toHaveCount(0);
+  await expect(publicActivityList.getByRole('button', { name: /Trugerunden/ })).toHaveCount(0);
   await page.getByRole('checkbox', { name: 'Vinteraktiviteter', exact: true }).check();
-  await expect(page.getByRole('button', { name: /Trugerunden/ })).toBeVisible();
+  await expect(publicActivityList.getByRole('button', { name: /Trugerunden/ })).toBeVisible();
 });
 
 test('activity seasons and website details work on desktop and mobile', async ({ page }) => {
@@ -402,26 +412,32 @@ test('activity seasons and website details work on desktop and mobile', async ({
     contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#dce8d2"/></svg>',
   }));
   await page.goto('/activity-map-browser-test');
+  const activityList = page.getByRole('list', { name: 'Synlige aktiviteter' });
   const filter = page.getByRole('combobox', { name: 'Sesong', exact: true });
   await filter.selectOption('winter');
-  await expect(page.getByRole('button', { name: /Sykkelrunden/ })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /Blåløypa/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Kafeen/ })).toBeVisible();
+  await expect(activityList.getByRole('button', { name: /Sykkelrunden/ })).toHaveCount(0);
+  await expect(activityList.getByRole('button', { name: /Blåløypa/ })).toBeVisible();
+  await expect(activityList.getByRole('button', { name: /Kafeen/ })).toBeVisible();
   await filter.selectOption('summer');
-  await expect(page.getByRole('button', { name: /Blåløypa/ })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /Sykkelrunden/ })).toBeVisible();
-  await page.getByRole('button', { name: /Kafeen/ }).click();
+  await expect(activityList.getByRole('button', { name: /Blåløypa/ })).toHaveCount(0);
+  await expect(activityList.getByRole('button', { name: /Sykkelrunden/ })).toBeVisible();
+  await activityList.getByRole('button', { name: /Kafeen/ }).click();
   const details = page.getByRole('region', { name: 'Aktivitetsinformasjon' });
   await expect(details).toContainText('Servering ved alpinanlegget.');
   await expect(details.getByRole('link', { name: /Besøk webside/ })).toHaveAttribute('href', 'https://example.test/kafe');
   await expect(details.getByRole('link')).toHaveAttribute('rel', 'noopener noreferrer');
   await expect(details).toHaveCSS('position', 'sticky');
   await expect(page.locator('.leaflet-popup')).toHaveCount(0);
-  await page.locator('[data-feature-id="retail-point"]').hover();
+  const pointGeometry = page.locator('[data-feature-id="retail-point"]');
+  await expect(pointGeometry).toHaveCSS('pointer-events', 'none');
+  await pointGeometry.dispatchEvent('mouseover');
+  await page.waitForTimeout(600);
+  await expect(page.locator('.public-activity-map-frame .leaflet-tooltip')).toHaveCount(0);
+  await page.locator('[data-activity-icon-id="retail-point"]').hover();
   await expect(page.locator('.public-activity-map-frame .leaflet-tooltip')).toBeVisible();
   await page.getByRole('checkbox', { name: 'Utsalg', exact: true }).uncheck();
   await expect(details).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /Kafeen/ })).toHaveCount(0);
+  await expect(activityList.getByRole('button', { name: /Kafeen/ })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 

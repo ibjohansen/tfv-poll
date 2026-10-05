@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import { ACTIVITY_MAP_CENTER } from '@/lib/activity-map-display';
 import { activityCategoryColor } from '@/lib/activity-map-catalog';
 import { BACKGROUND_MAP, SATELLITE_MAP } from '@/lib/map/sources';
+import { bindActivityIconInteraction } from '@/lib/map/leaflet-icon-interaction';
 import { revealLeafletLayerWithoutZoom } from '@/lib/map/leaflet-viewport';
 import { activityMapIconAnchor, activityMapIconCoordinate, activityMapIconKind, activityMapIconMarkup } from '@/lib/activity-map-icons';
 
@@ -110,19 +111,20 @@ export default function ActivityMapEditorView({ features, previewFeatures = [], 
   }, [baseMap]);
 
   useEffect(() => {
+    const map = mapRef.current;
     const group = layers.current;
+    if (!map || !group) return;
     group.clearLayers();
     featureLayers.current.clear();
     const visibleBounds = L.latLngBounds();
     for (const feature of features) {
       if (feature.id === draft.id || !feature.geometry) continue;
       const layer = L.geoJSON({ type: 'Feature', properties: {}, geometry: feature.geometry }, {
+        interactive: false,
         style: { className: 'activity-map-visible-feature', color: activityCategoryColor(feature), weight: 3, fillOpacity: .18 },
-        pointToLayer: (_item, point) => L.circleMarker(point, { radius: 8, color: activityCategoryColor(feature), fillColor: '#fff', fillOpacity: .95, weight: 3 }),
+        pointToLayer: (_item, point) => L.circleMarker(point, { interactive: false, radius: 8, color: activityCategoryColor(feature), fillColor: '#fff', fillOpacity: .95, weight: 3 }),
       }).addTo(group);
       visibleBounds.extend(layer.getBounds());
-      const iconCoordinate = activityMapIconCoordinate(feature.geometry);
-      if (iconCoordinate) L.marker(latLng(iconCoordinate), { icon: activityCategoryIcon(feature), interactive: false, keyboard: false }).addTo(group);
       layer.eachLayer((item) => item.getElement()?.setAttribute('data-feature-id', feature.id));
       featureLayers.current.set(feature.id, layer);
       const tooltip = document.createElement('div');
@@ -134,8 +136,18 @@ export default function ActivityMapEditorView({ features, previewFeatures = [], 
         description.textContent = feature.tooltipText;
         tooltip.append(description);
       }
-      layer.bindTooltip(tooltip);
-      layer.on('click', () => { if (!drawing && !editing) onSelect(feature); });
+      const iconCoordinate = activityMapIconCoordinate(feature.geometry);
+      if (iconCoordinate) {
+        const iconMarker = L.marker(latLng(iconCoordinate), {
+          icon: activityCategoryIcon(feature), interactive: !drawing && !editing, keyboard: !drawing && !editing, bubblingMouseEvents: false,
+        }).addTo(group);
+        const iconElement = iconMarker.getElement();
+        iconElement?.setAttribute('data-activity-icon-id', feature.id);
+        iconElement?.setAttribute('aria-label', feature.name);
+        if (!drawing && !editing) bindActivityIconInteraction({ marker: iconMarker, map,
+          tooltip: L.tooltip({ direction: 'auto', offset: [0, -18] }).setContent(tooltip),
+          onSelect: () => onSelect(feature) });
+      }
     }
     for (const candidate of previewFeatures) {
       if (!candidate.geometry) continue;
@@ -150,18 +162,41 @@ export default function ActivityMapEditorView({ features, previewFeatures = [], 
       return;
     }
     L.geoJSON({ type: 'Feature', properties: {}, geometry: draft.geometry }, {
+      interactive: false,
       style: selectedGeometryHaloStyle,
       pointToLayer: (_item, point) => L.circleMarker(point, {
-        ...selectedGeometryHaloStyle, radius: 15, fillColor: '#fffdf8', fillOpacity: .95, weight: 3,
+        ...selectedGeometryHaloStyle, interactive: false, radius: 15, fillColor: '#fffdf8', fillOpacity: .95, weight: 3,
       }),
     }).addTo(group);
     const currentStyle = { ...selectedGeometryStyle, dashArray: drawing ? '7 5' : undefined };
     const selectedLayer = L.geoJSON({ type: 'Feature', properties: {}, geometry: draft.geometry }, {
+      interactive: false,
       style: currentStyle,
-      pointToLayer: (_item, point) => L.circleMarker(point, { ...currentStyle, radius: 10, fillOpacity: .95 }),
+      pointToLayer: (_item, point) => L.circleMarker(point, { ...currentStyle, interactive: false, radius: 10, fillOpacity: .95 }),
     }).addTo(group);
     const selectedIconCoordinate = activityMapIconCoordinate(draft.geometry);
-    if (selectedIconCoordinate) L.marker(latLng(selectedIconCoordinate), { icon: activityCategoryIcon(draft, true), interactive: false, keyboard: false }).addTo(group);
+    if (selectedIconCoordinate) {
+      const selectedIconMarker = L.marker(latLng(selectedIconCoordinate), {
+        icon: activityCategoryIcon(draft, true), interactive: Boolean(draft.id) && !drawing && !editing,
+        keyboard: Boolean(draft.id) && !drawing && !editing, bubblingMouseEvents: false,
+      }).addTo(group);
+      const iconElement = selectedIconMarker.getElement();
+      iconElement?.setAttribute('data-activity-icon-id', draft.id);
+      iconElement?.setAttribute('aria-label', draft.name);
+      if (draft.id && !drawing && !editing) {
+        const tooltip = document.createElement('div');
+        const name = document.createElement('strong');
+        name.textContent = draft.name;
+        tooltip.append(name);
+        if (draft.tooltipText) {
+          const description = document.createElement('p');
+          description.textContent = draft.tooltipText;
+          tooltip.append(description);
+        }
+        bindActivityIconInteraction({ marker: selectedIconMarker, map,
+          tooltip: L.tooltip({ direction: 'auto', offset: [0, -18] }).setContent(tooltip), onSelect: () => onSelect(draft) });
+      }
+    }
     visibleBounds.extend(selectedLayer.getBounds());
     if (draft.id) featureLayers.current.set(draft.id, selectedLayer);
     if ((drawing || editing) && (draft.geometry.type === 'Polygon' || draft.geometry.type === 'LineString')) {
