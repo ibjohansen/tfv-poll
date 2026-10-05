@@ -9731,6 +9731,20 @@ body:has(.cookie-notice) {
   font: inherit;
 }
 
+.activity-icon-override-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: .35rem .65rem;
+}
+
+.activity-icon-override-field > small {
+  grid-column: 1 / -1;
+  color: #665950;
+  font-size: .78rem;
+  line-height: 1.4;
+}
+
 .activity-catalog-manager {
   margin-bottom: 1rem;
   padding: 1rem;

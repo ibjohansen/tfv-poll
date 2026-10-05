@@ -139,6 +139,7 @@ Object.assign(map.backend.errors, {
   activityCatalogColor: 'Velg en gyldig kategorifarge.', activityCatalogDuplicate: 'Navnet finnes allerede. Velg et annet navn.',
   activityCatalogChanged: 'Kategorien eller typen er endret. Last siden på nytt. Geometriformen til en eksisterende type kan ikke endres.',
   activityType: 'Velg en gyldig aktivitetstype.', activityColor: 'Velg en gyldig alpinfarge.', activityNumber: 'Nummer kan inneholde bokstaver og tall (maks 24 tegn).',
+  activityIconOverride: 'Velg et tilgjengelig ikon fra aktivitetskatalogen.',
   activityPoint: 'Plasser et gyldig punkt i kartet.', activityCombination: 'Kategori, aktivitetstype, farge og geometri kan ikke kombineres slik.',
   activityDraft: 'Kladdestatusen er ugyldig.', activityPublishedGeometry: 'En publisert aktivitet må ha gyldig geometri.',
   activityChanged: 'Aktiviteten er endret av en annen bruker. Last siden på nytt og prøv igjen.', activityMock: 'Aktiviteter kan ikke lagres i demonstrasjonsmodus.',

@@ -6,7 +6,7 @@ import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { activityFeatureRecord, activityMatchesSeason, activityMatchesTurufjell, normalizeActivityWebsite, normalizeActivityFeatureInput, publicActivityFeatureRecord, smoothActivityGeometry } from '../lib/activity-map.js';
 import { MapError } from '../lib/map/geo.js';
 import { revealLeafletLayerWithoutZoom } from '../lib/map/leaflet-viewport.js';
-import { DEFAULT_ACTIVITY_CATALOG, normalizeActivityCatalogInput, withActivityCatalog, withActivityMapCatalogIcon } from '../lib/activity-map-catalog.js';
+import { activityMapIconOverrideValue, DEFAULT_ACTIVITY_CATALOG, normalizeActivityCatalogInput, normalizeActivityMapIconOverride, withActivityCatalog, withActivityMapCatalogIcon } from '../lib/activity-map-catalog.js';
 import { activityMapIconAnchor, activityMapIconCoordinate, activityMapIconKind, activityMapIconMarkup } from '../lib/activity-map-icons.js';
 import { downloadActivityImageSource, isPublicActivityImageAddress, normalizeActivityImageSourceUrl } from '../lib/activity-map-remote-image.js';
 import { loadModule, request } from './helpers/load-module.mjs';
@@ -83,6 +83,20 @@ test('custom categories and types are validated from the catalog, not hardcoded 
   assert.throws(() => normalizeActivityCatalogInput({ kind: 'type', action: 'create', category: 'winter', name: 'A', geometryKind: 'Area' }), MapError);
 });
 
+test('an activity can override its automatic icon with a stored catalog icon', () => {
+  const iconUrl = `/api/activity-map/icons/category/parking?v=${'a'.repeat(32)}`;
+  const catalog = { ...DEFAULT_ACTIVITY_CATALOG,
+    categories: DEFAULT_ACTIVITY_CATALOG.categories.map((item) => item.id === 'parking' ? { ...item, iconUrl } : item) };
+  const value = activityMapIconOverrideValue('category', catalog.categories.find((item) => item.id === 'parking'));
+  assert.equal(value, 'category:parking');
+  assert.deepEqual(normalizeActivityMapIconOverride(value, catalog), {
+    value, kind: 'category', category: 'parking', featureType: null, featureSubtype: null,
+  });
+  assert.equal(withActivityCatalog({ category: 'cycling', featureType: 'trail', iconOverride: value }, catalog).iconUrl, iconUrl);
+  assert.throws(() => normalizeActivityMapIconOverride('category:cycling', catalog), { code: 'errors.activityIconOverride' });
+  assert.throws(() => normalizeActivityMapIconOverride('unknown:parking', catalog), { code: 'errors.activityIconOverride' });
+});
+
 test('activity map validates category, geometry and alpine metadata', () => {
   const cycling = normalizeActivityFeatureInput({ action: 'create', name: '  Rundløypa  ', category: 'cycling', featureType: 'trail', geometry: polygon });
   assert.equal(cycling.name, 'Rundløypa');
@@ -129,17 +143,20 @@ test('activity map accepts versioned deletes and exposes only public fields', ()
   assert.deepEqual(value, { action: 'delete', id: 'a'.repeat(32), version: 3 });
   const row = { id: 'b'.repeat(32), name: 'Blåløypa', category: 'alpine', feature_type: 'trail',
     tooltip_text: 'Kort omtale', activity_number: '4A', alpine_color: 'blue', feature_subtype: null, geometry: JSON.stringify(polygon.geometry), is_draft: true, version: '2',
+    icon_override_kind: 'category', icon_override_category: 'parking', override_icon_key: `activity-map/icons/${'d'.repeat(32)}.svg`,
     image_storage_key: `activity-map/images/${'b'.repeat(32)}/${'c'.repeat(32)}.webp`, image_source_url: 'https://images.example.test/trail.jpg',
     source_ids: ['kartverket', 'not-allowed'], last_changed_by: 'private@example.test' };
   const publicResult = publicActivityFeatureRecord(row);
   assert.deepEqual(Object.keys(publicResult).sort(), ['activityNumber', 'alpineColor', 'category', 'categoryName', 'categoryColor', 'typeName', 'subtypeName', 'geometryKind', 'featureType', 'featureSubtype', 'geometry', 'iconUrl', 'imageUrl', 'id', 'name', 'tooltipText', 'season', 'websiteUrl', 'sources'].sort());
   assert.equal(publicResult.tooltipText, 'Kort omtale');
   assert.equal(publicResult.imageUrl, `/api/activity-map/images/${'b'.repeat(32)}?v=${'c'.repeat(32)}`);
+  assert.equal(publicResult.iconUrl, `/api/activity-map/icons/category/parking?v=${'d'.repeat(32)}`);
   assert.deepEqual(publicResult.sources.map((source) => source.id), ['kartverket']);
   assert.equal(Object.hasOwn(publicResult.sources[0], 'priority'), false);
   assert.doesNotMatch(JSON.stringify(publicResult), /private@example|version|isDraft/);
   assert.equal(activityFeatureRecord(row).version, 2); assert.equal(activityFeatureRecord(row).isDraft, true);
   assert.equal(activityFeatureRecord(row).imageSourceUrl, 'https://images.example.test/trail.jpg');
+  assert.equal(activityFeatureRecord(row).iconOverride, 'category:parking');
   assert.doesNotMatch(JSON.stringify(publicResult), /image_storage_key|images\.example/);
 });
 
@@ -294,6 +311,8 @@ test('database schema constrains activity map combinations and adds audit trigge
   assert.match(schema, /tooltip_text TEXT/);
   assert.match(schema, /image_storage_key TEXT/);
   assert.match(schema, /activity_map_feature_image_check/);
+  assert.match(schema, /activity_map_feature_icon_override_check/);
+  assert.match(schema, /activity_map_feature_icon_override_subtype_fk/);
   assert.match(schema, /old_data := old_data - 'image_storage_key'/);
   assert.match(schema, /activity_number TEXT/);
   assert.match(schema, /ALTER COLUMN activity_number TYPE TEXT USING activity_number::TEXT/);
@@ -395,6 +414,10 @@ test('database schema seeds the requested alpine drafts idempotently', async () 
     assert.equal(catalog.types.find((item) => item.id === type.id).name, 'Trugetur');
     assert.equal(catalog.subtypes.find((item) => item.id === 't_bar')?.name, 'T-krok');
     assert.equal(invalidations, 4);
+    await database.query('UPDATE activity_map_categories SET icon_key = $1 WHERE id = $2',
+      [`activity-map/icons/${'7'.repeat(32)}.svg`, category.id]);
+    catalog = await service.getActivityMapCatalog();
+    const iconOverride = activityMapIconOverrideValue('category', catalog.categories.find((item) => item.id === category.id));
     const featureService = await loadModule('lib/activity-map-service.js', {
       './admin-access.js': { requirePermission: async () => ({ email: 'admin@example.test' }) },
       './db.js': { getSql: () => ({ query: async (...args) => (await database.query(...args)).rows }) },
@@ -404,14 +427,17 @@ test('database schema seeds the requested alpine drafts idempotently', async () 
       './activity-map-catalog-service.js': { getActivityMapCatalog: service.getActivityMapCatalog }, './activity-map-catalog.js': { withActivityCatalog },
     });
     const created = await featureService.saveActivityMapFeature({ action: 'create', name: 'Ny runde', category: category.id, featureType: type.id, geometry: hikingLine,
-      season: 'summer', websiteUrl: 'https://example.test/aktiviteter' });
+      season: 'summer', websiteUrl: 'https://example.test/aktiviteter', iconOverride });
     assert.equal(created.categoryName, 'Vinteraktiviteter'); assert.equal(created.typeName, 'Trugetur');
     assert.equal(created.season, 'summer'); assert.equal(created.websiteUrl, 'https://example.test/aktiviteter');
+    assert.equal(created.iconOverride, iconOverride);
+    assert.equal(created.iconUrl, `/api/activity-map/icons/category/${category.id}?v=${'7'.repeat(32)}`);
     const updated = await featureService.saveActivityMapFeature({ ...created, action: 'update', season: 'all_year', websiteUrl: 'https://example.test/helars' });
     assert.equal(updated.version, created.version + 1);
     // Exercise the real INSERT, UPDATE and both SELECTs, not a mock that echoes inputs.
     const reloaded = (await featureService.getAdminActivityMapFeatures()).find((item) => item.id === created.id);
     assert.equal(reloaded.season, 'all_year'); assert.equal(reloaded.websiteUrl, 'https://example.test/helars');
+    assert.equal(reloaded.iconOverride, iconOverride); assert.equal(reloaded.iconUrl, created.iconUrl);
     const publicFeatures = await featureService.getPublicActivityMapFeatures();
     assert.equal(publicFeatures.find((item) => item.id === created.id).geometryKind, 'line');
     assert.equal(publicFeatures.find((item) => item.id === created.id).season, 'all_year');

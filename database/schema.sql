@@ -609,6 +609,10 @@ CREATE TABLE IF NOT EXISTS activity_map_features (
   image_source_url TEXT,
   image_mime_type TEXT,
   image_size_bytes INTEGER,
+  icon_override_kind TEXT,
+  icon_override_category TEXT,
+  icon_override_type TEXT,
+  icon_override_subtype TEXT,
   is_draft BOOLEAN NOT NULL DEFAULT FALSE,
   version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -625,6 +629,10 @@ ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS image_storage_key TEX
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS image_source_url TEXT;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS image_mime_type TEXT;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS image_size_bytes INTEGER;
+ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS icon_override_kind TEXT;
+ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS icon_override_category TEXT;
+ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS icon_override_type TEXT;
+ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS icon_override_subtype TEXT;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS geometry_origin TEXT NOT NULL DEFAULT 'manual';
 ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_geometry_origin_check;
 ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_geometry_origin_check
@@ -643,6 +651,13 @@ ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_image_chec
     AND image_mime_type = 'image/webp' AND image_size_bytes BETWEEN 1 AND 5242880
     AND (image_source_url IS NULL OR (length(image_source_url) BETWEEN 1 AND 2048
       AND image_source_url ~ '^https://[^[:space:]/@]+([/?#]|$)' AND image_source_url !~ '[[:space:][:cntrl:]]')))
+);
+ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_icon_override_check;
+ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_icon_override_check CHECK (
+  (icon_override_kind IS NULL AND icon_override_category IS NULL AND icon_override_type IS NULL AND icon_override_subtype IS NULL)
+  OR (icon_override_kind = 'category' AND icon_override_category IS NOT NULL AND icon_override_type IS NULL AND icon_override_subtype IS NULL)
+  OR (icon_override_kind = 'type' AND icon_override_category IS NOT NULL AND icon_override_type IS NOT NULL AND icon_override_subtype IS NULL)
+  OR (icon_override_kind = 'subtype' AND icon_override_category IS NOT NULL AND icon_override_type IS NOT NULL AND icon_override_subtype IS NOT NULL)
 );
 ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_features_category_check;
 ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_number_check;
@@ -668,6 +683,16 @@ ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_type_fk
 ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_subtype_fk;
 ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_subtype_fk
   FOREIGN KEY (category, feature_type, feature_subtype) REFERENCES activity_map_subtypes(category, feature_type, id) ON DELETE RESTRICT;
+ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_icon_override_category_fk;
+ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_icon_override_category_fk
+  FOREIGN KEY (icon_override_category) REFERENCES activity_map_categories(id) ON DELETE RESTRICT;
+ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_icon_override_type_fk;
+ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_icon_override_type_fk
+  FOREIGN KEY (icon_override_category, icon_override_type) REFERENCES activity_map_types(category, id) ON DELETE RESTRICT;
+ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_icon_override_subtype_fk;
+ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_icon_override_subtype_fk
+  FOREIGN KEY (icon_override_category, icon_override_type, icon_override_subtype)
+  REFERENCES activity_map_subtypes(category, feature_type, id) ON DELETE RESTRICT;
 
 CREATE OR REPLACE FUNCTION validate_activity_map_geometry()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$

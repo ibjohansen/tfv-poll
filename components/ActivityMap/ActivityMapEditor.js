@@ -8,7 +8,8 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/components/LocaleProvider';
 import { ACTIVITY_SEASONS, ALPINE_COLORS, activityMatchesTurufjell, normalizeActivityNumber } from '@/lib/activity-map-display';
-import { activityCatalogLabel, activityCategoryLabel, activitySubtypeLabel, activityTypeLabel, findActivityType, withActivityCatalog } from '@/lib/activity-map-catalog';
+import { activityCatalogLabel, activityCategoryLabel, activityMapIconOverrideValue, activitySubtypeLabel, activityTypeLabel, findActivityType, withActivityCatalog } from '@/lib/activity-map-catalog';
+import { activityMapIconKind, activityMapIconMarkup } from '@/lib/activity-map-icons';
 import ActivityMapCatalogManager from './ActivityMapCatalogManager';
 import ActivityMapImportPanel from './ActivityMapImportPanel';
 import { ACTIVITY_MAP_SOURCE_IDS, ACTIVITY_MAP_SOURCES } from '@/lib/activity-map-sources';
@@ -19,7 +20,7 @@ function MapLoading() {
 }
 const ActivityMapEditorView = dynamic(() => import('./ActivityMapEditorView'), { ssr: false, loading: MapLoading });
 
-const emptyDraft = () => ({ id: null, version: null, name: '', tooltipText: '', season: '', websiteUrl: '', imageUrl: null, imageSourceUrl: null, category: 'cycling', activityNumber: '', featureType: 'trail', featureSubtype: '', alpineColor: '', geometry: null, isDraft: true });
+const emptyDraft = () => ({ id: null, version: null, name: '', tooltipText: '', season: '', websiteUrl: '', imageUrl: null, imageSourceUrl: null, iconOverride: '', category: 'cycling', activityNumber: '', featureType: 'trail', featureSubtype: '', alpineColor: '', geometry: null, isDraft: true });
 
 const geometryType = { polygon: 'Polygon', line: 'LineString', point: 'Point' };
 
@@ -57,6 +58,21 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
   const imageSourceUrlRef = useRef(null);
 
   const selected = useMemo(() => features.find((feature) => feature.id === draft.id) || null, [draft.id, features]);
+  const iconChoices = useMemo(() => [
+    ...catalog.categories.filter((item) => item.iconUrl).map((item) => ({
+      value: activityMapIconOverrideValue('category', item), label: `${t('iconGroups.category')}: ${activityCatalogLabel(item, 'categories', t)}`,
+      feature: { category: item.id, categoryName: item.name, iconUrl: item.iconUrl },
+    })),
+    ...catalog.types.filter((item) => item.iconUrl).map((item) => ({
+      value: activityMapIconOverrideValue('type', item), label: `${t('iconGroups.type')}: ${activityCatalogLabel(catalog.categories.find((category) => category.id === item.category) || { id: item.category, name: item.category }, 'categories', t)} – ${activityCatalogLabel(item, 'types', t)}`,
+      feature: { category: item.category, featureType: item.id, typeName: item.name, iconUrl: item.iconUrl },
+    })),
+    ...(catalog.subtypes || []).filter((item) => item.iconUrl).map((item) => ({
+      value: activityMapIconOverrideValue('subtype', item), label: `${t('iconGroups.subtype')}: ${activitySubtypeLabel({ category: item.category, featureType: item.featureType, featureSubtype: item.id, subtypeName: item.name }, t)}`,
+      feature: { category: item.category, featureType: item.featureType, featureSubtype: item.id, subtypeName: item.name, iconUrl: item.iconUrl },
+    })),
+  ], [catalog, t]);
+  const selectedIconChoice = iconChoices.find((choice) => choice.value === draft.iconOverride) || null;
   const decoratedFeatures = useMemo(() => features.map((feature) => withActivityCatalog(feature, catalog)), [features, catalog]);
   const filteredFeatures = useMemo(() => decoratedFeatures.filter((feature) => {
     const sourceMatches = sourceFilter === 'all' || (sourceFilter === 'manual' && !feature.sources?.length)
@@ -118,7 +134,7 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
 
   function selectFeature(feature) {
     if ((drawing || editing) && !window.confirm(t('confirmDiscard'))) return;
-    setDraft({ ...feature, activityNumber: feature.activityNumber == null ? '' : String(feature.activityNumber), featureSubtype: feature.featureSubtype || '', alpineColor: feature.alpineColor || '' });
+    setDraft({ ...feature, activityNumber: feature.activityNumber == null ? '' : String(feature.activityNumber), featureSubtype: feature.featureSubtype || '', alpineColor: feature.alpineColor || '', iconOverride: feature.iconOverride || '' });
     if (imageSourceUrlRef.current) imageSourceUrlRef.current.value = feature.imageSourceUrl || '';
     if (imageFileRef.current) imageFileRef.current.value = '';
     setDrawing(false); setEditing(false); setError(''); setNotice('');
@@ -184,11 +200,11 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
       const payload = { action: draft.id ? 'update' : 'create', id: draft.id, version: draft.version,
         name: draft.name, tooltipText: draft.tooltipText || null, category: draft.category, activityNumber: draft.category === 'alpine' && draft.activityNumber !== '' ? draft.activityNumber : null,
         featureType: draft.featureType, featureSubtype: draft.featureSubtype || null, alpineColor: draft.alpineColor || null, geometry: draft.geometry, isDraft: draft.isDraft,
-        season: draft.season || null, websiteUrl: draft.websiteUrl || null };
+        season: draft.season || null, websiteUrl: draft.websiteUrl || null, iconOverride: draft.iconOverride || null };
       const { feature } = await request({ method: 'POST', body: JSON.stringify(payload) });
       setFeatures((current) => [...current.filter((item) => item.id !== feature.id), feature]
         .sort(compareFeatures));
-      setDraft({ ...feature, activityNumber: feature.activityNumber == null ? '' : String(feature.activityNumber), featureSubtype: feature.featureSubtype || '', alpineColor: feature.alpineColor || '' });
+      setDraft({ ...feature, activityNumber: feature.activityNumber == null ? '' : String(feature.activityNumber), featureSubtype: feature.featureSubtype || '', alpineColor: feature.alpineColor || '', iconOverride: feature.iconOverride || '' });
       setDrawing(false); setEditing(false); setNotice(t('saved', { name: feature.name }));
     } catch (failure) { if (failure.name !== 'AbortError') setError(failure.message); }
     finally { setBusy(false); }
@@ -304,6 +320,10 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
           {subtypes.length > 0 && <label>{t('subtype')}<select value={draft.featureSubtype} onChange={(event) => setDraft((current) => ({ ...current, featureSubtype: event.target.value }))}>
             <option value="">{t('noSubtype')}</option>{subtypes.map((item) => <option key={item.id} value={item.id}>{activitySubtypeLabel({ ...draft, featureSubtype: item.id, subtypeName: item.name }, t)}</option>)}
           </select></label>}
+          <div className="activity-icon-override-field"><label>{t('iconOverride')}<select value={draft.iconOverride || ''} onChange={(event) => setDraft((current) => ({ ...current, iconOverride: event.target.value }))}>
+            <option value="">{t('iconAutomatic')}</option>{iconChoices.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+          </select></label>{selectedIconChoice && <span className={`activity-catalog-icon-preview is-${activityMapIconKind(selectedIconChoice.feature)}`} aria-label={t('iconPreview')}
+            dangerouslySetInnerHTML={{ __html: activityMapIconMarkup(selectedIconChoice.feature) }} />}<small>{t('iconOverrideHelp')}</small></div>
           <label>{t('season')}<select value={draft.season || ''} onChange={(event) => setDraft((current) => ({ ...current, season: event.target.value }))}>
             <option value="">{t('noSeason')}</option>{ACTIVITY_SEASONS.map((season) => <option key={season} value={season}>{t(`seasons.${season}`)}</option>)}
           </select></label>

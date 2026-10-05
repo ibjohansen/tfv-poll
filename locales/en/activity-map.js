@@ -49,6 +49,8 @@ const activityMap = {
     imageChanged: 'The activity was changed by another user. Reload the page.', imageUnauthorized: 'Sign in to change the image.', imageInvalidRequest: 'The request could not be accepted.',
     savedFeatures: 'Saved activities', new: 'New activity', loading: 'Loading activities …', empty: 'No activities have been saved.',
     createTitle: 'Create activity', editTitle: 'Edit “{name}”', name: 'Name', tooltipText: 'Short map tooltip text', number: 'Number', category: 'Category', type: 'Type', subtype: 'Subtype', noSubtype: 'No subtype', color: 'Alpine colour', noColor: 'No colour', ordinaryTrail: 'No special type',
+    iconOverride: 'Icon for this activity', iconAutomatic: 'Automatic from category, type or subtype', iconPreview: 'Selected icon preview',
+    iconOverrideHelp: 'A selected icon overrides the activity’s automatic icon. The list contains uploaded catalog icons.', iconGroups: { category: 'Category', type: 'Type', subtype: 'Subtype' },
     filterCategory: 'Filter by category', allCategories: 'All categories', selectAll: 'Select all', filterSource: 'Filter by source',
     allSources: 'All sources', manualSource: 'Manually registered', filterTurufjell: 'Turufjell',
     categories: { cycling: 'Cycling', alpine: 'Alpine', hiking: 'Hike', cross_country: 'Cross-country skiing', retail: 'Retail', training: 'Training', parking: 'Parking', wc: 'WC' }, types: { trail: 'Trail', park: 'Park', sledding: 'Sledding hill', lift: 'Lift', route: 'Hiking route', cross_country_route: 'Trail', point: 'Place', parking: 'Parking', restroom: 'WC' },

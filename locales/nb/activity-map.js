@@ -49,6 +49,8 @@ const activityMap = {
     imageChanged: 'Aktiviteten er endret av en annen bruker. Last inn siden på nytt.', imageUnauthorized: 'Du må logge inn for å endre bildet.', imageInvalidRequest: 'Forespørselen kunne ikke godtas.',
     savedFeatures: 'Lagrede aktiviteter', new: 'Ny aktivitet', loading: 'Laster aktiviteter …', empty: 'Ingen aktiviteter er lagret.',
     createTitle: 'Opprett aktivitet', editTitle: 'Rediger «{name}»', name: 'Navn', tooltipText: 'Kort tekst i kartmarkør', number: 'Nummer', category: 'Kategori', type: 'Type', subtype: 'Undertype', noSubtype: 'Ingen undertype', color: 'Alpinfarge', noColor: 'Ingen farge', ordinaryTrail: 'Ingen særtype',
+    iconOverride: 'Ikon for denne aktiviteten', iconAutomatic: 'Automatisk fra kategori, type eller undertype', iconPreview: 'Forhåndsvisning av valgt ikon',
+    iconOverrideHelp: 'Et valgt ikon overstyrer aktivitetens automatiske ikon. Listen inneholder opplastede ikoner fra katalogen.', iconGroups: { category: 'Kategori', type: 'Type', subtype: 'Undertype' },
     filterCategory: 'Filtrer på kategori', allCategories: 'Alle kategorier', selectAll: 'Velg alle', filterSource: 'Filtrer på kilde',
     allSources: 'Alle kilder', manualSource: 'Manuelt registrert', filterTurufjell: 'Turufjell',
     categories: { cycling: 'Sykkel', alpine: 'Alpint', hiking: 'Tur', cross_country: 'Langrenn', retail: 'Utsalg', training: 'Trening', parking: 'Parkering', wc: 'WC' }, types: { trail: 'Løype', park: 'Park', sledding: 'Akebakke', lift: 'Heis', route: 'Turrute', cross_country_route: 'Løype', point: 'Sted', parking: 'Parkering', restroom: 'WC' },

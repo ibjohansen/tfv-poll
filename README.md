@@ -849,6 +849,14 @@ databaseforbindelse. Se
 [migreringsresultatet](docs/database/database-migration-2026-10-06-activity-images.md).
 Den eksisterende private `cms-assets`-bøtten gjenbrukes; ingen ny miljøvariabel
 eller Neon-tjeneste kreves.
+En aktivitet kan velge ett av de opplastede katalogikonene som overstyring, eller
+bruke automatisk ikon fra undertype, type og kategori. Overstyringen lagrer en
+stabil katalogreferanse, slik at et senere bytte av SVG på katalogoppføringen
+også oppdaterer aktiviteten uten å kopiere lagringsobjektet. Feltene
+`icon_override_kind`, `icon_override_category`, `icon_override_type` og
+`icon_override_subtype` ble migrert og verifisert i produksjon 6. oktober 2026;
+se
+[migreringsresultatet](docs/database/database-migration-2026-10-06-activity-icon-overrides.md).
 Aktivitetskartet vises på forsiden. Bare publiserte aktiviteter med gyldig
 geometri vises.
 Admin- og forsidekartet kan veksle mellom Kartverkets

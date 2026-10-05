@@ -138,6 +138,7 @@ Object.assign(map.backend.errors, {
   activityCatalogColor: 'Select a valid category colour.', activityCatalogDuplicate: 'This name already exists. Choose a different name.',
   activityCatalogChanged: 'The category or type has changed. Reload the page. Geometry cannot be changed for an existing type.',
   activityType: 'Select a valid activity type.', activityColor: 'Select a valid alpine colour.', activityNumber: 'The number may contain letters and digits (maximum 24 characters).',
+  activityIconOverride: 'Select an available icon from the activity catalog.',
   activityPoint: 'Place a valid point on the map.', activityCombination: 'Category, activity type, colour and geometry cannot be combined in this way.',
   activityDraft: 'The draft status is invalid.', activityPublishedGeometry: 'A published activity must have valid geometry.',
   activityChanged: 'The activity was changed by another user. Reload and try again.', activityMock: 'Activities cannot be saved in demo mode.',
