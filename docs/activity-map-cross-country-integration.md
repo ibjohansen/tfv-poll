@@ -61,9 +61,9 @@ importerte løyper med Turufjell i navn eller kort tekst, eller Vassfarfjellet
 løypelag i kort tekst.
 
 Kart og liste er synkronisert i begge grensesnitt. En valgt aktivitet markeres
-rødt i kartet. I offentlig fullskjermvisning vises kortinformasjon som tooltip
-ved hover, mens full informasjon om den valgte aktiviteten vises i et eget felt
-over aktivitetslisten til høyre.
+rødt i kartet. På forsiden vises kartinformasjon bare som tooltip ved hover;
+valg åpner aldri en kartpopup. Full informasjon om den valgte aktiviteten vises
+i et sticky felt over aktivitetslisten til høyre.
 
 ## Kilder og prioritet
 

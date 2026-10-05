@@ -401,7 +401,10 @@ test('activity seasons and website details work on desktop and mobile', async ({
   await expect(details).toContainText('Servering ved alpinanlegget.');
   await expect(details.getByRole('link', { name: /Besøk webside/ })).toHaveAttribute('href', 'https://example.test/kafe');
   await expect(details.getByRole('link')).toHaveAttribute('rel', 'noopener noreferrer');
-  await expect(page.locator('.leaflet-popup').getByRole('link')).toHaveAttribute('href', 'https://example.test/kafe');
+  await expect(details).toHaveCSS('position', 'sticky');
+  await expect(page.locator('.leaflet-popup')).toHaveCount(0);
+  await page.locator('[data-feature-id="retail-point"]').hover();
+  await expect(page.locator('.public-activity-map-frame .leaflet-tooltip')).toBeVisible();
   await page.getByRole('checkbox', { name: 'Utsalg', exact: true }).uncheck();
   await expect(details).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Kafeen/ })).toHaveCount(0);

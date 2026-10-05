@@ -120,26 +120,11 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
         label.append(description);
       }
       layer.bindTooltip(label, { sticky: true, direction: 'auto' });
-      const popup = label.cloneNode(true);
-      if (feature.season) {
-        const season = document.createElement('p');
-        season.textContent = t(`seasons.${feature.season}`);
-        popup.append(season);
-      }
-      if (feature.websiteUrl) {
-        const link = document.createElement('a');
-        link.href = feature.websiteUrl;
-        link.textContent = t('visitWebsite');
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        popup.append(link);
-      }
-      if (!isFullscreen) layer.bindPopup(popup, { autoPan: false });
       layer.on('click', () => onSelect(feature.id));
       layer.eachLayer((item) => item.getElement()?.setAttribute('data-feature-id', feature.id));
       featureLayers.current.set(feature.id, layer);
     }
-  }, [features, isFullscreen, onSelect, selectedId, showAlpineColors, t]);
+  }, [features, onSelect, selectedId, showAlpineColors, t]);
 
   useEffect(() => { fitVisibleFeatures(mapRef.current, layers.current); }, [features]);
 
@@ -147,8 +132,7 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
     const layer = featureLayers.current.get(selectedId);
     if (!layer) return;
     revealLeafletLayerWithoutZoom(mapRef.current, layer);
-    if (!isFullscreen) layer.openPopup();
-  }, [isFullscreen, selectedId]);
+  }, [selectedId]);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
