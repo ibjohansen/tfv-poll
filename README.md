@@ -832,6 +832,12 @@ Admin- og forsidekartet kan veksle mellom Kartverkets
 topografiske kart og Esri World Imagery (satellitt- og flyfoto). Ingen
 personopplysninger eller ny miljøvariabel inngår.
 
+Den additive produksjonsmigreringen for valgfrie aktivitetsundertyper ble kjørt
+5. oktober 2026. Den opprettet undertypene Skålheis, T-krok, Stolheis, Gondol og
+Servering samt punktkategoriene Parkering og WC. Eksisterende aktiviteter fikk
+ingen undertype automatisk. Se
+[migreringsresultatet](docs/database/database-migration-2026-10-05-activity-subtypes.md).
+
 Løypeimporten kan startes manuelt av en administrator. I tillegg oppretter
 `background-watchdog` én månedlig forhåndsvisning på den første kalenderdagen i
 måneden, beregnet i `Europe/Oslo`. Kartverket leses fra Geonorges ferdig genererte

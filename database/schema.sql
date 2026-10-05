@@ -548,16 +548,36 @@ CREATE TABLE IF NOT EXISTS activity_map_types (
   PRIMARY KEY (category, id)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS activity_map_types_name_idx ON activity_map_types (category, lower(btrim(name)));
+CREATE TABLE IF NOT EXISTS activity_map_subtypes (
+  category TEXT NOT NULL,
+  feature_type TEXT NOT NULL,
+  id TEXT NOT NULL CHECK (id ~ '^[a-z0-9][a-z0-9_-]{0,63}$'),
+  name TEXT NOT NULL CHECK (length(btrim(name)) BETWEEN 1 AND 80),
+  version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_changed_by TEXT,
+  PRIMARY KEY (category, feature_type, id),
+  FOREIGN KEY (category, feature_type) REFERENCES activity_map_types(category, id) ON DELETE RESTRICT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS activity_map_subtypes_name_idx ON activity_map_subtypes (category, feature_type, lower(btrim(name)));
 INSERT INTO activity_map_categories (id, name, color) VALUES
   ('cycling', 'Sykkel', '#16745a'), ('alpine', 'Alpint', '#7d3147'), ('hiking', 'Tur', '#a66321'),
-  ('cross_country', 'Langrenn', '#2f6fb0')
+  ('cross_country', 'Langrenn', '#2f6fb0'), ('retail', 'Utsalg', '#00546c'), ('training', 'Trening', '#326981'),
+  ('parking', 'Parkering', '#00546c'), ('wc', 'WC', '#00546c')
 ON CONFLICT (id) DO NOTHING;
 INSERT INTO activity_map_types (category, id, name, geometry_kind) VALUES
   ('cycling', 'trail', 'Løype', 'polygon'), ('alpine', 'trail', 'Løype', 'polygon'),
   ('alpine', 'lift', 'Heis', 'polygon'), ('alpine', 'park', 'Park', 'point'),
   ('alpine', 'sledding', 'Akebakke', 'point'), ('hiking', 'route', 'Turrute', 'line'),
-  ('cross_country', 'route', 'Løype', 'line')
+  ('cross_country', 'route', 'Løype', 'line'), ('retail', 'point', 'Sted', 'point'),
+  ('training', 'point', 'Trening', 'point'), ('parking', 'parking', 'Parkering', 'point'),
+  ('wc', 'restroom', 'WC', 'point')
 ON CONFLICT (category, id) DO NOTHING;
+INSERT INTO activity_map_subtypes (category, feature_type, id, name) VALUES
+  ('alpine', 'lift', 'bowl_lift', 'Skålheis'), ('alpine', 'lift', 't_bar', 'T-krok'),
+  ('alpine', 'lift', 'chairlift', 'Stolheis'), ('alpine', 'lift', 'gondola', 'Gondol'),
+  ('retail', 'point', 'serving', 'Servering')
+ON CONFLICT (category, feature_type, id) DO NOTHING;
 
 -- Geometri valideres også i applikasjonen.
 CREATE TABLE IF NOT EXISTS activity_map_features (
@@ -567,6 +587,7 @@ CREATE TABLE IF NOT EXISTS activity_map_features (
   tooltip_text TEXT,
   activity_number TEXT,
   feature_type TEXT NOT NULL,
+  feature_subtype TEXT,
   alpine_color TEXT CHECK (alpine_color IN ('blue', 'yellow', 'green', 'red', 'black')),
   geometry JSONB,
   is_draft BOOLEAN NOT NULL DEFAULT FALSE,
@@ -578,6 +599,7 @@ CREATE TABLE IF NOT EXISTS activity_map_features (
 );
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS activity_number TEXT;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS tooltip_text TEXT;
+ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS feature_subtype TEXT;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS season TEXT;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS website_url TEXT;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS geometry_origin TEXT NOT NULL DEFAULT 'manual';
@@ -612,6 +634,9 @@ ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_combinatio
 ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_type_fk;
 ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_type_fk
   FOREIGN KEY (category, feature_type) REFERENCES activity_map_types(category, id) ON DELETE RESTRICT;
+ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_subtype_fk;
+ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_subtype_fk
+  FOREIGN KEY (category, feature_type, feature_subtype) REFERENCES activity_map_subtypes(category, feature_type, id) ON DELETE RESTRICT;
 
 CREATE OR REPLACE FUNCTION validate_activity_map_geometry()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
@@ -667,6 +692,9 @@ CREATE TRIGGER activity_map_categories_version_trigger BEFORE UPDATE ON activity
 FOR EACH ROW EXECUTE FUNCTION increment_activity_map_feature_version();
 DROP TRIGGER IF EXISTS activity_map_types_version_trigger ON activity_map_types;
 CREATE TRIGGER activity_map_types_version_trigger BEFORE UPDATE ON activity_map_types
+FOR EACH ROW EXECUTE FUNCTION increment_activity_map_feature_version();
+DROP TRIGGER IF EXISTS activity_map_subtypes_version_trigger ON activity_map_subtypes;
+CREATE TRIGGER activity_map_subtypes_version_trigger BEFORE UPDATE ON activity_map_subtypes
 FOR EACH ROW EXECUTE FUNCTION increment_activity_map_feature_version();
 
 -- Private, immutable-by-import recovery records. Never included in public APIs.
@@ -1284,6 +1312,8 @@ BEGIN
       COALESCE(new_data ->> 'fee_year', old_data ->> 'fee_year'))
     WHEN TG_TABLE_NAME = 'activity_map_types'
     THEN concat(COALESCE(new_data ->> 'category', old_data ->> 'category'), ':', COALESCE(new_data ->> 'id', old_data ->> 'id'))
+    WHEN TG_TABLE_NAME = 'activity_map_subtypes'
+    THEN concat(COALESCE(new_data ->> 'category', old_data ->> 'category'), ':', COALESCE(new_data ->> 'feature_type', old_data ->> 'feature_type'), ':', COALESCE(new_data ->> 'id', old_data ->> 'id'))
     ELSE COALESCE(new_data ->> 'id', old_data ->> 'id', 'unknown') END;
 
   INSERT INTO audit_log (table_name, row_id, operation, changed_by, before_value, after_value)
@@ -1350,6 +1380,12 @@ CREATE TRIGGER activity_map_types_audit_context_trigger BEFORE INSERT OR UPDATE 
 FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
 DROP TRIGGER IF EXISTS activity_map_types_audit_trigger ON activity_map_types;
 CREATE TRIGGER activity_map_types_audit_trigger AFTER INSERT OR UPDATE OR DELETE ON activity_map_types
+FOR EACH ROW EXECUTE FUNCTION record_audit_change();
+DROP TRIGGER IF EXISTS activity_map_subtypes_audit_context_trigger ON activity_map_subtypes;
+CREATE TRIGGER activity_map_subtypes_audit_context_trigger BEFORE INSERT OR UPDATE OR DELETE ON activity_map_subtypes
+FOR EACH ROW EXECUTE FUNCTION prepare_audit_change();
+DROP TRIGGER IF EXISTS activity_map_subtypes_audit_trigger ON activity_map_subtypes;
+CREATE TRIGGER activity_map_subtypes_audit_trigger AFTER INSERT OR UPDATE OR DELETE ON activity_map_subtypes
 FOR EACH ROW EXECUTE FUNCTION record_audit_change();
 CREATE TRIGGER activity_map_features_audit_context_trigger
 BEFORE INSERT OR UPDATE OR DELETE ON activity_map_features

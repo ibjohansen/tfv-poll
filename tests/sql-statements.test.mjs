@@ -28,8 +28,8 @@ test('production schema contains complete audit triggers without sensitive value
   const contextTriggers = statements.filter((statement) => /CREATE TRIGGER \w+_audit_context_trigger/.test(statement));
 
   assert.ok(auditFunction);
-  assert.equal(auditTriggers.length, 15);
-  assert.equal(contextTriggers.length, 15);
+  assert.equal(auditTriggers.length, 16);
+  assert.equal(contextTriggers.length, 16);
   assert.match(auditFunction, /old_data := old_data - 'access_token'/);
   assert.match(auditFunction, /old_data := old_data - 'verification_token_hash'/);
   assert.match(auditFunction, /old_data := old_data - 'storage_key'/);
@@ -50,5 +50,6 @@ test('production schema contains complete audit triggers without sensitive value
   assert.match(schema, /CREATE TABLE IF NOT EXISTS survey_attachments/);
   assert.match(schema, /survey_attachments_audit_trigger/);
   assert.match(schema, /activity_map_features_audit_trigger/);
+  assert.match(schema, /activity_map_subtypes_audit_trigger/);
   assert.match(schema, /security_events_append_only_trigger/);
 });

@@ -65,6 +65,19 @@ rødt i kartet. På forsiden vises kartinformasjon bare som tooltip ved hover;
 valg åpner aldri en kartpopup. Full informasjon om den valgte aktiviteten vises
 i et sticky felt over aktivitetslisten til høyre.
 
+Hver aktivitet får også et lite SVG-symbol like ved geometrien i kartet. Det
+prosjektspesifikke ikonsettet bruker alpinski for Alpint, langrennsløper for
+Langrenn, sykkel for Sykkel, vektstang for Trening, vandrer for Tur og
+handlevogn for Utsalg. Egendefinerte kategorier bruker en nøytral kartmarkør
+til de eventuelt får en egen ikonvariant. Kategorinavn som «Lading»,
+«Ladepunkt» eller «Charging» får automatisk ladeikon dersom kategorien opprettes.
+
+Katalogen har i tillegg de faste kategoriene «Parkering» og «WC» med punktform.
+«Utsalg» kan valgfritt merkes med undertypen «Servering». For Alpint → Heis kan
+man velge Skålheis, T-krok, Stolheis eller Gondol. Undertypene vises i både
+administrasjon og på forsiden, og gir et spesifikt SVG-symbol på kartet. Hver
+aktivitet kan fortsatt lagres uten undertype.
+
 ## Kilder og prioritet
 
 ### 1. Kartverket

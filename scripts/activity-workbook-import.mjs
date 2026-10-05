@@ -26,6 +26,7 @@ export function buildActivityImportPlan(source, state) {
   const catalog = {
     categories: state.categories.map((row) => ({ ...row })),
     types: state.types.map((row) => ({ ...row, geometryKind: row.geometry_kind })),
+    subtypes: (state.subtypes || []).map((row) => ({ ...row })),
   };
   const categoryCreates = [], typeCreates = [], typeChanges = [], featureChanges = [];
   const active = state.features.filter((row) => !row.deleted_at);
@@ -82,7 +83,7 @@ export function buildActivityImportPlan(source, state) {
       ? before.feature_type : ensureType(category, kind);
     const input = { action: before ? 'update' : 'create', id: before?.id, version: before?.version,
       name, category, featureType, geometry, isDraft: before ? before.is_draft : true,
-      activityNumber: before?.activity_number || null, alpineColor: before?.alpine_color || null,
+      activityNumber: before?.activity_number || null, featureSubtype: before?.feature_subtype || null, alpineColor: before?.alpine_color || null,
       tooltipText: description || null, season: seasons[seasonName], websiteUrl: website || null };
     const value = normalizeActivityFeatureInput(input, catalog);
     value.id = before?.id || importHash(['activity-workbook', category, name]).slice(0, 32);
@@ -96,7 +97,7 @@ export function buildActivityImportPlan(source, state) {
     // Include drafts to give all alpine activities the appropriate season.
     if (!before.deleted_at) featureChanges.push(normalizeActivityFeatureInput({ action: 'update', id: before.id, version: before.version,
       name: before.name, category: before.category, featureType: before.feature_type, geometry, isDraft: before.is_draft,
-      activityNumber: before.activity_number, alpineColor: before.alpine_color, tooltipText: before.tooltip_text,
+      activityNumber: before.activity_number, featureSubtype: before.feature_subtype, alpineColor: before.alpine_color, tooltipText: before.tooltip_text,
       season: before.season || 'winter', websiteUrl: before.website_url }, catalog));
     else assert.notEqual(before.geometry?.type, 'Polygon', 'Deleted alpine polygons require explicit recovery handling');
   }
@@ -115,6 +116,7 @@ export async function readActivityImportState(db) {
     features: (await db.query('SELECT * FROM activity_map_features ORDER BY id')).rows,
     categories: (await db.query('SELECT * FROM activity_map_categories ORDER BY id')).rows,
     types: (await db.query('SELECT * FROM activity_map_types ORDER BY category, id')).rows,
+    subtypes: (await db.query('SELECT * FROM activity_map_subtypes ORDER BY category, feature_type, id')).rows,
   };
 }
 
@@ -125,7 +127,7 @@ export async function applyActivityImport(db, source, { expectedHash, snapshotId
     await db.query("SET LOCAL lock_timeout='5s'");
     await db.query("SET LOCAL statement_timeout='60s'");
     await db.query('SELECT pg_advisory_xact_lock(62719, 0)');
-    await db.query('LOCK TABLE activity_map_features, activity_map_categories, activity_map_types, activity_map_import_runs IN SHARE ROW EXCLUSIVE MODE');
+    await db.query('LOCK TABLE activity_map_features, activity_map_categories, activity_map_types, activity_map_subtypes, activity_map_import_runs IN SHARE ROW EXCLUSIVE MODE');
     const previous = (await db.query('SELECT summary FROM activity_map_import_runs WHERE source_sha256=$1', [source.sourceHash])).rows[0];
     if (previous) { await db.query('COMMIT'); return { alreadyImported: true, ...previous.summary }; }
     const before = await readActivityImportState(db);
@@ -146,14 +148,14 @@ export async function applyActivityImport(db, source, { expectedHash, snapshotId
     }
     await db.query('ALTER TABLE activity_map_types ENABLE TRIGGER activity_map_types_geometry_trigger');
     for (const row of plan.featureChanges) {
-      const values = [row.name,row.category,row.featureType,row.activityNumber,row.alpineColor,row.tooltipText,row.season,row.websiteUrl,
+      const values = [row.name,row.category,row.featureType,row.featureSubtype,row.activityNumber,row.alpineColor,row.tooltipText,row.season,row.websiteUrl,
         row.geometry ? JSON.stringify(row.geometry) : null,row.isDraft,actor,row.id];
       if (row.action === 'create') await db.query(`INSERT INTO activity_map_features
-        (name,category,feature_type,activity_number,alpine_color,tooltip_text,season,website_url,geometry,is_draft,last_changed_by,id)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12)`, values);
+        (name,category,feature_type,feature_subtype,activity_number,alpine_color,tooltip_text,season,website_url,geometry,is_draft,last_changed_by,id)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13)`, values);
       else {
-        const result = await db.query(`UPDATE activity_map_features SET name=$1,category=$2,feature_type=$3,activity_number=$4,alpine_color=$5,
-          tooltip_text=$6,season=$7,website_url=$8,geometry=$9::jsonb,is_draft=$10,last_changed_by=$11 WHERE id=$12 AND version=$13 AND deleted_at IS NULL RETURNING id`, [...values,row.version]);
+        const result = await db.query(`UPDATE activity_map_features SET name=$1,category=$2,feature_type=$3,feature_subtype=$4,activity_number=$5,alpine_color=$6,
+          tooltip_text=$7,season=$8,website_url=$9,geometry=$10::jsonb,is_draft=$11,last_changed_by=$12 WHERE id=$13 AND version=$14 AND deleted_at IS NULL RETURNING id`, [...values,row.version]);
         assert.equal(result.rows.length, 1, 'Activity changed while importing');
       }
     }
@@ -170,7 +172,7 @@ export async function applyActivityImport(db, source, { expectedHash, snapshotId
     }
     for (const expected of plan.featureChanges) {
       const actual = after.features.find((row) => row.id === expected.id);
-      for (const [field, column] of Object.entries({ name: 'name', category: 'category', featureType: 'feature_type', tooltipText: 'tooltip_text', season: 'season', websiteUrl: 'website_url', geometry: 'geometry', isDraft: 'is_draft' })) {
+      for (const [field, column] of Object.entries({ name: 'name', category: 'category', featureType: 'feature_type', featureSubtype: 'feature_subtype', tooltipText: 'tooltip_text', season: 'season', websiteUrl: 'website_url', geometry: 'geometry', isDraft: 'is_draft' })) {
         assert.deepEqual(actual[column], expected[field], `Imported ${column} does not match the plan`);
       }
     }

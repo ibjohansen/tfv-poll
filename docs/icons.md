@@ -17,6 +17,7 @@ Oppgi ikonnavn og hvor det skal brukes; vi kan gjenbruke SVG uten en ny pakke.
 | Artikkelkort uten bilde | `components/PublicArticleDirectory.js` |
 | Opplasting av artikkelbilde | `components/CmsPageDirectory.js` |
 | Felles dropdownpil | `components/Select.js` og `.shared-select-chevron` i `app/globals.css` |
+| Aktiviteter i kart | `lib/activity-map-icons.js` (prosjektets innleverte SVG-sett) |
 
 Dekorative SVG-er skal fortsatt ha `aria-hidden="true"`. Knapper trenger et
 lesbart navn uavhengig av valgt ikon. Kartets Leaflet-kontroller tilhører

@@ -9,7 +9,7 @@ import { splitSqlStatements } from './split-sql-statements.mjs';
 
 export function activityMapStatements(schema) {
   return splitSqlStatements(schema).filter((statement) =>
-    /(?:CREATE TABLE IF NOT EXISTS|ALTER TABLE|INSERT INTO) activity_map_(?:features|categories|types|import_runs|sources|source_runs|source_items|feature_sources)\b/.test(statement)
+    /(?:CREATE TABLE IF NOT EXISTS|ALTER TABLE|INSERT INTO) activity_map_(?:features|categories|types|subtypes|import_runs|sources|source_runs|source_items|feature_sources)\b/.test(statement)
     || /(?:CREATE (?:UNIQUE )?INDEX IF NOT EXISTS|DROP INDEX IF EXISTS|CREATE TRIGGER|DROP TRIGGER IF EXISTS) activity_map_\w+\b/.test(statement)
     || /CREATE OR REPLACE FUNCTION (?:increment_activity_map_feature_version|validate_activity_map_geometry|preserve_activity_map_type_geometry|record_audit_change)\(\)/.test(statement));
 }
@@ -37,11 +37,13 @@ export async function migrateActivityMapSchema(db, schema) {
     assert.deepEqual(await fingerprint(db, columns, existingIds), before, 'Existing activities must remain unchanged');
     const invalid = (await db.query(`SELECT count(*)::int AS count FROM activity_map_features f
       LEFT JOIN activity_map_types t ON t.category = f.category AND t.id = f.feature_type
-      WHERE t.id IS NULL OR (NULLIF(f.geometry, 'null'::jsonb) IS NOT NULL AND f.geometry->>'type' IS DISTINCT FROM
+      LEFT JOIN activity_map_subtypes s ON s.category = f.category AND s.feature_type = f.feature_type AND s.id = f.feature_subtype
+      WHERE t.id IS NULL OR (f.feature_subtype IS NOT NULL AND s.id IS NULL) OR (NULLIF(f.geometry, 'null'::jsonb) IS NOT NULL AND f.geometry->>'type' IS DISTINCT FROM
         CASE t.geometry_kind WHEN 'polygon' THEN 'Polygon' WHEN 'line' THEN 'LineString' ELSE 'Point' END)`)).rows[0].count;
     assert.equal(invalid, 0, 'Every existing geometry must match its catalog type');
     const counts = (await db.query(`SELECT (SELECT count(*)::int FROM activity_map_categories) AS categories,
-      (SELECT count(*)::int FROM activity_map_types) AS types`)).rows[0];
+      (SELECT count(*)::int FROM activity_map_types) AS types,
+      (SELECT count(*)::int FROM activity_map_subtypes) AS subtypes`)).rows[0];
     await db.query('COMMIT');
     return { statements: statements.length, activitiesPreserved: before.count, invalidGeometries: invalid, ...counts };
   } catch (error) { await db.query('ROLLBACK'); throw error; }

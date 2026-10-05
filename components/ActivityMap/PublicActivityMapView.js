@@ -6,9 +6,10 @@ import 'leaflet/dist/leaflet.css';
 import { ACTIVITY_MAP_CENTER, smoothActivityGeometry } from '@/lib/activity-map-display';
 import { BACKGROUND_MAP, SATELLITE_MAP } from '@/lib/map/sources';
 import { useI18n } from '@/components/LocaleProvider';
-import { activityCategoryColor, activityCategoryLabel, activityTypeLabel } from '@/lib/activity-map-catalog';
+import { activityCategoryColor, activityCategoryLabel, activitySubtypeLabel, activityTypeLabel } from '@/lib/activity-map-catalog';
 import { ACTIVITY_MAP_SOURCES } from '@/lib/activity-map-sources';
 import { revealLeafletLayerWithoutZoom } from '@/lib/map/leaflet-viewport';
+import { activityMapIconAnchor, activityMapIconCoordinate, activityMapIconKind, activityMapIconMarkup } from '@/lib/activity-map-icons';
 
 const latLng = ([longitude, latitude]) => [latitude, longitude];
 const alpineColors = { blue: '#2166ac', yellow: '#d6a900', green: '#238b45', red: '#c92f2f', black: '#202124' };
@@ -24,6 +25,14 @@ function fitVisibleFeatures(map, group) {
   const bounds = group.getBounds();
   if (bounds.isValid()) map.fitBounds(bounds, { animate: false, maxZoom: 17, padding: [42, 42] });
   else map.setView(latLng(ACTIVITY_MAP_CENTER), 13, { animate: false });
+}
+
+function activityCategoryIcon(feature, selected) {
+  const kind = activityMapIconKind(feature);
+  return L.divIcon({
+    className: `activity-map-category-icon is-${kind}${selected ? ' is-selected' : ''}`,
+    html: activityMapIconMarkup(feature), iconSize: [30, 30], iconAnchor: activityMapIconAnchor(feature),
+  });
 }
 
 export default function PublicActivityMapView({ features, showAlpineColors, selectedId, isFullscreen, onSelect, onError }) {
@@ -108,11 +117,13 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
         style,
         pointToLayer: (_item, point) => L.circleMarker(point, { ...style, radius: selected ? 12 : 9, fillOpacity: .92 }),
       }).addTo(group);
+      const iconCoordinate = activityMapIconCoordinate(feature.geometry);
+      if (iconCoordinate) L.marker(latLng(iconCoordinate), { icon: activityCategoryIcon(feature, selected), interactive: false, keyboard: false }).addTo(group);
       const label = document.createElement('div');
       const name = document.createElement('strong');
       name.textContent = feature.activityNumber ? `${feature.activityNumber}. ${feature.name}` : feature.name;
       const detail = document.createElement('div');
-      detail.textContent = `${activityCategoryLabel(feature, t)} · ${activityTypeLabel(feature, t)}${feature.alpineColor && showAlpineColors ? ` · ${t(`colors.${feature.alpineColor}`)}` : ''}`;
+      detail.textContent = `${activityCategoryLabel(feature, t)} · ${activityTypeLabel(feature, t)}${feature.featureSubtype ? ` · ${activitySubtypeLabel(feature, t)}` : ''}${feature.alpineColor && showAlpineColors ? ` · ${t(`colors.${feature.alpineColor}`)}` : ''}`;
       label.append(name, detail);
       if (feature.tooltipText) {
         const description = document.createElement('p');

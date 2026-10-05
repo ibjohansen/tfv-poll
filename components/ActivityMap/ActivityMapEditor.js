@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/components/LocaleProvider';
 import { ACTIVITY_SEASONS, ALPINE_COLORS, activityMatchesTurufjell, normalizeActivityNumber } from '@/lib/activity-map-display';
-import { activityCatalogLabel, activityCategoryLabel, activityTypeLabel, findActivityType, withActivityCatalog } from '@/lib/activity-map-catalog';
+import { activityCatalogLabel, activityCategoryLabel, activitySubtypeLabel, activityTypeLabel, findActivityType, withActivityCatalog } from '@/lib/activity-map-catalog';
 import ActivityMapCatalogManager from './ActivityMapCatalogManager';
 import ActivityMapImportPanel from './ActivityMapImportPanel';
 import { ACTIVITY_MAP_SOURCE_IDS, ACTIVITY_MAP_SOURCES } from '@/lib/activity-map-sources';
@@ -17,7 +17,7 @@ function MapLoading() {
 }
 const ActivityMapEditorView = dynamic(() => import('./ActivityMapEditorView'), { ssr: false, loading: MapLoading });
 
-const emptyDraft = () => ({ id: null, version: null, name: '', tooltipText: '', season: '', websiteUrl: '', category: 'cycling', activityNumber: '', featureType: 'trail', alpineColor: '', geometry: null, isDraft: true });
+const emptyDraft = () => ({ id: null, version: null, name: '', tooltipText: '', season: '', websiteUrl: '', category: 'cycling', activityNumber: '', featureType: 'trail', featureSubtype: '', alpineColor: '', geometry: null, isDraft: true });
 
 const geometryType = { polygon: 'Polygon', line: 'LineString', point: 'Point' };
 
@@ -113,7 +113,7 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
 
   function selectFeature(feature) {
     if ((drawing || editing) && !window.confirm(t('confirmDiscard'))) return;
-    setDraft({ ...feature, activityNumber: feature.activityNumber == null ? '' : String(feature.activityNumber), alpineColor: feature.alpineColor || '' });
+    setDraft({ ...feature, activityNumber: feature.activityNumber == null ? '' : String(feature.activityNumber), featureSubtype: feature.featureSubtype || '', alpineColor: feature.alpineColor || '' });
     setDrawing(false); setEditing(false); setError(''); setNotice('');
   }
 
@@ -126,7 +126,7 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
     setDraft((current) => {
       const type = findActivityType(catalog, category, current.featureType) || catalog.types.find((item) => item.category === category);
       const expected = geometryType[type?.geometryKind];
-      return { ...current, category, featureType: type?.id || '', activityNumber: category === 'alpine' ? current.activityNumber : '',
+      return { ...current, category, featureType: type?.id || '', featureSubtype: '', activityNumber: category === 'alpine' ? current.activityNumber : '',
         alpineColor: category === 'alpine' && type?.id === 'trail' ? current.alpineColor : '',
         geometry: current.geometry?.type === expected ? current.geometry : null };
     });
@@ -135,7 +135,7 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
 
   function changeType(featureType) {
     const expected = geometryType[findActivityType(catalog, draft.category, featureType)?.geometryKind];
-    setDraft((current) => ({ ...current, featureType, alpineColor: featureType === 'trail' ? current.alpineColor : '',
+    setDraft((current) => ({ ...current, featureType, featureSubtype: '', alpineColor: featureType === 'trail' ? current.alpineColor : '',
       geometry: current.geometry?.type === expected ? current.geometry : null }));
     setDrawing(false); setEditing(false);
   }
@@ -174,12 +174,12 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
     try {
       const payload = { action: draft.id ? 'update' : 'create', id: draft.id, version: draft.version,
         name: draft.name, tooltipText: draft.tooltipText || null, category: draft.category, activityNumber: draft.category === 'alpine' && draft.activityNumber !== '' ? draft.activityNumber : null,
-        featureType: draft.featureType, alpineColor: draft.alpineColor || null, geometry: draft.geometry, isDraft: draft.isDraft,
+        featureType: draft.featureType, featureSubtype: draft.featureSubtype || null, alpineColor: draft.alpineColor || null, geometry: draft.geometry, isDraft: draft.isDraft,
         season: draft.season || null, websiteUrl: draft.websiteUrl || null };
       const { feature } = await request({ method: 'POST', body: JSON.stringify(payload) });
       setFeatures((current) => [...current.filter((item) => item.id !== feature.id), feature]
         .sort(compareFeatures));
-      setDraft({ ...feature, activityNumber: feature.activityNumber == null ? '' : String(feature.activityNumber), alpineColor: feature.alpineColor || '' });
+      setDraft({ ...feature, activityNumber: feature.activityNumber == null ? '' : String(feature.activityNumber), featureSubtype: feature.featureSubtype || '', alpineColor: feature.alpineColor || '' });
       setDrawing(false); setEditing(false); setNotice(t('saved', { name: feature.name }));
     } catch (failure) { if (failure.name !== 'AbortError') setError(failure.message); }
     finally { setBusy(false); }
@@ -197,6 +197,7 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
   }
 
   const kind = findActivityType(catalog, draft.category, draft.featureType)?.geometryKind;
+  const subtypes = (catalog.subtypes || []).filter((item) => item.category === draft.category && item.featureType === draft.featureType);
   const expectedGeometry = geometryType[kind];
   let numberValid = true;
   try { normalizeActivityNumber(draft.activityNumber, draft.category); } catch { numberValid = draft.activityNumber === ''; }
@@ -228,7 +229,7 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
         <label className="activity-checkbox-filter"><input type="checkbox" checked={turufjellOnly} onChange={(event) => setTurufjellOnly(event.target.checked)} /><span>{t('filterTurufjell')}</span></label>
         {busy && !features.length ? <p role="status">{t('loading')}</p> : filteredFeatures.length ? <ul>{filteredFeatures.map((feature) => <li key={feature.id}>
           <button ref={draft.id === feature.id ? selectedFeatureButtonRef : null} type="button" aria-pressed={draft.id === feature.id} onClick={() => selectFeature(feature)}>
-            <strong>{feature.activityNumber ? `${feature.activityNumber}. ${feature.name}` : feature.name}</strong><span>{activityCategoryLabel(feature, t)} · {activityTypeLabel(feature, t)}{feature.isDraft ? ` · ${t('draft')}` : ''}</span>
+            <strong>{feature.activityNumber ? `${feature.activityNumber}. ${feature.name}` : feature.name}</strong><span>{activityCategoryLabel(feature, t)} · {activityTypeLabel(feature, t)}{feature.featureSubtype ? ` · ${activitySubtypeLabel(feature, t)}` : ''}{feature.isDraft ? ` · ${t('draft')}` : ''}</span>
           </button></li>)}</ul> : <p className="muted">{t('empty')}</p>}
       </aside>
       <section className="activity-editor-panel" aria-labelledby="activity-editor-title">
@@ -244,6 +245,9 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
           <label>{t('type')}<select value={draft.featureType} onChange={(event) => changeType(event.target.value)}>
             {!kind && <option value="">{t('catalog.selectType')}</option>}{catalog.types.filter((item) => item.category === draft.category).map((item) => <option key={item.id} value={item.id}>{activityCatalogLabel(item, 'types', t)}</option>)}
           </select></label>
+          {subtypes.length > 0 && <label>{t('subtype')}<select value={draft.featureSubtype} onChange={(event) => setDraft((current) => ({ ...current, featureSubtype: event.target.value }))}>
+            <option value="">{t('noSubtype')}</option>{subtypes.map((item) => <option key={item.id} value={item.id}>{activitySubtypeLabel({ ...draft, featureSubtype: item.id, subtypeName: item.name }, t)}</option>)}
+          </select></label>}
           <label>{t('season')}<select value={draft.season || ''} onChange={(event) => setDraft((current) => ({ ...current, season: event.target.value }))}>
             <option value="">{t('noSeason')}</option>{ACTIVITY_SEASONS.map((season) => <option key={season} value={season}>{t(`seasons.${season}`)}</option>)}
           </select></label>

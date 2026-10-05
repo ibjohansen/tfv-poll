@@ -142,6 +142,7 @@ test('activity maps support satellite layers, editable polygons and hiking route
   await page.goto('/admin/activity-map');
   await page.getByRole('combobox', { name: 'Kategori', exact: true }).selectOption('alpine');
   await page.getByRole('combobox', { name: 'Type' }).selectOption('lift');
+  await page.getByRole('combobox', { name: 'Undertype' }).selectOption('t_bar');
   await expect(page.getByRole('button', { name: 'Tegn polygon' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Plasser punkt' })).toHaveCount(0);
   await page.getByLabel('Navn', { exact: true }).fill('Slåtteliheisen');
@@ -165,8 +166,16 @@ test('activity maps support satellite layers, editable polygons and hiking route
   await expect(adminMap).not.toHaveClass(/is-drawing/);
   await page.getByRole('button', { name: 'Lagre aktivitet' }).click();
   await expect.poll(() => savedActivity?.featureType).toBe('lift');
+  expect(savedActivity.featureSubtype).toBe('t_bar');
   expect(savedActivity.activityNumber).toBe('H1');
   expect(savedActivity.geometry.type).toBe('Polygon');
+  await expect(adminMap.locator('.activity-map-category-icon.is-tBar')).toBeVisible();
+  await expect(adminMap.locator('.activity-map-category-icon.is-tBar')).toHaveCSS('margin-left', '-15px');
+  await expect(adminMap.locator('.activity-map-category-icon.is-tBar')).toHaveCSS('margin-top', '-15px');
+  await expect(adminMap.locator('.activity-map-category-icon.is-tBar')).toHaveCSS('color', 'rgb(255, 255, 255)');
+  await expect(adminMap.locator('.activity-map-category-icon.is-tBar svg')).toHaveCSS('width', '24px');
+  await expect(adminMap.locator('.activity-map-category-icon.is-tBar svg')).toHaveCSS('height', '24px');
+  await expect(adminMap.locator('.activity-map-category-icon.is-tBar svg')).toHaveCSS('padding', '4px');
   await page.getByRole('checkbox', { name: 'Alpint', exact: true }).uncheck();
   await expect(page.getByRole('button', { name: /Slåtteliheisen/ })).toHaveCount(0);
   await page.getByRole('checkbox', { name: 'Alpint', exact: true }).check();
@@ -377,6 +386,11 @@ test('activity categories and types can be created, renamed and used after reloa
   await expect(page.getByRole('button', { name: /Trugerunden/ })).toContainText('Vinteraktiviteter · Trugetur');
   // SSR labels can appear before hydration; the Leaflet control proves mount.
   await expect(page.getByTitle('Zoom inn')).toBeVisible();
+  for (const icon of ['alpine', 'crossCountry', 'cycling', 'hiking', 'training', 'serving', 'bowlLift', 'tBar', 'parking', 'restroom', 'evCharging']) {
+    await expect(page.locator(`.activity-map-category-icon.is-${icon}`).first()).toBeVisible();
+  }
+  await expect(page.locator('.activity-map-category-icon.is-evCharging')).toHaveCSS('margin-left', '-15px');
+  await expect(page.locator('.activity-map-category-icon.is-evCharging')).toHaveCSS('margin-top', '-30px');
   await page.getByRole('checkbox', { name: 'Vinteraktiviteter', exact: true }).uncheck();
   await expect(page.getByRole('button', { name: /Trugerunden/ })).toHaveCount(0);
   await page.getByRole('checkbox', { name: 'Vinteraktiviteter', exact: true }).check();

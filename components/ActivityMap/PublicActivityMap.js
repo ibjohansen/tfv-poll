@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/components/LocaleProvider';
-import { activityCategoryColor, activityCategoryLabel, activityTypeLabel } from '@/lib/activity-map-catalog';
+import { activityCategoryColor, activityCategoryLabel, activitySubtypeLabel, activityTypeLabel } from '@/lib/activity-map-catalog';
 import { ACTIVITY_SEASONS, activityMatchesSeason, activityMatchesTurufjell } from '@/lib/activity-map-display';
 import { ACTIVITY_MAP_EXTERNAL_LINKS, ACTIVITY_MAP_SOURCES } from '@/lib/activity-map-sources';
 
@@ -89,6 +89,7 @@ export default function PublicActivityMap({ features }) {
           <div className="public-activity-status" aria-live="polite">{error ? <p className="form-error">{error}</p> : <p>{t('visibleCount', { count: visible.length })}{selected ? ` ${t('selected', { name: selected.activityNumber ? `${selected.activityNumber}. ${selected.name}` : selected.name })}` : ''}</p>}</div>
           {selected && <section className="activity-selected-details" aria-label={t('activityDetails')}>
             <h3>{selected.activityNumber ? `${selected.activityNumber}. ${selected.name}` : selected.name}</h3>
+            <p>{activityCategoryLabel(selected, t)} · {activityTypeLabel(selected, t)}{selected.featureSubtype ? ` · ${activitySubtypeLabel(selected, t)}` : ''}</p>
             {selected.season && <p>{t(`seasons.${selected.season}`)}</p>}
             {selected.tooltipText && <p>{selected.tooltipText}</p>}
             {selected.sources?.map((source) => <p key={source.id}>{t('sourceLabel', { source: source.name })}</p>)}
@@ -97,7 +98,7 @@ export default function PublicActivityMap({ features }) {
           <ul className="public-activity-list" aria-label={t('visibleActivities')}>{visible.map((feature) => <li key={feature.id}>
             <button ref={selectedId === feature.id ? selectedButtonRef : null} type="button" aria-pressed={selectedId === feature.id} onClick={() => setSelectedId(feature.id)}>
               <span className={`activity-list-symbol is-${feature.alpineColor && showAlpineColors ? feature.alpineColor : 'neutral'}`} style={feature.alpineColor && showAlpineColors ? undefined : { backgroundColor: activityCategoryColor(feature) }} aria-hidden="true" />
-              <span><strong>{feature.activityNumber ? `${feature.activityNumber}. ${feature.name}` : feature.name}</strong><small>{activityCategoryLabel(feature, t)} · {activityTypeLabel(feature, t)}{feature.alpineColor && showAlpineColors ? ` · ${t(`colors.${feature.alpineColor}`)}` : ''}</small></span>
+              <span><strong>{feature.activityNumber ? `${feature.activityNumber}. ${feature.name}` : feature.name}</strong><small>{activityCategoryLabel(feature, t)} · {activityTypeLabel(feature, t)}{feature.featureSubtype ? ` · ${activitySubtypeLabel(feature, t)}` : ''}{feature.alpineColor && showAlpineColors ? ` · ${t(`colors.${feature.alpineColor}`)}` : ''}</small></span>
             </button></li>)}</ul>
           {!visible.length && <p className="public-activity-empty">{features.length ? t('noCategories') : t('empty')}</p>}
           <p className="public-map-source">{t('source')}{visibleSources.length ? <> {t('trailDataAttribution')}: {visibleSources.map((source, index) => <span key={source.id}>{index ? ' · ' : ''}

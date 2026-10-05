@@ -7,6 +7,7 @@ import { ACTIVITY_MAP_CENTER } from '@/lib/activity-map-display';
 import { activityCategoryColor } from '@/lib/activity-map-catalog';
 import { BACKGROUND_MAP, SATELLITE_MAP } from '@/lib/map/sources';
 import { revealLeafletLayerWithoutZoom } from '@/lib/map/leaflet-viewport';
+import { activityMapIconAnchor, activityMapIconCoordinate, activityMapIconKind, activityMapIconMarkup } from '@/lib/activity-map-icons';
 
 const latLng = ([longitude, latitude]) => [latitude, longitude];
 const geometryVertexIcon = L.divIcon({
@@ -40,6 +41,14 @@ function fitVisibleGeometry(map, bounds) {
   if (!map || !bounds) return;
   if (bounds.isValid()) map.fitBounds(bounds, { animate: false, maxZoom: 17, padding: [42, 42] });
   else map.setView(latLng(ACTIVITY_MAP_CENTER), 16, { animate: false });
+}
+
+function activityCategoryIcon(feature, selected = false) {
+  const kind = activityMapIconKind(feature);
+  return L.divIcon({
+    className: `activity-map-category-icon is-${kind}${selected ? ' is-selected' : ''}`,
+    html: activityMapIconMarkup(feature), iconSize: [30, 30], iconAnchor: activityMapIconAnchor(feature),
+  });
 }
 
 export default function ActivityMapEditorView({ features, previewFeatures = [], draft, drawing, editing, onSelect, onGeometryChange, onError, labels }) {
@@ -112,6 +121,8 @@ export default function ActivityMapEditorView({ features, previewFeatures = [], 
         pointToLayer: (_item, point) => L.circleMarker(point, { radius: 8, color: activityCategoryColor(feature), fillColor: '#fff', fillOpacity: .95, weight: 3 }),
       }).addTo(group);
       visibleBounds.extend(layer.getBounds());
+      const iconCoordinate = activityMapIconCoordinate(feature.geometry);
+      if (iconCoordinate) L.marker(latLng(iconCoordinate), { icon: activityCategoryIcon(feature), interactive: false, keyboard: false }).addTo(group);
       layer.eachLayer((item) => item.getElement()?.setAttribute('data-feature-id', feature.id));
       featureLayers.current.set(feature.id, layer);
       const tooltip = document.createElement('div');
@@ -149,6 +160,8 @@ export default function ActivityMapEditorView({ features, previewFeatures = [], 
       style: currentStyle,
       pointToLayer: (_item, point) => L.circleMarker(point, { ...currentStyle, radius: 10, fillOpacity: .95 }),
     }).addTo(group);
+    const selectedIconCoordinate = activityMapIconCoordinate(draft.geometry);
+    if (selectedIconCoordinate) L.marker(latLng(selectedIconCoordinate), { icon: activityCategoryIcon(draft, true), interactive: false, keyboard: false }).addTo(group);
     visibleBounds.extend(selectedLayer.getBounds());
     if (draft.id) featureLayers.current.set(draft.id, selectedLayer);
     if ((drawing || editing) && (draft.geometry.type === 'Polygon' || draft.geometry.type === 'LineString')) {
