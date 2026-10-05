@@ -8,6 +8,7 @@ import { MapError } from '../lib/map/geo.js';
 import { revealLeafletLayerWithoutZoom } from '../lib/map/leaflet-viewport.js';
 import { DEFAULT_ACTIVITY_CATALOG, normalizeActivityCatalogInput, withActivityCatalog, withActivityMapCatalogIcon } from '../lib/activity-map-catalog.js';
 import { activityMapIconAnchor, activityMapIconCoordinate, activityMapIconKind, activityMapIconMarkup } from '../lib/activity-map-icons.js';
+import { downloadActivityImageSource, isPublicActivityImageAddress, normalizeActivityImageSourceUrl } from '../lib/activity-map-remote-image.js';
 import { loadModule, request } from './helpers/load-module.mjs';
 import { activityMapStatements, migrateActivityMapSchema } from '../scripts/release-activity-map-schema.mjs';
 
@@ -50,6 +51,8 @@ test('activity-map icons recognize the configured activity categories and have a
   assert.equal(activityMapIconKind({ category: 'retail', featureSubtype: 'serving' }), 'serving');
   assert.equal(activityMapIconKind({ category: 'alpine', featureType: 'lift', featureSubtype: 'bowl_lift' }), 'bowlLift');
   assert.equal(activityMapIconKind({ category: 'alpine', featureType: 'lift', featureSubtype: 't_bar' }), 'tBar');
+  assert.equal(activityMapIconKind({ category: 'alpine', featureType: 'sledding' }), 'sledding');
+  assert.equal(activityMapIconKind({ category: 'alpine', featureType: 'lift', featureSubtype: 'gondola' }), 'gondola');
   assert.equal(activityMapIconKind({ category: 'parking' }), 'parking');
   assert.equal(activityMapIconKind({ category: 'wc' }), 'restroom');
   assert.equal(activityMapIconKind({ categoryName: 'Ladepunkt' }), 'evCharging');
@@ -126,14 +129,41 @@ test('activity map accepts versioned deletes and exposes only public fields', ()
   assert.deepEqual(value, { action: 'delete', id: 'a'.repeat(32), version: 3 });
   const row = { id: 'b'.repeat(32), name: 'Blåløypa', category: 'alpine', feature_type: 'trail',
     tooltip_text: 'Kort omtale', activity_number: '4A', alpine_color: 'blue', feature_subtype: null, geometry: JSON.stringify(polygon.geometry), is_draft: true, version: '2',
+    image_storage_key: `activity-map/images/${'b'.repeat(32)}/${'c'.repeat(32)}.webp`, image_source_url: 'https://images.example.test/trail.jpg',
     source_ids: ['kartverket', 'not-allowed'], last_changed_by: 'private@example.test' };
   const publicResult = publicActivityFeatureRecord(row);
-  assert.deepEqual(Object.keys(publicResult).sort(), ['activityNumber', 'alpineColor', 'category', 'categoryName', 'categoryColor', 'typeName', 'subtypeName', 'geometryKind', 'featureType', 'featureSubtype', 'geometry', 'iconUrl', 'id', 'name', 'tooltipText', 'season', 'websiteUrl', 'sources'].sort());
+  assert.deepEqual(Object.keys(publicResult).sort(), ['activityNumber', 'alpineColor', 'category', 'categoryName', 'categoryColor', 'typeName', 'subtypeName', 'geometryKind', 'featureType', 'featureSubtype', 'geometry', 'iconUrl', 'imageUrl', 'id', 'name', 'tooltipText', 'season', 'websiteUrl', 'sources'].sort());
   assert.equal(publicResult.tooltipText, 'Kort omtale');
+  assert.equal(publicResult.imageUrl, `/api/activity-map/images/${'b'.repeat(32)}?v=${'c'.repeat(32)}`);
   assert.deepEqual(publicResult.sources.map((source) => source.id), ['kartverket']);
   assert.equal(Object.hasOwn(publicResult.sources[0], 'priority'), false);
   assert.doesNotMatch(JSON.stringify(publicResult), /private@example|version|isDraft/);
   assert.equal(activityFeatureRecord(row).version, 2); assert.equal(activityFeatureRecord(row).isDraft, true);
+  assert.equal(activityFeatureRecord(row).imageSourceUrl, 'https://images.example.test/trail.jpg');
+  assert.doesNotMatch(JSON.stringify(publicResult), /image_storage_key|images\.example/);
+});
+
+test('remote activity images require a public HTTPS host and bounded supported image data', async () => {
+  assert.equal(normalizeActivityImageSourceUrl('https://images.example.test/trail.jpg#crop'), 'https://images.example.test/trail.jpg');
+  for (const url of ['http://images.example.test/trail.jpg', 'https://localhost/trail.jpg', 'https://user:pass@example.test/a.jpg', 'https://example.test:8443/a.jpg']) {
+    assert.throws(() => normalizeActivityImageSourceUrl(url), /Invalid activity image URL/);
+  }
+  for (const address of ['127.0.0.1', '10.0.0.2', '169.254.169.254', '192.168.1.4', '::1', 'fd00::1', 'fe80::1', '::ffff:7f00:1']) {
+    assert.equal(isPublicActivityImageAddress(address), false);
+  }
+  assert.equal(isPublicActivityImageAddress('93.184.216.34'), true);
+  assert.equal(isPublicActivityImageAddress('2606:2800:220:1:248:1893:25c8:1946'), true);
+  const downloaded = await downloadActivityImageSource('https://images.example.test/trail.png', {
+    lookup: async () => [{ address: '93.184.216.34', family: 4 }],
+    fetchImpl: async () => new Response(Buffer.from('89504e470d0a1a0a', 'hex'), { headers: { 'Content-Type': 'image/png' } }),
+  });
+  assert.equal(downloaded.sourceUrl, 'https://images.example.test/trail.png');
+  assert.equal(downloaded.file.name, 'remote-image.png');
+  assert.equal(downloaded.file.size, 8);
+  await assert.rejects(downloadActivityImageSource('https://internal.example.test/image.png', {
+    lookup: async () => [{ address: '10.0.0.4', family: 4 }],
+    fetchImpl: async () => assert.fail('Private hosts must be rejected before fetch'),
+  }), /Invalid activity image URL/);
 });
 
 test('public activity polygons are smoothed without changing stored geometry or points', () => {
@@ -207,6 +237,35 @@ test('activity map admin route inherits authentication, same-origin and private-
   const allowed = await catalogRoute.POST(request('/api/admin/activity-map/catalog', { method: 'POST', body: {} }));
   assert.equal(allowed.status, 200); assert.match(allowed.headers.get('Cache-Control'), /private/);
 
+  let imageImports = 0;
+  const imageRoute = await loadModule('app/api/admin/activity-map/features/image/route.js', {
+    '@/lib/activity-map-image-service': {
+      uploadActivityMapImage: async () => assert.fail('Unexpected file upload'),
+      importActivityMapImage: async ({ id }, sourceUrl) => { imageImports++; return { id, imageUrl: sourceUrl }; },
+      removeActivityMapImage: async ({ id }) => ({ id, imageUrl: null }),
+    },
+  });
+  const imageForm = new FormData();
+  imageForm.set('id', 'a'.repeat(32)); imageForm.set('version', '1'); imageForm.set('sourceUrl', 'https://images.example.test/test.jpg');
+  const blockedImage = await imageRoute.POST(new Request('https://example.test/api/admin/activity-map/features/image', {
+    method: 'POST', headers: { Origin: 'https://evil.test' }, body: imageForm,
+  }));
+  assert.equal(blockedImage.status, 403); assert.equal(imageImports, 0);
+  const importedImage = await imageRoute.POST(new Request('https://example.test/api/admin/activity-map/features/image', {
+    method: 'POST', headers: { Origin: 'https://example.test' }, body: imageForm,
+  }));
+  assert.equal(importedImage.status, 201); assert.equal(imageImports, 1); assert.match(importedImage.headers.get('Cache-Control'), /private/);
+
+  const publicImageRoute = await loadModule('app/api/activity-map/images/[id]/route.js', {
+    '@/lib/activity-map-image-service': {
+      getActivityMapImage: async () => ({ storageKey: `activity-map/images/${'a'.repeat(32)}/${'b'.repeat(32)}.webp`, mimeType: 'image/webp', size: 3, isPublic: true }),
+      downloadActivityMapImage: async () => ({ Body: { transformToByteArray: async () => Uint8Array.from([1, 2, 3]) } }),
+    },
+  });
+  const publicImage = await publicImageRoute.GET(request(`/api/activity-map/images/${'a'.repeat(32)}?v=${'b'.repeat(32)}`), { params: Promise.resolve({ id: 'a'.repeat(32) }) });
+  assert.equal(publicImage.status, 200); assert.equal(publicImage.headers.get('Content-Type'), 'image/webp');
+  assert.match(publicImage.headers.get('Cache-Control'), /immutable/); assert.equal(publicImage.headers.get('X-Content-Type-Options'), 'nosniff');
+
   let previews = 0;
   const importRoute = await loadModule('app/api/admin/activity-map/import/route.js', {
     '@/lib/map/api': { handleMapRequest }, '@/lib/map/errors': { MapError },
@@ -233,6 +292,9 @@ test('database schema constrains activity map combinations and adds audit trigge
   assert.match(schema, /CREATE TABLE IF NOT EXISTS activity_map_subtypes/);
   assert.match(schema, /feature_subtype TEXT/);
   assert.match(schema, /tooltip_text TEXT/);
+  assert.match(schema, /image_storage_key TEXT/);
+  assert.match(schema, /activity_map_feature_image_check/);
+  assert.match(schema, /old_data := old_data - 'image_storage_key'/);
   assert.match(schema, /activity_number TEXT/);
   assert.match(schema, /ALTER COLUMN activity_number TYPE TEXT USING activity_number::TEXT/);
   assert.match(schema, /CHECK \(is_draft OR \(geometry IS NOT NULL AND geometry <> 'null'::jsonb\)\)/);

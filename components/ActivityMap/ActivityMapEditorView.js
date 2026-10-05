@@ -8,6 +8,7 @@ import { activityCategoryColor } from '@/lib/activity-map-catalog';
 import { BACKGROUND_MAP, SATELLITE_MAP } from '@/lib/map/sources';
 import { bindActivityIconInteraction } from '@/lib/map/leaflet-icon-interaction';
 import { revealLeafletLayerWithoutZoom } from '@/lib/map/leaflet-viewport';
+import { activityTooltipContent } from '@/lib/map/activity-tooltip';
 import { activityMapIconAnchor, activityMapIconCoordinate, activityMapIconKind, activityMapIconMarkup } from '@/lib/activity-map-icons';
 
 const latLng = ([longitude, latitude]) => [latitude, longitude];
@@ -127,15 +128,7 @@ export default function ActivityMapEditorView({ features, previewFeatures = [], 
       visibleBounds.extend(layer.getBounds());
       layer.eachLayer((item) => item.getElement()?.setAttribute('data-feature-id', feature.id));
       featureLayers.current.set(feature.id, layer);
-      const tooltip = document.createElement('div');
-      const name = document.createElement('strong');
-      name.textContent = feature.name;
-      tooltip.append(name);
-      if (feature.tooltipText) {
-        const description = document.createElement('p');
-        description.textContent = feature.tooltipText;
-        tooltip.append(description);
-      }
+      const tooltip = activityTooltipContent(feature);
       const iconCoordinate = activityMapIconCoordinate(feature.geometry);
       if (iconCoordinate) {
         const iconMarker = L.marker(latLng(iconCoordinate), {
@@ -184,15 +177,7 @@ export default function ActivityMapEditorView({ features, previewFeatures = [], 
       iconElement?.setAttribute('data-activity-icon-id', draft.id);
       iconElement?.setAttribute('aria-label', draft.name);
       if (draft.id && !drawing && !editing) {
-        const tooltip = document.createElement('div');
-        const name = document.createElement('strong');
-        name.textContent = draft.name;
-        tooltip.append(name);
-        if (draft.tooltipText) {
-          const description = document.createElement('p');
-          description.textContent = draft.tooltipText;
-          tooltip.append(description);
-        }
+        const tooltip = activityTooltipContent(draft);
         bindActivityIconInteraction({ marker: selectedIconMarker, map,
           tooltip: L.tooltip({ direction: 'auto', offset: [0, -18] }).setContent(tooltip), onSelect: () => onSelect(draft) });
       }

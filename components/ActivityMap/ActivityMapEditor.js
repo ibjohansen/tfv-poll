@@ -1,4 +1,6 @@
 'use client';
+/* Activity images are already resized and converted to WebP before storage. */
+/* eslint-disable @next/next/no-img-element */
 
 import { useApiClient } from '@/components/useApiClient';
 
@@ -17,7 +19,7 @@ function MapLoading() {
 }
 const ActivityMapEditorView = dynamic(() => import('./ActivityMapEditorView'), { ssr: false, loading: MapLoading });
 
-const emptyDraft = () => ({ id: null, version: null, name: '', tooltipText: '', season: '', websiteUrl: '', category: 'cycling', activityNumber: '', featureType: 'trail', featureSubtype: '', alpineColor: '', geometry: null, isDraft: true });
+const emptyDraft = () => ({ id: null, version: null, name: '', tooltipText: '', season: '', websiteUrl: '', imageUrl: null, imageSourceUrl: null, category: 'cycling', activityNumber: '', featureType: 'trail', featureSubtype: '', alpineColor: '', geometry: null, isDraft: true });
 
 const geometryType = { polygon: 'Polygon', line: 'LineString', point: 'Point' };
 
@@ -42,6 +44,7 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
   const [drawing, setDrawing] = useState(false);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(true);
+  const [imageBusy, setImageBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [fullscreenSupported, setFullscreenSupported] = useState(false);
@@ -50,6 +53,8 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
   const mapFrameRef = useRef(null);
   const selectedFeatureButtonRef = useRef(null);
   const selectAllCategoriesRef = useRef(null);
+  const imageFileRef = useRef(null);
+  const imageSourceUrlRef = useRef(null);
 
   const selected = useMemo(() => features.find((feature) => feature.id === draft.id) || null, [draft.id, features]);
   const decoratedFeatures = useMemo(() => features.map((feature) => withActivityCatalog(feature, catalog)), [features, catalog]);
@@ -114,12 +119,16 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
   function selectFeature(feature) {
     if ((drawing || editing) && !window.confirm(t('confirmDiscard'))) return;
     setDraft({ ...feature, activityNumber: feature.activityNumber == null ? '' : String(feature.activityNumber), featureSubtype: feature.featureSubtype || '', alpineColor: feature.alpineColor || '' });
+    if (imageSourceUrlRef.current) imageSourceUrlRef.current.value = feature.imageSourceUrl || '';
+    if (imageFileRef.current) imageFileRef.current.value = '';
     setDrawing(false); setEditing(false); setError(''); setNotice('');
   }
 
   function newFeature() {
     if ((draft.geometry || draft.name) && !window.confirm(t('confirmDiscard'))) return;
     setDraft(emptyDraft()); setDrawing(false); setEditing(false); setError(''); setNotice('');
+    if (imageSourceUrlRef.current) imageSourceUrlRef.current.value = '';
+    if (imageFileRef.current) imageFileRef.current.value = '';
   }
 
   function changeCategory(category) {
@@ -196,13 +205,60 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
     finally { setBusy(false); }
   }
 
+  function applyImageFeature(feature) {
+    setFeatures((current) => [...current.filter((item) => item.id !== feature.id), feature].sort(compareFeatures));
+    setDraft((current) => current.id === feature.id ? {
+      ...current, version: feature.version, imageUrl: feature.imageUrl, imageSourceUrl: feature.imageSourceUrl,
+    } : current);
+    if (imageSourceUrlRef.current) imageSourceUrlRef.current.value = feature.imageSourceUrl || '';
+  }
+
+  async function updateImage(mode) {
+    if (!draft.id) return;
+    setImageBusy(true); setError(''); setNotice('');
+    try {
+      const form = new FormData();
+      form.set('id', draft.id); form.set('version', String(draft.version));
+      if (mode === 'file') {
+        const file = imageFileRef.current?.files?.[0];
+        if (!file) throw new Error(t('imageChooseFile'));
+        form.set('file', file);
+      } else form.set('sourceUrl', imageSourceUrlRef.current?.value || '');
+      const response = await apiFetch('/api/admin/activity-map/features/image', {
+        method: 'POST', credentials: 'same-origin', cache: 'no-store', body: form,
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.message || t('requestError'));
+      applyImageFeature(body.feature);
+      if (imageFileRef.current) imageFileRef.current.value = '';
+      setNotice(t('imageUpdated'));
+    } catch (failure) { setError(failure.message || t('requestError')); }
+    finally { setImageBusy(false); }
+  }
+
+  async function removeImage() {
+    if (!draft.id || !draft.imageUrl) return;
+    setImageBusy(true); setError(''); setNotice('');
+    try {
+      const response = await apiFetch('/api/admin/activity-map/features/image', {
+        method: 'DELETE', credentials: 'same-origin', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: draft.id, version: draft.version }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.message || t('requestError'));
+      applyImageFeature(body.feature);
+      setNotice(t('imageRemoved'));
+    } catch (failure) { setError(failure.message || t('requestError')); }
+    finally { setImageBusy(false); }
+  }
+
   const kind = findActivityType(catalog, draft.category, draft.featureType)?.geometryKind;
   const subtypes = (catalog.subtypes || []).filter((item) => item.category === draft.category && item.featureType === draft.featureType);
   const expectedGeometry = geometryType[kind];
   let numberValid = true;
   try { normalizeActivityNumber(draft.activityNumber, draft.category); } catch { numberValid = draft.activityNumber === ''; }
   const geometryValid = !draft.geometry || draft.geometry.type === expectedGeometry;
-  const canSave = kind && draft.name.trim() && numberValid && geometryValid && (draft.isDraft || draft.geometry?.type === expectedGeometry) && !drawing && !editing && !busy;
+  const canSave = kind && draft.name.trim() && numberValid && geometryValid && (draft.isDraft || draft.geometry?.type === expectedGeometry) && !drawing && !editing && !busy && !imageBusy;
   const canFinish = kind === 'polygon' ? (draft.geometry?.coordinates?.[0]?.length || 0) >= 3
     : kind === 'line' ? (draft.geometry?.coordinates?.length || 0) >= 2 : Boolean(draft.geometry);
 
@@ -253,6 +309,15 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
           </select></label>
           <label className="activity-tooltip-field">{t('website')}<input type="url" maxLength={2048} placeholder="https://" value={draft.websiteUrl || ''} onChange={(event) => setDraft((current) => ({ ...current, websiteUrl: event.target.value }))} /></label>
         </div>
+        <section className="activity-image-editor" aria-labelledby="activity-image-title">
+          <h4 id="activity-image-title">{t('imageTitle')}</h4>
+          {draft.imageUrl && <div className="activity-image-preview"><img src={draft.imageUrl} alt={t('imagePreviewAlt', { name: draft.name })} /><button type="button" className="admin-button danger" disabled={busy || imageBusy} onClick={removeImage}>{t('removeImage')}</button></div>}
+          {draft.id ? <div className="activity-image-inputs">
+            <div><label>{t('imageFile')}<input ref={imageFileRef} type="file" accept="image/jpeg,image/png,image/webp" disabled={busy || imageBusy} /></label><button type="button" className="admin-button" disabled={busy || imageBusy} onClick={() => updateImage('file')}>{t('uploadImage')}</button></div>
+            <div><label>{t('imageUrl')}<input ref={imageSourceUrlRef} type="url" maxLength={2048} placeholder="https://" defaultValue={draft.imageSourceUrl || ''} disabled={busy || imageBusy} /></label><button type="button" className="admin-button" disabled={busy || imageBusy} onClick={() => updateImage('url')}>{t('importImage')}</button></div>
+            <p className="muted">{t('imageHelp')}</p>
+          </div> : <p className="muted">{t('imageSaveFirst')}</p>}
+        </section>
         {!catalog.types.some((item) => item.category === draft.category) && !busy && <p className="muted">{t('catalog.noTypes')}</p>}
         <label className="activity-draft-toggle"><input type="checkbox" checked={draft.isDraft} onChange={(event) => setDraft((current) => ({ ...current, isDraft: event.target.checked }))} /><span><strong>{t('saveAsDraft')}</strong><small>{t('draftHelp')}</small></span></label>
         <div className="activity-drawing-actions" role="group" aria-label={t('geometryTools')}>

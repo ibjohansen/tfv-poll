@@ -10,6 +10,7 @@ import { activityCategoryColor, activityCategoryLabel, activitySubtypeLabel, act
 import { ACTIVITY_MAP_SOURCES } from '@/lib/activity-map-sources';
 import { bindActivityIconInteraction } from '@/lib/map/leaflet-icon-interaction';
 import { revealLeafletLayerWithoutZoom } from '@/lib/map/leaflet-viewport';
+import { activityTooltipContent } from '@/lib/map/activity-tooltip';
 import { activityMapIconAnchor, activityMapIconCoordinate, activityMapIconKind, activityMapIconMarkup } from '@/lib/activity-map-icons';
 
 const latLng = ([longitude, latitude]) => [latitude, longitude];
@@ -119,17 +120,9 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
         style,
         pointToLayer: (_item, point) => L.circleMarker(point, { ...style, interactive: false, radius: selected ? 12 : 9, fillOpacity: .92 }),
       }).addTo(group);
-      const label = document.createElement('div');
-      const name = document.createElement('strong');
-      name.textContent = feature.activityNumber ? `${feature.activityNumber}. ${feature.name}` : feature.name;
-      const detail = document.createElement('div');
-      detail.textContent = `${activityCategoryLabel(feature, t)} · ${activityTypeLabel(feature, t)}${feature.featureSubtype ? ` · ${activitySubtypeLabel(feature, t)}` : ''}${feature.alpineColor && showAlpineColors ? ` · ${t(`colors.${feature.alpineColor}`)}` : ''}`;
-      label.append(name, detail);
-      if (feature.tooltipText) {
-        const description = document.createElement('p');
-        description.textContent = feature.tooltipText;
-        label.append(description);
-      }
+      const displayFeature = { ...feature, name: feature.activityNumber ? `${feature.activityNumber}. ${feature.name}` : feature.name };
+      const detail = `${activityCategoryLabel(feature, t)} · ${activityTypeLabel(feature, t)}${feature.featureSubtype ? ` · ${activitySubtypeLabel(feature, t)}` : ''}${feature.alpineColor && showAlpineColors ? ` · ${t(`colors.${feature.alpineColor}`)}` : ''}`;
+      const label = activityTooltipContent(displayFeature, detail);
       const iconCoordinate = activityMapIconCoordinate(feature.geometry);
       if (iconCoordinate) {
         const iconMarker = L.marker(latLng(iconCoordinate), {

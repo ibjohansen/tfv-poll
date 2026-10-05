@@ -803,7 +803,8 @@ Se [kartmodulens datakilder, begrensninger og bruk](docs/map-explorer.md).
 
 Aktivitetskartet ligger på `/admin/activity-map`, med beskyttede Node-ruter
 `GET/POST /api/admin/activity-map/features`, `POST /api/admin/activity-map/catalog`,
-`POST/DELETE /api/admin/activity-map/catalog/icon`, `GET /api/activity-map/icons/*` og
+`POST/DELETE /api/admin/activity-map/catalog/icon`, `GET /api/activity-map/icons/*`,
+`POST/DELETE /api/admin/activity-map/features/image`, `GET /api/activity-map/images/[id]` og
 `GET/POST /api/admin/activity-map/import`. Adminrutene bruker eksisterende
 `members`-rettighet, same-origin-kontroll og pooled databaseforbindelse. Data
 lagres i `activity_map_features`, med redigerbare kategorier, typer og undertyper i
@@ -816,6 +817,15 @@ valideres mot en streng elementliste og avviser aktive eller eksterne SVG-funksj
 en offentlig, cachet innholdsroute med CSP-sandbox; ikonets private lagringsnøkkel returneres aldri.
 Undertypeikon overstyrer typeikon, som overstyrer kategoriikon; uten opplastet ikon brukes
 det innebygde standardikonet.
+En lagret aktivitet kan i tillegg få ett valgfritt bilde. Administrator kan laste
+opp JPEG, PNG eller WebP, eller oppgi en offentlig HTTPS-adresse. Eksterne bilder
+hentes server-side etter offentlig DNS-kontroll, uten redirect eller
+innloggingsopplysninger, og både disse og lokale opplastinger valideres, roteres,
+skaleres til maksimalt 1200 × 900 og lagres som WebP under en ny, uforanderlig
+objektnøkkel. Nettleseren henter bare den interne bilderuten; tredjeparten mottar
+dermed ikke besøksdata og CSP trenger ingen nye eksterne bildekilder. Private
+kladdbilder krever administratorøkt, mens bilder på publiserte aktiviteter kan
+caches offentlig. Lagringsnøkkelen eksponeres ikke i API-et eller auditloggen.
 Standardkategoriene er Sykkel, Alpint, Tur og Langrenn; turer og langrenn bruker linjer, sykkel- og
 alpinløyper samt heiser bruker polygoner, og park/akebakke bruker punkt.
 Alpinaktiviteter kan
@@ -831,7 +841,14 @@ Sesongfilteret kombineres med kategorifiltrene; helårsaktiviteter vises både o
 og vinteren. Eldre aktiviteter uten sesong holdes synlige til de er klassifisert.
 Websiden vises som en lenke i kartets klikkbare informasjonsboks og i et
 tastaturtilgjengelig detaljpanel. Bare http/https uten innloggingsopplysninger tillates.
-Disse feltene krever additiv migrering før denne kodeversjonen tas i bruk.
+Sesong og webside er allerede en del av produksjonsskjemaet. Den additive
+produksjonsmigreringen for aktivitetsbilder (`image_storage_key`,
+`image_source_url`, `image_mime_type` og `image_size_bytes`) ble kjørt og
+verifisert 6. oktober 2026 med den avgrensede aktivitetskartprosedyren og direkte
+databaseforbindelse. Se
+[migreringsresultatet](docs/database/database-migration-2026-10-06-activity-images.md).
+Den eksisterende private `cms-assets`-bøtten gjenbrukes; ingen ny miljøvariabel
+eller Neon-tjeneste kreves.
 Aktivitetskartet vises på forsiden. Bare publiserte aktiviteter med gyldig
 geometri vises.
 Admin- og forsidekartet kan veksle mellom Kartverkets
@@ -1453,6 +1470,10 @@ Ved utrulling av kodegjennomgangen fra 3. oktober 2026:
   [meldingsformat og kompatibilitet](docs/message-localization.md).
 - Verifiser aktivitetenes `season`/`website_url` ved lagring, ny innlasting og
   offentlig visning. Ikke gjenta den allerede gjennomførte aktivitetsimporten.
+- Etter migrering av aktivitetsbilder: last opp ett bilde og importer ett bilde
+  fra en offentlig HTTPS-adresse. Kontroller WebP-respons, bilde i hover-tooltip
+  og informasjonsboks, at kladdbildet ikke kan leses uten administratorøkt, og at
+  fjerning invaliderer kartdata uten å eksponere privat lagringsnøkkel.
 - Verifiser CMS-publisering/avpublisering uten stale offentlig innhold.
 - Kontroller at legitime adminmutasjoner virker, og at fremmed/manglende
   `Origin` avvises. Kontroller også godkjente webhooks og bakgrunnsjobber.

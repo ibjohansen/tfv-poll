@@ -605,6 +605,10 @@ CREATE TABLE IF NOT EXISTS activity_map_features (
   feature_subtype TEXT,
   alpine_color TEXT CHECK (alpine_color IN ('blue', 'yellow', 'green', 'red', 'black')),
   geometry JSONB,
+  image_storage_key TEXT,
+  image_source_url TEXT,
+  image_mime_type TEXT,
+  image_size_bytes INTEGER,
   is_draft BOOLEAN NOT NULL DEFAULT FALSE,
   version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -617,6 +621,10 @@ ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS tooltip_text TEXT;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS feature_subtype TEXT;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS season TEXT;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS website_url TEXT;
+ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS image_storage_key TEXT;
+ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS image_source_url TEXT;
+ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS image_mime_type TEXT;
+ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS image_size_bytes INTEGER;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS geometry_origin TEXT NOT NULL DEFAULT 'manual';
 ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_geometry_origin_check;
 ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_geometry_origin_check
@@ -628,6 +636,14 @@ ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature
 ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_website_check
   CHECK (website_url IS NULL OR (length(website_url) BETWEEN 1 AND 2048
     AND website_url ~ '^https?://[^[:space:]/@]+([/?#]|$)' AND website_url !~ '[[:space:][:cntrl:]]'));
+ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_image_check;
+ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_image_check CHECK (
+  (image_storage_key IS NULL AND image_source_url IS NULL AND image_mime_type IS NULL AND image_size_bytes IS NULL)
+  OR (image_storage_key ~ '^activity-map/images/[a-f0-9]{32}/[a-f0-9]{32}\.webp$'
+    AND image_mime_type = 'image/webp' AND image_size_bytes BETWEEN 1 AND 5242880
+    AND (image_source_url IS NULL OR (length(image_source_url) BETWEEN 1 AND 2048
+      AND image_source_url ~ '^https://[^[:space:]/@]+([/?#]|$)' AND image_source_url !~ '[[:space:][:cntrl:]]')))
+);
 ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_features_category_check;
 ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_number_check;
 ALTER TABLE activity_map_features ALTER COLUMN activity_number TYPE TEXT USING activity_number::TEXT;
@@ -1316,6 +1332,9 @@ BEGIN
   ELSIF TG_TABLE_NAME IN ('cms_attachments', 'survey_attachments', 'accounting_attachments') THEN
     old_data := old_data - 'storage_key';
     new_data := new_data - 'storage_key';
+  ELSIF TG_TABLE_NAME = 'activity_map_features' THEN
+    old_data := old_data - 'image_storage_key';
+    new_data := new_data - 'image_storage_key';
   END IF;
 
   IF TG_OP = 'UPDATE' AND old_data = new_data THEN
