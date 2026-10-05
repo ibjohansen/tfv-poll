@@ -41,7 +41,7 @@ const activityMap = {
     eyebrow: 'Activity map', title: 'Manage activities',
     introduction: 'Create activities with polygons, lines or points, depending on the selected type. Only published activities are shown on the home page.',
     season: 'Season', noSeason: 'Not specified', seasons: { summer: 'Summer', winter: 'Winter', all_year: 'Year-round' }, website: 'Website',
-    imageTitle: 'Image', imageFile: 'Upload image file', uploadImage: 'Upload image', imageUrl: 'Image address', importImage: 'Fetch image',
+    imageTitle: 'Image', imageFile: 'JPEG, PNG or WebP', uploadImage: 'Upload image', imageUploading: 'Uploading …', imageUrl: 'Image address', importImage: 'Fetch image',
     imageHelp: 'JPEG, PNG and WebP are supported. Images from an HTTPS address are copied to secure storage and optimized.', imageSaveFirst: 'Save the activity before adding an image.',
     imagePreviewAlt: 'Image preview for {name}', removeImage: 'Remove image', imageUpdated: 'The image was updated.', imageRemoved: 'The image was removed.', imageChooseFile: 'Choose an image file first.',
     imageFileError: 'Choose a valid JPEG, PNG or WebP file.', imageUrlError: 'Enter a valid public HTTPS image address.', imageUnavailable: 'The image could not be fetched from that address.',

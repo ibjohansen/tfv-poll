@@ -41,7 +41,7 @@ const activityMap = {
     eyebrow: 'Aktivitetskart', title: 'Administrer aktiviteter',
     introduction: 'Opprett aktiviteter med polygon, linje eller punkt, avhengig av valgt type. Bare publiserte aktiviteter vises på forsiden.',
     season: 'Sesong', noSeason: 'Ikke angitt', seasons: { summer: 'Sommer', winter: 'Vinter', all_year: 'Helårs' }, website: 'Webside',
-    imageTitle: 'Bilde', imageFile: 'Last opp bildefil', uploadImage: 'Last opp bilde', imageUrl: 'Adresse til bilde', importImage: 'Hent bilde',
+    imageTitle: 'Bilde', imageFile: 'JPEG, PNG eller WebP', uploadImage: 'Last opp bilde', imageUploading: 'Laster opp …', imageUrl: 'Adresse til bilde', importImage: 'Hent bilde',
     imageHelp: 'JPEG, PNG og WebP støttes. Bilder fra en HTTPS-adresse kopieres til sikker lagring og optimaliseres.', imageSaveFirst: 'Lagre aktiviteten før du legger til bilde.',
     imagePreviewAlt: 'Forhåndsvisning av bilde for {name}', removeImage: 'Fjern bilde', imageUpdated: 'Bildet er oppdatert.', imageRemoved: 'Bildet er fjernet.', imageChooseFile: 'Velg en bildefil først.',
     imageFileError: 'Velg en gyldig JPEG-, PNG- eller WebP-fil.', imageUrlError: 'Skriv inn en gyldig offentlig HTTPS-adresse til et bilde.', imageUnavailable: 'Bildet kunne ikke hentes fra adressen.',

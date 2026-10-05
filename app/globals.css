@@ -9920,6 +9920,15 @@ body:has(.cookie-notice) {
   align-items: end;
 }
 
+.activity-image-inputs > .activity-image-upload-action {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.activity-image-upload-action small {
+  color: #625d55;
+}
+
 .activity-image-inputs label {
   min-width: 0;
 }
@@ -9931,6 +9940,10 @@ body:has(.cookie-notice) {
 @media (max-width: 640px) {
   .activity-image-inputs > div {
     grid-template-columns: 1fr;
+  }
+
+  .activity-image-inputs > .activity-image-upload-action {
+    grid-template-columns: auto minmax(0, 1fr);
   }
 
   .activity-image-inputs .admin-button {

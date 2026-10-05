@@ -254,10 +254,10 @@ test('activity map admin route inherits authentication, same-origin and private-
   const allowed = await catalogRoute.POST(request('/api/admin/activity-map/catalog', { method: 'POST', body: {} }));
   assert.equal(allowed.status, 200); assert.match(allowed.headers.get('Cache-Control'), /private/);
 
-  let imageImports = 0;
+  let imageImports = 0; let imageUploads = 0;
   const imageRoute = await loadModule('app/api/admin/activity-map/features/image/route.js', {
     '@/lib/activity-map-image-service': {
-      uploadActivityMapImage: async () => assert.fail('Unexpected file upload'),
+      uploadActivityMapImage: async ({ id }, file) => { imageUploads++; return { id, imageUrl: `uploaded:${file.name}` }; },
       importActivityMapImage: async ({ id }, sourceUrl) => { imageImports++; return { id, imageUrl: sourceUrl }; },
       removeActivityMapImage: async ({ id }) => ({ id, imageUrl: null }),
     },
@@ -272,6 +272,14 @@ test('activity map admin route inherits authentication, same-origin and private-
     method: 'POST', headers: { Origin: 'https://example.test' }, body: imageForm,
   }));
   assert.equal(importedImage.status, 201); assert.equal(imageImports, 1); assert.match(importedImage.headers.get('Cache-Control'), /private/);
+
+  const uploadForm = new FormData();
+  uploadForm.set('id', 'a'.repeat(32)); uploadForm.set('version', '1');
+  uploadForm.set('file', new Blob(['image'], { type: 'image/png' }), 'activity.png');
+  const uploadedImage = await imageRoute.POST(new Request('https://example.test/api/admin/activity-map/features/image', {
+    method: 'POST', headers: { Origin: 'https://example.test' }, body: uploadForm,
+  }));
+  assert.equal(uploadedImage.status, 201); assert.equal(imageUploads, 1);
 
   const publicImageRoute = await loadModule('app/api/activity-map/images/[id]/route.js', {
     '@/lib/activity-map-image-service': {

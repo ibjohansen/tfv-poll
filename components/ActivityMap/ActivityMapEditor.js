@@ -46,6 +46,8 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(true);
   const [imageBusy, setImageBusy] = useState(false);
+  const [imageError, setImageError] = useState('');
+  const [imageNotice, setImageNotice] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [fullscreenSupported, setFullscreenSupported] = useState(false);
@@ -137,12 +139,12 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
     setDraft({ ...feature, activityNumber: feature.activityNumber == null ? '' : String(feature.activityNumber), featureSubtype: feature.featureSubtype || '', alpineColor: feature.alpineColor || '', iconOverride: feature.iconOverride || '' });
     if (imageSourceUrlRef.current) imageSourceUrlRef.current.value = feature.imageSourceUrl || '';
     if (imageFileRef.current) imageFileRef.current.value = '';
-    setDrawing(false); setEditing(false); setError(''); setNotice('');
+    setDrawing(false); setEditing(false); setError(''); setNotice(''); setImageError(''); setImageNotice('');
   }
 
   function newFeature() {
     if ((draft.geometry || draft.name) && !window.confirm(t('confirmDiscard'))) return;
-    setDraft(emptyDraft()); setDrawing(false); setEditing(false); setError(''); setNotice('');
+    setDraft(emptyDraft()); setDrawing(false); setEditing(false); setError(''); setNotice(''); setImageError(''); setImageNotice('');
     if (imageSourceUrlRef.current) imageSourceUrlRef.current.value = '';
     if (imageFileRef.current) imageFileRef.current.value = '';
   }
@@ -231,7 +233,7 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
 
   async function updateImage(mode) {
     if (!draft.id) return;
-    setImageBusy(true); setError(''); setNotice('');
+    setImageBusy(true); setImageError(''); setImageNotice('');
     try {
       const form = new FormData();
       form.set('id', draft.id); form.set('version', String(draft.version));
@@ -246,15 +248,17 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
       const body = await response.json();
       if (!response.ok) throw new Error(body?.message || t('requestError'));
       applyImageFeature(body.feature);
-      if (imageFileRef.current) imageFileRef.current.value = '';
-      setNotice(t('imageUpdated'));
-    } catch (failure) { setError(failure.message || t('requestError')); }
-    finally { setImageBusy(false); }
+      setImageNotice(t('imageUpdated'));
+    } catch (failure) { setImageError(failure.message || t('requestError')); }
+    finally {
+      if (mode === 'file' && imageFileRef.current) imageFileRef.current.value = '';
+      setImageBusy(false);
+    }
   }
 
   async function removeImage() {
     if (!draft.id || !draft.imageUrl) return;
-    setImageBusy(true); setError(''); setNotice('');
+    setImageBusy(true); setImageError(''); setImageNotice('');
     try {
       const response = await apiFetch('/api/admin/activity-map/features/image', {
         method: 'DELETE', credentials: 'same-origin', cache: 'no-store',
@@ -263,8 +267,8 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
       const body = await response.json();
       if (!response.ok) throw new Error(body?.message || t('requestError'));
       applyImageFeature(body.feature);
-      setNotice(t('imageRemoved'));
-    } catch (failure) { setError(failure.message || t('requestError')); }
+      setImageNotice(t('imageRemoved'));
+    } catch (failure) { setImageError(failure.message || t('requestError')); }
     finally { setImageBusy(false); }
   }
 
@@ -333,10 +337,13 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
           <h4 id="activity-image-title">{t('imageTitle')}</h4>
           {draft.imageUrl && <div className="activity-image-preview"><img src={draft.imageUrl} alt={t('imagePreviewAlt', { name: draft.name })} /><button type="button" className="admin-button danger" disabled={busy || imageBusy} onClick={removeImage}>{t('removeImage')}</button></div>}
           {draft.id ? <div className="activity-image-inputs">
-            <div><label>{t('imageFile')}<input ref={imageFileRef} type="file" accept="image/jpeg,image/png,image/webp" disabled={busy || imageBusy} /></label><button type="button" className="admin-button" disabled={busy || imageBusy} onClick={() => updateImage('file')}>{t('uploadImage')}</button></div>
+            <div className="activity-image-upload-action"><input ref={imageFileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden disabled={busy || imageBusy}
+              onChange={(event) => { if (event.target.files?.[0]) updateImage('file'); }} /><button type="button" className="admin-button" disabled={busy || imageBusy}
+                onClick={() => imageFileRef.current?.click()}>{imageBusy ? t('imageUploading') : t('uploadImage')}</button><small>{t('imageFile')}</small></div>
             <div><label>{t('imageUrl')}<input ref={imageSourceUrlRef} type="url" maxLength={2048} placeholder="https://" defaultValue={draft.imageSourceUrl || ''} disabled={busy || imageBusy} /></label><button type="button" className="admin-button" disabled={busy || imageBusy} onClick={() => updateImage('url')}>{t('importImage')}</button></div>
             <p className="muted">{t('imageHelp')}</p>
           </div> : <p className="muted">{t('imageSaveFirst')}</p>}
+          {imageError && <p className="error-message" role="alert">{imageError}</p>}{imageNotice && <p role="status">{imageNotice}</p>}
         </section>
         {!catalog.types.some((item) => item.category === draft.category) && !busy && <p className="muted">{t('catalog.noTypes')}</p>}
         <label className="activity-draft-toggle"><input type="checkbox" checked={draft.isDraft} onChange={(event) => setDraft((current) => ({ ...current, isDraft: event.target.checked }))} /><span><strong>{t('saveAsDraft')}</strong><small>{t('draftHelp')}</small></span></label>
