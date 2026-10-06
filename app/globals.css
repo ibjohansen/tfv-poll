@@ -10359,6 +10359,29 @@ body:has(.cookie-notice) {
   object-fit: cover;
 }
 
+.activity-map-tooltip-image-frame,
+.activity-selected-image-frame {
+  position: relative;
+  margin: 0;
+}
+
+.activity-map-tooltip-image-frame .activity-map-tooltip-image {
+  margin-bottom: 0;
+}
+
+.activity-image-credit {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  max-width: calc(100% - 16px);
+  padding: 4px 7px;
+  border-radius: 4px;
+  background: rgba(55, 55, 55, .76);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .activity-map-category-icon {
   width: 30px !important;
   height: 30px !important;
@@ -10527,9 +10550,12 @@ body:has(.cookie-notice) {
   display: block;
   width: 100%;
   max-height: 240px;
-  margin-bottom: 14px;
   border-radius: 8px;
   object-fit: cover;
+}
+
+.activity-selected-image-frame {
+  margin-bottom: 14px;
 }
 
 .activity-selected-details a {

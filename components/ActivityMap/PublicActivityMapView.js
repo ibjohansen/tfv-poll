@@ -122,7 +122,7 @@ export default function PublicActivityMapView({ features, showAlpineColors, sele
       }).addTo(group);
       const displayFeature = { ...feature, name: feature.activityNumber ? `${feature.activityNumber}. ${feature.name}` : feature.name };
       const detail = `${activityCategoryLabel(feature, t)} · ${activityTypeLabel(feature, t)}${feature.featureSubtype ? ` · ${activitySubtypeLabel(feature, t)}` : ''}${feature.alpineColor && showAlpineColors ? ` · ${t(`colors.${feature.alpineColor}`)}` : ''}`;
-      const label = activityTooltipContent(displayFeature, detail);
+      const label = activityTooltipContent(displayFeature, detail, feature.imageCredit ? t('photoCredit', { credit: feature.imageCredit }) : '');
       const iconCoordinate = activityMapIconCoordinate(feature.geometry);
       if (iconCoordinate) {
         const iconMarker = L.marker(latLng(iconCoordinate), {

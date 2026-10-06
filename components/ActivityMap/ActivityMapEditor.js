@@ -20,7 +20,7 @@ function MapLoading() {
 }
 const ActivityMapEditorView = dynamic(() => import('./ActivityMapEditorView'), { ssr: false, loading: MapLoading });
 
-const emptyDraft = () => ({ id: null, version: null, name: '', tooltipText: '', season: '', websiteUrl: '', imageUrl: null, imageSourceUrl: null, iconOverride: '', category: 'cycling', activityNumber: '', featureType: 'trail', featureSubtype: '', alpineColor: '', geometry: null, isDraft: true });
+const emptyDraft = () => ({ id: null, version: null, name: '', tooltipText: '', season: '', websiteUrl: '', imageUrl: null, imageSourceUrl: null, imageCredit: '', iconOverride: '', category: 'cycling', activityNumber: '', featureType: 'trail', featureSubtype: '', alpineColor: '', geometry: null, isDraft: true });
 
 const geometryType = { polygon: 'Polygon', line: 'LineString', point: 'Point' };
 
@@ -89,6 +89,7 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
     geometryPoint: (number) => t('geometryPoint', { number }), addGeometryPoint: t('addGeometryPoint'),
     removeGeometryPoint: (number) => t('removeGeometryPoint', { number }), activityPoint: t('activityPoint'), baseMap: t('baseMap'),
     topographicMap: t('topographicMap'), satelliteMap: t('satelliteMap'),
+    photoCredit: (credit) => t('photoCredit', { credit }),
     importPreview: ({ name, source }) => t('import.previewMapLabel', { name, source }),
   }), [t]);
 
@@ -202,7 +203,7 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
       const payload = { action: draft.id ? 'update' : 'create', id: draft.id, version: draft.version,
         name: draft.name, tooltipText: draft.tooltipText || null, category: draft.category, activityNumber: draft.category === 'alpine' && draft.activityNumber !== '' ? draft.activityNumber : null,
         featureType: draft.featureType, featureSubtype: draft.featureSubtype || null, alpineColor: draft.alpineColor || null, geometry: draft.geometry, isDraft: draft.isDraft,
-        season: draft.season || null, websiteUrl: draft.websiteUrl || null, iconOverride: draft.iconOverride || null };
+        season: draft.season || null, websiteUrl: draft.websiteUrl || null, imageCredit: draft.imageCredit || null, iconOverride: draft.iconOverride || null };
       const { feature } = await request({ method: 'POST', body: JSON.stringify(payload) });
       setFeatures((current) => [...current.filter((item) => item.id !== feature.id), feature]
         .sort(compareFeatures));
@@ -336,6 +337,8 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
         <section className="activity-image-editor" aria-labelledby="activity-image-title">
           <h4 id="activity-image-title">{t('imageTitle')}</h4>
           {draft.imageUrl && <div className="activity-image-preview"><img src={draft.imageUrl} alt={t('imagePreviewAlt', { name: draft.name })} /><button type="button" className="admin-button danger" disabled={busy || imageBusy} onClick={removeImage}>{t('removeImage')}</button></div>}
+          <label>{t('imageCredit')}<input maxLength={160} value={draft.imageCredit || ''} placeholder={t('imageCreditPlaceholder')}
+            onChange={(event) => setDraft((current) => ({ ...current, imageCredit: event.target.value }))} /></label>
           {draft.id ? <div className="activity-image-inputs">
             <div className="activity-image-upload-action"><input ref={imageFileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden disabled={busy || imageBusy}
               onChange={(event) => { if (event.target.files?.[0]) updateImage('file'); }} /><button type="button" className="admin-button" disabled={busy || imageBusy}

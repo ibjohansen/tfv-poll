@@ -90,7 +90,8 @@ export default function PublicActivityMap({ features }) {
         <div className="public-activity-panel">
           <div className="public-activity-status" aria-live="polite">{error ? <p className="form-error">{error}</p> : <p>{t('visibleCount', { count: visible.length })}{selected ? ` ${t('selected', { name: selected.activityNumber ? `${selected.activityNumber}. ${selected.name}` : selected.name })}` : ''}</p>}</div>
           {selected && <section className="activity-selected-details" aria-label={t('activityDetails')}>
-            {selected.imageUrl && <img className="activity-selected-image" src={selected.imageUrl} alt={t('imageAlt', { name: selected.name })} loading="lazy" decoding="async" referrerPolicy="no-referrer" />}
+            {selected.imageUrl && <figure className="activity-selected-image-frame"><img className="activity-selected-image" src={selected.imageUrl} alt={t('imageAlt', { name: selected.name })} loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+              {selected.imageCredit && <figcaption className="activity-image-credit">{t('photoCredit', { credit: selected.imageCredit })}</figcaption>}</figure>}
             <h3>{selected.activityNumber ? `${selected.activityNumber}. ${selected.name}` : selected.name}</h3>
             <p>{activityCategoryLabel(selected, t)} · {activityTypeLabel(selected, t)}{selected.featureSubtype ? ` · ${activitySubtypeLabel(selected, t)}` : ''}</p>
             {selected.season && <p>{t(`seasons.${selected.season}`)}</p>}

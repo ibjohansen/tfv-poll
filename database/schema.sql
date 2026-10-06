@@ -609,6 +609,7 @@ CREATE TABLE IF NOT EXISTS activity_map_features (
   image_source_url TEXT,
   image_mime_type TEXT,
   image_size_bytes INTEGER,
+  image_credit TEXT,
   icon_override_kind TEXT,
   icon_override_category TEXT,
   icon_override_type TEXT,
@@ -629,6 +630,7 @@ ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS image_storage_key TEX
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS image_source_url TEXT;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS image_mime_type TEXT;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS image_size_bytes INTEGER;
+ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS image_credit TEXT;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS icon_override_kind TEXT;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS icon_override_category TEXT;
 ALTER TABLE activity_map_features ADD COLUMN IF NOT EXISTS icon_override_type TEXT;
@@ -652,6 +654,10 @@ ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_image_chec
     AND (image_source_url IS NULL OR (length(image_source_url) BETWEEN 1 AND 2048
       AND image_source_url ~ '^https://[^[:space:]/@]+([/?#]|$)' AND image_source_url !~ '[[:space:][:cntrl:]]')))
 );
+ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_image_credit_check;
+ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_image_credit_check
+  CHECK (image_credit IS NULL OR (length(image_credit) BETWEEN 1 AND 160
+    AND image_credit = btrim(image_credit) AND image_credit !~ '[[:cntrl:]]'));
 ALTER TABLE activity_map_features DROP CONSTRAINT IF EXISTS activity_map_feature_icon_override_check;
 ALTER TABLE activity_map_features ADD CONSTRAINT activity_map_feature_icon_override_check CHECK (
   (icon_override_kind IS NULL AND icon_override_category IS NULL AND icon_override_type IS NULL AND icon_override_subtype IS NULL)

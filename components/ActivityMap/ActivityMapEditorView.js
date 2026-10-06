@@ -128,7 +128,7 @@ export default function ActivityMapEditorView({ features, previewFeatures = [], 
       visibleBounds.extend(layer.getBounds());
       layer.eachLayer((item) => item.getElement()?.setAttribute('data-feature-id', feature.id));
       featureLayers.current.set(feature.id, layer);
-      const tooltip = activityTooltipContent(feature);
+      const tooltip = activityTooltipContent(feature, '', feature.imageCredit ? labels.photoCredit(feature.imageCredit) : '');
       const iconCoordinate = activityMapIconCoordinate(feature.geometry);
       if (iconCoordinate) {
         const iconMarker = L.marker(latLng(iconCoordinate), {
@@ -177,7 +177,7 @@ export default function ActivityMapEditorView({ features, previewFeatures = [], 
       iconElement?.setAttribute('data-activity-icon-id', draft.id);
       iconElement?.setAttribute('aria-label', draft.name);
       if (draft.id && !drawing && !editing) {
-        const tooltip = activityTooltipContent(draft);
+        const tooltip = activityTooltipContent(draft, '', draft.imageCredit ? labels.photoCredit(draft.imageCredit) : '');
         bindActivityIconInteraction({ marker: selectedIconMarker, map,
           tooltip: L.tooltip({ direction: 'auto', offset: [0, -18] }).setContent(tooltip), onSelect: () => onSelect(draft) });
       }

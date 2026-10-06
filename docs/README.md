@@ -36,7 +36,7 @@ Filnavnene er beholdt, slik at dato og opprinnelig sammenheng er gjenkjennelige.
 | Mappe | Innhold |
 | --- | --- |
 | [imports/](imports/) | Rapporter fra gjennomførte importer, inkludert aktivitetsimporten 3. oktober 2026. |
-| [database/](database/) | Historiske migrerings-, utrullings- og databasetestrapporter, inkludert [langrennsimporten](database/database-migration-2026-10-04-cross-country.md) og [månedlig kontroll/publisering](database/database-release-activity-map-schedule-2026-10-04.md) 4. oktober 2026. |
+| [database/](database/) | Historiske migrerings-, utrullings- og databasetestrapporter, inkludert [langrennsimporten](database/database-migration-2026-10-04-cross-country.md), [månedlig kontroll/publisering](database/database-release-activity-map-schedule-2026-10-04.md), [Alpint-bilder](database/database-update-2026-10-06-alpine-images.md) og [bildekreditering](database/database-migration-2026-10-06-activity-image-credit.md). |
 | [code-review/](code-review/) | Eldre kvalitets- og sikkerhetsgjennomganger som grunnlagsmateriale. |
 | [other/](other/) | Avsluttede forbedringsprompter merket `SOLVED` og øvrig historikk. |
 

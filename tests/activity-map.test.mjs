@@ -128,6 +128,9 @@ test('activity map validates category, geometry and alpine metadata', () => {
   assert.throws(() => normalizeActivityFeatureInput({ ...hike, action: 'create', geometry: polygon }), MapError);
   assert.throws(() => normalizeActivityFeatureInput({ ...hike, action: 'create', featureType: 'trail' }), MapError);
   assert.throws(() => normalizeActivityFeatureInput({ ...hike, action: 'create', tooltipText: 'x'.repeat(301) }), MapError);
+  const creditedHike = { action: 'create', name: 'Utsiktsrunden', category: 'hiking', featureType: 'route', geometry: hikingLine };
+  assert.equal(normalizeActivityFeatureInput({ ...creditedHike, imageCredit: '  Kari   Nordmann  ' }).imageCredit, 'Kari Nordmann');
+  assert.throws(() => normalizeActivityFeatureInput({ ...creditedHike, imageCredit: 'x'.repeat(161) }), MapError);
   assert.throws(() => normalizeActivityFeatureInput({ ...draft, action: 'create', isDraft: false }), MapError);
   assert.throws(() => normalizeActivityFeatureInput({ ...cycling, action: 'create', activityNumber: '2' }), MapError);
   assert.throws(() => normalizeActivityFeatureInput({ ...draft, action: 'create', activityNumber: 0 }), MapError);
@@ -144,12 +147,13 @@ test('activity map accepts versioned deletes and exposes only public fields', ()
   const row = { id: 'b'.repeat(32), name: 'Blåløypa', category: 'alpine', feature_type: 'trail',
     tooltip_text: 'Kort omtale', activity_number: '4A', alpine_color: 'blue', feature_subtype: null, geometry: JSON.stringify(polygon.geometry), is_draft: true, version: '2',
     icon_override_kind: 'category', icon_override_category: 'parking', override_icon_key: `activity-map/icons/${'d'.repeat(32)}.svg`,
-    image_storage_key: `activity-map/images/${'b'.repeat(32)}/${'c'.repeat(32)}.webp`, image_source_url: 'https://images.example.test/trail.jpg',
+    image_storage_key: `activity-map/images/${'b'.repeat(32)}/${'c'.repeat(32)}.webp`, image_source_url: 'https://images.example.test/trail.jpg', image_credit: 'Kari Nordmann',
     source_ids: ['kartverket', 'not-allowed'], last_changed_by: 'private@example.test' };
   const publicResult = publicActivityFeatureRecord(row);
-  assert.deepEqual(Object.keys(publicResult).sort(), ['activityNumber', 'alpineColor', 'category', 'categoryName', 'categoryColor', 'typeName', 'subtypeName', 'geometryKind', 'featureType', 'featureSubtype', 'geometry', 'iconUrl', 'imageUrl', 'id', 'name', 'tooltipText', 'season', 'websiteUrl', 'sources'].sort());
+  assert.deepEqual(Object.keys(publicResult).sort(), ['activityNumber', 'alpineColor', 'category', 'categoryName', 'categoryColor', 'typeName', 'subtypeName', 'geometryKind', 'featureType', 'featureSubtype', 'geometry', 'iconUrl', 'imageUrl', 'imageCredit', 'id', 'name', 'tooltipText', 'season', 'websiteUrl', 'sources'].sort());
   assert.equal(publicResult.tooltipText, 'Kort omtale');
   assert.equal(publicResult.imageUrl, `/api/activity-map/images/${'b'.repeat(32)}?v=${'c'.repeat(32)}`);
+  assert.equal(publicResult.imageCredit, 'Kari Nordmann');
   assert.equal(publicResult.iconUrl, `/api/activity-map/icons/category/parking?v=${'d'.repeat(32)}`);
   assert.deepEqual(publicResult.sources.map((source) => source.id), ['kartverket']);
   assert.equal(Object.hasOwn(publicResult.sources[0], 'priority'), false);
@@ -200,9 +204,9 @@ test('activity map service performs audited, versioned create, update and soft d
   const sql = { query: async (text, values = []) => {
     calls.push({ text, values });
     if (text.startsWith('INSERT')) return [{ id: 'c'.repeat(32), name: values[1], tooltip_text: values[2], category: values[3], activity_number: values[4], feature_type: values[5], feature_subtype: values[6],
-      alpine_color: values[7], geometry: values[8], is_draft: values[9], season: values[11], website_url: values[12], version: 1 }];
+      alpine_color: values[7], geometry: values[8], is_draft: values[9], season: values[11], website_url: values[12], image_credit: values[17], version: 1 }];
     if (text.startsWith('UPDATE activity_map_features SET name')) return [{ id: 'c'.repeat(32), name: values[0], tooltip_text: values[1], category: values[2], activity_number: values[3], feature_type: values[4],
-      feature_subtype: values[5], alpine_color: values[6], geometry: values[7], is_draft: values[8], season: values[12], website_url: values[13], version: 2 }];
+      feature_subtype: values[5], alpine_color: values[6], geometry: values[7], is_draft: values[8], season: values[12], website_url: values[13], image_credit: values[18], version: 2 }];
     if (text.startsWith('SELECT')) return [];
     return [{ id: 'c'.repeat(32), name: 'Test 2', category: 'alpine', activity_number: '7A', feature_type: 'trail', alpine_color: 'red', geometry: polygon.geometry, is_draft: false, version: 3 }];
   } };
@@ -216,10 +220,10 @@ test('activity map service performs audited, versioned create, update and soft d
     './activity-map-catalog-service.js': { getActivityMapCatalog: async () => DEFAULT_ACTIVITY_CATALOG },
     './activity-map-catalog.js': { withActivityCatalog },
   });
-  const created = await service.saveActivityMapFeature({ action: 'create', name: 'Test', category: 'cycling', featureType: 'trail', geometry: polygon, isDraft: false, season: 'summer', websiteUrl: 'https://example.test/cycle' });
-  assert.equal(created.season, 'summer'); assert.equal(created.websiteUrl, 'https://example.test/cycle');
-  const updated = await service.saveActivityMapFeature({ action: 'update', id: 'c'.repeat(32), version: 1, name: 'Test 2', category: 'alpine', activityNumber: '7A', featureType: 'trail', alpineColor: 'red', geometry: polygon, isDraft: false, season: 'winter', websiteUrl: 'https://example.test/alpine' });
-  assert.equal(updated.season, 'winter'); assert.equal(updated.websiteUrl, 'https://example.test/alpine');
+  const created = await service.saveActivityMapFeature({ action: 'create', name: 'Test', category: 'cycling', featureType: 'trail', geometry: polygon, isDraft: false, season: 'summer', websiteUrl: 'https://example.test/cycle', imageCredit: 'Kari Nordmann' });
+  assert.equal(created.season, 'summer'); assert.equal(created.websiteUrl, 'https://example.test/cycle'); assert.equal(created.imageCredit, 'Kari Nordmann');
+  const updated = await service.saveActivityMapFeature({ action: 'update', id: 'c'.repeat(32), version: 1, name: 'Test 2', category: 'alpine', activityNumber: '7A', featureType: 'trail', alpineColor: 'red', geometry: polygon, isDraft: false, season: 'winter', websiteUrl: 'https://example.test/alpine', imageCredit: 'Ola Nordmann' });
+  assert.equal(updated.season, 'winter'); assert.equal(updated.websiteUrl, 'https://example.test/alpine'); assert.equal(updated.imageCredit, 'Ola Nordmann');
   await service.saveActivityMapFeature({ action: 'delete', id: 'c'.repeat(32), version: 2 });
   await service.getPublicActivityMapFeatures();
   assert.match(calls[0].text, /last_changed_by/); assert.equal(calls[0].values[10], 'admin@example.test');
@@ -318,6 +322,8 @@ test('database schema constrains activity map combinations and adds audit trigge
   assert.match(schema, /feature_subtype TEXT/);
   assert.match(schema, /tooltip_text TEXT/);
   assert.match(schema, /image_storage_key TEXT/);
+  assert.match(schema, /image_credit TEXT/);
+  assert.match(schema, /activity_map_feature_image_credit_check/);
   assert.match(schema, /activity_map_feature_image_check/);
   assert.match(schema, /activity_map_feature_icon_override_check/);
   assert.match(schema, /activity_map_feature_icon_override_subtype_fk/);

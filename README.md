@@ -849,6 +849,11 @@ databaseforbindelse. Se
 [migreringsresultatet](docs/database/database-migration-2026-10-06-activity-images.md).
 Den eksisterende private `cms-assets`-bøtten gjenbrukes; ingen ny miljøvariabel
 eller Neon-tjeneste kreves.
+Aktivitetsbilder kan i tillegg ha en valgfri `image_credit` på inntil 160 tegn.
+Krediteringen lagres som aktivitetsmetadata og vises som «Foto: …» oppå bildet i
+offentlig tooltip og aktivitetsdetaljer. Kolonnen ble migrert og verifisert i
+produksjon 6. oktober 2026 før kodepublisering; se
+[migreringsresultatet](docs/database/database-migration-2026-10-06-activity-image-credit.md).
 En aktivitet kan velge ett av de opplastede katalogikonene som overstyring, eller
 bruke automatisk ikon fra undertype, type og kategori. Overstyringen lagrer en
 stabil katalogreferanse, slik at et senere bytte av SVG på katalogoppføringen
@@ -1482,6 +1487,8 @@ Ved utrulling av kodegjennomgangen fra 3. oktober 2026:
   fra en offentlig HTTPS-adresse. Kontroller WebP-respons, bilde i hover-tooltip
   og informasjonsboks, at kladdbildet ikke kan leses uten administratorøkt, og at
   fjerning invaliderer kartdata uten å eksponere privat lagringsnøkkel.
+- Etter migrering av `image_credit`: lagre kreditering med aktiviteten og
+  kontroller at «Foto: …» vises oppå bildet både i tooltip og informasjonsboks.
 - Verifiser CMS-publisering/avpublisering uten stale offentlig innhold.
 - Kontroller at legitime adminmutasjoner virker, og at fremmed/manglende
   `Origin` avvises. Kontroller også godkjente webhooks og bakgrunnsjobber.
