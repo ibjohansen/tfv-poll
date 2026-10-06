@@ -332,18 +332,18 @@ export default function ActivityMapEditor({ initialImportRunId = null }) {
           <label>{t('season')}<select value={draft.season || ''} onChange={(event) => setDraft((current) => ({ ...current, season: event.target.value }))}>
             <option value="">{t('noSeason')}</option>{ACTIVITY_SEASONS.map((season) => <option key={season} value={season}>{t(`seasons.${season}`)}</option>)}
           </select></label>
-          <label className="activity-tooltip-field">{t('website')}<input type="url" maxLength={2048} placeholder="https://" value={draft.websiteUrl || ''} onChange={(event) => setDraft((current) => ({ ...current, websiteUrl: event.target.value }))} /></label>
+          <label className="activity-tooltip-field">{t('website')} <input type="url" maxLength={2048} placeholder="https://" value={draft.websiteUrl || ''} onChange={(event) => setDraft((current) => ({ ...current, websiteUrl: event.target.value }))} /></label>
         </div>
         <section className="activity-image-editor" aria-labelledby="activity-image-title">
           <h4 id="activity-image-title">{t('imageTitle')}</h4>
           {draft.imageUrl && <div className="activity-image-preview"><img src={draft.imageUrl} alt={t('imagePreviewAlt', { name: draft.name })} /><button type="button" className="admin-button danger" disabled={busy || imageBusy} onClick={removeImage}>{t('removeImage')}</button></div>}
-          <label>{t('imageCredit')}<input maxLength={160} value={draft.imageCredit || ''} placeholder={t('imageCreditPlaceholder')}
+          <label>{t('imageCredit')} <input maxLength={160} value={draft.imageCredit || ''} placeholder={t('imageCreditPlaceholder')}
             onChange={(event) => setDraft((current) => ({ ...current, imageCredit: event.target.value }))} /></label>
           {draft.id ? <div className="activity-image-inputs">
             <div className="activity-image-upload-action"><input ref={imageFileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden disabled={busy || imageBusy}
               onChange={(event) => { if (event.target.files?.[0]) updateImage('file'); }} /><button type="button" className="admin-button" disabled={busy || imageBusy}
                 onClick={() => imageFileRef.current?.click()}>{imageBusy ? t('imageUploading') : t('uploadImage')}</button><small>{t('imageFile')}</small></div>
-            <div><label>{t('imageUrl')}<input ref={imageSourceUrlRef} type="url" maxLength={2048} placeholder="https://" defaultValue={draft.imageSourceUrl || ''} disabled={busy || imageBusy} /></label><button type="button" className="admin-button" disabled={busy || imageBusy} onClick={() => updateImage('url')}>{t('importImage')}</button></div>
+            <div><label>{t('imageUrl')} <input ref={imageSourceUrlRef} type="url" maxLength={2048} placeholder="https://" defaultValue={draft.imageSourceUrl || ''} disabled={busy || imageBusy} /></label><button type="button" className="admin-button" disabled={busy || imageBusy} onClick={() => updateImage('url')}>{t('importImage')}</button></div>
             <p className="muted">{t('imageHelp')}</p>
           </div> : <p className="muted">{t('imageSaveFirst')}</p>}
           {imageError && <p className="error-message" role="alert">{imageError}</p>}{imageNotice && <p role="status">{imageNotice}</p>}
