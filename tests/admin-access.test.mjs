@@ -34,7 +34,7 @@ test('server permission guards enforce actual tenant, allowlist and role policy'
   await assert.rejects(api.requireAdmin(), /Unauthorized/);
 });
 
-test('member mutations validate input and never permit editing property identity or attribution', async () => {
+test('member mutations allow manual H-numbers but preserve cadastral identity and attribution', async () => {
   const queries = [];
   let denied = false;
   let assignment = { hamlet: null, status: 'address_missing' };
@@ -49,8 +49,10 @@ test('member mutations validate input and never permit editing property identity
   await assert.rejects(api.updateAdminMember('7', { other_contact_emails: [], turufjell_as_sharing_opt_out: 'yes' }), /Invalid member/);
   await assert.rejects(api.updateAdminMember('bad-id', { other_contact_emails: [] }), /Invalid member/);
   assert.equal(queries.length, 0);
-  await api.updateAdminMember('7', { primary_contact_name: 'Test', other_contact_emails: [], h_number: 'malicious-property', street_address: 'malicious-address', last_changed_by: 'forged-actor' });
+  await api.updateAdminMember('7', { primary_contact_name: 'Test', other_contact_emails: [], h_number: 'H101',
+    cadastral_number: 'malicious-property', section_number: 'malicious-section', street_address: 'malicious-address', last_changed_by: 'forged-actor' });
   assert.ok(queries[0].values.includes('admin@example.test'));
+  assert.ok(queries[0].values.includes('H101'));
   assert.doesNotMatch(JSON.stringify(queries[0].values), /malicious|forged/);
   await assert.rejects(api.setAdminMemberAnnualFee('7', { year: 1899, paid: true }), /Invalid annual fee/);
   await assert.rejects(api.setAdminMemberAnnualFee('7', { year: 2026, paid: 'yes' }), /Invalid annual fee/);

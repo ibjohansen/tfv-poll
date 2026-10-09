@@ -531,11 +531,16 @@ test('map workspace separates register checks from keyboard-accessible hamlet ma
     };
     return route.fulfill({ json: { fetchedAt: '2026-09-19T10:00:00Z', warnings: [], addresses: [first, second], comparison, mockRegister: true } });
   });
-  await page.route('**/api/admin/members/701', (route) => route.fulfill({ json: { ok: true, member: {
+  let savedMapMember;
+  const mapMember = {
     id: '701', h_number: 'H392', cadastral_number: '10/701', section_number: '', street_address: 'Testvegen 1', title_holder: 'Syntetisk eier',
     registration_date: '01.01.2026', primary_contact_name: 'Syntetisk kontakt', primary_contact_email: 'kart@example.invalid', other_contact_emails: [],
     admin_comment: '', membership_status: 'member', turufjell_as_sharing_opt_out: false, hamlet_name: 'Syntetisk grend', email_group_names: ['Veiinformasjon'],
-  } } }));
+  };
+  await page.route('**/api/admin/members/701', (route) => {
+    if (route.request().method() === 'PATCH') savedMapMember = route.request().postDataJSON();
+    return route.fulfill({ json: { ok: true, member: { ...mapMember, ...savedMapMember } } });
+  });
 
   await authenticate(context); await page.goto('/admin/map-browser-test');
   const workspace = page.getByRole('region', { name: 'Test av kart og registerkontroll' });
@@ -563,6 +568,11 @@ test('map workspace separates register checks from keyboard-accessible hamlet ma
   const memberDetails = page.getByRole('complementary', { name: 'Medlemsdetaljer fra kartet' });
   await expect(memberDetails.getByRole('link', { name: 'Kontroller forslag til matrikkeloppdatering' })).toHaveAttribute('href', '/admin/members/matrikkel?member=701');
   await expect(memberDetails.getByText('Veiinformasjon')).toBeVisible();
+  await expect(memberDetails.getByLabel('H-nummer', { exact: true })).toBeEditable();
+  await expect(memberDetails.getByLabel('Gårds- og bruksnummer', { exact: true })).toHaveAttribute('readonly', '');
+  await memberDetails.getByLabel('H-nummer', { exact: true }).fill('H101');
+  await expect.poll(() => savedMapMember?.h_number).toBe('H101');
+  await expect(memberDetails.getByRole('heading', { name: 'H101', exact: true })).toBeVisible();
   await memberDetails.getByRole('button', { name: 'Lukk' }).click();
   await expect(objectDetails.getByRole('button', { name: 'Åpne H392' })).toBeFocused();
   await expect(queueStatus).toContainText('Utsatt');
@@ -1092,6 +1102,24 @@ test('synthetic member details close with Escape', async ({ page, context }) => 
   await page.keyboard.press('Escape');
   await expect(page.getByRole('complementary', { name: 'Rediger medlem' })).toHaveCount(0);
   await expect(row).toBeFocused();
+});
+
+test('member directory saves an editable H-number while cadastral data remains locked', async ({ page, context }) => {
+  let saved;
+  await page.route('**/api/admin/members/*', (route) => {
+    if (route.request().method() !== 'PATCH') return route.continue();
+    saved = route.request().postDataJSON();
+    return route.fulfill({ json: { ok: true, member: { ...saved, id: route.request().url().split('/').at(-1) } } });
+  });
+  await authenticate(context); await page.goto('/admin/member-browser-test');
+  await page.getByRole('row').filter({ hasText: 'H-TEST-001' }).click();
+  const details = page.getByRole('complementary', { name: 'Rediger medlem' });
+  await expect(details.getByLabel('H-nummer', { exact: true })).toBeEditable();
+  await expect(details.getByLabel('Gårds- og bruksnummer', { exact: true })).toHaveAttribute('readonly', '');
+  await details.getByLabel('H-nummer', { exact: true }).fill('H101');
+  await expect.poll(() => saved?.h_number).toBe('H101');
+  await expect(details.getByRole('heading', { name: 'H101', exact: true })).toBeVisible();
+  await expect(details.getByText('Alle endringer lagret')).toBeVisible();
 });
 
 test('member search waits for typing to finish and preserves the input', async ({ page, context }) => {

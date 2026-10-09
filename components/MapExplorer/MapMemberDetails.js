@@ -9,7 +9,7 @@ import MemberPropertyMap from '@/components/MemberPropertyMap';
 import { useI18n } from '@/components/LocaleProvider';
 import { MEMBER_CONTACT_FIELDS, MEMBER_PROPERTY_FIELDS } from '@/lib/member-detail-sections';
 
-const propertyFields = MEMBER_PROPERTY_FIELDS.map(([name]) => name);
+const propertyFields = MEMBER_PROPERTY_FIELDS;
 const contactFields = MEMBER_CONTACT_FIELDS.map(([name]) => name);
 
 function formFromMember(member) {
@@ -18,6 +18,7 @@ function formFromMember(member) {
 
 function payload(form) {
   return {
+    h_number: form.h_number,
     primary_contact_name: form.primary_contact_name || '',
     primary_contact_email: form.primary_contact_email || '',
     other_contact_emails: form.other_contact_emails.split(/[\n,;]+/).map((value) => value.trim()).filter(Boolean),
@@ -98,7 +99,7 @@ export default function MapMemberDetails({ memberId, canMatrikkelSync = false, o
       <div className="map-actions"><Link className="admin-button" href={`/admin/members?member=${encodeURIComponent(memberId)}`}>{t('openRegister')}</Link></div>
       <section className="admin-detail-section" aria-labelledby="map-member-cadastral-title">
         <div className="admin-section-header"><h3 id="map-member-cadastral-title">{t('cadastralData')}</h3></div>
-        <div className="admin-detail-field-grid is-property">{propertyFields.map((name) => <div className="admin-detail-field" key={name}><label>{t(`fields.${name}`)}<input value={form[name] || ''} readOnly /></label></div>)}</div>
+        <div className="admin-detail-field-grid is-property">{propertyFields.map(([name, readOnly]) => <div className="admin-detail-field" key={name}><label>{t(`fields.${name}`)}<input value={form[name] || ''} onChange={(event) => update(name, event.target.value)} readOnly={Boolean(readOnly)} required={name === 'h_number'} /></label></div>)}</div>
         <div className="admin-detail-field"><label>{t('streetAddress')}<input value={form.street_address || ''} readOnly /></label></div>
         <div className="admin-detail-field-grid is-ownership"><div className="admin-detail-field"><label>{t('titleHolder')}<textarea value={(form.title_holder || '').split(/\s*\/\s*/).join('\n')} rows="3" readOnly /></label></div>
           <div className="admin-detail-field"><label>{t('registrationDate')}<textarea value={(form.registration_date || '').split(/\s*\/\s*/).join('\n')} rows="3" readOnly /></label></div></div>

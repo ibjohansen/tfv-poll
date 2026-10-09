@@ -1031,6 +1031,40 @@ Den bruker eksisterende `DATABASE_URL`, `MATRIKKEL_JOB_SECRET` og Netlifys `URL`
 Funksjonen kan ikke startes via
 en offentlig URL; se [Netlify Scheduled Functions](https://docs.netlify.com/build/functions/scheduled-functions/).
 
+Nye oppgaver i `/admin/inbox` legger atomisk ett e-postvarsel i `email_deliveries`
+til `post@turufjellvel.no`. Dette gjelder innmelding (også ubekreftet), eierskifte,
+medlemskommentar, oppfølging av kartimport og månedlige matrikkel-/aktivitetskontroller
+med avvik eller feil. Rene kontaktendringer uten kommentar og kontroller uten
+avvik gir ingen oppgave og dermed intet varsel. Bekreftelse, behandling og
+kvittering av samme oppgave lager ikke et nytt varsel. Sammendraget inneholder
+oppgavetype, eventuell tomt/adresse, opptil 500 tegn av kommentaren eller
+kontrolltall og en innloggingsbeskyttet lenke til oppgavelisten. Tilgangskoder,
+kontaktadresser og fulle skjemainnsendinger kopieres ikke til varselet.
+
+Før denne koden publiseres må den avgrensede, additive migreringen
+`database/task-notifications.sql` kjøres i én transaksjon på en godkjent Neon-gren,
+og deretter i produksjon etter eksplisitt godkjenning. Bruk den upoolende
+`DATABASE_URL_UNPOOLED` og en verifisert gjenopprettingsmulighet; ikke kjør hele
+`db:setup` som denne migreringen. Migreringen legger til tre køkolonner, en
+indeks og fire triggere, utvider e-posttypen og endrer ingen eksisterende oppgaver.
+Den sender ingen meldinger og etterfyller ingen gamle oppgaver. Det kan testes
+uten eksterne tjenester med `node --experimental-vm-modules --test tests/task-notifications.test.mjs`.
+
+Watchdog-en starter `/.netlify/functions/task-notifications-background` hvert
+femte minutt ved ventende varsler, normalt med utsendelse innen fem minutter.
+Funksjonen bruker eksisterende `MAILERSEND_JOB_SECRET`, MailerSend-variabler,
+`AUTH_URL` og databasevariabler; ingen nye miljøvariabler kreves. Den krever både
+jobbhemmeligheten og produksjonskontekst fra Netlify. Kun denne eksakte
+funksjonsruten unntas fra nettleserinnlogging i `proxy.js`. Preview og lokal
+Netlify-kjøring kan ikke sende slike varsler. MailerSend-webhooken oppdaterer
+leveringsstatus med eksisterende meldings-ID, og tjenestefeil går til den
+eksisterende e-postfeilloggen. En sikker HTTP 429-avvisning forsøkes på nytt etter
+leverandørens frist, høyst fem forsøk. Andre feil og avbrutte forespørsler
+beholdes som feil for manuell oppfølging; kontroller leverandørens meldingslogg
+før eventuell ny utsendelse når det er uklart om første melding ble akseptert.
+En oppgave som er behandlet raskt varsles fortsatt med sitt opprinnelige
+sammendrag, mens en forespørsel som ble slettet før sending ikke varsles.
+
 På samme kalenderdag forsøker watchdog-en også å opprette høyst én månedlig
 forhåndsvisning av aktivitetsdata fra Kartverket og OpenStreetMap. En unik
 månedsnøkkel hindrer doble kjøringer. En fastlåst innhenting kan tas opp igjen
@@ -1425,7 +1459,7 @@ URI i Entra oppdateres. Utløs en ny deploy etter endringen.
 4. Kontroller at byggeloggen avsluttes uten feil.
 5. Kontroller at Next.js-funksjonene og
    `matrikkel-sync-background`, `hamlet-member-sync-background`, `survey-email-background`,
-   `newsletter-background`, `activity-map-import-background` og `background-watchdog` finnes i Netlifys
+   `newsletter-background`, `activity-map-import-background`, `task-notifications-background` og `background-watchdog` finnes i Netlifys
    funksjonsoversikt. Kontroller også at edge-funksjonen
    `public-member-rate-limit` er oppdaget og aktivert i deployloggen.
 6. Kontroller at den publiserte deployen bruker committen som var godkjent i
@@ -1439,7 +1473,8 @@ Etter at GitHub-repositoriet er koblet til Netlify, utløser senere pushes til
 `main` normalt en ny produksjonsdeploy.
 
 Ved en uttrykkelig godkjent manuell CLI-deploy kan `netlify deploy --prod
---build` brukes fra en kontrollert arbeidskopi etter `npm run check`. Netlify
+--context production` brukes fra en kontrollert arbeidskopi etter `npm run check`.
+Netlify CLI 27 kjører bygg som standard som del av deploy-kommandoen. Netlify
 setter da `NETLIFY_LOCAL=true` og holder Functions-avgrensede hemmeligheter
 utenfor den lokale byggeprosessen. Skybygg validerer fortsatt hele
 produksjonskonfigurasjonen, mens API-ruter og bakgrunnsfunksjoner alltid
@@ -1453,7 +1488,7 @@ egen pakkemanifest. Kontroller at slike filer ikke finnes i den ferdige
 `___netlify-server-handler.zip` før publisering. Produksjon skal hente
 hemmeligheter fra Netlify, ikke fra en medpakket utviklerfil.
 
-Kjør bygg og publisering i **samme** `netlify deploy --prod --build`-kommando.
+Kjør bygg og publisering i **samme** `netlify deploy --prod --context production`-kommando.
 Ikke erstatt denne med `netlify build` fulgt av `netlify deploy --no-build`
 mot `.next`: Next-adapteren 5.16 flytter de statiske filene midlertidig inn i
 publiseringsmappen under deploy og tilbake til `.netlify/static` etter bygg.
@@ -1564,6 +1599,16 @@ Utfør kontrollene i denne rekkefølgen:
 - Send en valgfri kommentar med retting/eierskifte fra et testmedlem. Kontroller
   ren tekst i oppgaveliste, medlemshistorikk og brukerlogg; kvitter lest og bekreft
   at historikken beholdes. Test delte hoved-/ekstraadresser på separate tomter.
+- Med syntetisk database og simulert MailerSend: opprett syntetiske oppgaver av
+  alle varslingstypene og bekreft ett sammendrag per oppgave. Bekreft at raske
+  statusendringer ikke gir doble varsler, at rene kontaktendringer ikke varsles,
+  og at 429, undertrykking og avbrudd får riktig køstatus. Kontroller webhookens
+  leveringsstatus og e-postfeilloggen. Produksjonsmottakeren er fast
+  `post@turufjellvel.no`; ikke bruk ekte medlemsdata til røykprøver.
+- Rediger H-nummer på en syntetisk tomt både i medlemsregisteret og i kartets
+  detaljpanel. Last inn igjen og kontroller verdien og revisjonsloggen. Tomt eller
+  duplisert H-nummer skal avvises. Gårds-/bruksnummer og seksjonsnummer skal
+  fremdeles være låst, og matrikkelkontroll skal ikke overskrive H-nummeret.
 - Kontroller at **Mine medlemsopplysninger** alltid vises før artiklene. Be om
   lenke med en kontrollert testbruker via H-nummer, adresse og e-post. Bekreft
   at treff og ikke-treff gir identisk HTTP-status, responsstruktur og tekst,
@@ -1959,6 +2004,12 @@ advarsel om at e-postbekreftelsen overstyres. Begge endepunktene kontrollerer Mi
 administratortilgang server-side. Den offentlige funksjonen bekrefter aldri om
 H-nummer, adresse eller e-post finnes. Oppslag og endringer har origin-kontroll,
 Netlify edge-rategrense, delt Postgres-begrensning og duplikatbrems.
+
+H-nummer er et internt tomtefelt og inngår ikke i matrikkeloppslaget.
+Medlemsadministratorer kan redigere det i medlemsregisteret og kartets
+medlemsdetaljer. Verdien må være utfylt, og kjente H-numre må være unike blant
+aktive tomter. Endringen følger den eksisterende revisjonsloggen. Offisielle
+matrikkelfelt og medlemmenes selvbetjeningsvisning er fortsatt skrivebeskyttet.
 
 Databaseendringen er additiv og oppretter:
 
