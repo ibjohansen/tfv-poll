@@ -37,8 +37,8 @@ before(async()=>{
  const [{assertDatabaseEnvironment},{mailFailureDetails},mailer]=await Promise.all([import('../lib/security-config.js'),import('../lib/mail-failure-log.js'),import('../lib/mailer-service.js')]);
  worker=await loadModule('lib/annual-dues-worker.js',{'./db.js':{getSql:()=>sql},'./security-config.js':{assertDatabaseEnvironment},'./annual-dues-email.js':documents,'./mail-failure-log.js':{mailFailureDetails},'./mailer-service.js':mailer,'./annual-dues-sending.js':sending});
  await sql`INSERT INTO accounting_years(id,annual_fee_ore,member_count,budget,actual_income) VALUES(2026,25000,1,'{"dues":25000}','{}'),(2025,25000,1,'{}','{}'),(2024,25000,1,'{}','{}')`;
- [member]=await sql`INSERT INTO members(h_number,street_address,title_holder,primary_contact_name,primary_contact_email,membership_status,registration_date)
-  VALUES('DEMO-101','Eksempelvegen 10','Eksempelmedlem','Eksempelmedlem','member@example.test','member','2025-10-10') RETURNING id::text,h_number`;
+ [member]=await sql`INSERT INTO members(h_number,street_address,cadastral_number,title_holder,primary_contact_name,primary_contact_email,membership_status,registration_date)
+  VALUES('DEMO-101','Eksempelvegen 10','10/725','Eksempelmedlem','Eksempelmedlem','member@example.test','member','2025-10-10') RETURNING id::text,h_number`;
 });
 after(async()=>db.close());
 const issue=(id,extra={})=>({id:uuid(),year:2026,member_id:id,date:'2026-02-02',invoice_settings_version:settingsVersion,...extra});
@@ -46,6 +46,7 @@ test('campaign is unique and leaves manual accounts and historic balance untouch
  const before=plain(await sql`SELECT annual_fee_ore,budget,actual_income FROM accounting_years WHERE id=2026`);
  await api.openDuesCampaign(campaign(2026));await assert.rejects(api.openDuesCampaign(campaign(2026)),/campaignExists/);
  invoice=await api.issueDuesInvoice(issue(member.id));assert.equal(invoice.number,'AK-2026-1');
+ assert.equal((await api.getFinanceOverview(2026)).invoices[0].snapshot.cadastral_number,'10/725');
  await assert.rejects(api.issueDuesInvoice(issue(member.id)),e=>e.code==='23505');
  assert.deepEqual(plain(await sql`SELECT annual_fee_ore,budget,actual_income FROM accounting_years WHERE id=2026`),before);
  assert.deepEqual(plain(await sql`SELECT tablename FROM pg_tables WHERE tablename LIKE 'finance_%'`),[{tablename:'finance_invoice_settings'}]);

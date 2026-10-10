@@ -2507,6 +2507,15 @@ faktureres før adressen er registrert. Samlede handlinger kjøres i partier på
 opptil ti med individuelle resultater; gjentatt oppretting med samme
 partinøkkel er idempotent.
 
+Nye fakturaer viser hjemmelshaver, tomtens gateadresse, gårds- og bruksnummer
+og hoved-e-post i mottakerblokken. Eiendomsopplysningene lagres i fakturaens
+øyeblikksbilde. Perioden vises med begge årstall, for eksempel
+«01.01.2026 – 31.12.2026», og varelinjen heter «Årskontingent 2026».
+Betalingsreferansen bruker fakturanummer og `H-` foran rent numeriske
+tomtenumre, for eksempel «AK-2026-1 og H-25». Formaterte numre som
+«SPG H 1» beholdes direkte. E-postteksten bruker samme betalingsreferanse.
+Arkiverte PDF-er omskrives ikke ved malendringer.
+
 Manuelle betalinger krever betalingsdato, eksakt beløp, unik bankreferanse og
 dokumentasjon. Delbetalinger og korreksjoner beholder historikk. Overbetaling
 sperres til separat avklaring. Kampanjeårets gamle betaltmarkering kan ikke
