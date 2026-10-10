@@ -2540,6 +2540,9 @@ Lesing krever `read`; skriving krever `members`, samsvarende `Origin` og JSON.
 `POST` på samme rute med `operation=invoice_settings` lagrer dem.
 E-postmeldingen bruker konsekvent Årskontingent og inkluderer den godkjente
 vedtektsteksten § 4 og § 5 rett før hilsenen. Den omtaler ikke inkasso.
+Seksjonene i Fakturering kan åpnes og lukkes via overskriftene, også med tastatur.
+«Åpne alle seksjoner» og «Lukk alle seksjoner» gir rask navigering. Seksjonene
+starter åpne; utfylte felt beholdes ved lukking og oppdatering av fakturalisten.
 E-postteksten starter med hjemmelshaver, gateadresse og gårds- og bruksnummer.
 Numeriske H-numre vises med `H-` også i setningen om tomten. Hele kronebeløp
 vises som «250,-», norsk bankkonto grupperes som `1080.55.35682`, og

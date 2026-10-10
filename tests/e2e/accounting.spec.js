@@ -309,6 +309,44 @@ test('annual dues uses the member owner and primary email without address prepar
  expect(writes[0]).not.toHaveProperty('recipient_name');expect(writes[0]).not.toHaveProperty('invoice_address');expect(writes[0]).not.toHaveProperty('reviewed');
 });
 
+test('invoice sections support keyboard collapse, keep drafts after refresh and never submit from navigation', async ({ page, context }, testInfo) => {
+ await authenticate(context);
+ const writes=[];
+ const settings={version:2,name:'Eksempelvel',sender_address:'Eksempelvegen 1',bank_account:'86011117947',reply_to:'post@example.test'};
+ await page.route('**/api/admin/accounting/dues**',route=>{
+  if(route.request().method()!=='GET')writes.push(route.request().postDataJSON());
+  return route.fulfill({json:{ok:true,data:{year:2026,installed:true,yearClosed:false,sendingEnabled:true,sendingMode:'live',invoiceSettings:settings,campaign:null,invoices:[],candidates:[],excluded:[]}}});
+ });
+ await page.goto('/admin/regnskap/browser-test');
+ const dashboard=page.locator('.accounting-dashboard');
+ await dashboard.getByRole('button',{name:'Fakturering',exact:true}).click();
+ const finance=dashboard.locator('.finance-workspace');
+ const sections=finance.locator('details.finance-section');
+ const campaign=sections.filter({has:page.getByRole('heading',{name:'Start årets kampanje',exact:true})});
+ const summary=campaign.locator('summary');
+ const prefix=campaign.getByLabel('Prefiks i fakturanummer');
+ await prefix.fill('AK-2026-UTKAST-');
+ await summary.focus();await summary.press('Enter');
+ await expect(prefix).not.toBeVisible();
+ const refreshed=page.waitForResponse(response=>response.url().includes('/api/admin/accounting/dues?'));
+ await finance.getByRole('button',{name:'Oppdater fakturalisten'}).click();await refreshed;
+ await expect(campaign).not.toHaveAttribute('open');
+ await summary.focus();await summary.press('Space');
+ await expect(prefix).toBeVisible();await expect(prefix).toHaveValue('AK-2026-UTKAST-');
+ await finance.getByRole('button',{name:'Lukk alle seksjoner'}).click();
+ await expect(finance.locator('details.finance-section[open]')).toHaveCount(0);
+ await finance.getByRole('button',{name:'Åpne alle seksjoner'}).click();
+ await expect(finance.locator('details.finance-section:not([open])')).toHaveCount(0);
+ await expect(prefix).toHaveValue('AK-2026-UTKAST-');expect(writes).toEqual([]);
+ if(testInfo.project.name==='mobile')await page.setViewportSize({width:320,height:800});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ await page.addScriptTag({content:axe.source});
+ const result=await page.evaluate(async()=>window.axe.run('.finance-workspace',{runOnly:['wcag2a','wcag2aa','wcag21aa']}));
+ expect(result.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)}))).toEqual([]);
+ await finance.getByRole('button',{name:'Lukk alle seksjoner'}).click();
+ await page.screenshot({path:testInfo.outputPath('invoice-sections-collapsed.png'),fullPage:true});
+});
+
 test('annual dues test mode limits manual sending and labels the email TEST', async ({ page, context }) => {
  await authenticate(context);
  const settings={version:2,name:'Eksempelvel',sender_address:'Eksempelvel\nEksempelvegen 1\n0000 Eksempel',bank_account:'86011117947',organization_number:'123456785',phone:'123 45 678',reply_to:'post@example.test',website:'www.example.test'};
@@ -323,7 +361,7 @@ test('annual dues test mode limits manual sending and labels the email TEST', as
  await expect(dashboard.getByText('Testmodus er aktiv.',{exact:false})).toBeVisible();
  await expect(dashboard.getByRole('button',{name:/Send alle usendte/})).toHaveCount(0);
  await dashboard.getByRole('button',{name:'Send testfaktura'}).click();
- await expect(dashboard.locator('legend').filter({hasText:'Send testfaktura'})).toBeVisible();
+ await expect(dashboard.getByRole('heading',{name:'Send testfaktura',exact:true})).toBeVisible();
  await expect(dashboard.getByText('TEST først i emnefeltet',{exact:false})).toBeVisible();
  await dashboard.getByRole('button',{name:'Legg testfaktura i sendekø'}).click();
  expect(writes).toEqual([expect.objectContaining({operation:'queue',invoice_id:invoice.id,test:true})]);

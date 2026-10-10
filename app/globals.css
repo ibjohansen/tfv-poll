@@ -1,6 +1,13 @@
 @import "tailwindcss";
 
 .finance-workspace { min-width: 0; display: grid; gap: 1rem; }
+.finance-workspace > .finance-section { padding: 0; }
+.finance-workspace .finance-section > summary { padding: 20px 24px; min-height: 60px; cursor: pointer; overflow-wrap: anywhere; }
+.finance-workspace .finance-section > summary h2,
+.finance-workspace .finance-section > summary h3 { display: inline; margin: 0; }
+.finance-workspace .finance-section[open] > summary { border-bottom: 1px solid var(--line); }
+.finance-workspace .finance-section > summary:focus-visible { outline-offset: -4px; border-radius: var(--radius-md); }
+.finance-section-content { padding: 16px 24px 24px; min-width: 0; }
 .finance-table-wrap { max-width: 100%; overflow-x: auto; }
 .finance-table-wrap table { width: 100%; border-collapse: collapse; text-align: left; }
 .finance-table-wrap th, .finance-table-wrap td { padding: .75rem; vertical-align: top; border-bottom: 1px solid #d8d1c8; }
