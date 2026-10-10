@@ -49,8 +49,11 @@ test('member status defaults safely, validates changes, filters/counts and prese
   const unassigned = await directory.getAdminMembers(key, 1, 'h_number', 'asc', false, false, { hamletId: 'unassigned' });
   assert.equal(unassigned.total, 2);
   assert.ok(unassigned.members.every((member) => member.hamlet_id === null));
-  await admin.updateAdminMember(String(second.id), { ...input, primary_contact_name: 'Oppdatert' });
-  assert.equal((await directory.getAdminMemberById(String(second.id))).membership_status, 'exempt', 'omitted status preserves current value');
+  await admin.updateAdminMember(String(second.id), { ...input, h_number: second.h_number, primary_contact_name: 'Oppdatert' });
+  const updated = await directory.getAdminMemberById(String(second.id));
+  assert.equal(updated.membership_status, 'exempt', 'omitted status preserves current value');
+  assert.equal(updated.h_number, second.h_number);
+  assert.equal((await directory.getAdminMemberById(String(first.id))).h_number, first.h_number);
   await assert.rejects(admin.updateAdminMember(String(first.id), { ...input, membership_status: 'invalid' }), /Invalid member/);
   const events = await db.sql`SELECT after_value FROM audit_log WHERE table_name = 'members' AND row_id = ${String(second.id)} ORDER BY id`;
   assert.equal(events[0].after_value.membership_status, 'exempt');

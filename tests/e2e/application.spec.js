@@ -224,16 +224,17 @@ test('admin activity map can filter the Turufjell trail subset', async ({ page, 
     contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#dce8d2"/></svg>',
   }));
   await authenticate(context);
-  const feature = (id, name, tooltipText) => ({
+  const feature = (id, name, tooltipText, sources = [{ id: 'kartverket', name: 'Kartverket' }]) => ({
     id, version: 1, name, tooltipText, category: 'cross_country', featureType: 'route',
     geometry: { type: 'LineString', coordinates: [[9.49, 60.47], [9.496, 60.475]] }, isDraft: true, season: 'winter', websiteUrl: null, activityNumber: null,
-    alpineColor: null, sources: [],
+    alpineColor: null, sources,
   });
   await page.route('**/api/admin/activity-map/features', (route) => route.fulfill({ json: {
     ok: true, catalog: DEFAULT_ACTIVITY_CATALOG, features: [
       feature('trail-local-name', 'Turufjell-runden', 'Preparert skiløype'),
       feature('trail-local-operator', 'Løypelagsrunden', 'Prepareres av Vassfarfjellet løypelag'),
       feature('trail-elsewhere', 'Fjellrunden', 'Preparert skiløype i naboområdet'),
+      feature('trail-manual', 'Egenløypa', 'Manuelt opprettet løype', []),
     ],
   } }));
   await page.goto('/admin/activity-map');
@@ -247,6 +248,7 @@ test('admin activity map can filter the Turufjell trail subset', async ({ page, 
   await expect(list.getByRole('button', { name: /Turufjell-runden/ })).toBeVisible();
   await expect(list.getByRole('button', { name: /Løypelagsrunden/ })).toBeVisible();
   await expect(list.getByRole('button', { name: /Fjellrunden/ })).toHaveCount(0);
+  await expect(list.getByRole('button', { name: /Egenløypa/ })).toBeVisible();
   const adminGeometry = page.locator('.activity-admin-map [data-feature-id="trail-local-operator"]');
   await adminGeometry.dispatchEvent('click');
   await expect(list.getByRole('button', { name: /Løypelagsrunden/ })).toHaveAttribute('aria-pressed', 'false');

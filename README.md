@@ -634,6 +634,10 @@ produksjonsbygget. Flytene dekker også profil, oppgaveliste, logg, grupper,
 nyhetsbrev, CMS-riktekst og utsendingsfeil. Alle leverandørkall er blokkert/mocket.
 Installerte Chrome kan brukes lokalt med `PLAYWRIGHT_CHANNEL=chrome npm run test:e2e`.
 CI kjører også begge testnivåene i `quality`, med egen Postgres-container og Chromium.
+Ytelsessjekken bruker en fast mobilvisning og tillater inntil 16 innledende
+Kartverket-fliser for kartene som nå åpnes automatisk (målt normalnivå: 12).
+Grensene for lastetid, JavaScript, interne kall og CSP beholdes. Målingene
+skrives også når en grense overskrides, slik at CI-feilen kan etterprøves.
 
 Kjør `npm test` for modul- og rutetester, eller `npm run check` for lint, tester
 og produksjonsbygg. Rutetestene bruker ekte Next.js Request/Response-objekter

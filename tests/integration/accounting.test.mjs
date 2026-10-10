@@ -6,12 +6,14 @@ import { createTestDatabase } from '../helpers/postgres.mjs';
 import { loadModule } from '../helpers/load-module.mjs';
 import * as validation from '../../lib/accounting-validation.js';
 import * as upload from '../../lib/upload-validation.js';
+import * as feeFiles from '../../lib/accounting-fee-files.js';
 import { accountingStatements, verifyAccountingSchema } from '../../scripts/release-accounting-schema.mjs';
 
 const db = createTestDatabase();
 const id = () => crypto.randomUUID().replaceAll('-', '');
 const year = 2087;
 let api;
+let feeApi;
 const entry = (extra = {}) => ({ id: id(), supplier: 'Synthetic accounting supplier', invoice_number: id(),
   description: 'Isolated integration test', category: 'systems', invoice_date: `${year}-09-12`,
   amount: '16.25', currency: 'USD', exchange_rate: '10.123456', reviewed: true,
@@ -26,11 +28,30 @@ before(async () => {
     './upload-validation.js': upload, './accounting-validation.js': validation,
     './accounting-pdf.js': { readAccountingReceipt: async () => ({ amount: '16.25', currency: 'USD' }) },
   });
+  feeApi = await loadModule('lib/accounting-fees.js', {
+    'node:crypto': crypto, './db.js': { getSql: () => db.sql }, './mock-store.js': { isMockMode: () => false },
+    './admin-access.js': { requirePermission: async () => ({ email: 'Accountant@example.test' }) },
+    './accounting-validation.js': validation, './accounting-fee-files.js': feeFiles,
+  });
   await api.saveAccountingYear({ year, version: 0, member_count: 411, annual_fee: '250',
     budget: { fees: '0', reminders: '0', board: '53000', systems: '5000', accountant: '5000', trailer: '8000', other: '20000', bank: '2000' },
     actual_income: { dues: '', fees: '0', reminders: '0' } });
 });
 after(() => db.close());
+
+test('annual fee imports retain the authenticated audit actor on insert and both conflict-update paths', async () => {
+  const [member] = await db.sql`INSERT INTO members (h_number) VALUES (${`fee-import-${id()}`}) RETURNING id`;
+  const file = new File([`member_id\n${member.id}\n`], 'synthetic.csv', { type: 'text/csv' });
+  await feeApi.importAnnualFeeStatuses({ year, kind: 'invoiced', date: `${year}-02-01`, apply: true, file });
+  await feeApi.importAnnualFeeStatuses({ year, kind: 'invoiced', date: `${year}-02-02`, apply: true, file });
+  await feeApi.importAnnualFeeStatuses({ year, kind: 'paid', apply: true, file });
+  const events = await db.sql`SELECT operation, changed_by, after_value FROM audit_log
+    WHERE table_name = 'member_annual_fees' AND row_id = ${`${member.id}:${year}`} ORDER BY id`;
+  assert.deepEqual(events.map(({ operation }) => operation), ['INSERT', 'UPDATE', 'UPDATE']);
+  assert.ok(events.every(({ changed_by, after_value }) => changed_by === 'accountant@example.test' && !('last_changed_by' in after_value)));
+  assert.equal(events[1].after_value.invoiced_on, `${year}-02-02`);
+  assert.equal(events[2].after_value.paid, true);
+});
 
 test('accounting-only schema is idempotent and preserves saved budgets', async () => {
   const schema = await readFile(new URL('../../database/schema.sql', import.meta.url), 'utf8');
