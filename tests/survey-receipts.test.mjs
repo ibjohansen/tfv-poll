@@ -99,6 +99,7 @@ test('watchdog isolates receipt errors from Matrikkel recovery and rejects non-p
     '../../lib/survey-email-background.js': { dispatchSurveyReceipts: async () => assert.fail('unexpected dispatch') },
     '../../lib/task-notifications-background.js': { dispatchTaskNotifications: async () => assert.fail('unexpected dispatch') },
     '../../lib/annual-dues-background.js': { dispatchAnnualDues: async () => assert.fail('invoice sending disabled') },
+    '../../lib/annual-dues-sending.js': { annualDuesSendingEnabled: () => false },
   }, { process: { env: { APP_ENVIRONMENT: 'production' } } });
   await api.default({}, { deploy: { context: 'deploy-preview' } });
   assert.equal(queried, 0);

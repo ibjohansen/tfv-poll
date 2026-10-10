@@ -11,12 +11,13 @@ import * as accountingValidation from '../lib/accounting-validation.js';
 import {processMailerSendEvent} from '../lib/mailersend-webhook.js';
 import {loadModule,plain} from './helpers/load-module.mjs';
 import * as senderDefaults from '../lib/invoice-sender-defaults.js';
+import * as sending from '../lib/annual-dues-sending.js';
 
 const db=new PGlite({extensions:{pg_trgm}}),uuid=()=>crypto.randomUUID().replaceAll('-','');
 function query(text,values=[]){let promise;return {text,values,then(resolve,reject){promise??=db.query(text,values).then(r=>r.rows);return promise.then(resolve,reject);}};}
 function sql(strings,...values){return query(strings.reduce((s,part,i)=>s+(i?`$${i}`:'')+part,''),values);}
 sql.query=query;sql.transaction=queries=>db.transaction(async tx=>{const out=[];for(const q of queries)out.push((await tx.query(q.text,q.values)).rows);return out;});
-const env={INVOICE_EMAIL_ENABLED:'true',APP_ENVIRONMENT:'production',TOKEN_AUDIENCE:'synthetic-dues',SECURITY_EVENT_HMAC_KEY:'x'.repeat(32),MAILERSEND_ENABLED:'true',MAILERSEND_BULK_ENABLED:'true',MAILERSEND_API_TOKEN:'synthetic',MAILERSEND_DOMAIN_ID:'synthetic',MAILERSEND_FROM_EMAIL:'post@turufjellvel.no'};
+const env={INVOICE_EMAIL_ENABLED:'true',INVOICE_EMAIL_MODE:'live',APP_ENVIRONMENT:'production',TOKEN_AUDIENCE:'synthetic-dues',SECURITY_EVENT_HMAC_KEY:'x'.repeat(32),MAILERSEND_ENABLED:'true',MAILERSEND_BULK_ENABLED:'true',MAILERSEND_API_TOKEN:'synthetic',MAILERSEND_DOMAIN_ID:'synthetic',MAILERSEND_FROM_EMAIL:'post@turufjellvel.no'};
 let api,worker,member,invoice,denied=false,settingsVersion;
 const campaign=year=>({year,amount:'250',prefix:`AK-${year}-`,first_number:1,vat_exempt:true,invoice_settings_version:settingsVersion,reviewed:true});
 const payment=(i,values={})=>({id:uuid(),invoice_id:i.id,payment_year:2026,date:'2026-02-15',amount:'100',reference:uuid(),evidence:'Syntetisk bankbilag',...values});
@@ -28,13 +29,13 @@ before(async()=>{
  const dependencies={'node:crypto':crypto,'./invoice-sender-defaults.js':senderDefaults,'./db.js':{getSql:()=>sql},'./admin-access.js':{requirePermission:async permission=>{if(denied&&permission!=='read')throw new Error('Forbidden');return {email:'accountant@example.test'};}},
   './mock-store.js':{isMockMode:()=>false},'./accounting-validation.js':accountingValidation,'./annual-dues-validation.js':validation,
   './annual-dues-documents.js':documents,'./survey-email-background.js':{getSurveyEmailBackgroundStatus:()=> 'ready'},
-  './mailer-service.js':{isMailerSendConfigured:()=>true,isMailerSendBulkEnabled:()=>true}};
+  './mailer-service.js':{isMailerSendConfigured:()=>true,isMailerSendBulkEnabled:()=>true},'./annual-dues-sending.js':sending};
  api=await loadModule('lib/annual-dues.js',dependencies,{process:{env}});
  const initial=await api.getFinanceInvoiceSettings();assert.equal(initial.bank_account,'');
  await assert.rejects(api.openDuesCampaign(campaign(2026)),/invoiceSettingsRequired/);
  const configured=await api.saveFinanceInvoiceSettings({...initial,sender_address:'Eksempelvel\nEksempelvegen 1\n0000 Eksempel',bank_account:'8601.11.17947'});settingsVersion=configured.version;
  const [{assertDatabaseEnvironment},{mailFailureDetails},mailer]=await Promise.all([import('../lib/security-config.js'),import('../lib/mail-failure-log.js'),import('../lib/mailer-service.js')]);
- worker=await loadModule('lib/annual-dues-worker.js',{'./db.js':{getSql:()=>sql},'./security-config.js':{assertDatabaseEnvironment},'./annual-dues-email.js':documents,'./mail-failure-log.js':{mailFailureDetails},'./mailer-service.js':mailer});
+ worker=await loadModule('lib/annual-dues-worker.js',{'./db.js':{getSql:()=>sql},'./security-config.js':{assertDatabaseEnvironment},'./annual-dues-email.js':documents,'./mail-failure-log.js':{mailFailureDetails},'./mailer-service.js':mailer,'./annual-dues-sending.js':sending});
  await sql`INSERT INTO accounting_years(id,annual_fee_ore,member_count,budget,actual_income) VALUES(2026,25000,1,'{"dues":25000}','{}'),(2025,25000,1,'{}','{}'),(2024,25000,1,'{}','{}')`;
  [member]=await sql`INSERT INTO members(h_number,street_address,title_holder,primary_contact_name,primary_contact_email,membership_status,registration_date)
   VALUES('DEMO-101','Eksempelvegen 10','Eksempelmedlem','Eksempelmedlem','member@example.test','member','2025-10-10') RETURNING id::text,h_number`;
@@ -101,6 +102,30 @@ test('mail is off by default; simulated worker sends archived PDF once and inclu
  assert.equal((await processMailerSendEvent(event,{sql})).outcome,'updated');assert.equal((await processMailerSendEvent(event,{sql})).outcome,'duplicate');
  await processMailerSendEvent({type:'activity.sent',data:{id:'late-sent',message_id:'provider-invoice-1'}},{sql});
  const last=(await api.getFinanceOverview(2026)).invoices[0].deliveries.at(-1);assert.equal(last.status,'bounced');assert.equal(last.events.length,2);assert.equal(last.events[0].detail.enhanced_code,'5.1.1');
+});
+test('test mode only queues the approved properties and marks their email subjects',async()=>{
+ await sql`INSERT INTO accounting_years(id,annual_fee_ore,member_count,budget,actual_income) VALUES(2022,25000,2,'{}','{}')`;
+ await api.openDuesCampaign(campaign(2022));
+ const [approved,other]=await sql`INSERT INTO members(h_number,title_holder,primary_contact_email,registration_date) VALUES
+  ('TEST-APPROVED','Test','approved@example.test','2021-01-01'),('TEST-OTHER','Test','other@example.test','2021-01-01') RETURNING id::text`;
+ const first=await api.issueDuesInvoice(issue(approved.id,{year:2022,date:'2022-02-02'}));
+ const second=await api.issueDuesInvoice(issue(other.id,{year:2022,date:'2022-02-02'}));
+ env.INVOICE_EMAIL_MODE='test';env.INVOICE_EMAIL_TEST_MEMBER_IDS=approved.id;
+ const savedProcessEnv=Object.fromEntries(['INVOICE_EMAIL_ENABLED','INVOICE_EMAIL_MODE','INVOICE_EMAIL_TEST_MEMBER_IDS','APP_ENVIRONMENT','MAILERSEND_ENABLED','MAILERSEND_BULK_ENABLED'].map(key=>[key,process.env[key]]));
+ Object.assign(process.env,{INVOICE_EMAIL_ENABLED:'true',INVOICE_EMAIL_MODE:'test',INVOICE_EMAIL_TEST_MEMBER_IDS:approved.id,APP_ENVIRONMENT:'production',MAILERSEND_ENABLED:'true',MAILERSEND_BULK_ENABLED:'true'});
+ try{
+  await api.queueDuesInvoice({invoice_id:first.id});
+  const [delivery]=await sql`SELECT subject,recipient_email FROM email_deliveries WHERE invoice_id=${first.id}`;
+  assert.match(delivery.subject,/^TEST — Årskontingent 2022/);assert.equal(delivery.recipient_email,'approved@example.test');
+  await assert.rejects(api.queueDuesInvoice({invoice_id:second.id}),/testRecipientNotAllowed/);
+  await assert.rejects(api.queueDuesBatch({invoice_ids:[first.id]}),/testBulkDisabled/);
+  let sent=0;await worker.processAnnualDues({env,sql,delayMs:0,getSuppressions:async()=>({emails:new Set(),domains:new Set()}),sendEmail:async message=>{
+   sent++;assert.match(message.subject,/^TEST — Årskontingent 2022/);return {messageId:'provider-test-mode'};
+  }});assert.equal(sent,1);
+ }finally{
+  env.INVOICE_EMAIL_MODE='live';delete env.INVOICE_EMAIL_TEST_MEMBER_IDS;
+  for(const [key,value] of Object.entries(savedProcessEnv)){if(value===undefined)delete process.env[key];else process.env[key]=value;}
+ }
 });
 test('queued invoices are blocked if the owner becomes ineligible before the worker runs',async()=>{
  const i=(await api.getFinanceOverview(2026)).invoices[1];

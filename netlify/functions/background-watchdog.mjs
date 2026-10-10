@@ -4,13 +4,14 @@ import { dispatchSurveyReceipts } from '../../lib/survey-email-background.js';
 import { startDueMonthlyActivityImport } from '../../lib/activity-map-import-background.js';
 import { dispatchTaskNotifications } from '../../lib/task-notifications-background.js';
 import { dispatchAnnualDues } from '../../lib/annual-dues-background.js';
+import { annualDuesSendingEnabled } from '../../lib/annual-dues-sending.js';
 
 // Netlify scheduled functions cannot be invoked through their public URL.
 // Preview/manual test invocations additionally fail closed on environment.
 export default async function handler(request, context) {
   if (context?.deploy?.context !== 'production' || process.env.APP_ENVIRONMENT !== 'production') return;
   let failed = false;
-  if (process.env.INVOICE_EMAIL_ENABLED === 'true') {
+  if (annualDuesSendingEnabled()) {
     try {
       const sql = getSql();
       const [invoices] = await sql`SELECT EXISTS (SELECT 1 FROM email_deliveries WHERE email_type = 'annual_dues'

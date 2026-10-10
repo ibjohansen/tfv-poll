@@ -309,6 +309,26 @@ test('annual dues uses the member owner and primary email without address prepar
  expect(writes[0]).not.toHaveProperty('recipient_name');expect(writes[0]).not.toHaveProperty('invoice_address');expect(writes[0]).not.toHaveProperty('reviewed');
 });
 
+test('annual dues test mode limits manual sending and labels the email TEST', async ({ page, context }) => {
+ await authenticate(context);
+ const settings={version:2,name:'Eksempelvel',sender_address:'Eksempelvel\nEksempelvegen 1\n0000 Eksempel',bank_account:'86011117947',organization_number:'123456785',phone:'123 45 678',reply_to:'post@example.test',website:'www.example.test'};
+ const invoice={id:'b'.repeat(32),member_id:'25',number:'AK-2026-1',issued_on:'2026-10-10',due_on:'2026-10-24',amount_ore:25000,paid_ore:0,snapshot:{h_number:'25',street_address:'Nedre Turusvingen 16',recipient_name:'Test Eier',invoice_address:'test@example.test',title_holder:'Test Eier',registration_date:'2025-01-01'},current_title_holder:'Test Eier',current_registration_date:'2025-01-01',eligibility:'eligible',current_email:'test@example.test',is_test_target:true,payments:[],deliveries:[]};
+ const writes=[];
+ await page.route('**/api/admin/accounting/dues**',async route=>{
+  if(route.request().method()==='GET')return route.fulfill({json:{ok:true,data:{year:2026,installed:true,yearClosed:false,sendingEnabled:true,sendingMode:'test',invoiceSettings:settings,campaign:{amount_ore:25000,number_prefix:'AK-2026-',next_number:2,sender:{bank_account:'86011117947'}},invoices:[invoice],candidates:[],excluded:[]}}});
+  writes.push(route.request().postDataJSON());return route.fulfill({json:{ok:true,result:{id:invoice.id,queued:true}}});
+ });
+ await page.goto('/admin/regnskap/browser-test');const dashboard=page.locator('.accounting-dashboard');
+ await dashboard.getByRole('button',{name:'Fakturering',exact:true}).click();
+ await expect(dashboard.getByText('Testmodus er aktiv.',{exact:false})).toBeVisible();
+ await expect(dashboard.getByRole('button',{name:/Send alle usendte/})).toHaveCount(0);
+ await dashboard.getByRole('button',{name:'Send testfaktura'}).click();
+ await expect(dashboard.locator('legend').filter({hasText:'Send testfaktura'})).toBeVisible();
+ await expect(dashboard.getByText('TEST først i emnefeltet',{exact:false})).toBeVisible();
+ await dashboard.getByRole('button',{name:'Legg testfaktura i sendekø'}).click();
+ expect(writes).toEqual([expect.objectContaining({operation:'queue',invoice_id:invoice.id,test:true})]);
+});
+
 test('invoice settings feed the campaign and require explicit VAT exemption confirmation', async ({ page, context }, testInfo) => {
  await authenticate(context);
  let settings={version:1,name:'Eksempelvel',sender_address:'Eksempelvel\nEksempelvegen 1\n0000 Eksempel',bank_account:'',organization_number:'123456785',phone:'123 45 678',reply_to:'post@example.test',website:'www.example.test'};

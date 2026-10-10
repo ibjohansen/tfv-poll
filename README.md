@@ -2528,15 +2528,16 @@ Lesing krever `read`; skriving krever `members`, samsvarende `Origin` og JSON.
 E-postmeldingen bruker konsekvent Årskontingent og inkluderer den godkjente
 vedtektsteksten § 4 og § 5 rett før hilsenen. Den omtaler ikke inkasso.
 
-**Ingen ekte utsendelse er bestilt.** `INVOICE_EMAIL_ENABLED` er en ny,
-server-side miljøvariabel som skal være fraværende eller `false` frem til
-brukeren uttrykkelig bestiller sending. Den er ikke satt av implementeringen.
-Utsendelse krever i tillegg eksisterende MailerSend-oppsett, bulkaktivering,
-sterk `MAILERSEND_JOB_SECRET`, betrodd produksjonsorigin og bekreftet
-databasemiljø. Forhåndsvisning, utvikling og lokal Netlify-kjøring sender ikke.
-Aktivering av variabelen på produksjon, ekte sending og kontokonfigurasjon
-krever hver sin uttrykkelige bestilling; en bestilling på deploy er ikke
-samtykke til e-postsending.
+Ekte utsendelse krever uttrykkelig bestilling og tre server-side
+miljøvariabler: `INVOICE_EMAIL_ENABLED=true`, `INVOICE_EMAIL_MODE=test|live`
+og eksisterende `MAILERSEND_BULK_ENABLED=true`. `test` krever i tillegg
+`INVOICE_EMAIL_TEST_MEMBER_IDS` med kommaseparerte medlems-ID-er. I testmodus
+kan bare disse medlemmene køsettes, e-postemnet starter med `TEST —`, og
+«Send alle» er både skjult og avvist på serveren. `live` åpner den ordinære
+massehandlingen først etter en eksplisitt avkryssing i Økonomi. Forhåndsvisning,
+utvikling og lokal Netlify-kjøring sender ikke. Utsendelse krever også
+eksisterende MailerSend-oppsett, sterk `MAILERSEND_JOB_SECRET`, betrodd
+produksjonsorigin og bekreftet databasemiljø.
 
 Den additive produksjonsmigreringen ble godkjent, utført og verifisert
 10. oktober 2026 etter schema-only-test og nytt snapshot. Alle 46 eksisterende
@@ -2568,8 +2569,12 @@ Automatisk mottaker og fakturaadresse ble verifisert samme dag; se
 [migreringsrapporten](docs/database/database-release-annual-dues-auto-recipients-2026-10-10.md).
 
 Netlifys nye `annual-dues-background` funksjon bruker eksisterende jobbhemmelighet
-og varsles av den eksisterende watchdog hvert femte minutt, bare når
-`INVOICE_EMAIL_ENABLED=true`. Bakgrunnsjobben sender den allerede arkiverte PDF-en og trenger ikke PDF-generatoren.
+og varsles straks en faktura legges i kø, eller av watchdogen hvert femte minutt.
+Den kjører bare i aktivert test- eller ordinær produksjonsmodus, sender den
+allerede arkiverte PDF-en og trenger ikke PDF-generatoren. Arbeideren sender én
+faktura om gangen med minst 6,1 sekunders avstand (under 10 per minutt), godt
+under MailerSends grense på 120 enkeltsendinger per minutt. HTTP 429 følger
+`Retry-After` før neste forsøk.
 Next.js tracing inkluderer PDF-fontene og logoen i fakturaruten. Kontroller disse
 filene i den faktisk bygde pakken før en eventuell produksjonsutrulling.
 Kvotefeil med kjent HTTP 429 kan forsøkes igjen opptil fem ganger. Avbrudd eller
@@ -2592,4 +2597,5 @@ Ved utrulling kontrolleres:
 - Ingen endring av balansen fra 2025 eller eksisterende manuelle inntektssummer.
 - PNG-rapporter, mobil/tastatur og tilgangssperrer for PDF, oversikt og mutasjoner.
 - Simulert bounce, tomme metadata, duplikate/tidlige/sene webhooks og avbrudd.
-- Fakturasending fortsatt deaktivert etter deploy; ingen ekte testmail uten bestilling.
+- Testmodus: bare avtalte medlems-ID-er, `TEST —` i lagret emne og ingen masseutsending.
+- Ordinær modus: eksplisitt massebekreftelse, én og én sending, 429/retry og ingen ekte e-post før administrator legger en faktura i kø.

@@ -195,6 +195,7 @@ test('production watchdog dispatches due tasks without interrupting other backgr
     '../../lib/db.js': { getSql: () => sql },
     '../../lib/task-notifications-background.js': { dispatchTaskNotifications: async () => { dispatches++; } },
     '../../lib/annual-dues-background.js': { dispatchAnnualDues: async () => assert.fail('invoice sending disabled') },
+    '../../lib/annual-dues-sending.js': { annualDuesSendingEnabled: () => false },
     '../../lib/survey-email-background.js': { dispatchSurveyReceipts: () => assert.fail('no receipts') },
     '../../lib/activity-map-import-background.js': { startDueMonthlyActivityImport: async () => ({ result: 'idle' }) },
     '../../lib/background-watchdog.js': { recoverDueSurveyEmailCampaigns: async () => ({ result: 'idle' }),
