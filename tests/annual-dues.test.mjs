@@ -12,6 +12,7 @@ import {processMailerSendEvent} from '../lib/mailersend-webhook.js';
 import {loadModule,plain} from './helpers/load-module.mjs';
 import * as senderDefaults from '../lib/invoice-sender-defaults.js';
 import * as sending from '../lib/annual-dues-sending.js';
+import {deliveryExplanation} from '../lib/annual-dues-delivery.js';
 
 const db=new PGlite({extensions:{pg_trgm}}),uuid=()=>crypto.randomUUID().replaceAll('-','');
 function query(text,values=[]){let promise;return {text,values,then(resolve,reject){promise??=db.query(text,values).then(r=>r.rows);return promise.then(resolve,reject);}};}
@@ -91,9 +92,13 @@ test('primary email copies preserve the archived claim and pending attempts prev
 test('mail is off by default; simulated worker sends archived PDF once and includes exact bylaws before greeting',async()=>{
  assert.deepEqual(plain(await worker.processAnnualDues({env:{}})),{disabled:true});
  await sql`INSERT INTO application_environment(singleton,environment) VALUES(TRUE,'production') ON CONFLICT(singleton) DO UPDATE SET environment='production'`;
+ const [archived]=await sql`SELECT encode(pdf,'base64') AS content FROM annual_dues_invoices WHERE id=${invoice.id}`;
+ assert.match(archived.content,/\n/);
  const options={env,sql,delayMs:0,getSuppressions:async()=>({emails:new Set(),domains:new Set()})};let sent=0;
  const result=await worker.processAnnualDues({...options,sendEmail:async message=>{
   sent++;assert.equal(message.to,'new@example.test');assert.equal(message.attachments[0].filename,invoice.number+'.pdf');
+  assert.doesNotMatch(message.attachments[0].content,/\s/);
+  assert.equal(message.attachments[0].content,Buffer.from(archived.content,'base64').toString('base64'));
   const pdf=await PDFDocument.load(Buffer.from(message.attachments[0].content,'base64'));assert.equal(pdf.getPageCount(),1);
   assert.ok(message.text.endsWith(documents.annualDuesBylaws+'\n\nVennlig hilsen\nTurufjell Vel'));assert.doesNotMatch(message.text,/Velavgift|inkasso/i);
   return {messageId:'provider-invoice-1'};
@@ -103,6 +108,10 @@ test('mail is off by default; simulated worker sends archived PDF once and inclu
  assert.equal((await processMailerSendEvent(event,{sql})).outcome,'updated');assert.equal((await processMailerSendEvent(event,{sql})).outcome,'duplicate');
  await processMailerSendEvent({type:'activity.sent',data:{id:'late-sent',message_id:'provider-invoice-1'}},{sql});
  const last=(await api.getFinanceOverview(2026)).invoices[0].deliveries.at(-1);assert.equal(last.status,'bounced');assert.equal(last.events.length,2);assert.equal(last.events[0].detail.enhanced_code,'5.1.1');
+});
+test('attachment validation failures explain why no email was sent',()=>{
+ assert.match(deliveryExplanation({http_status:422,provider_code:'MS42215'},'UPSTREAM'),/PDF-vedlegget/);
+ assert.match(deliveryExplanation({http_status:422,provider_code:'MS42215'},'UPSTREAM'),/ikke sendt/);
 });
 test('test mode only queues the approved properties and marks their email subjects',async()=>{
  await sql`INSERT INTO accounting_years(id,annual_fee_ore,member_count,budget,actual_income) VALUES(2022,25000,2,'{}','{}')`;

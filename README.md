@@ -2591,6 +2591,16 @@ ukjent API-aksept blir uavklart og krever manuell kontroll før ny utsendelse.
 Permanent bounce/sperre stopper automatisk sending. Visningsrapporten skiller
 API-aksept fra levering, beholder signerte hendelser og forklarer tilgjengelige
 HTTP-/SMTP-koder. Levering beviser ikke at meldingen er lest eller betalt.
+PDF-vedlegg normaliseres til Base64 uten linjeskift før MailerSend-kallet;
+PostgreSQLs `encode(..., 'base64')` legger ellers inn linjeskift. HTTP 422 / MS42215
+forklares som en avvist vedleggsforespørsel uten utsendelse. Slike mislykkede
+forsøk beholdes, og sendes først igjen når administrator legger et nytt forsøk i kø.
+
+For å teste en ny fakturamal når en testfaktura allerede er lagret: krediter
+den gamle fakturaen med en beskrivende årsak, utsted erstatningsfaktura fra
+«Suppler kampanjen», åpne den nye PDF-en og velg «Send testfaktura» og deretter
+«Legg testfaktura i sendekø». Et nytt sendeforsøk på den gamle fakturaen sender
+den opprinnelig lagrede PDF-en og bruker ikke den nye malen.
 
 Ved utrulling kontrolleres:
 
