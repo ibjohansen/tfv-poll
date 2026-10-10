@@ -2536,6 +2536,15 @@ Lesing krever `read`; skriving krever `members`, samsvarende `Origin` og JSON.
 `POST` på samme rute med `operation=invoice_settings` lagrer dem.
 E-postmeldingen bruker konsekvent Årskontingent og inkluderer den godkjente
 vedtektsteksten § 4 og § 5 rett før hilsenen. Den omtaler ikke inkasso.
+E-postteksten starter med hjemmelshaver, gateadresse og gårds- og bruksnummer.
+Numeriske H-numre vises med `H-` også i setningen om tomten. Hele kronebeløp
+vises som «250,-», norsk bankkonto grupperes som `1080.55.35682`, og
+betalingsreferansen står i anførselstegn. Rettelser henvises til skjemaet på
+`https://medlemsservice.turufjellvel.no/` eller foreningens svaradresse.
+Det korte, godkjente vedtektsutdraget bruker «gårds- og bruksnummer» og
+utelater avsnittet om purregebyr, renter og stemmerett. Nye sendeforsøk og
+kopier bruker gjeldende e-posttekst; allerede lagrede PDF-er og snapshot beholdes.
+Den eksisterende e-posttjenesten legger til systemhilsenen én gang.
 
 Ekte utsendelse krever uttrykkelig bestilling og tre server-side
 miljøvariabler: `INVOICE_EMAIL_ENABLED=true`, `INVOICE_EMAIL_MODE=test|live`

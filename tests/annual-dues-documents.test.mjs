@@ -28,7 +28,7 @@ for(const [number,reference] of [['25','H-25'],['SPG H 1','SPG H 1'],['H-25','H-
       assert.doesNotMatch(text,/Årskontingent 2026 ·/);
       const payment=`Merk betalingen med: AK-2026-1 og ${reference}.`;
       assert.ok(text.includes(payment));
-      assert.ok(invoiceEmailContent(invoice).text.includes(`merk betalingen med: AK-2026-1 og ${reference}.`));
+      assert.ok(invoiceEmailContent(invoice).text.includes(`merk betalingen med: "AK-2026-1 og ${reference}".`));
       assert.equal(invoicePropertyReference(number),reference);
     }finally{await task.destroy();}
   });

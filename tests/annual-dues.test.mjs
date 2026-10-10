@@ -100,7 +100,7 @@ test('mail is off by default; simulated worker sends archived PDF once and inclu
   assert.doesNotMatch(message.attachments[0].content,/\s/);
   assert.equal(message.attachments[0].content,Buffer.from(archived.content,'base64').toString('base64'));
   const pdf=await PDFDocument.load(Buffer.from(message.attachments[0].content,'base64'));assert.equal(pdf.getPageCount(),1);
-  assert.ok(message.text.endsWith(documents.annualDuesBylaws+'\n\nVennlig hilsen\nTurufjell Vel'));assert.doesNotMatch(message.text,/Velavgift|inkasso/i);
+  assert.ok(message.text.endsWith(documents.annualDuesBylaws+'\n\n\nVennlig hilsen\nTurufjell Vel'));assert.doesNotMatch(message.text,/Velavgift|inkasso|purregebyr|stemmerett/i);
   return {messageId:'provider-invoice-1'};
  }});assert.equal(result.sent,1);assert.equal(sent,1);
  await worker.processAnnualDues({...options,sendEmail:async()=>assert.fail('duplicate send')});
