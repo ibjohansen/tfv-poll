@@ -144,10 +144,10 @@ før [produksjonsmigreringen 25. september](database/database-release-accounting
 
 Den opprinnelige regnskapsmigreringen og publiseringen ble gjennomført 25.
 september 2026; se [utrullingsrapporten](database/database-release-accounting-2026-09-25.md).
-Kontingentoppfølgingens additive kolonne og indeks er klargjort, men er ikke
-produksjonsmigrert eller deployet. Følg produksjonsprosedyren og sjekklisten i
-README ved senere utrulling. Ingen nye miljøvariabler, bøtter, Entra-roller eller
-bakgrunnsfunksjoner er nødvendige.
+Kontingentoppfølgingens kolonne og indeks ble produksjonsmigrert 25. september.
+Årskontingentens fakturering ble lagt til 10. oktober; se
+[utrullingsrapporten](database/database-release-annual-dues-2026-10-10.md).
+Følg produksjonsprosedyren og sjekklisten i README ved senere utrulling.
 
 Arbeidsflyten er inspirert av leverandørenes beskrivelser av
 [utlegg med valuta og status](https://hjelp.fiken.no/reiseregning-og-utlegg-for-ansatte)
@@ -170,3 +170,23 @@ automatisk dagens brukernavn: siste redigerer er ikke nødvendigvis utlegger.
 De to nye kolonnene ble migrert og verifisert i produksjon 26. september 2026;
 se [migreringsrapporten](database/database-release-claimants-2026-09-26.md). Eksisterende
 data er bevart. Ingen applikasjonsdeploy ble gjort i denne operasjonen.
+
+## Avsender og avgiftsunntak på årskontingenten
+
+I Økonomi → «Innstillinger» lagres foreningens bankkonto, adresse, navn,
+organisasjonsnummer, telefon, e-post og nettside. Adressen kan ha flere linjer.
+Oppgitte kontaktopplysninger er fylt ut; et reelt norsk bankkontonummer må
+lagres før fakturering. Kontonummerets kontrollsiffer kontrolleres ved lagring.
+Skrivetilgang krever `members`; endringer får et revisjonsspor og en ny versjon.
+
+Kampanjen lagrer avgiftsunntaket «Årskontingent unntatt merverdiavgift».
+Dette må bekreftes når kampanjen åpnes og kan ikke endres etterpå.
+Nye fakturaer henter gjeldende avsenderopplysninger fra Innstillinger, også
+ved supplering av en pågående kampanje. Arkiverte fakturaer og utsendte kopier
+beholder de opprinnelige opplysningene. Hvis innstillingene endres underveis,
+må fakturagrunnlaget lastes inn og kontrolleres på nytt.
+
+Tilleggsmigreringen er `database/invoice-settings.sql`; følg README for
+schema-only-test, snapshot og verifikasjon før publisering. Den ble utført
+10. oktober 2026; se [migreringsrapporten](database/database-release-invoice-settings-2026-10-10.md).
+E-postsending er fortsatt deaktivert og krever en egen uttrykkelig bestilling.

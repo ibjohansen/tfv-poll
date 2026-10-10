@@ -10,24 +10,28 @@ import * as validation from '../lib/annual-dues-validation.js';
 import * as accountingValidation from '../lib/accounting-validation.js';
 import {processMailerSendEvent} from '../lib/mailersend-webhook.js';
 import {loadModule,plain} from './helpers/load-module.mjs';
+import * as senderDefaults from '../lib/invoice-sender-defaults.js';
 
 const db=new PGlite({extensions:{pg_trgm}}),uuid=()=>crypto.randomUUID().replaceAll('-','');
 function query(text,values=[]){let promise;return {text,values,then(resolve,reject){promise??=db.query(text,values).then(r=>r.rows);return promise.then(resolve,reject);}};}
 function sql(strings,...values){return query(strings.reduce((s,part,i)=>s+(i?`$${i}`:'')+part,''),values);}
 sql.query=query;sql.transaction=queries=>db.transaction(async tx=>{const out=[];for(const q of queries)out.push((await tx.query(q.text,q.values)).rows);return out;});
 const env={INVOICE_EMAIL_ENABLED:'true',APP_ENVIRONMENT:'production',TOKEN_AUDIENCE:'synthetic-dues',SECURITY_EVENT_HMAC_KEY:'x'.repeat(32),MAILERSEND_ENABLED:'true',MAILERSEND_BULK_ENABLED:'true',MAILERSEND_API_TOKEN:'synthetic',MAILERSEND_DOMAIN_ID:'synthetic',MAILERSEND_FROM_EMAIL:'post@turufjellvel.no'};
-let api,worker,member,invoice,denied=false;
-const campaign=year=>({year,amount:'250',prefix:`AK-${year}-`,first_number:1,sender_address:'Eksempelvegen 1, 0000 Eksempel',bank_account:'86011117947',reply_to:'post@turufjellvel.no',reviewed:true});
+let api,worker,member,invoice,denied=false,settingsVersion;
+const campaign=year=>({year,amount:'250',prefix:`AK-${year}-`,first_number:1,vat_exempt:true,invoice_settings_version:settingsVersion,reviewed:true});
 const payment=(i,values={})=>({id:uuid(),invoice_id:i.id,payment_year:2026,date:'2026-02-15',amount:'100',reference:uuid(),evidence:'Syntetisk bankbilag',...values});
 
 before(async()=>{
  await db.exec(await readFile(new URL('../database/schema.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../database/annual-dues.sql',import.meta.url),'utf8'));
- const dependencies={'node:crypto':crypto,'./db.js':{getSql:()=>sql},'./admin-access.js':{requirePermission:async permission=>{if(denied&&permission!=='read')throw new Error('Forbidden');return {email:'accountant@example.test'};}},
+ const dependencies={'node:crypto':crypto,'./invoice-sender-defaults.js':senderDefaults,'./db.js':{getSql:()=>sql},'./admin-access.js':{requirePermission:async permission=>{if(denied&&permission!=='read')throw new Error('Forbidden');return {email:'accountant@example.test'};}},
   './mock-store.js':{isMockMode:()=>false},'./accounting-validation.js':accountingValidation,'./annual-dues-validation.js':validation,
   './annual-dues-documents.js':documents,'./survey-email-background.js':{getSurveyEmailBackgroundStatus:()=> 'ready'},
   './mailer-service.js':{isMailerSendConfigured:()=>true,isMailerSendBulkEnabled:()=>true}};
  api=await loadModule('lib/annual-dues.js',dependencies,{process:{env}});
+ const initial=await api.getFinanceInvoiceSettings();assert.equal(initial.bank_account,'');
+ await assert.rejects(api.openDuesCampaign(campaign(2026)),/invoiceSettingsRequired/);
+ const configured=await api.saveFinanceInvoiceSettings({...initial,sender_address:'Eksempelvel\nEksempelvegen 1\n0000 Eksempel',bank_account:'8601.11.17947'});settingsVersion=configured.version;
  const [{assertDatabaseEnvironment},{mailFailureDetails},mailer]=await Promise.all([import('../lib/security-config.js'),import('../lib/mail-failure-log.js'),import('../lib/mailer-service.js')]);
  worker=await loadModule('lib/annual-dues-worker.js',{'./db.js':{getSql:()=>sql},'./security-config.js':{assertDatabaseEnvironment},'./annual-dues-email.js':documents,'./mail-failure-log.js':{mailFailureDetails},'./mailer-service.js':mailer});
  await sql`INSERT INTO accounting_years(id,annual_fee_ore,member_count,budget,actual_income) VALUES(2026,25000,1,'{"dues":25000}','{}'),(2025,25000,1,'{}','{}'),(2024,25000,1,'{}','{}')`;
@@ -35,14 +39,14 @@ before(async()=>{
   VALUES('DEMO-101','Eksempelvegen 10','Eksempelmedlem','Eksempelmedlem','member@example.test','member','2025-10-10') RETURNING id::text,h_number`;
 });
 after(async()=>db.close());
-const issue=(id,extra={})=>({id:uuid(),year:2026,member_id:id,date:'2026-02-02',recipient_name:'Eksempelmedlem',invoice_address:'Eksempelgata 9, 0000 Eksempel',reviewed:true,...extra});
+const issue=(id,extra={})=>({id:uuid(),year:2026,member_id:id,date:'2026-02-02',recipient_name:'Eksempelmedlem',invoice_address:'Eksempelgata 9, 0000 Eksempel',reviewed:true,invoice_settings_version:settingsVersion,...extra});
 test('campaign is unique and leaves manual accounts and historic balance untouched',async()=>{
  const before=plain(await sql`SELECT annual_fee_ore,budget,actual_income FROM accounting_years WHERE id=2026`);
  await api.openDuesCampaign(campaign(2026));await assert.rejects(api.openDuesCampaign(campaign(2026)),/campaignExists/);
  invoice=await api.issueDuesInvoice(issue(member.id));assert.equal(invoice.number,'AK-2026-1');
  await assert.rejects(api.issueDuesInvoice(issue(member.id)),e=>e.code==='23505');
  assert.deepEqual(plain(await sql`SELECT annual_fee_ore,budget,actual_income FROM accounting_years WHERE id=2026`),before);
- assert.equal((await sql`SELECT tablename FROM pg_tables WHERE tablename LIKE 'finance_%'`).length,0);
+ assert.deepEqual(plain(await sql`SELECT tablename FROM pg_tables WHERE tablename LIKE 'finance_%'`),[{tablename:'finance_invoice_settings'}]);
  await assert.rejects(async()=>await sql`UPDATE annual_dues_invoices SET amount_ore=1 WHERE id=${invoice.id}`,/immutableFinanceRecord/);
 });
 test('February 1 is inclusive; later dates, unknown and conflicting dates are held',async()=>{
@@ -57,7 +61,7 @@ test('February 1 is inclusive; later dates, unknown and conflicting dates are he
 test('prepared batch issuance is idempotent and includes only eligible properties',async()=>{
  const overview=await api.getFinanceOverview(2026),m=overview.candidates[0];
  await api.prepareDuesRecipient({member_id:m.id,recipient_name:'Grunnbok Test',invoice_address:'Eksempelgata 10',title_holder:m.title_holder,reviewed:true});
- const input={batch_id:uuid(),year:2026,date:'2026-02-02',member_ids:[m.id,overview.excluded[0].id],reviewed:true};
+ const input={batch_id:uuid(),year:2026,date:'2026-02-02',member_ids:[m.id,overview.excluded[0].id],reviewed:true,invoice_settings_version:settingsVersion};
  let result=await api.issueDuesBatch(input);assert.equal(result.results[0].ok,true);assert.equal(result.results[1].ok,false);
  result=await api.issueDuesBatch(input);assert.equal(result.results[0].ok,true);assert.equal((await api.getFinanceOverview(2026)).invoices.length,2);
 });
@@ -161,4 +165,43 @@ test('an open prior-year campaign accepts the actual issue date in the following
  const i=(await api.getFinanceOverview(2025)).invoices.find(i=>i.id===late.id);
  assert.equal(i.issued_on,'2026-02-02');assert.equal(i.due_on,'2026-02-16');assert.equal(i.number.startsWith('AK-2025-'),true);
  await assert.rejects(api.issueDuesInvoice(issue(m.id,{year:2025,date:'2099-02-02'})),/invalidDate/);
+});
+test('sender settings validate the account, retain address lines and reject stale or unauthorized changes',async()=>{
+ const current=await api.getFinanceInvoiceSettings();
+ assert.equal(current.bank_account,'86011117947');assert.equal(current.sender_address,'Eksempelvel\nEksempelvegen 1\n0000 Eksempel');
+ assert.equal(current.phone,'416 01 917');assert.equal(current.website,'www.turufjellvel.no');
+ await assert.rejects(api.saveFinanceInvoiceSettings({...current,bank_account:'86011117948'}),/invalidBankAccount/);
+ await assert.rejects(api.saveFinanceInvoiceSettings({...current,version:current.version-1}),/invoiceSettingsChanged/);
+ denied=true;try{assert.equal((await api.getFinanceInvoiceSettings()).version,current.version);await assert.rejects(api.saveFinanceInvoiceSettings(current),/Forbidden/);}finally{denied=false;}
+ assert.equal((await api.getFinanceInvoiceSettings()).version,current.version);
+});
+test('campaign VAT exemption is explicit and immutable, and client sender overrides are ignored',async()=>{
+ await sql`INSERT INTO accounting_years(id,annual_fee_ore,member_count,budget,actual_income) VALUES(2023,25000,1,'{}','{}')`;
+ await assert.rejects(api.openDuesCampaign({...campaign(2023),vat_exempt:false}),/vatReviewRequired/);
+ await api.openDuesCampaign({...campaign(2023),bank_account:'invalid',sender_address:'Unreviewed override',reply_to:'wrong@example.test'});
+ const [c]=await sql`SELECT sender,tax_treatment FROM annual_dues_campaigns WHERE year=2023`;
+ assert.equal(c.sender.bank_account,'86011117947');assert.equal(c.sender.address,'Eksempelvel\nEksempelvegen 1\n0000 Eksempel');
+ assert.deepEqual(plain(c.tax_treatment),{type:'exempt',reason:'Årskontingent',text:'Årskontingent unntatt merverdiavgift'});
+ await assert.rejects(async()=>await sql`UPDATE annual_dues_campaigns SET tax_treatment=tax_treatment WHERE year=2023`,/immutableFinanceRecord/);
+});
+test('ongoing campaigns use current settings for new PDFs and preserve archived invoices through settings and schema changes',async()=>{
+ const members=await sql`INSERT INTO members(h_number,title_holder,primary_contact_email,registration_date) VALUES('SETTINGS-1','Test','sender1@example.test','2022-01-01'),('SETTINGS-2','Test','sender2@example.test','2022-01-01') RETURNING id::text,h_number`;
+ const first=await api.issueDuesInvoice(issue(members[0].id,{year:2023}));
+ const [original]=await sql`SELECT snapshot,sha256,encode(pdf,'base64') AS pdf FROM annual_dues_invoices WHERE id=${first.id}`;
+ const current=await api.getFinanceInvoiceSettings();
+ const saved=await api.saveFinanceInvoiceSettings({...current,bank_account:'1234 56 78903',sender_address:'Eksempelvel\r\nNyvegen 2\r\n0001 Eksempel'});
+ assert.equal(saved.version,current.version+1);assert.equal(saved.sender_address,'Eksempelvel\nNyvegen 2\n0001 Eksempel');settingsVersion=saved.version;
+ await assert.rejects(api.issueDuesInvoice(issue(members[1].id,{year:2023,invoice_settings_version:current.version})),/invoiceSettingsChanged/);
+ const stale={...original.snapshot,h_number:members[1].h_number,source_email:'sender2@example.test'};
+ await assert.rejects(async()=>await sql`SELECT annual_dues_issue(${uuid()},2023,${members[1].id}::bigint,'2026-02-02'::date,'AK-2023-2',${JSON.stringify(stale)}::jsonb,${original.pdf},${original.sha256},'test')`,/invoiceSettingsChanged/);
+ const second=await api.issueDuesInvoice(issue(members[1].id,{year:2023}));
+ const [newInvoice]=await sql`SELECT snapshot,template_version FROM annual_dues_invoices WHERE id=${second.id}`;
+ assert.equal(newInvoice.snapshot.sender.bank_account,'12345678903');assert.equal(newInvoice.snapshot.sender.address,saved.sender_address);assert.equal(newInvoice.snapshot.sender.vat,'Årskontingent unntatt merverdiavgift');assert.equal(newInvoice.template_version,2);
+ const [audit]=await sql`SELECT before_value,after_value,changed_by FROM audit_log WHERE table_name='finance_invoice_settings' ORDER BY id DESC LIMIT 1`;
+ assert.equal(audit.before_value.bank_account,current.bank_account);assert.equal(audit.after_value.bank_account,saved.bank_account);assert.equal(audit.changed_by,'accountant@example.test');
+ await db.exec(await readFile(new URL('../database/invoice-settings.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../database/schema.sql',import.meta.url),'utf8'));
+ assert.deepEqual(plain(await api.getFinanceInvoiceSettings()),plain(saved));
+ assert.deepEqual(plain((await sql`SELECT snapshot,sha256,encode(pdf,'base64') AS pdf FROM annual_dues_invoices WHERE id=${first.id}`)[0]),plain(original));
+ assert.equal((await api.getFinanceOverview(2023)).campaign.sender.bank_account,current.bank_account);
 });

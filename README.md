@@ -2470,6 +2470,22 @@ kampanje per lagret regnskapsår. Satsen må samsvare med årsinnstillingene
 (2026: 250 kr). Før åpning må tidligere fakturering, ledig nummerserie,
 juridisk betaler, foreningens adresse og bankkonto kontrolleres.
 
+Foreningens bankkonto, adresse med linjeskift, navn, organisasjonsnummer,
+telefon, e-post og nettside lagres samlet i Økonomi → «Innstillinger».
+De gjelder på tvers av år og hentes derfra ved kampanjestart og utstedelse.
+Oppgitte kontaktopplysninger er forhåndsutfylt; bankkonto er tom inntil et
+reelt kontonummer lagres. Norsk bankkonto valideres med kontrollsiffer.
+Endringer logges med før-/etterverdier og innlogget bruker. Versjonskontroll
+avviser samtidig redigering og utstedelse fra utdaterte innstillinger.
+Nye fakturaer i en pågående kampanje bruker gjeldende innstillinger;
+allerede arkiverte fakturaer og kopier beholder opprinnelige opplysninger.
+
+Avgiftsbehandlingen lagres separat og uforanderlig på hver kampanje:
+«Årskontingent unntatt merverdiavgift». Avgiftsunntaket må bekreftes før
+kampanjen åpnes. Dette er et unntak for medlemskontingent og ideell virksomhet
+etter [merverdiavgiftsloven § 3-13](https://www.skatteetaten.no/rettskilder/type/handboker/merverdiavgiftshandboken/gjeldende/M-3/M-3-13/M-3-13.2/),
+og behandles ikke som en avgiftspliktig vare med nullsats.
+
 Utvalget krever aktivt ordinært medlemskap og registrert hjemmel senest
 1. februar i kontingentåret; selve 1. februar er inkludert. Hjemmel etter
 skjæringsdato, manglende/ugyldig dato og ulike datoer på hver side av grensen
@@ -2504,6 +2520,8 @@ balanse fra `Protokoll-2026.pdf`. Manglende inntekter vises som «Ikke registrer
 Nye private ruter er `/api/admin/accounting/dues`,
 `/api/admin/accounting/dues/[id]` og `/api/admin/accounting/reports`.
 Lesing krever `read`; skriving krever `members`, samsvarende `Origin` og JSON.
+`GET /api/admin/accounting/dues?settings=invoice` henter bare avsenderinnstillingene;
+`POST` på samme rute med `operation=invoice_settings` lagrer dem.
 E-postmeldingen bruker konsekvent Årskontingent og inkluderer den godkjente
 vedtektsteksten § 4 og § 5 rett før hilsenen. Den omtaler ikke inkasso.
 
@@ -2531,6 +2549,19 @@ skjemaet skal ikke kjøres som produksjonsmigrering**. Ingen eksisterende
 medlems-, budsjett-, bilags- eller balansetall importeres eller omskrives.
 Migreringen må være ferdig før kode med utvidede webhook-felt publiseres.
 
+Oppfølgingen for avsenderinnstillinger og kampanjens avgiftsunntak ligger i
+`database/invoice-settings.sql`, synkronisert med den siste merkede blokken
+i `database/schema.sql`. Før denne koden publiseres, test og kjør bare den
+avgrensede tilleggsmigreringen etter samme schema-only-/snapshot-prosedyre.
+Den legger til én innstillingstabell og kampanjens avgiftsmetadata, med
+versjons-/revisjonskontroll og sperre mot fakturering fra gamle innstillinger.
+Eksisterende kampanjer får avgiftsmetadata; arkiverte dokumenter, avsendersnapshot,
+medlemmer, betalinger og regnskapstall omskrives ikke. Ingen ny miljøvariabel,
+rute, Entra-rolle eller bakgrunnsfunksjon innføres.
+Tilleggsmigreringen ble utført og verifisert 10. oktober 2026; alle 52
+eksisterende tabeller beholdt innholdet. Se
+[migreringsrapporten](docs/database/database-release-invoice-settings-2026-10-10.md).
+
 Netlifys nye `annual-dues-background` funksjon bruker eksisterende jobbhemmelighet
 og varsles av den eksisterende watchdog hvert femte minutt, bare når
 `INVOICE_EMAIL_ENABLED=true`. Bakgrunnsjobben sender den allerede arkiverte PDF-en og trenger ikke PDF-generatoren.
@@ -2546,6 +2577,9 @@ Ved utrulling kontrolleres:
 
 - `npm run check`, `npm audit`, `git diff --check` og ingen secrets/eksporter i staging.
 - Én kampanje per år, én aktiv faktura per tomt og felles nummerserie for kreditnota.
+- Avsender lagres i Innstillinger; tom/ugyldig bankkonto og utdaterte versjoner sperres.
+- Kampanjens avgiftsunntak bekreftes og beholdes; nye fakturaer bruker gjeldende avsender,
+  mens gamle PDF-er og kopier er uendret etter innstillingsendring og ny migreringskjøring.
 - Inkludert hjemmel 1. februar, ekskludert 2. februar, manglende og blandede datoer.
 - Oppdatert kontaktadresse gir kopi; nytt eierskap sperrer gammel faktura.
 - Lagret PDF, vedtekter i e-post, eksakt utsendelsesadresse og historikk på tomten.

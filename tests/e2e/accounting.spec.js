@@ -285,3 +285,42 @@ test('annual dues shows ownership exclusions and delivery diagnostics without ch
  await page.screenshot({path:testInfo.outputPath('annual-dues.png'),fullPage:true});
  await dashboard.getByRole('button',{name:'Oversikt',exact:true}).click();await expect(dashboard.getByText('Sum formue').locator('..')).toContainText(/49.636,85/);
 });
+
+test('invoice settings feed the campaign and require explicit VAT exemption confirmation', async ({ page, context }, testInfo) => {
+ await authenticate(context);
+ let settings={version:1,name:'Eksempelvel',sender_address:'Eksempelvel\nEksempelvegen 1\n0000 Eksempel',bank_account:'',organization_number:'123456785',phone:'123 45 678',reply_to:'post@example.test',website:'www.example.test'};
+ let campaign=null;const writes=[];
+ await page.route('**/api/admin/accounting/dues**',async route=>{
+  const request=route.request(),url=new URL(request.url());
+  if(request.method()==='GET')return route.fulfill({json:{ok:true,data:url.searchParams.get('settings')==='invoice'?settings:{year:2026,installed:true,yearClosed:false,sendingEnabled:false,invoiceSettings:settings,campaign,invoices:[],candidates:[],excluded:[]}}});
+  const input=request.postDataJSON();writes.push(input);
+  if(input.operation==='invoice_settings'){settings={...input,version:input.version+1,bank_account:input.bank_account.replace(/[ .]/g,'')};return route.fulfill({json:{ok:true,result:settings}});}
+  if(input.operation==='campaign'){campaign={amount_ore:25000,number_prefix:'AK-2026-',next_number:1,tax_treatment:{type:'exempt',reason:'Årskontingent',text:'Årskontingent unntatt merverdiavgift'},sender:{vat:'Årskontingent unntatt merverdiavgift'}};return route.fulfill({json:{ok:true,result:{year:2026}}});}
+  throw new Error(`Unexpected mutation ${input.operation}`);
+ });
+ await page.goto('/admin/regnskap/browser-test');const dashboard=page.locator('.accounting-dashboard');
+ await dashboard.getByRole('button',{name:'Fakturering',exact:true}).click();
+ await expect(dashboard.getByRole('button',{name:'Start kampanjen',exact:true})).toBeDisabled();
+ await dashboard.getByRole('button',{name:'Åpne fakturainnstillinger'}).click();
+ await expect(dashboard.getByLabel('Foreningens adresse')).toHaveValue(settings.sender_address);
+ await dashboard.getByLabel('Bankkontonummer').fill('8601.11.17947');
+ await dashboard.getByLabel('Foreningens adresse').fill('Eksempelvel\nNyvegen 2\n0001 Eksempel');
+ await dashboard.getByRole('button',{name:'Lagre fakturainnstillinger'}).click();
+ await expect(dashboard.getByRole('status').filter({hasText:'Fakturainnstillingene er lagret.'})).toBeVisible();
+ await expect(dashboard.getByLabel('Bankkontonummer')).toHaveValue('86011117947');
+ if(testInfo.project.name==='mobile')await page.setViewportSize({width:320,height:800});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ await page.addScriptTag({content:axe.source});const accessibility=await page.evaluate(async()=>window.axe.run('.accounting-dashboard',{runOnly:['wcag2a','wcag2aa','wcag21aa']}));expect(accessibility.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)}))).toEqual([]);
+ await page.screenshot({path:testInfo.outputPath('invoice-settings.png'),fullPage:true});
+ await dashboard.getByRole('button',{name:'Fakturering',exact:true}).click();
+ await expect(dashboard.getByText('Bankkonto: 86011117947',{exact:false})).toBeVisible();
+ const start=dashboard.getByRole('button',{name:'Start kampanjen',exact:true});
+ await dashboard.getByLabel('Avsender, bankkonto, tidligere fakturering og ledig nummerserie er kontrollert').check();
+ await start.click();expect(writes.filter(i=>i.operation==='campaign')).toHaveLength(0);
+ await dashboard.getByLabel('Avgiftsunntak for kampanjen: Årskontingent er unntatt merverdiavgift').check();
+ await dashboard.getByLabel('Avsender, bankkonto, tidligere fakturering og ledig nummerserie er kontrollert').check();
+ await start.click();
+ await expect(dashboard.getByText('Avgiftsbehandling for kampanjen: Årskontingent unntatt merverdiavgift')).toBeVisible();
+ expect(writes.at(-1)).toMatchObject({operation:'campaign',vat_exempt:true,invoice_settings_version:2});
+ expect(writes.at(-1)).not.toHaveProperty('bank_account');expect(writes.at(-1)).not.toHaveProperty('sender_address');
+});
