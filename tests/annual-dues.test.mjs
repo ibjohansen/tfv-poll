@@ -88,6 +88,9 @@ test('primary email copies preserve the archived claim and pending attempts prev
  await sql`UPDATE members SET primary_contact_email='new@example.test' WHERE id=${member.id}::bigint`;
  await sql`SELECT annual_dues_queue(${uuid()},${invoice.id},'new@example.test','test',FALSE)`;
  const i=(await api.getFinanceOverview(2026)).invoices[0];assert.deepEqual(plain(i.deliveries.map(d=>d.recipient)),['member@example.test','new@example.test']);assert.equal(i.snapshot.source_email,'member@example.test');
+ assert.deepEqual(plain(i.current_other_emails),[]);
+ await sql`UPDATE members SET other_contact_emails=ARRAY['alternative1@example.test','alternative2@example.test'] WHERE id=${member.id}::bigint`;
+ const updated=(await api.getFinanceOverview(2026)).invoices[0];assert.deepEqual(plain(updated.current_other_emails),['alternative1@example.test','alternative2@example.test']);assert.deepEqual(plain(updated.snapshot),plain(i.snapshot));assert.deepEqual(plain(updated.deliveries),plain(i.deliveries));
 });
 test('mail is off by default; simulated worker sends archived PDF once and includes exact bylaws before greeting',async()=>{
  assert.deepEqual(plain(await worker.processAnnualDues({env:{}})),{disabled:true});

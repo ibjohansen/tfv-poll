@@ -8,7 +8,8 @@ ved siden av vellets ordinære regnskap. Kalenderåret er regnskapsperiode;
 
 Under **Økonomi → Fakturering → Utsendelsesfeil og sperrede mottakere** vises
 fakturaer med mislykket, sperret eller forsinket siste utsendelse. Her finner
-du mottakeradresse ved forsøket, nåværende hoved-e-post, tidspunkter, feilkoder
+du mottakeradresse ved forsøket, nåværende hoved-e-post, registrerte
+tilleggsmailadresser, tidspunkter, feilkoder
 med forklaring og alle lagrede leveringsdetaljer og hendelser.
 Årsaken vises direkte på kortet. **Vis alle feildetaljer** åpner hele rapporten.
 

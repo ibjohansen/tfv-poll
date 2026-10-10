@@ -293,7 +293,7 @@ test('invoice failure overview shows provider reasons, separates history and pre
   snapshot:{h_number:String(number),street_address:`Eksempelvegen ${number}`,recipient_name:`Test Eier ${number}`,invoice_address:`member${number}@example.test`,title_holder:`Test Eier ${number}`,registration_date:'2025-01-01'},
   current_email:`current${number}@example.test`,current_title_holder:`Test Eier ${number}`,current_registration_date:'2025-01-01',eligibility:'eligible',payments:[],deliveries,...extra});
  const delivery=(id,status,detail={})=>({id,status,attempt:1,recipient:`${id}@example.test`,subject:'Årskontingent 2026',queued_at:'2026-10-10T20:00:00Z',failed_at:'2026-10-10T20:01:00Z',failure_reason:status==='suppressed'?'RECIPIENT_SUPPRESSED':'activity.hard_bounced',detail,events:[]});
- const invoices=[invoice(1,[delivery('suppressed-1','suppressed')]),invoice(2,[delivery('bounce-2','bounced',{reason:'550 5.1.1 Not found',enhanced_code:'5.1.1',http_status:422,provider_code:'MS42215',validation_errors:[{field:'attachments.0.content',messages:['Invalid Base64']} ]})]),
+ const invoices=[invoice(1,[delivery('suppressed-1','suppressed')],{current_other_emails:['alternative1@example.test','alternative2@example.test']}),invoice(2,[delivery('bounce-2','bounced',{reason:'550 5.1.1 Not found',enhanced_code:'5.1.1',http_status:422,provider_code:'MS42215',validation_errors:[{field:'attachments.0.content',messages:['Invalid Base64']} ]})]),
   invoice(3,[delivery('old-3','failed'),{...delivery('new-3','sent'),attempt:2,failure_reason:null}]),invoice(4,[delivery('credited-4','suppressed')],{credit_number:'CR-2026-1'})];
  await page.route('**/api/admin/accounting/dues**',route=>{
   const request=route.request();requests.push({method:request.method(),url:request.url()});
@@ -306,11 +306,13 @@ test('invoice failure overview shows provider reasons, separates history and pre
  await page.goto('/admin/regnskap/browser-test');const dashboard=page.locator('.accounting-dashboard');await dashboard.getByRole('button',{name:'Fakturering',exact:true}).click();
  const errors=dashboard.locator('details.finance-section').filter({has:page.getByRole('heading',{name:'Utsendelsesfeil og sperrede mottakere (2)',exact:true})});
  await expect(errors.locator('.finance-failure-card')).toHaveCount(2);
+ await expect(errors.getByText('alternative1@example.test',{exact:true})).toBeVisible();await expect(errors.getByText('alternative2@example.test',{exact:true})).toBeVisible();
+ await expect(errors.getByText('Registrerte tilleggsmailadresser:',{exact:true})).toHaveCount(1);
  await expect(errors.getByText('MailerSend: Mailbox unavailable',{exact:true})).toBeVisible();await expect(errors.getByText('Mottakerens postkasse er utilgjengelig.',{exact:false}).first()).toBeVisible();
  await errors.getByText('Vis alle feildetaljer · AK-2026-1',{exact:true}).click();await errors.getByText('Vis alle feildetaljer · AK-2026-2',{exact:true}).click();
  await expect(errors.getByText('HTTP 403',{exact:false})).toBeVisible();await expect(errors.getByText('current1@example.test',{exact:false})).toBeVisible();await expect(errors.getByText('suppressed-1@example.test',{exact:true})).toBeVisible();
  await expect(errors.getByText('Invalid Base64',{exact:false})).toBeVisible();
- const search=errors.getByLabel('Søk i utsendelsesfeil');await search.fill('Mailbox unavailable');await expect(errors.locator('.finance-failure-card')).toHaveCount(1);await search.fill('');
+ const search=errors.getByLabel('Søk i utsendelsesfeil');await search.fill('alternative2@example.test');await expect(errors.locator('.finance-failure-card')).toHaveCount(1);await expect(errors.getByText('AK-2026-1 · Test Eier 1',{exact:true})).toBeVisible();await search.fill('Mailbox unavailable');await expect(errors.locator('.finance-failure-card')).toHaveCount(1);await search.fill('');
  await errors.getByLabel('Vis også tidligere feil og krediterte fakturaer').check();await expect(errors.locator('.finance-failure-card')).toHaveCount(4);
  await search.fill('AK-2026-3');await expect(errors.getByText('Historisk feil · siste forsøk: Godtatt av mailtjenesten')).toBeVisible();
  await search.fill('');await errors.getByLabel('Vis også tidligere feil og krediterte fakturaer').uncheck();

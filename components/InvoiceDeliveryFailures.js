@@ -68,7 +68,7 @@ export default function InvoiceDeliveryFailures({invoices,year,apiFetch}){
  }
  const current=diagnostics?.requestKey===requestKey?diagnostics:null;
  const pending=loading||Boolean(activeKey&&!current&&error?.requestKey!==requestKey);
- const issues=invoiceDeliveryIssues(invoices,{includeHistory}).filter(issue=>JSON.stringify([issue.invoice.snapshot,issue.invoice.number,issue.deliveries,issue.deliveries.map(d=>current?.deliveries?.[d.id])]).toLocaleLowerCase('nb-NO').includes(search.toLocaleLowerCase('nb-NO')));
+ const issues=invoiceDeliveryIssues(invoices,{includeHistory}).filter(issue=>JSON.stringify([issue.invoice.snapshot,issue.invoice.number,issue.invoice.current_email,issue.invoice.current_other_emails,issue.deliveries,issue.deliveries.map(d=>current?.deliveries?.[d.id])]).toLocaleLowerCase('nb-NO').includes(search.toLocaleLowerCase('nb-NO')));
  return <div className="finance-failures">
   <p>Mislykkede, sperrede og forsinkede utsendelser, samt utsendelser som venter på nytt forsøk. Oversikten gjelder siste forsøk på gjeldende fakturaer.</p>
   <div className="accounting-toolbar"><label>Søk i utsendelsesfeil<input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Tomt, adresse, mottaker eller feilkode"/></label>
@@ -86,6 +86,7 @@ export default function InvoiceDeliveryFailures({invoices,year,apiFetch}){
   {issues.map(({invoice,deliveries,resolved})=><article className="finance-failure-card" key={invoice.id}>
    <h4>{invoicePropertyReference(invoice.snapshot.h_number)} · {invoice.snapshot.street_address||'Adresse ikke registrert'}</h4>
    <p>{invoice.number} · {invoice.snapshot.recipient_name}</p><p>Nåværende hoved-e-post: {invoice.current_email||'Ikke registrert'}</p>
+   {invoice.current_other_emails?.length>0&&<div><p>Registrerte tilleggsmailadresser:</p><ul>{invoice.current_other_emails.map((email,index)=><li key={index}>{email}</li>)}</ul></div>}
    {resolved&&<p className="accounting-notice">Historisk feil · {invoice.credit_number?'fakturaen er kreditert':`siste forsøk: ${statuses[invoice.deliveries.at(-1)?.status]||'Ingen utsendelse'}`}</p>}
    {deliveries.map(d=>{
     const reasons=current?.deliveries?.[d.id]?.suppression_reasons?.length?current.deliveries[d.id].suppression_reasons:d.detail?.suppression_reasons;

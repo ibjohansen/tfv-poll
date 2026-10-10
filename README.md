@@ -2548,7 +2548,8 @@ API-feil og manglende historikktilgang vises sammen med tilgjengelige detaljer.
 Ingen utsendelse startes av dette oppslaget, og ingen sperring fjernes.
 Seksjonen «Utsendelsesfeil og sperrede mottakere» viser siste feil på gjeldende
 fakturaer, med valg for tidligere feil og krediterte fakturaer. Den viser
-tomt, faktura, mottakeradresse ved forsøket, nåværende hoved-e-post, tidspunkter,
+tomt, faktura, mottakeradresse ved forsøket, nåværende hoved-e-post, registrerte
+tilleggsmailadresser, tidspunkter,
 feilkoder med forklaring, SMTP-/HTTP-koder, opprinnelige meldinger, valideringsfeil,
 identifikatorer og lagrede hendelser. Årsaken vises direkte på hvert kort;
 «Vis alle feildetaljer» åpner det komplette sendeforsøket. Sperrelisten hentes automatisk og kan
