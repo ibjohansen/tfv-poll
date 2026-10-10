@@ -2462,3 +2462,95 @@ Conditional Access. Økter varer maksimalt åtte timer.
 ```bash
 npm run check
 ```
+
+### Årskontingent: fakturering og produksjonsutrulling
+
+Fakturering ligger i Økonomi under fanen «Fakturering». Det kan opprettes én
+kampanje per lagret regnskapsår. Satsen må samsvare med årsinnstillingene
+(2026: 250 kr). Før åpning må tidligere fakturering, ledig nummerserie,
+juridisk betaler, foreningens adresse og bankkonto kontrolleres.
+
+Utvalget krever aktivt ordinært medlemskap og registrert hjemmel senest
+1. februar i kontingentåret; selve 1. februar er inkludert. Hjemmel etter
+skjæringsdato, manglende/ugyldig dato og ulike datoer på hver side av grensen
+holdes utenfor. Sperren kontrolleres ved utstedelse, kølegging og før sending.
+Kampanjen kan være åpen etter nyttår frem til formell årsavslutning. Fakturadato
+og kreditnotadato kan da ligge i det nye året, mens kontingentperioden og
+hjemmelsgrensen fortsatt følger kampanjeåret. Datoer settes ikke i fremtiden.
+Datoene bygger på matrikkelregisterets `registration_date`; uavklarte eierskap
+må håndteres særskilt. Fakturering kan tidligst starte 1. februar.
+
+Faktura og kreditnota lagres uforanderlig som PDF i private databasetabeller,
+med felles kontrollert nummerserie og mottaker-/adresseøyeblikksbilde. En kopi
+bruker samme dokument og får eget sendeforsøk med eksakt e-postadresse og
+tidspunkter. En endret hjemmelshaver kan ikke overstyres med en bekreftelse.
+Juridisk mottaker og postadresse kontrolleres per tomt og kan klargjøres før
+samlet fakturering. Samlede handlinger kjøres i partier på opptil ti med
+individuelle resultater; gjentatt oppretting med samme partinøkkel er idempotent.
+
+Manuelle betalinger krever betalingsdato, eksakt beløp, unik bankreferanse og
+dokumentasjon. Delbetalinger og korreksjoner beholder historikk. Overbetaling
+sperres til separat avklaring. Kampanjeårets gamle betaltmarkering kan ikke
+brukes til å erstatte dokumenterte betalinger. Formell årsavslutning lagrer
+avslutningsmetadata og stenger kampanjen; ubetalte krav beholdes, og senere
+betaling registreres i et senere, åpent regnskapsår.
+
+**Balansen fra 2025 beholdes.** Denne funksjonen oppretter ingen hovedbok,
+åpningsbalanse, bankposteringer eller automatisk endring av manuelle
+inntektssummer. Bankavstemming og løpende balanse kommer senere. Private
+PNG-eksporter bruker eksisterende regnskap, neste års budsjett og historisk
+balanse fra `Protokoll-2026.pdf`. Manglende inntekter vises som «Ikke registrert».
+
+Nye private ruter er `/api/admin/accounting/dues`,
+`/api/admin/accounting/dues/[id]` og `/api/admin/accounting/reports`.
+Lesing krever `read`; skriving krever `members`, samsvarende `Origin` og JSON.
+E-postmeldingen bruker konsekvent Årskontingent og inkluderer den godkjente
+vedtektsteksten § 4 og § 5 rett før hilsenen. Den omtaler ikke inkasso.
+
+**Ingen ekte utsendelse er bestilt.** `INVOICE_EMAIL_ENABLED` er en ny,
+server-side miljøvariabel som skal være fraværende eller `false` frem til
+brukeren uttrykkelig bestiller sending. Den er ikke satt av implementeringen.
+Utsendelse krever i tillegg eksisterende MailerSend-oppsett, bulkaktivering,
+sterk `MAILERSEND_JOB_SECRET`, betrodd produksjonsorigin og bekreftet
+databasemiljø. Forhåndsvisning, utvikling og lokal Netlify-kjøring sender ikke.
+Aktivering av variabelen på produksjon, ekte sending og kontokonfigurasjon
+krever hver sin uttrykkelige bestilling; en bestilling på deploy er ikke
+samtykke til e-postsending.
+
+Den additive produksjonsmigreringen ble godkjent, utført og verifisert
+10. oktober 2026 etter schema-only-test og nytt snapshot. Alle 46 eksisterende
+tabeller beholdt innholdet uendret, og ingen reell kampanje, faktura, betaling
+eller utsendelse ble opprettet. Se
+[utrullingsrapporten](docs/database/database-release-annual-dues-2026-10-10.md).
+
+Ved senere endringer: test den avgrensede additive
+`database/annual-dues.sql` på isolert schema-only-gren, ta snapshot, verifiser
+skjemahash og bruk `DATABASE_URL_UNPOOLED` kun til den godkjente migreringen.
+Den er synkronisert med sluttblokken i `database/schema.sql`, men **hele
+skjemaet skal ikke kjøres som produksjonsmigrering**. Ingen eksisterende
+medlems-, budsjett-, bilags- eller balansetall importeres eller omskrives.
+Migreringen må være ferdig før kode med utvidede webhook-felt publiseres.
+
+Netlifys nye `annual-dues-background` funksjon bruker eksisterende jobbhemmelighet
+og varsles av den eksisterende watchdog hvert femte minutt, bare når
+`INVOICE_EMAIL_ENABLED=true`. Bakgrunnsjobben sender den allerede arkiverte PDF-en og trenger ikke PDF-generatoren.
+Next.js tracing inkluderer PDF-fontene og logoen i fakturaruten. Kontroller disse
+filene i den faktisk bygde pakken før en eventuell produksjonsutrulling.
+Kvotefeil med kjent HTTP 429 kan forsøkes igjen opptil fem ganger. Avbrudd eller
+ukjent API-aksept blir uavklart og krever manuell kontroll før ny utsendelse.
+Permanent bounce/sperre stopper automatisk sending. Visningsrapporten skiller
+API-aksept fra levering, beholder signerte hendelser og forklarer tilgjengelige
+HTTP-/SMTP-koder. Levering beviser ikke at meldingen er lest eller betalt.
+
+Ved utrulling kontrolleres:
+
+- `npm run check`, `npm audit`, `git diff --check` og ingen secrets/eksporter i staging.
+- Én kampanje per år, én aktiv faktura per tomt og felles nummerserie for kreditnota.
+- Inkludert hjemmel 1. februar, ekskludert 2. februar, manglende og blandede datoer.
+- Oppdatert kontaktadresse gir kopi; nytt eierskap sperrer gammel faktura.
+- Lagret PDF, vedtekter i e-post, eksakt utsendelsesadresse og historikk på tomten.
+- Betalt/delbetalt/ubetalt, duplikatreferanser, korreksjon og kreditering.
+- Ingen endring av balansen fra 2025 eller eksisterende manuelle inntektssummer.
+- PNG-rapporter, mobil/tastatur og tilgangssperrer for PDF, oversikt og mutasjoner.
+- Simulert bounce, tomme metadata, duplikate/tidlige/sene webhooks og avbrudd.
+- Fakturasending fortsatt deaktivert etter deploy; ingen ekte testmail uten bestilling.

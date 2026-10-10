@@ -1,4 +1,5 @@
 'use client';
+import FinanceWorkspace from '@/components/FinanceWorkspace';
 
 import { useApiClient } from '@/components/useApiClient';
 
@@ -124,6 +125,7 @@ export default function MapMemberDetails({ memberId, canMatrikkelSync = false, o
           : <p className="muted">{t('noEmailGroups')}</p>}</div>
       </section>
       <button className="primary-button" type="submit" disabled={saveState === 'saving'}>{saveState === 'saving' ? t('saving') : t('saveNow')}</button>
+      <FinanceWorkspace year={new Date().getFullYear()} memberId={memberId} />
     </form>}
   </aside>;
 }

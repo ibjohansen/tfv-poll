@@ -16,7 +16,7 @@ export function accountingStatements(schema) {
     || /ALTER TABLE accounting_(?:expenses ADD COLUMN IF NOT EXISTS claimant_name|attachments ADD COLUMN IF NOT EXISTS uploaded_by) TEXT/.test(statement)
     || /CREATE INDEX IF NOT EXISTS member_annual_fees_collection_candidates_idx\s/.test(statement)
     || /CREATE OR REPLACE FUNCTION record_audit_change\(\)/.test(statement)
-    || /(?:DROP TRIGGER IF EXISTS|CREATE TRIGGER) accounting_\w+\s/.test(statement));
+    || /(?:DROP TRIGGER IF EXISTS|CREATE TRIGGER) accounting_\w+_audit(?:_context)?_trigger\s/.test(statement));
   assert.equal(selected.length, 23, 'Review the accounting migration selection if the schema changes');
   return selected;
 }
@@ -52,7 +52,7 @@ export async function verifyAccountingSchema(db) {
   const found = (await db.query("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename = ANY($1::text[])", [tables])).rows;
   assert.equal(found.length, 3);
   const triggers = (await db.query(`SELECT count(*)::int AS n FROM pg_trigger
-    WHERE NOT tgisinternal AND tgrelid = ANY($1::regclass[]) AND tgenabled = 'O'`, [tables])).rows[0].n;
+    WHERE NOT tgisinternal AND tgname ~ '^accounting_.*_audit(_context)?_trigger$' AND tgrelid = ANY($1::regclass[]) AND tgenabled = 'O'`, [tables])).rows[0].n;
   assert.equal(triggers, 6);
   const indexes = (await db.query(`SELECT count(*)::int AS n FROM pg_indexes
     WHERE schemaname='public' AND indexname IN ('accounting_expenses_year_idx',

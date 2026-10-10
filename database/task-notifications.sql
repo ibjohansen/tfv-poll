@@ -8,7 +8,7 @@ ALTER TABLE email_deliveries DROP CONSTRAINT IF EXISTS email_deliveries_email_ty
 ALTER TABLE email_deliveries ADD CONSTRAINT email_deliveries_email_type_check
   CHECK (email_type IN (
     'survey_invitation', 'survey_test', 'newsletter', 'newsletter_test', 'member_access', 'membership_verification',
-    'member_email_change_old', 'member_email_change_new', 'member_email_change_notice', 'admin_task_notification'
+    'member_email_change_old', 'member_email_change_new', 'member_email_change_notice', 'admin_task_notification', 'annual_dues'
   ));
 CREATE INDEX IF NOT EXISTS email_deliveries_task_pending_idx
   ON email_deliveries (created_at, id)

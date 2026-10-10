@@ -1,5 +1,23 @@
 @import "tailwindcss";
 
+.finance-workspace { min-width: 0; display: grid; gap: 1rem; }
+.finance-table-wrap { max-width: 100%; overflow-x: auto; }
+.finance-table-wrap table { width: 100%; border-collapse: collapse; text-align: left; }
+.finance-table-wrap th, .finance-table-wrap td { padding: .75rem; vertical-align: top; border-bottom: 1px solid #d8d1c8; }
+.finance-table-wrap caption { text-align: left; font-weight: 600; padding: 1rem 0; }
+.finance-actions { display: grid; gap: .5rem; min-width: 10rem; }
+.finance-history { max-width: 32rem; font-weight: 400; margin-top: .5rem; }
+.finance-history summary { cursor: pointer; overflow-wrap: anywhere; }
+.finance-delivery, .finance-event { border: 1px solid #d8d1c8; border-radius: .5rem; padding: .75rem; margin-top: .5rem; }
+.finance-details { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: .5rem; overflow-wrap: anywhere; }
+.finance-details > div { display: contents; }
+.finance-details dd { margin: 0; }
+.finance-invoice-preview { background: #f6f4ee; border: 1px solid #d8d1c8; padding: 1rem; margin: 1rem 0; border-radius: .5rem; }
+@media (max-width: 700px) {
+  .finance-details { grid-template-columns: minmax(0, 1fr); }
+  .finance-table-wrap th, .finance-table-wrap td { min-width: 8rem; }
+}
+
 .member-comment-text {
   white-space: pre-wrap;
   overflow-wrap: anywhere;

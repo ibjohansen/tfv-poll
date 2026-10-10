@@ -7,6 +7,7 @@ import Link from 'next/link';
 import Select from '@/components/Select';
 import AccountingTable from '@/components/AccountingTable';
 import AccountingChart from '@/components/AccountingChart';
+import FinanceWorkspace from '@/components/FinanceWorkspace';
 import { useI18n } from '@/components/LocaleProvider';
 import { accountingCategories, accountingCurrencies, accountingReference2025 } from '@/data/accounting';
 import { accountingSummary, convertToOre, decimalString, decimalUnits } from '@/lib/accounting-validation';
@@ -224,14 +225,16 @@ export default function AdminAccounting({ initialData, canWrite, currentUserName
     {!canWrite && <p className="accounting-notice">{t('readOnly')}</p>}
     {!data.settings.version && <p className="accounting-notice">{t('noYear')}</p>}
     <div className="accounting-stats">{[['budgetIncome', summary.budgetIncome], ['budgetResult', summary.budgetIncome - summary.budgetExpenses], ['registeredCosts', summary.expenses], ['outstanding', summary.outstanding]].map(([label, value]) => <div className="accounting-stat" key={label}><span>{t(label)}</span><strong>{money(value)}</strong></div>)}</div>
-    <div className="accounting-toolbar"><nav aria-label={t('title')}>{['overview', 'budget', 'receipts', 'fees'].map((key) => <button className="admin-button" key={key} type="button" aria-pressed={tab === key} onClick={() => setTab(key)}>{t(key)}</button>)}</nav><Link className="admin-button" href={`/admin/regnskap/arsmote?year=${data.year + 1}`} target="_blank">{t('report')}</Link></div>
+    <div className="accounting-toolbar"><nav aria-label={t('title')}>{['overview', 'budget', 'receipts', 'fees', 'finance'].map((key) => <button className="admin-button" key={key} type="button" aria-pressed={tab === key} onClick={() => setTab(key)}>{key === 'finance' ? 'Fakturering' : t(key)}</button>)}</nav><Link className="admin-button" href={`/admin/regnskap/arsmote?year=${data.year + 1}`} target="_blank">{t('report')}</Link></div>
     <div role="status" aria-live="polite">{progress || notice}</div>
     {errors.length > 0 && <div className="form-error" role="alert">{errors.map((error, index) => <p key={index}>{error}</p>)}<button type="button" className="admin-button" disabled={busy} onClick={() => action(refresh)}>{t('refresh')}</button></div>}
 
     {tab === 'overview' && <>
       <section className="accounting-panel"><h2>{t('overview')}</h2><AccountingChart settings={data.settings} expenses={data.expenses} /><AccountingTable settings={data.settings} expenses={data.expenses} />{!summary.incomeComplete && <p className="accounting-notice">{t('incomplete')}</p>}<p>{t('supplementary')}</p></section>
-      <section className="accounting-panel"><h2>{t('balanceTitle')}</h2><AccountingBalance t={t} money={money} /><p>{t('balanceNote')}</p><p>{t('source')} {t('sourceNote')}</p></section>
+      <section className="accounting-panel"><h2>{t('balanceTitle')}</h2><AccountingBalance t={t} money={money} /><div className="accounting-toolbar">{[['result','Regnskap'],['balance','Historisk balanse 2025'],['budget',`Budsjett ${data.year + 1}`]].map(([kind,label]) => <a className="admin-button" key={kind} href={`/api/admin/accounting/reports?year=${data.year}&kind=${kind}`}>{label} som bilde</a>)}</div><p>{t('balanceNote')}</p><p>{t('source')} {t('sourceNote')}</p></section>
     </>}
+
+    {tab === 'finance' && <FinanceWorkspace year={data.year} canWrite={canWrite} onMutation={refresh} />}
 
     {tab === 'budget' && <form className="accounting-panel" onSubmit={(event) => { event.preventDefault(); action(async () => { await api({ operation: 'year', ...settings }); const current = await refresh(); setSettings(settingsForm(current.settings)); }); }}>
       <fieldset disabled={!canWrite || busy}><legend>{data.settings.version ? t('budget') : t('proposal')}</legend><p>{data.year === 2026 ? t('baseline') : t('rolledForward')}</p>

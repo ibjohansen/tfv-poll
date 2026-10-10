@@ -1,4 +1,5 @@
 'use client';
+import FinanceWorkspace from '@/components/FinanceWorkspace';
 
 import { useApiClient } from '@/components/useApiClient';
 
@@ -80,6 +81,8 @@ export default function AdminMemberDirectory({ data, search, sort, direction, in
   const [bulkGroupId, setBulkGroupId] = useState('');
   const [groupBusy, setGroupBusy] = useState('');
   const [groupMessage, setGroupMessage] = useState(null);
+  const [managedCampaigns, setManagedCampaigns] = useState({});
+  const onCampaignState = useCallback((id, year, managed) => setManagedCampaigns(current => current[`${id}:${year}`] === managed ? current : { ...current, [`${id}:${year}`]: managed }), []);
   const [annualFeeBusy, setAnnualFeeBusy] = useState(false);
   const [annualFeeMessage, setAnnualFeeMessage] = useState(null);
   const [saveState, setSaveState] = useState(initialSelected ? 'saved' : 'idle');
@@ -379,10 +382,11 @@ export default function AdminMemberDirectory({ data, search, sort, direction, in
           <div className="admin-section-header"><div><p className="eyebrow">{t('annualFeeEyebrow')}</p><h3 id="member-annual-fees-title">{t('annualFeeTitle')}</h3></div></div>
           <p className="admin-field-note">{t('annualFeeHelp')}</p>
           <table className="annual-fee-table"><caption className="visually-hidden">{t('annualFeeCaption')}</caption><thead><tr><th scope="col">{t('year')}</th><th scope="col">{t('annualFeeInvoiced')}</th><th scope="col">{t('annualFeePaid')}</th></tr></thead><tbody>
-            {annualFees.map((fee) => <tr key={fee.year}><th scope="row">{fee.year}</th><td>{fee.invoiced_on || t('no')}</td><td><label className="admin-checkbox"><input type="checkbox" checked={fee.paid} onChange={(event) => updateAnnualFee(fee.year, event.target.checked)} disabled={annualFeeBusy || data.mock} aria-label={t('annualFeeToggle', {year: fee.year})} /><span>{t(fee.paid ? 'yes' : 'no')}</span></label></td></tr>)}
+            {annualFees.map((fee) => <tr key={fee.year}><th scope="row">{fee.year}</th><td>{fee.invoiced_on || t('no')}</td><td><label className="admin-checkbox"><input type="checkbox" checked={fee.paid} onChange={(event) => updateAnnualFee(fee.year, event.target.checked)} disabled={annualFeeBusy || data.mock || managedCampaigns[`${selected.id}:${fee.year}`]} aria-label={t('annualFeeToggle', {year: fee.year})} /><span>{t(fee.paid ? 'yes' : 'no')}</span></label></td></tr>)}
           </tbody></table>
           {annualFeeMessage && <p className={annualFeeMessage.type === 'error' ? 'form-error' : 'admin-success'} role="status">{annualFeeMessage.text}</p>}
         </section>}
+        {!selected.isNew && <FinanceWorkspace key={selected.id} year={new Date().getFullYear()} memberId={selected.id} onCampaignState={onCampaignState} />}
         {newToken && <p className="admin-success">{t('memberId', {id: newToken})}</p>}{message && <p className={saveState === 'error' ? 'form-error' : 'admin-success'} role="status">{message}</p>}
         <button className="primary-button" type="submit" disabled={saving || data.mock}>{saving ? t('saving') : selected.isNew ? t('createMember') : t('saveNow')}</button>{!selected.isNew && <button className="admin-delete" type="button" onClick={() => setConfirmDelete(true)} disabled={data.mock}>{t('delete')}</button>}{data.mock && <p className="privacy-subnote">{t('mockReadonly')}</p>}
       </form>}

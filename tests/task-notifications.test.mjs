@@ -36,7 +36,7 @@ async function process(options = {}) {
 before(async () => {
   const schema = await readFile(new URL('../database/schema.sql', import.meta.url), 'utf8');
   const migration = await readFile(new URL('../database/task-notifications.sql', import.meta.url), 'utf8');
-  assert.equal(schema.slice(schema.indexOf('-- BEGIN: task-notifications')), migration);
+  assert.equal(schema.slice(schema.indexOf('-- BEGIN: task-notifications'), schema.indexOf('-- END: task-notifications') + '-- END: task-notifications'.length).trim(), migration.trim());
   await db.exec(schema.slice(0, schema.indexOf('-- BEGIN: task-notifications')));
   await request();
   await db.exec(migration);
@@ -194,6 +194,7 @@ test('production watchdog dispatches due tasks without interrupting other backgr
   const watchdog = await loadModule('netlify/functions/background-watchdog.mjs', {
     '../../lib/db.js': { getSql: () => sql },
     '../../lib/task-notifications-background.js': { dispatchTaskNotifications: async () => { dispatches++; } },
+    '../../lib/annual-dues-background.js': { dispatchAnnualDues: async () => assert.fail('invoice sending disabled') },
     '../../lib/survey-email-background.js': { dispatchSurveyReceipts: () => assert.fail('no receipts') },
     '../../lib/activity-map-import-background.js': { startDueMonthlyActivityImport: async () => ({ result: 'idle' }) },
     '../../lib/background-watchdog.js': { recoverDueSurveyEmailCampaigns: async () => ({ result: 'idle' }),

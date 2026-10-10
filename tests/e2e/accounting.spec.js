@@ -260,3 +260,28 @@ test('annual meeting report prints without navigation or clipped columns', async
   expect(layout.cellPadding).toBeLessThanOrEqual(8);
   await page.screenshot({ path: testInfo.outputPath('accounting-print.png'), fullPage: true });
 });
+
+test('annual dues shows ownership exclusions and delivery diagnostics without changing the historical balance', async ({ page, context }, testInfo) => {
+ await authenticate(context);
+ const invoice={id:'a'.repeat(32),member_id:'1',number:'AK-2026-1',issued_on:'2026-10-10',due_on:'2026-10-24',amount_ore:25000,paid_ore:10000,
+  snapshot:{h_number:'DEMO-101',street_address:'Eksempelvegen 1',recipient_name:'Test Eier',invoice_address:'Fakturavegen 1',title_holder:'Test Eier',registration_date:'2025-01-01'},
+  current_title_holder:'Test Eier',current_registration_date:'2025-01-01',eligibility:'eligible',current_email:'test@example.test',payments:[],deliveries:[{id:'d',attempt:1,recipient:'test@example.test',status:'bounced',queued_at:'2026-10-10T10:00:00Z',sent_at:'2026-10-10T10:01:00Z',failed_at:'2026-10-10T10:02:00Z',provider_message_id:'synthetic-provider-id',failure_reason:'activity.hard_bounced',detail:{enhanced_code:'5.1.1',reason:'Mailbox does not exist'},events:[]}]};
+ await page.route('**/api/admin/accounting/dues?*',route=>route.fulfill({json:{ok:true,data:{year:2026,installed:true,yearClosed:false,sendingEnabled:false,
+  campaign:{amount_ore:25000,number_prefix:'AK-2026-',next_number:2,sender:{bank_account:'synthetic'}},invoices:[invoice],candidates:[],
+  excluded:[{id:'2',h_number:'DEMO-102',street_address:'Ettervegen 2',registration_date:'2026-02-02',eligibility:'after_cutoff'},{id:'3',h_number:'DEMO-103',street_address:'Ukjentvegen 3',registration_date:null,eligibility:'review'}]}}}));
+ await page.goto('/admin/regnskap/browser-test');
+ const dashboard=page.locator('.accounting-dashboard');await dashboard.getByRole('button',{name:'Fakturering',exact:true}).click();
+ await expect(dashboard.getByRole('heading',{name:'Tomter holdt utenfor fakturering (2)'})).toBeVisible();
+ await expect(dashboard.getByText('Hjemmel etter 1. februar · først aktuelt 2027')).toBeVisible();await expect(dashboard.getByText('Må avklares før fakturering',{exact:true})).toBeVisible();
+ await expect(dashboard.getByText('E-postsending er avskrudd',{exact:false})).toBeVisible();
+ await dashboard.getByText('Utsendelser og betalinger · AK-2026-1',{exact:true}).click();
+ await expect(dashboard.getByText('Mottakerens postkasse finnes ikke.',{exact:false})).toBeVisible();await expect(dashboard.getByText('synthetic-provider-id')).toBeVisible();
+ await expect(dashboard.getByRole('button',{name:'Send kopi',exact:true})).toBeDisabled();
+ await dashboard.getByRole('combobox',{name:'Vis fakturaer',exact:true}).selectOption('paid');await expect(dashboard.getByText('DEMO-101 · AK-2026-1',{exact:false})).toHaveCount(0);
+ await dashboard.getByRole('combobox',{name:'Vis fakturaer',exact:true}).selectOption('unpaid');await expect(dashboard.getByText('DEMO-101 · AK-2026-1',{exact:false})).toBeVisible();
+ if(testInfo.project.name==='mobile')await page.setViewportSize({width:320,height:800});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ await page.addScriptTag({content:axe.source});const result=await page.evaluate(async()=>window.axe.run('.finance-workspace',{runOnly:['wcag2a','wcag2aa','wcag21aa']}));expect(result.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)}))).toEqual([]);
+ await page.screenshot({path:testInfo.outputPath('annual-dues.png'),fullPage:true});
+ await dashboard.getByRole('button',{name:'Oversikt',exact:true}).click();await expect(dashboard.getByText('Sum formue').locator('..')).toContainText(/49.636,85/);
+});

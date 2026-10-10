@@ -30,6 +30,7 @@ export async function PATCH(request, { params }) {
     const member = await updateAdminMember((await params).id, input);
     return NextResponse.json({ ok: true, member }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
+    if (error.code === 'P0001' && error.message === 'useDocumentedPayments') return NextResponse.json({ ok: false, message: 'Bruk dokumenterte betalinger under Økonomi → Fakturering for denne årskontingenten.' }, { status: 409, headers: { 'Cache-Control': 'no-store' } });
     const status = apiErrorStatus(error);
     console.error('Admin member update failed', { id: (await params).id, code: error.code || error.cause?.code, message: error.message });
     const message = status === 409 ? t('duplicate')
