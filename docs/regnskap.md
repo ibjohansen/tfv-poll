@@ -186,6 +186,11 @@ ved supplering av en pågående kampanje. Arkiverte fakturaer og utsendte kopier
 beholder de opprinnelige opplysningene. Hvis innstillingene endres underveis,
 må fakturagrunnlaget lastes inn og kontrolleres på nytt.
 
+Fakturering henter mottaker fra hjemmelshaver og bruker hoved-e-post som
+fakturaadresse. Det vaskede medlemsregisteret er grunnlaget for dette, så det
+finnes ingen manuell klargjøring eller per-tomt-bekreftelse av fakturaadresse.
+Tomter uten hoved-e-post kan ikke faktureres før adressen er registrert.
+
 Tilleggsmigreringen er `database/invoice-settings.sql`; følg README for
 schema-only-test, snapshot og verifikasjon før publisering. Den ble utført
 10. oktober 2026; se [migreringsrapporten](database/database-release-invoice-settings-2026-10-10.md).

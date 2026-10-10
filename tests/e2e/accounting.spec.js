@@ -286,6 +286,29 @@ test('annual dues shows ownership exclusions and delivery diagnostics without ch
  await dashboard.getByRole('button',{name:'Oversikt',exact:true}).click();await expect(dashboard.getByText('Sum formue').locator('..')).toContainText(/49.636,85/);
 });
 
+test('annual dues uses the member owner and primary email without address preparation', async ({ page, context }) => {
+ await authenticate(context);
+ const settings={version:2,name:'Eksempelvel',sender_address:'Eksempelvel',bank_account:'86011117947',organization_number:'123456785',phone:'123 45 678',reply_to:'post@example.test',website:'www.example.test'};
+ let invoices=[];const writes=[];
+ const candidate={id:'42',h_number:'DEMO-104',street_address:'Eksempelvegen 4',title_holder:'Test Eier',primary_contact_name:'Kontaktperson',primary_contact_email:'faktura@example.test',registration_date:'2025-01-01',eligibility:'eligible',has_active_invoice:false,replaces_id:null};
+ await page.route('**/api/admin/accounting/dues**',async route=>{
+  const request=route.request();
+  if(request.method()==='GET')return route.fulfill({json:{ok:true,data:{year:2026,installed:true,yearClosed:false,sendingEnabled:false,invoiceSettings:settings,campaign:{amount_ore:25000,number_prefix:'AK-2026-',next_number:1,tax_treatment:{text:'Årskontingent unntatt merverdiavgift'},sender:{vat:'Årskontingent unntatt merverdiavgift'}},invoices,candidates:[candidate],excluded:[]}}});
+  const input=request.postDataJSON();writes.push(input);
+  if(input.operation==='issue'){invoices=[{id:input.id,member_id:'42',number:'AK-2026-1',issued_on:input.date,due_on:'2026-10-24',amount_ore:25000,paid_ore:0,snapshot:{h_number:candidate.h_number,street_address:candidate.street_address,recipient_name:'Test Eier',invoice_address:'faktura@example.test',title_holder:'Test Eier',registration_date:'2025-01-01'},current_title_holder:'Test Eier',current_registration_date:'2025-01-01',eligibility:'eligible',current_email:'faktura@example.test',payments:[],deliveries:[]}];return route.fulfill({json:{ok:true,result:{id:input.id,number:'AK-2026-1'}}});}
+  throw new Error(`Unexpected mutation ${input.operation}`);
+ });
+ await page.goto('/admin/regnskap/browser-test');const dashboard=page.locator('.accounting-dashboard');
+ await dashboard.getByRole('button',{name:'Fakturering',exact:true}).click();
+ await expect(dashboard.getByText('Test Eier')).toBeVisible();await expect(dashboard.getByText('faktura@example.test')).toBeVisible();
+ await expect(dashboard.getByRole('button',{name:'Kontroller faktura'})).toHaveCount(0);
+ await expect(dashboard.getByRole('button',{name:'Utsted faktura'})).toBeVisible();
+ await dashboard.getByRole('button',{name:'Utsted faktura'}).click();
+ await expect(dashboard.getByText('Lagret.',{exact:true})).toBeVisible();
+ expect(writes).toHaveLength(1);expect(writes[0]).toMatchObject({operation:'issue',member_id:'42',invoice_settings_version:2});
+ expect(writes[0]).not.toHaveProperty('recipient_name');expect(writes[0]).not.toHaveProperty('invoice_address');expect(writes[0]).not.toHaveProperty('reviewed');
+});
+
 test('invoice settings feed the campaign and require explicit VAT exemption confirmation', async ({ page, context }, testInfo) => {
  await authenticate(context);
  let settings={version:1,name:'Eksempelvel',sender_address:'Eksempelvel\nEksempelvegen 1\n0000 Eksempel',bank_account:'',organization_number:'123456785',phone:'123 45 678',reply_to:'post@example.test',website:'www.example.test'};

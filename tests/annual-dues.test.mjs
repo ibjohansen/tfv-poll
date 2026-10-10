@@ -24,6 +24,7 @@ const payment=(i,values={})=>({id:uuid(),invoice_id:i.id,payment_year:2026,date:
 before(async()=>{
  await db.exec(await readFile(new URL('../database/schema.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../database/annual-dues.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../database/annual-dues-auto-recipients.sql',import.meta.url),'utf8'));
  const dependencies={'node:crypto':crypto,'./invoice-sender-defaults.js':senderDefaults,'./db.js':{getSql:()=>sql},'./admin-access.js':{requirePermission:async permission=>{if(denied&&permission!=='read')throw new Error('Forbidden');return {email:'accountant@example.test'};}},
   './mock-store.js':{isMockMode:()=>false},'./accounting-validation.js':accountingValidation,'./annual-dues-validation.js':validation,
   './annual-dues-documents.js':documents,'./survey-email-background.js':{getSurveyEmailBackgroundStatus:()=> 'ready'},
@@ -39,7 +40,7 @@ before(async()=>{
   VALUES('DEMO-101','Eksempelvegen 10','Eksempelmedlem','Eksempelmedlem','member@example.test','member','2025-10-10') RETURNING id::text,h_number`;
 });
 after(async()=>db.close());
-const issue=(id,extra={})=>({id:uuid(),year:2026,member_id:id,date:'2026-02-02',recipient_name:'Eksempelmedlem',invoice_address:'Eksempelgata 9, 0000 Eksempel',reviewed:true,invoice_settings_version:settingsVersion,...extra});
+const issue=(id,extra={})=>({id:uuid(),year:2026,member_id:id,date:'2026-02-02',invoice_settings_version:settingsVersion,...extra});
 test('campaign is unique and leaves manual accounts and historic balance untouched',async()=>{
  const before=plain(await sql`SELECT annual_fee_ore,budget,actual_income FROM accounting_years WHERE id=2026`);
  await api.openDuesCampaign(campaign(2026));await assert.rejects(api.openDuesCampaign(campaign(2026)),/campaignExists/);
@@ -58,12 +59,12 @@ test('February 1 is inclusive; later dates, unknown and conflicting dates are he
  for(const m of overview.excluded)await assert.rejects(api.issueDuesInvoice(issue(m.id)),/ownershipDateExcluded/);
  await assert.rejects(api.issueDuesInvoice(issue(overview.candidates[0].id,{date:'2026-01-31'})),/beforeCutoff/);
 });
-test('prepared batch issuance is idempotent and includes only eligible properties',async()=>{
+test('batch issuance uses the current owner and primary email without prepared addresses',async()=>{
  const overview=await api.getFinanceOverview(2026),m=overview.candidates[0];
- await api.prepareDuesRecipient({member_id:m.id,recipient_name:'Grunnbok Test',invoice_address:'Eksempelgata 10',title_holder:m.title_holder,reviewed:true});
- const input={batch_id:uuid(),year:2026,date:'2026-02-02',member_ids:[m.id,overview.excluded[0].id],reviewed:true,invoice_settings_version:settingsVersion};
+ const input={batch_id:uuid(),year:2026,date:'2026-02-02',member_ids:[m.id,overview.excluded[0].id],invoice_settings_version:settingsVersion};
  let result=await api.issueDuesBatch(input);assert.equal(result.results[0].ok,true);assert.equal(result.results[1].ok,false);
  result=await api.issueDuesBatch(input);assert.equal(result.results[0].ok,true);assert.equal((await api.getFinanceOverview(2026)).invoices.length,2);
+ const issued=(await api.getFinanceOverview(2026)).invoices.find(i=>i.member_id===m.id);assert.equal(issued.snapshot.recipient_name,'Test');assert.equal(issued.snapshot.invoice_address,'boundary@example.test');
 });
 test('partial payments, idempotency, overpayments and corrections retain evidence',async()=>{
  const first=payment(invoice);await api.recordDuesPayment(first);await api.recordDuesPayment(first);

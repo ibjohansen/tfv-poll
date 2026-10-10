@@ -2500,9 +2500,12 @@ Faktura og kreditnota lagres uforanderlig som PDF i private databasetabeller,
 med felles kontrollert nummerserie og mottaker-/adresseøyeblikksbilde. En kopi
 bruker samme dokument og får eget sendeforsøk med eksakt e-postadresse og
 tidspunkter. En endret hjemmelshaver kan ikke overstyres med en bekreftelse.
-Juridisk mottaker og postadresse kontrolleres per tomt og kan klargjøres før
-samlet fakturering. Samlede handlinger kjøres i partier på opptil ti med
-individuelle resultater; gjentatt oppretting med samme partinøkkel er idempotent.
+Fakturering bruker hjemmelshaver som mottaker og hoved-e-post som fakturaadresse
+fra det vaskede medlemsregisteret. Det finnes ingen manuell klargjøring eller
+per-tomt-bekreftelse av fakturaadresse. Tomter uten hoved-e-post kan ikke
+faktureres før adressen er registrert. Samlede handlinger kjøres i partier på
+opptil ti med individuelle resultater; gjentatt oppretting med samme
+partinøkkel er idempotent.
 
 Manuelle betalinger krever betalingsdato, eksakt beløp, unik bankreferanse og
 dokumentasjon. Delbetalinger og korreksjoner beholder historikk. Overbetaling
@@ -2561,6 +2564,8 @@ rute, Entra-rolle eller bakgrunnsfunksjon innføres.
 Tilleggsmigreringen ble utført og verifisert 10. oktober 2026; alle 52
 eksisterende tabeller beholdt innholdet. Se
 [migreringsrapporten](docs/database/database-release-invoice-settings-2026-10-10.md).
+Automatisk mottaker og fakturaadresse ble verifisert samme dag; se
+[migreringsrapporten](docs/database/database-release-annual-dues-auto-recipients-2026-10-10.md).
 
 Netlifys nye `annual-dues-background` funksjon bruker eksisterende jobbhemmelighet
 og varsles av den eksisterende watchdog hvert femte minutt, bare når
