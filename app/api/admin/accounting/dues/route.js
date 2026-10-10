@@ -3,12 +3,14 @@ import { closeFinanceYear, creditDuesInvoice, financeMutation, getFinanceOvervie
   issueDuesInvoice, openDuesCampaign, queueDuesInvoice, recordDuesPayment, issueDuesBatch, queueDuesBatch, getFinanceInvoiceSettings, saveFinanceInvoiceSettings } from '@/lib/annual-dues';
 import { AccountingError } from '@/lib/accounting-validation';
 import { dispatchAnnualDues } from '@/lib/annual-dues-background';
+import { getDuesDeliveryDiagnostics } from '@/lib/annual-dues-diagnostics';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 export async function GET(request){
   try{
     const params=new URL(request.url).searchParams,year=params.get('year'),memberId=params.get('member_id');
     if(memberId&&!/^\d{1,18}$/.test(memberId))throw new AccountingError('invalidInput');
+    if(params.get('diagnostics')==='delivery')return accountingResponse({ok:true,data:await getDuesDeliveryDiagnostics(year,{signal:request.signal})});
     const data=params.get('settings')==='invoice'?await getFinanceInvoiceSettings():await getFinanceOverview(year,{memberId});
     return accountingResponse({ok:true,data});
   }catch(error){return accountingFailure(error);}

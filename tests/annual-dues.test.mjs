@@ -252,3 +252,14 @@ test('issuing an invoice with a long owner name preserves the full name and stor
  assert.ok(documents.invoiceEmailContent({...issued,year:2023,due_on:'2026-02-16',amount_ore:25000,snapshot:saved.snapshot}).text.includes(`Fullstendig navn:\n${owner}`));
  assert.equal((await api.issueDuesInvoice(input)).id,issued.id);
 });
+
+test('suppressed invoice attempts archive the available provider reason without sending an email',async()=>{
+ const [m]=await sql`INSERT INTO members(h_number,title_holder,primary_contact_email,registration_date) VALUES('BLOCK-DETAIL','Test','blocked-detail@example.test','2022-01-01') RETURNING id::text`;
+ const i=await api.issueDuesInvoice(issue(m.id,{year:2023}));
+ await sql`SELECT annual_dues_queue(${uuid()},${i.id},'blocked-detail@example.test','test',FALSE)`;
+ const reason={type:'hard-bounces',reason:'Mailbox unavailable',created_at:'2026-09-18T16:36:57.000Z',provider_id:'synthetic-block'};
+ await worker.processAnnualDues({env,sql,delayMs:0,getSuppressions:async()=>({emails:new Set(['blocked-detail@example.test']),domains:new Set(),details:new Map([['blocked-detail@example.test',[reason]]])}),sendEmail:async()=>assert.fail('a blocked invoice must not be sent')});
+ const [saved]=await sql`SELECT status,delivery_detail FROM email_deliveries WHERE invoice_id=${i.id}`;
+ assert.equal(saved.status,'suppressed');assert.equal(saved.delivery_detail.suppression_source,'mailersend');
+ assert.deepEqual(plain(saved.delivery_detail.suppression_reasons),[reason]);
+});

@@ -19,8 +19,17 @@
 .finance-details { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: .5rem; overflow-wrap: anywhere; }
 .finance-details > div { display: contents; }
 .finance-details dd { margin: 0; }
+.finance-failures { min-width: 0; }
+.finance-failure-card { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 1rem; margin-top: 1rem; min-width: 0; overflow-wrap: anywhere; }
+.finance-failure-card h4 { margin-top: 0; }
+.finance-failure-details > summary { cursor: pointer; padding: .75rem 0; }
+.finance-diagnostic-json { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .85rem; margin: 0; }
 .finance-invoice-preview { background: #f6f4ee; border: 1px solid #d8d1c8; padding: 1rem; margin: 1rem 0; border-radius: .5rem; }
 @media (max-width: 700px) {
+  .finance-workspace .finance-section > summary { padding: 16px; }
+  .finance-section-content { padding: 12px 16px 16px; }
+  .finance-failure-card { padding: .75rem; }
+  .finance-failure-card .finance-delivery, .finance-failure-card .finance-event { padding: .5rem; }
   .finance-details { grid-template-columns: minmax(0, 1fr); }
   .finance-table-wrap th, .finance-table-wrap td { min-width: 8rem; }
 }

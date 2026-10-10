@@ -275,7 +275,8 @@ test('annual dues shows ownership exclusions and delivery diagnostics without ch
  await expect(dashboard.getByText('Hjemmel etter 1. februar · først aktuelt 2027')).toBeVisible();await expect(dashboard.getByText('Må avklares før fakturering',{exact:true})).toBeVisible();
  await expect(dashboard.getByText('E-postsending er avskrudd',{exact:false})).toBeVisible();
  await dashboard.getByText('Utsendelser og betalinger · AK-2026-1',{exact:true}).click();
- await expect(dashboard.getByText('Mottakerens postkasse finnes ikke.',{exact:false})).toBeVisible();await expect(dashboard.getByText('synthetic-provider-id')).toBeVisible();
+ const history=dashboard.locator('.finance-history');
+ await expect(history.getByText('Mottakerens postkasse finnes ikke.',{exact:false})).toBeVisible();await expect(history.getByText('synthetic-provider-id')).toBeVisible();
  await expect(dashboard.getByRole('button',{name:'Send kopi',exact:true})).toBeDisabled();
  await dashboard.getByRole('combobox',{name:'Vis fakturaer',exact:true}).selectOption('paid');await expect(dashboard.getByText('DEMO-101 · AK-2026-1',{exact:false})).toHaveCount(0);
  await dashboard.getByRole('combobox',{name:'Vis fakturaer',exact:true}).selectOption('unpaid');await expect(dashboard.getByText('DEMO-101 · AK-2026-1',{exact:false})).toBeVisible();
@@ -284,6 +285,44 @@ test('annual dues shows ownership exclusions and delivery diagnostics without ch
  await page.addScriptTag({content:axe.source});const result=await page.evaluate(async()=>window.axe.run('.finance-workspace',{runOnly:['wcag2a','wcag2aa','wcag21aa']}));expect(result.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)}))).toEqual([]);
  await page.screenshot({path:testInfo.outputPath('annual-dues.png'),fullPage:true});
  await dashboard.getByRole('button',{name:'Oversikt',exact:true}).click();await expect(dashboard.getByText('Sum formue').locator('..')).toContainText(/49.636,85/);
+});
+
+test('invoice failure overview shows provider reasons, separates history and preserves details on lookup failure without sending',async({page,context},testInfo)=>{
+ await authenticate(context);const requests=[];let lookupFails=false;
+ const invoice=(number,deliveries,extra={})=>({id:String(number).repeat(32),member_id:String(number),number:`AK-2026-${number}`,issued_on:'2026-10-10',due_on:'2026-10-24',amount_ore:25000,paid_ore:0,
+  snapshot:{h_number:String(number),street_address:`Eksempelvegen ${number}`,recipient_name:`Test Eier ${number}`,invoice_address:`member${number}@example.test`,title_holder:`Test Eier ${number}`,registration_date:'2025-01-01'},
+  current_email:`current${number}@example.test`,current_title_holder:`Test Eier ${number}`,current_registration_date:'2025-01-01',eligibility:'eligible',payments:[],deliveries,...extra});
+ const delivery=(id,status,detail={})=>({id,status,attempt:1,recipient:`${id}@example.test`,subject:'Årskontingent 2026',queued_at:'2026-10-10T20:00:00Z',failed_at:'2026-10-10T20:01:00Z',failure_reason:status==='suppressed'?'RECIPIENT_SUPPRESSED':'activity.hard_bounced',detail,events:[]});
+ const invoices=[invoice(1,[delivery('suppressed-1','suppressed')]),invoice(2,[delivery('bounce-2','bounced',{reason:'550 5.1.1 Not found',enhanced_code:'5.1.1',http_status:422,provider_code:'MS42215',validation_errors:[{field:'attachments.0.content',messages:['Invalid Base64']} ]})]),
+  invoice(3,[delivery('old-3','failed'),{...delivery('new-3','sent'),attempt:2,failure_reason:null}]),invoice(4,[delivery('credited-4','suppressed')],{credit_number:'CR-2026-1'})];
+ await page.route('**/api/admin/accounting/dues**',route=>{
+  const request=route.request();requests.push({method:request.method(),url:request.url()});
+  if(request.url().includes('diagnostics=delivery')){
+   if(lookupFails)return route.fulfill({status:503,json:{ok:false,code:'unavailable'}});
+   return route.fulfill({json:{ok:true,data:{checked_at:'2026-10-10T20:30:00Z',deliveries:{'suppressed-1':{lookup_complete:true,suppression_reasons:[{type:'hard-bounces',reason:'Mailbox unavailable',created_at:'2026-09-18T16:36:57.000Z',provider_id:'synthetic-suppression',recipient_id:'synthetic-recipient'}]}},limitations:[{operation:'recipient_history',http_status:403,code:'UPSTREAM'}]}}});
+  }
+  return route.fulfill({json:{ok:true,data:{year:2026,installed:true,yearClosed:false,sendingEnabled:false,campaign:{amount_ore:25000,number_prefix:'AK-2026-',next_number:5,sender:{bank_account:'synthetic'}},invoices,candidates:[],excluded:[]}}});
+ });
+ await page.goto('/admin/regnskap/browser-test');const dashboard=page.locator('.accounting-dashboard');await dashboard.getByRole('button',{name:'Fakturering',exact:true}).click();
+ const errors=dashboard.locator('details.finance-section').filter({has:page.getByRole('heading',{name:'Utsendelsesfeil og sperrede mottakere (2)',exact:true})});
+ await expect(errors.locator('.finance-failure-card')).toHaveCount(2);
+ await expect(errors.getByText('MailerSend: Mailbox unavailable',{exact:true})).toBeVisible();await expect(errors.getByText('Mottakerens postkasse er utilgjengelig.',{exact:false}).first()).toBeVisible();
+ await errors.getByText('Vis alle feildetaljer · AK-2026-1',{exact:true}).click();await errors.getByText('Vis alle feildetaljer · AK-2026-2',{exact:true}).click();
+ await expect(errors.getByText('HTTP 403',{exact:false})).toBeVisible();await expect(errors.getByText('current1@example.test',{exact:false})).toBeVisible();await expect(errors.getByText('suppressed-1@example.test',{exact:true})).toBeVisible();
+ await expect(errors.getByText('Invalid Base64',{exact:false})).toBeVisible();
+ const search=errors.getByLabel('Søk i utsendelsesfeil');await search.fill('Mailbox unavailable');await expect(errors.locator('.finance-failure-card')).toHaveCount(1);await search.fill('');
+ await errors.getByLabel('Vis også tidligere feil og krediterte fakturaer').check();await expect(errors.locator('.finance-failure-card')).toHaveCount(4);
+ await search.fill('AK-2026-3');await expect(errors.getByText('Historisk feil · siste forsøk: Godtatt av mailtjenesten')).toBeVisible();
+ await search.fill('');await errors.getByLabel('Vis også tidligere feil og krediterte fakturaer').uncheck();
+ lookupFails=true;await errors.getByRole('button',{name:'Oppdater feilinformasjon fra MailerSend'}).click();
+ await expect(errors.getByRole('alert')).toContainText('Registrerte feil vises fortsatt');await expect(errors.getByText('MailerSend: Mailbox unavailable',{exact:true})).toBeVisible();
+ expect(requests.every(r=>r.method==='GET')).toBe(true);expect(requests.filter(r=>r.url.includes('diagnostics=delivery')).length).toBeGreaterThanOrEqual(2);
+ if(testInfo.project.name==='mobile')await page.setViewportSize({width:320,height:800});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ await page.addScriptTag({content:axe.source});const result=await page.evaluate(async()=>window.axe.run('.finance-failures',{runOnly:['wcag2a','wcag2aa','wcag21aa']}));expect(result.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)}))).toEqual([]);
+ const summary=errors.getByText('Vis alle feildetaljer · AK-2026-1',{exact:true});await summary.focus();await summary.press('Enter');
+ await expect(errors.locator('details.finance-failure-details[open]')).toHaveCount(1);await summary.press('Space');await expect(errors.locator('details.finance-failure-details[open]')).toHaveCount(0);
+ await errors.screenshot({path:testInfo.outputPath('invoice-delivery-failures.png')});
 });
 
 test('annual dues uses the member owner and primary email without address preparation', async ({ page, context }) => {

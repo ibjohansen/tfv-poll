@@ -2541,6 +2541,22 @@ Nye private ruter er `/api/admin/accounting/dues`,
 Lesing krever `read`; skriving krever `members`, samsvarende `Origin` og JSON.
 `GET /api/admin/accounting/dues?settings=invoice` henter bare avsenderinnstillingene;
 `POST` på samme rute med `operation=invoice_settings` lagrer dem.
+`GET /api/admin/accounting/dues?year=2026&diagnostics=delivery` krever `read`
+og henter tilgjengelige sperregrunner og begrenset mottakerhistorikk fra
+MailerSend for årets feilede utsendelser. Svaret er privat og uten cache;
+API-feil og manglende historikktilgang vises sammen med tilgjengelige detaljer.
+Ingen utsendelse startes av dette oppslaget, og ingen sperring fjernes.
+Seksjonen «Utsendelsesfeil og sperrede mottakere» viser siste feil på gjeldende
+fakturaer, med valg for tidligere feil og krediterte fakturaer. Den viser
+tomt, faktura, mottakeradresse ved forsøket, nåværende hoved-e-post, tidspunkter,
+feilkoder med forklaring, SMTP-/HTTP-koder, opprinnelige meldinger, valideringsfeil,
+identifikatorer og lagrede hendelser. Årsaken vises direkte på hvert kort;
+«Vis alle feildetaljer» åpner det komplette sendeforsøket. Sperrelisten hentes automatisk og kan
+oppdateres manuelt. Nye sperrede sendeforsøk lagrer også sperregrunn og dato
+fra MailerSend i leveringsdetaljene. Kontoens API-tilgang avgjør hvor mye
+mottakerhistorikk som kan hentes; HTTP 403 fjerner ikke tilgjengelige sperregrunner.
+Kontroller at seksjonen viser aktuelle feil, at historiske løste feil bare
+vises når de velges, og at oppdatering av feilinformasjon bare gjør GET-oppslag.
 E-postmeldingen bruker konsekvent Årskontingent og inkluderer den godkjente
 vedtektsteksten § 4 og § 5 rett før hilsenen. Den omtaler ikke inkasso.
 Seksjonene i Fakturering kan åpnes og lukkes via overskriftene, også med tastatur.

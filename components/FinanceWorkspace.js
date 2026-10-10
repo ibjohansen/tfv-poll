@@ -3,12 +3,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useApiClient } from '@/components/useApiClient';
 import { financeMessages } from '@/lib/annual-dues-validation';
-import { deliveryExplanation } from '@/lib/annual-dues-delivery';
+import { invoiceDeliveryIssues } from '@/lib/annual-dues-delivery';
+import InvoiceDeliveryFailures, { DeliveryDiagnostic } from '@/components/InvoiceDeliveryFailures';
 
 const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Oslo'}).format(new Date());
 const uuid=()=>crypto.randomUUID().replaceAll('-','');
 const money=n=>new Intl.NumberFormat('nb-NO',{style:'currency',currency:'NOK'}).format(n/100);
-const time=value=>value?new Intl.DateTimeFormat('nb-NO',{dateStyle:'short',timeStyle:'short',timeZone:'Europe/Oslo'}).format(new Date(value)):'Ikke registrert';
 const statuses={pending:'I kø',processing:'Under behandling',sent:'Godtatt av mailtjenesten',delivered:'Levert til mottakerens server',failed:'Feil eller uavklart',bounced:'Permanent leveringsfeil',suppressed:'Sperret mottaker'};
 
 function FinanceSection({title,level=3,children}){
@@ -23,12 +23,7 @@ export function InvoiceHistory({invoice}){
  return <details className="finance-history"><summary>Utsendelser og betalinger · {invoice.number}</summary>
   <p><a href={`/api/admin/accounting/dues/${invoice.id}`} target="_blank" rel="noopener">Åpne lagret faktura PDF</a>{invoice.credit_number&&<> · <a href={`/api/admin/accounting/dues/${invoice.id}?credit=true`} target="_blank" rel="noopener">Kreditnota {invoice.credit_number}</a></>}</p>
   <p>Fakturert {invoice.issued_on} · Forfall {invoice.due_on} · {money(invoice.amount_ore)} · {invoice.snapshot.recipient_name} · {invoice.snapshot.invoice_address}</p>
-  {invoice.deliveries.length===0?<p>Ingen utsendelse er registrert.</p>:invoice.deliveries.map(d=><section key={d.id} className="finance-delivery">
-   <h4>Forsøk {d.attempt} · {d.detail?.delayed?'Forsinket levering':statuses[d.status]||d.status}</h4>
-   <dl className="finance-details"><dt>Emne</dt><dd>{d.subject}</dd><dt>Mottakeradresse</dt><dd>{d.recipient}</dd><dt>Lagt i kø</dt><dd>{time(d.queued_at)}</dd><dt>Sendt</dt><dd>{time(d.sent_at)}</dd><dt>Levert</dt><dd>{time(d.delivered_at)}</dd><dt>Feil registrert</dt><dd>{time(d.failed_at)}</dd><dt>Mailtjenestens meldings-ID</dt><dd>{d.provider_message_id||'Ikke oppgitt'}</dd></dl>
-   {(d.failure_reason||d.detail)&&<><p>{deliveryExplanation(d.detail||{},d.failure_reason)}</p><dl className="finance-details">{Object.entries(d.detail||{}).filter(([,v])=>v!==null&&v!==false).map(([k,v])=><div key={k}><dt>{({http_status:'HTTP-status',provider_code:'Tilbyders kode',provider_message:'Tilbyders melding',request_id:'Forespørsels-ID',network_code:'Nettverkskode',retry_at:'Neste forsøk',reason:'Oppgitt årsak',enhanced_code:'SMTP-underkode',bounce_code:'Tilbyders feilkode'})[k]||k}</dt><dd>{typeof v==='object'?JSON.stringify(v):String(v)}</dd></div>)}</dl></>}
-   {d.events.map((e,index)=><div key={index} className="finance-event"><p><strong>{e.type}</strong> · {time(e.occurred_at||e.received_at)}</p>{e.detail?.reason&&<p>{e.detail.reason}</p>}{(e.detail?.enhanced_code||e.detail?.bounce_code)&&<p>{e.detail.enhanced_code||e.detail.bounce_code}: {deliveryExplanation(e.detail)}</p>}</div>)}
-  </section>)}
+  {invoice.deliveries.length===0?<p>Ingen utsendelse er registrert.</p>:invoice.deliveries.map(d=><DeliveryDiagnostic key={d.id} delivery={d}/>)}
   <p>Levert betyr at mottakerens server har tatt imot meldingen. Det dokumenterer ikke at fakturaen er lest eller betalt.</p>
   {invoice.payments.length>0&&<><h4>Dokumenterte betalinger og korreksjoner</h4><ul>{invoice.payments.map(p=><li key={p.id}>{p.date} · {p.reverses_id?'Korreksjon −':''}{money(p.amount_ore)} · {p.reference} · {p.evidence}</li>)}</ul></>}
  </details>;
@@ -100,6 +95,7 @@ export default function FinanceWorkspace({year,canWrite=false,memberId=null,onMu
     {data.sendingMode==='test'&&<p className="accounting-notice">Testmodus er aktiv. Bare de to avtalte testtomtene kan legges i sendekø, og e-postemnet starter med TEST. Send til alle er sperret.</p>}
     {data.sendingMode==='live'&&<p className="accounting-notice">Ordinær utsendelse er aktiv. Utsendelser går via køen én om gangen.</p>}
    </FinanceSection>
+   <FinanceSection title={<>Utsendelsesfeil og sperrede mottakere ({invoiceDeliveryIssues(data.invoices).length})</>}><InvoiceDeliveryFailures invoices={data.invoices} year={year} apiFetch={apiFetch}/></FinanceSection>
    <FinanceSection title={<>Fakturaavsender fra Innstillinger</>} level={3}><p>{invoiceSettings.name||'Turufjell Vel'}</p><p style={{whiteSpace:'pre-line'}}>{invoiceSettings.sender_address}</p>{settingsReady?<p>Bankkonto: {invoiceSettings.bank_account} · {invoiceSettings.reply_to}</p>:<p className="accounting-notice">Lagre foreningens bankkonto under Innstillinger før fakturering.</p>}{onOpenSettings&&<button className="admin-button" type="button" onClick={onOpenSettings}>Åpne fakturainnstillinger</button>}</FinanceSection>
    {data.campaign&&<p className="accounting-notice">Avgiftsbehandling for kampanjen: {data.campaign.tax_treatment?.text||data.campaign.sender.vat}</p>}
    {!data.campaign&&open&&<FinanceSection title={<>Start årets kampanje</>}><form onSubmit={e=>{e.preventDefault();save('campaign',{...campaign,first_number:Number(campaign.first_number)});}}><fieldset disabled={busy||!settingsReady}><legend className="sr-only">Start årets kampanje</legend><p>Det kan åpnes én kampanje per år. Beløp, avgiftsbehandling og nummerserie lagres på kampanjen. Avsender hentes fra Innstillinger.</p>

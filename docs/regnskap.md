@@ -4,6 +4,24 @@ Modulen ligger under **Økonomi** i administrasjonen. Den gir en løpende oversi
 ved siden av vellets ordinære regnskap. Kalenderåret er regnskapsperiode;
 årsmøtet i april får forrige års regnskap og inneværende års budsjett.
 
+## Oppfølging av fakturautsendelser
+
+Under **Økonomi → Fakturering → Utsendelsesfeil og sperrede mottakere** vises
+fakturaer med mislykket, sperret eller forsinket siste utsendelse. Her finner
+du mottakeradresse ved forsøket, nåværende hoved-e-post, tidspunkter, feilkoder
+med forklaring og alle lagrede leveringsdetaljer og hendelser.
+Årsaken vises direkte på kortet. **Vis alle feildetaljer** åpner hele rapporten.
+
+MailerSends nåværende sperregrunner hentes automatisk. **Oppdater feilinformasjon
+fra MailerSend** henter dem på nytt; det sender ingen e-post. Oversikten viser
+også sperringens opprinnelige dato og melding. «Ukjent årsak» betyr at tjenesten
+ikke har gitt en mer konkret årsak. Dersom mottakerhistorikken krever mer
+API-tilgang, vises dette sammen med opplysningene som faktisk kunne hentes.
+
+Bruk søk for å finne tomt, mottaker eller feilkode. Velg **Vis også tidligere
+feil og krediterte fakturaer** for historikken. Gamle feil på krediterte fakturaer
+eller før en vellykket ny utsendelse er merket som historiske.
+
 ## Grunnlag fra protokollen
 
 `data/accounting.js` inneholder manuelt kontrollerte tall fra

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getMailerSendConfig, getMailerSendSuppressions, isMailerSendBulkEnabled, isSuppressedRecipient, MailerServiceError, requireMailerSendBulkEnabled, sendEmail } from '../lib/mailer-service.js';
+import { getMailerSendConfig, getMailerSendSuppressions, getMailerSendSuppressionDetails, getMailerSendRecipientDiagnostics, isMailerSendBulkEnabled, isSuppressedRecipient, MailerServiceError, requireMailerSendBulkEnabled, sendEmail } from '../lib/mailer-service.js';
 
 const env = {
   MAILERSEND_ENABLED: 'true',
@@ -113,6 +113,31 @@ test('suppression permission failure is reported distinctly', async () => {
     getMailerSendSuppressions({ env, fetchImpl: async () => new Response(null, { status: 403 }) }),
     (error) => error instanceof MailerServiceError && error.code === 'SUPPRESSION_PERMISSION' && error.status === 503,
   );
+});
+
+test('suppression diagnostics retain category, date, IDs and sanitized reasons across pages and domain matches',async()=>{
+ const calls=[];
+ const suppressions=await getMailerSendSuppressions({env,fetchImpl:async url=>{
+  calls.push(url);const query=new URL(url);
+  if(query.pathname.endsWith('/hard-bounces'))return Response.json({data:query.searchParams.get('page')==='1'
+   ?Array.from({length:100},(_,i)=>({id:`suppression-${i}`,recipient:{id:`recipient-${i}`,email:i===0?'member@example.com':`other${i}@example.com`},created_at:'2026-09-18 16:36:57',reason:`550 5.1.1 <b>Unknown</b> member@example.com Bearer ${env.MAILERSEND_API_TOKEN}`}))
+   :[{id:'second-page',recipient:{email:'later@example.com'},reason:'Mailbox unavailable'}]});
+  if(query.pathname.endsWith('/blocklist'))return Response.json({data:[{id:'domain-rule',pattern:'.*@blocked.example',created_at:'2026-09-18T16:36:57Z'}]});
+  return Response.json({data:[]});
+ }});
+ const [detail]=getMailerSendSuppressionDetails('MEMBER@example.com',suppressions);
+ assert.equal(detail.type,'hard-bounces');assert.equal(detail.created_at,'2026-09-18T16:36:57.000Z');assert.equal(detail.recipient_id,'recipient-0');assert.equal(detail.enhanced_code,'5.1.1');
+ assert.doesNotMatch(detail.reason,/<b>|member@example.com|synthetic-token/);assert.equal(getMailerSendSuppressionDetails('later@example.com',suppressions)[0].reason,'Mailbox unavailable');
+ assert.equal(getMailerSendSuppressionDetails('any@blocked.example',suppressions)[0].matched_domain,'blocked.example');
+ assert.ok(calls.some(url=>url.includes('page=2')));assert.deepEqual(getMailerSendSuppressionDetails('ok@example.com',suppressions),[]);
+});
+
+test('recipient diagnostics use only GET and omit message content, subject and unrelated metadata',async()=>{
+ const result=await getMailerSendRecipientDiagnostics('recipient-1',{env,fetchImpl:async(url,options)=>{
+  assert.equal(url,'https://api.mailersend.com/v1/recipients/recipient-1');assert.equal(options.method,'GET');
+  return Response.json({data:{email:'member@example.com',domain:{secret:'private'},emails:[{id:'email-1',status:'hard_bounced',html:'PRIVATE CONTENT',subject:'PRIVATE SUBJECT',reason:'550 5.1.1 Not found',created_at:'2026-09-18 16:36:57'}]}});
+ }});
+ assert.equal(result.emails[0].reason,'550 5.1.1 Not found');assert.doesNotMatch(JSON.stringify(result),/PRIVATE|member@example.com|secret/);
 });
 
 test('suppression lookup propagates the request deadline', async () => {
