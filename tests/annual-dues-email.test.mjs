@@ -57,3 +57,14 @@ test('email uses the invoice values and preserves formatted property numbers and
   assert.match(text,/"AK-2027-12 og SPG H 1"/);
   assert.doesNotMatch(text,/H-SPG|250,-|AK-2026|TEST/);
 });
+
+test('the truncation explanation follows the archived PDF flag and includes the full name on copies',()=>{
+  const invoice=sample();invoice.snapshot.recipient_name='ALEXANDER EKSEMPELSEN / '.repeat(6).slice(0,-3);
+  assert.doesNotMatch(invoiceEmailContent(invoice).text,/Hjemmelshavernavn på fakturaen/);
+  invoice.snapshot.recipient_name_truncated=true;
+  const {text}=invoiceEmailContent(invoice);
+  assert.ok(text.includes(`Fullstendig navn:\n${invoice.snapshot.recipient_name}`));
+  assert.match(text,/forkortet med «…» på den vedlagte fakturaen fordi hele navnet ikke får plass/);
+  assert.ok(text.indexOf('Hjemmelshavernavn på fakturaen')>text.indexOf('Årskontingenten er'));
+  assert.ok(text.indexOf('Hjemmelshavernavn på fakturaen')<text.indexOf('Bruk skjema'));
+});

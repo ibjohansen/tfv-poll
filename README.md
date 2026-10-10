@@ -2513,7 +2513,10 @@ partinøkkel er idempotent.
 
 Nye fakturaer viser hjemmelshaver, tomtens gateadresse, gårds- og bruksnummer
 og hoved-e-post i mottakerblokken. Eiendomsopplysningene lagres i fakturaens
-øyeblikksbilde. Perioden vises med begge årstall, for eksempel
+øyeblikksbilde. Lange hjemmelshavernavn forkortes med «…» til maksimalt tre
+linjer på PDF-en. Hele navnet beholdes i øyeblikksbildet og e-posten, som får
+en egen forklaring om forkortingen bare når den vedlagte fakturaen har dette.
+Perioden vises med begge årstall, for eksempel
 «01.01.2026 – 31.12.2026», og varelinjen heter «Årskontingent 2026».
 Betalingsreferansen bruker fakturanummer og `H-` foran rent numeriske
 tomtenumre, for eksempel «AK-2026-1 og H-25». Formaterte numre som

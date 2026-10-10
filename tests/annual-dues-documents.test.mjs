@@ -33,3 +33,28 @@ for(const [number,reference] of [['25','H-25'],['SPG H 1','SPG H 1'],['H-25','H-
     }finally{await task.destroy();}
   });
 }
+
+for(const recipient of ['ALEXANDER EKSEMPELSEN / '.repeat(6).slice(0,-3),'W'.repeat(150)]){
+  test(`long recipient names are visibly shortened without overlapping property details (${recipient.length} characters)`,async()=>{
+    const invoice=sample('209');invoice.snapshot.recipient_name=recipient;
+    const before=structuredClone(invoice),document=await invoicePdf(invoice);
+    assert.equal(document.recipientNameTruncated,true);assert.deepEqual(invoice,before);
+    const task=getDocument({data:new Uint8Array(document.bytes),isEvalSupported:false,useSystemFonts:false,verbosity:0});
+    try{
+      const pdf=await task.promise;assert.equal(pdf.numPages,1);
+      const {items}=await (await pdf.getPage(1)).getTextContent();
+      const names=items.filter(item=>item.str&&item.transform[0]===12&&item.transform[4]===52&&item.transform[5]>=639&&item.transform[5]<=675);
+      assert.ok(names.length<=3);assert.ok(names.at(-1).str.endsWith('…'));
+      const printed=names.map(item=>item.str).join(' ');
+      assert.ok(recipient.startsWith(printed.slice(0,-1)));assert.ok(printed.length<recipient.length);
+      for(const item of names)assert.ok(item.transform[4]+item.width<=302.01);
+      for(const line of ['Eksempelvegen 16','Gårds- og bruksnummer: 10/725','medlem@example.test']){
+        const item=items.find(item=>item.str===line);assert.ok(item);assert.ok(item.transform[5]<names.at(-1).transform[5]);assert.ok(item.transform[5]>560);
+      }
+    }finally{await task.destroy();}
+  });
+}
+
+test('ordinary recipient names do not need a truncation notice',async()=>{
+  assert.equal((await invoicePdf(sample('25'))).recipientNameTruncated,false);
+});

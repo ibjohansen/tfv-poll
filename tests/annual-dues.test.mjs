@@ -241,3 +241,14 @@ test('ongoing campaigns use current settings for new PDFs and preserve archived 
  assert.deepEqual(plain((await sql`SELECT snapshot,sha256,encode(pdf,'base64') AS pdf FROM annual_dues_invoices WHERE id=${first.id}`)[0]),plain(original));
  assert.equal((await api.getFinanceOverview(2023)).campaign.sender.bank_account,current.bank_account);
 });
+
+test('issuing an invoice with a long owner name preserves the full name and stores the PDF truncation flag',async()=>{
+ const owner='ALEXANDER EKSEMPELSEN / '.repeat(6).slice(0,-3);
+ const [m]=await sql`INSERT INTO members(h_number,street_address,cadastral_number,title_holder,primary_contact_email,registration_date) VALUES('LONG-OWNER','Eksempelvegen 16','10/725',${owner},'long-owner@example.test','2022-01-01') RETURNING id::text`;
+ const input=issue(m.id,{year:2023}),issued=await api.issueDuesInvoice(input);
+ const [saved]=await sql`SELECT snapshot FROM annual_dues_invoices WHERE id=${issued.id}`;
+ assert.equal(saved.snapshot.title_holder,owner);assert.equal(saved.snapshot.recipient_name,owner);
+ assert.equal(saved.snapshot.recipient_name_truncated,true);
+ assert.ok(documents.invoiceEmailContent({...issued,year:2023,due_on:'2026-02-16',amount_ore:25000,snapshot:saved.snapshot}).text.includes(`Fullstendig navn:\n${owner}`));
+ assert.equal((await api.issueDuesInvoice(input)).id,issued.id);
+});
